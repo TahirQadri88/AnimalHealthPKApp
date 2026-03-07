@@ -110,18 +110,14 @@
         };
 
         // --- LIVE FIREBASE SYNC HOOK ---
-        function useLiveCollection(collectionName, initialFallback = []) {
-          const [data, setData] = useState(initialFallback);
+        function useLiveCollection(collectionName) {
+          const [data, setData] = useState([]);
           
           useEffect(() => {
             const unsubscribe = onSnapshot(collection(db, collectionName), (snapshot) => {
-              if (snapshot.empty) {
-                setData(initialFallback);
-              } else {
-                const items = [];
-                snapshot.forEach((doc) => items.push(doc.data()));
-                setData(items.sort((a, b) => (a.id > b.id ? 1 : -1)));
-              }
+              const items = [];
+              snapshot.forEach((doc) => items.push(doc.data()));
+              setData(items.sort((a, b) => (a.id > b.id ? 1 : -1)));
             }, (error) => {
               console.error(`Error fetching ${collectionName}:`, error);
             });
@@ -156,36 +152,14 @@
           const [toast, setToast] = useState(null);
 
           // --- Data State (Live from Firebase) ---
-          const appUsers = useLiveCollection('app_users', [
-            { id: '1', name: 'Tahir', password: '7869', role: 'admin' },
-            { id: '2', name: 'Ovais', password: '2580', role: 'admin' },
-            { id: '3', name: 'Sales Staff 1', password: '1234', role: 'staff' },
-            { id: '4', name: 'Sales Staff 2', password: '1234', role: 'staff' }
-          ]);
-
-          const companies = useLiveCollection('companies', [
-            { id: 1, name: 'Selmore' }, { id: 2, name: 'ICI' }, { id: 3, name: 'Ghazi Bros' }
-          ]);
-
-          const products = useLiveCollection('products', [
-            { id: 1, name: 'Ceftriaxone Inj 1g', companyId: 1, unit: 'Vial', unitsInBox: 1, costPrice: 450, sellingPrice: 550, available: true },
-            { id: 2, name: 'Oxytetracycline 10%', companyId: 2, unit: 'Bottle', unitsInBox: 1, costPrice: 800, sellingPrice: 950, available: true },
-            { id: 3, name: 'Dewormer Bolus', companyId: 3, unit: 'Strip', unitsInBox: 10, costPrice: 1200, sellingPrice: 1500, available: false }
-          ]);
-          
-          const customers = useLiveCollection('customers', [
-            { id: 1, name: 'Karachi Vet Clinic', phone: '03001234567', address: 'DHA Phase 6', openingBalance: 0 },
-            { id: 2, name: 'Sindh Dairy Farm', phone: '03339876543', address: 'Super Highway', openingBalance: 0 }
-          ]);
-          
-          const invoices = useLiveCollection('invoices', []);
-          const expenses = useLiveCollection('expenses', []);
-          const expenseCategories = useLiveCollection('expenseCategories', [
-            { id: 1, name: 'Rider Payment' }, { id: 2, name: 'Rickshaw/Transport' }, 
-            { id: 3, name: 'Utility Bill' }, { id: 4, name: 'Staff Food/Tea' }, 
-            { id: 5, name: 'Maintenance' }, { id: 6, name: 'Other' }
-          ]);
-          const payments = useLiveCollection('payments', []); 
+          const appUsers = useLiveCollection('app_users');
+          const companies = useLiveCollection('companies');
+          const products = useLiveCollection('products');
+          const customers = useLiveCollection('customers');
+          const invoices = useLiveCollection('invoices');
+          const expenses = useLiveCollection('expenses');
+          const expenseCategories = useLiveCollection('expenseCategories');
+          const payments = useLiveCollection('payments'); 
 
           // Complex UI State
           const [billingView, setBillingView] = useState('list'); 
@@ -217,8 +191,24 @@
             return list.some(item => item.name.toLowerCase() === name.toLowerCase() && item.id !== excludeId);
           };
 
-          const handleLogin = (e) => {
+          const handleLogin = async (e) => {
             e.preventDefault();
+            
+            // First-time DB initialization logic: Secure fallback to create the first admin
+            if (appUsers.length === 0 && loginForm.name.toLowerCase() === 'tahir' && loginForm.password === '7869') {
+               const initUser = { id: Date.now().toString(), name: 'Tahir', password: '7869', role: 'admin' };
+               await saveToFirebase('app_users', initUser.id, initUser);
+               
+               if (expenseCategories.length === 0) {
+                  const defaultCats = ['Transport', 'Utility Bill', 'Staff Food/Tea', 'Maintenance', 'Other'];
+                  defaultCats.forEach((cat, i) => saveToFirebase('expenseCategories', Date.now()+i, { id: Date.now()+i, name: cat }));
+               }
+               
+               setCurrentUser(initUser);
+               showToast("Welcome! Clean Database Initialized.");
+               return;
+            }
+
             const user = appUsers.find(u => u.name.toLowerCase() === loginForm.name.toLowerCase() && u.password === loginForm.password);
             if (user) {
               setCurrentUser(user);
