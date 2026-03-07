@@ -78,24 +78,48 @@
         const APP_NAME = "AnimalHealth.PK";
         const VEHICLES = ['Rider', 'Rickshaw', 'Suzuki', 'Intercity Transport', 'Self-Pickup'];
 
+        // Helper to force Pakistan Standard Time (UTC+5) strictly
+        const getPKTDate = (date = new Date()) => {
+          const utc = date.getTime() + (date.getTimezoneOffset() * 60000);
+          return new Date(utc + (3600000 * 5));
+        };
+
         const getLocalDateStr = (date = new Date()) => {
-          const offset = date.getTimezoneOffset() * 60000;
-          return new Date(date.getTime() - offset).toISOString().split('T')[0];
+          const pktDate = getPKTDate(date);
+          const year = pktDate.getFullYear();
+          const month = String(pktDate.getMonth() + 1).padStart(2, '0');
+          const day = String(pktDate.getDate()).padStart(2, '0');
+          return `${year}-${month}-${day}`;
+        };
+
+        const formatDateDisp = (dateStr) => {
+          if (!dateStr) return '';
+          // Parse manually to avoid browser timezone shift bugs
+          const parts = dateStr.split('-');
+          if (parts.length !== 3) return dateStr;
+          const [year, month, day] = parts;
+          const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+          return `${day}-${months[parseInt(month, 10) - 1]}-${year.slice(-2)}`;
         };
 
         const checkDateFilter = (dateStr, filter) => {
           if (filter === 'All Time') return true;
-          const targetDate = new Date(dateStr);
-          const now = new Date();
-          if (filter === 'Today') return targetDate.toDateString() === now.toDateString();
+          
+          const parts = dateStr.split('-');
+          if (parts.length !== 3) return true;
+          const targetDate = new Date(parts[0], parts[1] - 1, parts[2]);
+          
+          const nowPKT = getPKTDate();
+          const todayPKT = new Date(nowPKT.getFullYear(), nowPKT.getMonth(), nowPKT.getDate());
+
+          if (filter === 'Today') return targetDate.getTime() === todayPKT.getTime();
           if (filter === 'This Week') {
-            const startOfWeek = new Date(now);
-            startOfWeek.setDate(now.getDate() - now.getDay());
-            startOfWeek.setHours(0,0,0,0);
+            const startOfWeek = new Date(todayPKT);
+            startOfWeek.setDate(todayPKT.getDate() - todayPKT.getDay());
             return targetDate >= startOfWeek;
           }
-          if (filter === 'This Month') return targetDate.getMonth() === now.getMonth() && targetDate.getFullYear() === now.getFullYear();
-          if (filter === 'This Year') return targetDate.getFullYear() === now.getFullYear();
+          if (filter === 'This Month') return targetDate.getMonth() === todayPKT.getMonth() && targetDate.getFullYear() === todayPKT.getFullYear();
+          if (filter === 'This Year') return targetDate.getFullYear() === todayPKT.getFullYear();
           return true;
         };
 
@@ -316,15 +340,15 @@
               const loose = qty % uib;
               const boxText = boxes === 1 ? 'Box' : 'Boxes';
               
-              if (boxes > 0 && loose > 0) return `${boxes} ${boxText}, ${loose} Loose`;
-              if (boxes > 0) return `${boxes} ${boxText}`;
-              return `${loose} Loose`;
+              if (boxes > 0 && loose > 0) return `${qty} (${boxes} ${boxText}, ${loose} Loose)`;
+              if (boxes > 0) return `${qty} (${boxes} ${boxText})`;
+              return `${qty} (${loose} Loose)`;
             };
             
             const generateShareText = () => {
               let text = `*AnimalHealth.PK*\n`;
               if (docType === 'invoice') {
-                text += `*INVOICE #${data.id}*\nDate: ${data.date}\nCustomer: ${data.customerName}\n\n*Items:*\n`;
+                text += `*INVOICE #${data.id}*\nDate: ${formatDateDisp(data.date)}\nCustomer: ${data.customerName}\n\n*Items:*\n`;
                 let savings = 0;
                 data.items.forEach(i => {
                    text += `- ${i.name} ${i.isBonus ? '(BONUS) ' : ''}(x${i.quantity}): ${i.isBonus ? 'FREE' : 'Rs.' + (i.price * i.quantity)}\n`;
@@ -336,7 +360,7 @@
                 text += `Status: ${data.paymentStatus}`;
               } else if (docType === 'dispatch') {
                 text += `*DISPATCH NOTE #${data.id}*\n`;
-                text += `Date: ${data.date}\n`;
+                text += `Date: ${formatDateDisp(data.date)}\n`;
                 text += `*Customer:* ${data.customerName}\n`;
                 
                 if(data.customerDetails?.contactPerson || data.customerDetails?.phone) {
@@ -357,32 +381,32 @@
                 text += `\n*Items to Deliver:*\n`;
                 data.items.forEach(i => text += `- ${i.name} ${i.isBonus ? '🎁 (BONUS)' : ''} -> ${getDispatchQtyStr(i)}\n`);
               } else if (docType === 'receipt') {
-                text += `*PAYMENT RECEIPT*\nRef: ${data.id}\nDate: ${data.date}\nCustomer: ${data.customerName}\n\n`;
+                text += `*PAYMENT RECEIPT*\nRef: ${data.id}\nDate: ${formatDateDisp(data.date)}\nCustomer: ${data.customerName}\n\n`;
                 text += `*Amount Received: Rs.${data.receivedAmount}*\n`;
                 text += `Previous Balance: Rs.${data.prevBalance}\n`;
                 text += `*Remaining Balance: Rs.${data.newBalance}*\n\n`;
                 text += `Thank you for your business!`;
               } else if (docType === 'ledger') {
-                 text += `*ACCOUNT STATEMENT*\nCustomer: ${data.customerName}\nStatement Period: ${data.dateRange.start} to ${data.dateRange.end}\n\n`;
+                 text += `*ACCOUNT STATEMENT*\nCustomer: ${data.customerName}\nStatement Period: ${formatDateDisp(data.dateRange.start)} to ${formatDateDisp(data.dateRange.end)}\n\n`;
                  text += `Total Debits: Rs.${data.totalDebit}\nTotal Credits: Rs.${data.totalCredit}\n*Current Closing Balance: Rs.${data.closingBal}*\n\nPlease arrange payment at your earliest convenience.`;
               }
               return encodeURIComponent(text);
             };
 
             return (
-              <div className={`bg-white min-h-screen text-black ${isThermal ? 'w-[80mm] mx-auto p-4 text-[12px]' : 'w-full max-w-[210mm] mx-auto p-8 text-sm'}`}>
-                <div className="print:hidden flex justify-between items-center mb-6 bg-slate-100 p-4 rounded-xl border border-slate-200">
-                   <div className="flex gap-2">
+              <div className={`bg-white min-h-screen text-black overflow-x-hidden ${isThermal ? 'w-full max-w-[80mm] mx-auto p-3 text-[10px]' : 'w-full max-w-[210mm] mx-auto p-4 sm:p-8 text-xs sm:text-sm'}`}>
+                <div className="print:hidden flex justify-between items-center mb-6 bg-slate-100 p-4 rounded-xl border border-slate-200 overflow-x-auto">
+                   <div className="flex gap-2 shrink-0">
                      <button onClick={() => setPrintConfig({...printConfig, format: 'thermal'})} className={`px-4 py-2 rounded-lg font-bold text-xs ${isThermal?'bg-slate-800 text-white':'bg-white text-slate-600 border'}`}>Thermal (80mm)</button>
                      <button onClick={() => setPrintConfig({...printConfig, format: 'a5'})} className={`px-4 py-2 rounded-lg font-bold text-xs ${!isThermal?'bg-slate-800 text-white':'bg-white text-slate-600 border'}`}>A4 / A5 Sheet</button>
                    </div>
-                   <button onClick={() => setPrintConfig(null)} className="p-2 bg-red-100 text-red-600 rounded-full hover:bg-red-200 transition-colors"><X size={20}/></button>
+                   <button onClick={() => setPrintConfig(null)} className="p-2 bg-red-100 text-red-600 rounded-full hover:bg-red-200 transition-colors ml-4 shrink-0"><X size={20}/></button>
                 </div>
 
                 <div className="text-center mb-6 border-b-2 border-slate-800 pb-4">
-                  <h1 className={`${isThermal ? 'text-2xl' : 'text-4xl'} font-extrabold uppercase tracking-tight`}>{APP_NAME}</h1>
-                  <p className="uppercase tracking-widest font-semibold mt-1 text-[10px] sm:text-xs text-slate-600">Wholesale Veterinary Pharmacy</p>
-                  <div className="mt-4 inline-block bg-slate-900 text-white px-4 py-1.5 rounded-full font-bold uppercase tracking-widest text-xs">
+                  <h1 className={`${isThermal ? 'text-xl' : 'text-2xl sm:text-4xl'} font-extrabold uppercase tracking-tight leading-tight`}>{APP_NAME}</h1>
+                  <p className="uppercase tracking-widest font-semibold mt-1 text-[9px] sm:text-xs text-slate-600">Wholesale Veterinary Pharmacy</p>
+                  <div className={`mt-4 inline-block bg-slate-900 text-white px-4 py-1.5 rounded-full font-bold uppercase tracking-widest ${isThermal ? 'text-[9px]' : 'text-xs'}`}>
                      {docType === 'invoice' && 'Invoice'}
                      {docType === 'dispatch' && 'Dispatch Note'}
                      {docType === 'receipt' && 'Payment Receipt'}
@@ -393,34 +417,34 @@
                 
                 {docType !== 'report' && (
                    <div className="mb-6 flex justify-between items-start font-medium text-slate-800">
-                     <div>
-                       <p className="text-slate-500 text-xs uppercase font-bold tracking-wider mb-1">Customer Details</p>
-                       <p className="text-lg font-bold">{data.customerName}</p>
+                     <div className="pr-2">
+                       <p className="text-slate-500 text-[10px] sm:text-xs uppercase font-bold tracking-wider mb-1">Customer Details</p>
+                       <p className={`${isThermal ? 'text-base' : 'text-lg'} font-bold leading-tight break-words`}>{data.customerName}</p>
                        
                        {/* Enhanced Dispatch Note Customer Details */}
                        {docType === 'dispatch' && data.customerDetails && (
-                         <div className="mt-2 text-xs space-y-1 text-slate-700 bg-slate-50 p-2 rounded border border-slate-200">
+                         <div className={`mt-2 ${isThermal ? 'text-[9px]' : 'text-xs'} space-y-1 text-slate-700 bg-slate-50 p-2 rounded border border-slate-200`}>
                             {(data.customerDetails.contactPerson || data.customerDetails.phone) && (
-                               <p><strong>Contact:</strong> {data.customerDetails.contactPerson || 'N/A'} ({data.customerDetails.phone || ''})</p>
+                               <p><strong>Contact:</strong> {data.customerDetails.contactPerson || 'N/A'} <br/>({data.customerDetails.phone || ''})</p>
                             )}
                             {data.customerDetails.address1 && <p><strong>Addr 1:</strong> {data.customerDetails.address1}</p>}
                             {data.customerDetails.address2 && <p><strong>Addr 2:</strong> {data.customerDetails.address2}</p>}
                          </div>
                        )}
-                       {docType === 'ledger' && <p className="text-sm text-slate-600">{data.phone}</p>}
+                       {docType === 'ledger' && <p className={`${isThermal ? 'text-xs' : 'text-sm'} text-slate-600`}>{data.phone}</p>}
                      </div>
-                     <div className="text-right">
+                     <div className="text-right pl-2 shrink-0">
                         {docType !== 'ledger' && (
                           <>
-                            <p className="text-slate-500 text-xs uppercase font-bold tracking-wider mb-1">Reference</p>
-                            <p className="font-semibold">{data.id}</p>
-                            <p className="text-slate-600">{data.date}</p>
+                            <p className="text-slate-500 text-[10px] sm:text-xs uppercase font-bold tracking-wider mb-1">Reference</p>
+                            <p className="font-semibold break-words max-w-[80px] sm:max-w-none">{data.id}</p>
+                            <p className="text-slate-600">{formatDateDisp(data.date)}</p>
                           </>
                         )}
                         {docType === 'ledger' && (
                           <>
-                            <p className="text-slate-500 text-xs uppercase font-bold tracking-wider mb-1">Statement Date</p>
-                            <p className="font-semibold">{getLocalDateStr()}</p>
+                            <p className="text-slate-500 text-[10px] sm:text-xs uppercase font-bold tracking-wider mb-1">Statement Date</p>
+                            <p className="font-semibold">{formatDateDisp(getLocalDateStr())}</p>
                           </>
                         )}
                      </div>
@@ -429,13 +453,13 @@
 
                 {/* Dispatch Note Logistics Block */}
                 {docType === 'dispatch' && (
-                   <div className="mb-6 bg-slate-50 p-3 rounded-lg border border-slate-300 text-xs text-slate-800">
-                      <p className="font-bold uppercase tracking-wider text-[10px] text-slate-500 mb-1">Logistics / Delivery Info</p>
+                   <div className={`mb-6 bg-slate-50 p-3 rounded-lg border border-slate-300 ${isThermal ? 'text-[9px]' : 'text-xs'} text-slate-800`}>
+                      <p className="font-bold uppercase tracking-wider text-[9px] sm:text-[10px] text-slate-500 mb-1">Logistics / Delivery Info</p>
                       <p><strong>Method:</strong> {data.vehicle}</p>
                       {data.vehicle === 'Intercity Transport' ? (
-                         <p><strong>Transport Co:</strong> {data.transportCompany || '-'} &nbsp;|&nbsp; <strong>Bilty No:</strong> {data.biltyNumber || '-'}</p>
+                         <p><strong>Transport Co:</strong> {data.transportCompany || '-'} <br/> <strong>Bilty No:</strong> {data.biltyNumber || '-'}</p>
                       ) : ['Rider', 'Rickshaw', 'Suzuki'].includes(data.vehicle) ? (
-                         <p><strong>Driver:</strong> {data.driverName || '-'} &nbsp;|&nbsp; <strong>Phone:</strong> {data.driverPhone || '-'}</p>
+                         <p><strong>Driver:</strong> {data.driverName || '-'} <br/> <strong>Phone:</strong> {data.driverPhone || '-'}</p>
                       ) : null}
                    </div>
                 )}
@@ -444,72 +468,75 @@
                 {docType === 'report' && (
                    <div className="space-y-4 text-slate-800">
                       <div className="flex justify-between items-end mb-4 border-b pb-2">
-                         <h2 className="text-lg font-extrabold">{data.title}</h2>
-                         <p className="text-xs font-bold text-slate-500 uppercase">Period: {data.dateFilter}</p>
+                         <h2 className={`${isThermal ? 'text-base' : 'text-lg sm:text-xl'} font-extrabold leading-tight`}>{data.title}</h2>
+                         <p className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase shrink-0 ml-2">Period: {data.dateFilter}</p>
                       </div>
 
                       {data.view === 'Overview' ? (
-                         <div className="space-y-2 max-w-sm mx-auto border p-4 rounded-xl text-base">
-                            <div className="flex justify-between"><span>Product Sales:</span> <span>Rs. {data.stats.productRevenue.toLocaleString()}</span></div>
-                            <div className="flex justify-between text-rose-600"><span>Total COGS:</span> <span>- Rs. {data.stats.totalCOGS.toLocaleString()}</span></div>
-                            <div className="flex justify-between font-bold"><span>Gross Margin:</span> <span>Rs. {data.stats.grossMargin.toLocaleString()}</span></div>
+                         <div className={`space-y-2 mx-auto border p-4 rounded-xl ${isThermal ? 'text-xs' : 'text-sm sm:text-base max-w-sm'}`}>
+                            <div className="flex justify-between gap-2"><span>Product Sales:</span> <span className="text-right">Rs. {data.stats.productRevenue.toLocaleString()}</span></div>
+                            <div className="flex justify-between gap-2 text-rose-600"><span>Total COGS:</span> <span className="text-right">- Rs. {data.stats.totalCOGS.toLocaleString()}</span></div>
+                            <div className="flex justify-between gap-2 font-bold"><span>Gross Margin:</span> <span className="text-right">Rs. {data.stats.grossMargin.toLocaleString()}</span></div>
                             <div className="border-t my-2"></div>
-                            <div className="flex justify-between text-sm"><span>Delivery Billed:</span> <span>+ Rs. {data.stats.deliveryBilled.toLocaleString()}</span></div>
-                            <div className="flex justify-between text-sm text-rose-600"><span>Transport Exp:</span> <span>- Rs. {data.stats.transportExpense.toLocaleString()}</span></div>
-                            <div className="flex justify-between text-sm text-rose-600"><span>Operational Exp:</span> <span>- Rs. {data.stats.totalExpenses.toLocaleString()}</span></div>
-                            <div className="border-t my-2 pt-2 flex justify-between font-extrabold text-xl"><span>Net Profit:</span> <span>Rs. {data.stats.netProfit.toLocaleString()}</span></div>
+                            <div className="flex justify-between gap-2 text-[10px] sm:text-sm"><span>Delivery Billed:</span> <span className="text-right">+ Rs. {data.stats.deliveryBilled.toLocaleString()}</span></div>
+                            <div className="flex justify-between gap-2 text-[10px] sm:text-sm text-rose-600"><span>Transport Exp:</span> <span className="text-right">- Rs. {data.stats.transportExpense.toLocaleString()}</span></div>
+                            <div className="flex justify-between gap-2 text-[10px] sm:text-sm text-rose-600"><span>Operational Exp:</span> <span className="text-right">- Rs. {data.stats.totalExpenses.toLocaleString()}</span></div>
+                            <div className="border-t my-2 pt-2 flex justify-between gap-2 font-extrabold text-lg sm:text-xl"><span>Net Profit:</span> <span className="text-right">Rs. {data.stats.netProfit.toLocaleString()}</span></div>
                          </div>
                       ) : (
-                         <table className="w-full text-left text-xs sm:text-sm border-collapse">
-                            <thead className="border-b-2 border-slate-800 text-slate-700">
-                               <tr>
-                                  <th className="py-2 font-bold">Name</th>
-                                  {data.view !== 'Receivables' && <th className="py-2 text-center font-bold">Qty</th>}
-                                  {data.view !== 'Receivables' && <th className="py-2 text-right font-bold">Revenue</th>}
-                                  <th className="py-2 text-right font-bold">{data.view === 'Receivables' ? 'Pending Amount' : 'Gross Profit'}</th>
-                               </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-200">
-                               {data.rows.map((r, i) => (
-                                  <tr key={i}>
-                                     <td className="py-2 font-semibold">{r.Name} {r.Company ? <span className="text-[10px] text-slate-500">({r.Company})</span> : ''}</td>
-                                     {data.view !== 'Receivables' && <td className="py-2 text-center">{r.Qty}</td>}
-                                     {data.view !== 'Receivables' && <td className="py-2 text-right">Rs. {r.Revenue.toLocaleString()}</td>}
-                                     <td className="py-2 text-right font-bold text-slate-800">Rs. {(r.GrossProfit || r.Amount).toLocaleString()}</td>
+                         <div className="overflow-x-auto">
+                            <table className={`w-full text-left border-collapse ${isThermal ? 'text-[9px]' : 'text-xs sm:text-sm'}`}>
+                               <thead className="border-b-2 border-slate-800 text-slate-700">
+                                  <tr>
+                                     <th className={`${isThermal ? 'py-1 pr-1' : 'py-2 pr-2'} font-bold`}>Name</th>
+                                     {data.view !== 'Receivables' && <th className={`${isThermal ? 'py-1 px-0.5' : 'py-2 px-2'} text-center font-bold`}>Qty</th>}
+                                     {data.view !== 'Receivables' && <th className={`${isThermal ? 'py-1 px-0.5' : 'py-2 px-2'} text-right font-bold`}>Rev.</th>}
+                                     <th className={`${isThermal ? 'py-1 pl-0.5' : 'py-2 pl-2'} text-right font-bold`}>{data.view === 'Receivables' ? 'Pending Amount' : 'Gross Profit'}</th>
                                   </tr>
-                               ))}
-                            </tbody>
-                         </table>
+                               </thead>
+                               <tbody className="divide-y divide-slate-200">
+                                  {data.rows.map((r, i) => (
+                                     <tr key={i}>
+                                        <td className={`${isThermal ? 'py-1 pr-1' : 'py-2 pr-2'} font-semibold break-words`}>{r.Name} {r.Company ? <span className="text-[8px] sm:text-[10px] text-slate-500 block">({r.Company})</span> : ''}</td>
+                                        {data.view !== 'Receivables' && <td className={`${isThermal ? 'py-1 px-0.5' : 'py-2 px-2'} text-center`}>{r.Qty}</td>}
+                                        {data.view !== 'Receivables' && <td className={`${isThermal ? 'py-1 px-0.5' : 'py-2 px-2'} text-right`}>{(r.Revenue/1000).toFixed(1)}k</td>}
+                                        <td className={`${isThermal ? 'py-1 pl-0.5' : 'py-2 pl-2'} text-right font-bold text-slate-800`}>Rs. {(r.GrossProfit || r.Amount).toLocaleString()}</td>
+                                     </tr>
+                                  ))}
+                               </tbody>
+                            </table>
+                         </div>
                       )}
                    </div>
                 )}
 
                 {(docType === 'invoice' || docType === 'dispatch') && (
                   <>
-                    <table className="w-full text-left mb-6 border-collapse">
+                    <table className={`w-full text-left mb-6 border-collapse ${isThermal ? 'text-[10px]' : 'text-sm'}`}>
                       <thead>
                         <tr className="border-b-2 border-slate-800 text-slate-700">
-                          <th className="py-2 font-bold">Description</th>
-                          <th className="py-2 text-center font-bold">{docType === 'dispatch' ? 'Packaging' : 'Qty'}</th>
-                          {docType === 'invoice' && <th className="py-2 text-right font-bold">Price</th>}
-                          {docType === 'invoice' && <th className="py-2 text-right font-bold">Total</th>}
+                          <th className={`${isThermal ? 'py-1 pr-1' : 'py-2 pr-2'} font-bold`}>Description</th>
+                          <th className={`${isThermal ? 'py-1 px-1' : 'py-2 px-2'} text-center font-bold`}>{docType === 'dispatch' ? 'Packaging' : 'Qty'}</th>
+                          {docType === 'invoice' && <th className={`${isThermal ? 'py-1 pl-1' : 'py-2 pl-2'} text-right font-bold`}>Price</th>}
+                          {docType === 'invoice' && !isThermal && <th className="py-2 text-right font-bold">Total</th>}
                         </tr>
                       </thead>
                       <tbody>
                         {data.items.map((item, idx) => (
                           <tr key={idx} className="border-b border-slate-200 text-slate-800">
-                            <td className="py-2 font-semibold">
+                            <td className={`${isThermal ? 'py-1.5 pr-1' : 'py-2 pr-2'} font-semibold break-words`}>
                                {item.name}
-                               {item.isBonus && <span className="ml-2 px-1.5 py-0.5 bg-emerald-100 text-emerald-700 text-[9px] font-bold rounded uppercase border border-emerald-200">Bonus</span>}
+                               {item.isBonus && <span className="ml-1.5 px-1 py-0.5 bg-emerald-100 text-emerald-700 text-[8px] font-bold rounded uppercase border border-emerald-200">Bonus</span>}
                             </td>
-                            <td className="py-2 text-center font-medium">{docType === 'dispatch' ? getDispatchQtyStr(item) : item.quantity}</td>
+                            <td className={`${isThermal ? 'py-1.5 px-1' : 'py-2 px-2'} text-center font-medium leading-tight`}>{docType === 'dispatch' ? getDispatchQtyStr(item) : item.quantity}</td>
                             {docType === 'invoice' && (
-                               <td className="py-2 text-right">
-                                 {item.isBonus ? <span className="text-emerald-600 font-bold text-[10px] uppercase tracking-wider">Free</span> : `Rs. ${item.price}`}
-                                 {item.isBonus && item.originalPrice && <span className="block text-[9px] line-through text-slate-400">Rs. {item.originalPrice}</span>}
+                               <td className={`${isThermal ? 'py-1.5 pl-1' : 'py-2 pl-2'} text-right`}>
+                                 {item.isBonus ? <span className="text-emerald-600 font-bold text-[9px] uppercase tracking-wider">Free</span> : `Rs. ${item.price}`}
+                                 {item.isBonus && item.originalPrice && <span className="block text-[8px] sm:text-[9px] line-through text-slate-400">Rs. {item.originalPrice}</span>}
+                                 {isThermal && !item.isBonus && <span className="block font-bold mt-0.5">T: {item.price * item.quantity}</span>}
                                </td>
                             )}
-                            {docType === 'invoice' && (
+                            {docType === 'invoice' && !isThermal && (
                                <td className="py-2 text-right font-bold">
                                  {item.isBonus ? <span className="text-emerald-600">Rs. 0</span> : `Rs. ${item.price * item.quantity}`}
                                </td>
@@ -520,7 +547,7 @@
                     </table>
 
                     {docType === 'invoice' && (
-                      <div className="border-t-2 border-slate-800 pt-2 w-full max-w-[280px] ml-auto text-slate-800">
+                      <div className={`border-t-2 border-slate-800 pt-2 w-full ${isThermal ? 'max-w-full' : 'max-w-[280px] ml-auto'} text-slate-800`}>
                         {(() => {
                            const currentBillTotal = data.total;
                            const ledger = getCustomerLedger(data.customerId);
@@ -576,7 +603,7 @@
                            const totalSavings = data.items.reduce((sum, i) => sum + (i.isBonus ? (i.originalPrice || 0) * i.quantity : 0), 0);
                            if (totalSavings > 0) {
                               return (
-                                 <div className="flex justify-between text-sm font-bold text-emerald-700 mt-2 border-t border-emerald-200 pt-1.5 bg-emerald-50 px-2 py-1 rounded">
+                                 <div className={`flex justify-between ${isThermal ? 'text-[10px]' : 'text-sm'} font-bold text-emerald-700 mt-2 border-t border-emerald-200 pt-1.5 bg-emerald-50 px-2 py-1 rounded`}>
                                    <span>Total Savings:</span>
                                    <span>Rs. {totalSavings}</span>
                                  </div>
@@ -591,73 +618,77 @@
 
                 {docType === 'receipt' && (
                    <div className="space-y-4">
-                     <div className="bg-slate-50 p-6 border border-slate-200 rounded-2xl text-center">
-                        <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Amount Received</p>
-                        <p className="text-5xl font-extrabold text-emerald-600 mt-2 tracking-tight">Rs. {data.receivedAmount.toLocaleString()}</p>
-                        {data.note && <p className="text-xs text-slate-500 mt-3 font-medium bg-white inline-block px-3 py-1 rounded-full border border-slate-200">{data.note}</p>}
+                     <div className="bg-slate-50 p-4 sm:p-6 border border-slate-200 rounded-2xl text-center">
+                        <p className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-widest">Amount Received</p>
+                        <p className={`${isThermal ? 'text-3xl' : 'text-5xl'} font-extrabold text-emerald-600 mt-2 tracking-tight`}>Rs. {data.receivedAmount.toLocaleString()}</p>
+                        {data.note && <p className="text-[10px] sm:text-xs text-slate-500 mt-3 font-medium bg-white inline-block px-3 py-1 rounded-full border border-slate-200 break-words">{data.note}</p>}
                      </div>
-                     <div className="border-t-2 border-slate-800 pt-4 space-y-2 text-sm">
+                     <div className={`border-t-2 border-slate-800 pt-4 space-y-2 ${isThermal ? 'text-xs' : 'text-sm'}`}>
                         <div className="flex justify-between font-semibold text-slate-500"><span>Previous Balance:</span> <span>Rs. {data.prevBalance.toLocaleString()}</span></div>
                         <div className="flex justify-between font-bold text-emerald-600"><span>Amount Credited:</span> <span>- Rs. {data.receivedAmount.toLocaleString()}</span></div>
-                        <div className="border-t border-slate-200 my-1 pt-1 flex justify-between font-extrabold text-lg text-slate-800 mt-2"><span>Remaining Balance:</span> <span>Rs. {data.newBalance.toLocaleString()}</span></div>
+                        <div className={`border-t border-slate-200 my-1 pt-1 flex justify-between font-extrabold ${isThermal ? 'text-base' : 'text-lg'} text-slate-800 mt-2`}><span>Remaining Balance:</span> <span>Rs. {data.newBalance.toLocaleString()}</span></div>
                      </div>
                    </div>
                 )}
 
                 {docType === 'ledger' && (
                    <>
-                     <div className="flex justify-between items-end mb-4 border-b-2 border-slate-800 pb-4 mt-2">
-                       <div>
-                          <p className="text-sm font-bold text-slate-700">Statement Period</p>
-                          <p className="text-base font-semibold">{data.dateRange.start} <span className="text-slate-400">to</span> {data.dateRange.end}</p>
+                     <div className="flex justify-between items-end mb-4 border-b-2 border-slate-800 pb-3 mt-2 gap-2">
+                       <div className="shrink-1 min-w-0">
+                          <p className={`font-bold text-slate-700 ${isThermal ? 'text-xs' : 'text-sm'}`}>Statement Period</p>
+                          <p className={`font-semibold text-slate-600 ${isThermal ? 'text-[9px]' : 'text-xs'}`}>{formatDateDisp(data.dateRange.start)} <span className="text-slate-400">to</span> {formatDateDisp(data.dateRange.end)}</p>
                        </div>
-                       <div className="text-right bg-rose-50 px-4 py-2 rounded-xl border border-rose-200">
-                          <p className="text-[10px] font-bold uppercase tracking-wider text-rose-600">Current Closing Balance</p>
-                          <p className="font-extrabold text-rose-700 text-xl">Rs. {data.closingBal.toLocaleString()}</p>
+                       <div className="text-right bg-rose-50 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl border border-rose-200 shrink-0">
+                          <p className="text-[8px] sm:text-[10px] font-bold uppercase tracking-wider text-rose-600">Closing Balance</p>
+                          <p className={`font-extrabold text-rose-700 ${isThermal ? 'text-sm' : 'text-xl'}`}>Rs. {data.closingBal.toLocaleString()}</p>
                        </div>
                      </div>
                      
-                     <table className="w-full text-left text-[11px] sm:text-xs border-collapse">
-                       <thead className="bg-slate-100 text-slate-600 border-y border-slate-300">
-                         <tr>
-                           <th className="py-2 px-1 font-bold uppercase tracking-wider">Date</th>
-                           <th className="py-2 px-1 font-bold uppercase tracking-wider">Particulars</th>
-                           <th className="py-2 px-1 text-right font-bold uppercase tracking-wider">Debit (Dr)</th>
-                           <th className="py-2 px-1 text-right font-bold uppercase tracking-wider">Credit (Cr)</th>
-                           <th className="py-2 px-1 text-right font-bold uppercase tracking-wider">Balance</th>
-                         </tr>
-                       </thead>
-                       <tbody className="divide-y divide-slate-100 text-slate-800">
-                         <tr className="bg-slate-50/50">
-                            <td className="py-2 px-1 text-slate-500 font-medium" colSpan={4}>Opening Balance (as of {data.dateRange.start})</td>
-                            <td className="py-2 px-1 text-right font-bold">Rs. {data.openingBal.toLocaleString()}</td>
-                         </tr>
-                         {data.rows.map((row) => (
-                           <tr key={row.id}>
-                             <td className="py-2 px-1 font-medium text-slate-600 whitespace-nowrap">{row.date}</td>
-                             <td className="py-2 px-1">
-                                <span className="font-semibold block">{row.desc}</span>
-                                <span className="text-[9px] text-slate-400 font-medium">{row.ref}</span>
-                             </td>
-                             <td className="py-2 px-1 text-right font-bold text-indigo-600">{row.debit > 0 ? row.debit.toLocaleString() : '-'}</td>
-                             <td className="py-2 px-1 text-right font-bold text-emerald-600">{row.credit > 0 ? row.credit.toLocaleString() : '-'}</td>
-                             <td className="py-2 px-1 text-right font-extrabold">{row.balance.toLocaleString()}</td>
+                     <div className="overflow-x-auto">
+                       <table className={`w-full text-left border-collapse ${isThermal ? 'text-[8px] table-fixed' : 'text-[11px] sm:text-xs'}`}>
+                         <thead className="bg-slate-100 text-slate-600 border-y border-slate-300">
+                           <tr>
+                             <th className={`${isThermal ? 'py-1 px-0.5 w-[18%]' : 'py-2 px-1 w-[15%]'} font-bold uppercase tracking-wider`}>Date</th>
+                             <th className={`${isThermal ? 'py-1 px-0.5 w-[35%]' : 'py-2 px-1 w-[40%]'} font-bold uppercase tracking-wider`}>Particulars</th>
+                             <th className={`${isThermal ? 'py-1 px-0.5 w-[15%]' : 'py-2 px-1 w-[15%]'} text-right font-bold uppercase tracking-wider`}>{isThermal ? 'Dr' : 'Debit (Dr)'}</th>
+                             <th className={`${isThermal ? 'py-1 px-0.5 w-[15%]' : 'py-2 px-1 w-[15%]'} text-right font-bold uppercase tracking-wider`}>{isThermal ? 'Cr' : 'Credit (Cr)'}</th>
+                             <th className={`${isThermal ? 'py-1 px-0.5 w-[17%]' : 'py-2 px-1 w-[15%]'} text-right font-bold uppercase tracking-wider`}>Balance</th>
                            </tr>
-                         ))}
-                       </tbody>
-                       <tfoot className="bg-slate-50 border-t-2 border-slate-800">
-                         <tr>
-                           <td colSpan={2} className="py-3 px-1 font-bold text-right uppercase tracking-wider text-slate-600">Period Totals:</td>
-                           <td className="py-3 px-1 text-right font-extrabold text-indigo-700">Rs. {data.totalDebit.toLocaleString()}</td>
-                           <td className="py-3 px-1 text-right font-extrabold text-emerald-600">Rs. {data.totalCredit.toLocaleString()}</td>
-                           <td></td>
-                         </tr>
-                       </tfoot>
-                     </table>
+                         </thead>
+                         <tbody className="divide-y divide-slate-100 text-slate-800">
+                           <tr className="bg-slate-50/50">
+                              <td className={`${isThermal ? 'py-1 px-0.5' : 'py-2 px-1'} text-slate-500 font-medium`} colSpan={4}>Opening Bal <span className="text-[9px]">(as of {formatDateDisp(data.dateRange.start)})</span></td>
+                              <td className={`${isThermal ? 'py-1 px-0.5' : 'py-2 px-1'} text-right font-bold`}>{data.openingBal.toLocaleString()}</td>
+                           </tr>
+                           {data.rows.map((row) => (
+                             <tr key={row.id}>
+                               <td className={`${isThermal ? 'py-1 px-0.5' : 'py-2 px-1'} font-medium text-slate-600 whitespace-nowrap`}>
+                                 {formatDateDisp(row.date)}
+                               </td>
+                               <td className={`${isThermal ? 'py-1 px-0.5' : 'py-2 px-1'} break-words`}>
+                                  <span className="font-semibold block leading-tight">{row.desc}</span>
+                                  <span className="text-[7px] sm:text-[9px] text-slate-400 font-medium leading-none block mt-0.5 break-all">{row.ref}</span>
+                               </td>
+                               <td className={`${isThermal ? 'py-1 px-0.5' : 'py-2 px-1'} text-right font-bold text-indigo-600`}>{row.debit > 0 ? row.debit.toLocaleString() : '-'}</td>
+                               <td className={`${isThermal ? 'py-1 px-0.5' : 'py-2 px-1'} text-right font-bold text-emerald-600`}>{row.credit > 0 ? row.credit.toLocaleString() : '-'}</td>
+                               <td className={`${isThermal ? 'py-1 px-0.5' : 'py-2 px-1'} text-right font-extrabold`}>{row.balance.toLocaleString()}</td>
+                             </tr>
+                           ))}
+                         </tbody>
+                         <tfoot className="bg-slate-50 border-t-2 border-slate-800">
+                           <tr>
+                             <td colSpan={2} className={`${isThermal ? 'py-1.5 px-0.5 text-[8px]' : 'py-3 px-1 text-[10px] sm:text-xs'} font-bold text-right uppercase tracking-wider text-slate-600`}>Totals:</td>
+                             <td className={`${isThermal ? 'py-1.5 px-0.5' : 'py-3 px-1'} text-right font-extrabold text-indigo-700`}>{data.totalDebit.toLocaleString()}</td>
+                             <td className={`${isThermal ? 'py-1.5 px-0.5' : 'py-3 px-1'} text-right font-extrabold text-emerald-600`}>{data.totalCredit.toLocaleString()}</td>
+                             <td></td>
+                           </tr>
+                         </tfoot>
+                       </table>
+                     </div>
                    </>
                 )}
                 
-                <div className="mt-12 text-center text-[10px] text-slate-400 font-medium uppercase tracking-widest">Software Generated Document • AnimalHealth.PK IT Dept.</div>
+                <div className="mt-12 text-center text-[9px] sm:text-[10px] text-slate-400 font-medium uppercase tracking-widest">Software Generated Document • AnimalHealth.PK IT Dept.</div>
                 
                 {docType !== 'report' && (
                    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 print:hidden flex gap-3 w-full max-w-sm px-4">
@@ -1110,13 +1141,13 @@
                           </thead>
                           <tbody className="divide-y divide-slate-100 text-slate-800">
                             <tr className="bg-slate-50/30">
-                               <td className="py-3 px-3 text-slate-500 font-medium" colSpan={4}>Opening Balance <span className="text-[9px]">(as of {startDate})</span></td>
+                               <td className="py-3 px-3 text-slate-500 font-medium" colSpan={4}>Opening Balance <span className="text-[9px]">(as of {formatDateDisp(startDate)})</span></td>
                                <td className="py-3 px-3 text-right font-bold text-slate-700">Rs. {periodOpeningBal.toLocaleString()}</td>
                                <td></td>
                             </tr>
                             {filteredRows.map(row => (
                                <tr key={row.id} className="hover:bg-slate-50 transition-colors">
-                                 <td className="py-3 px-3 font-medium text-slate-600">{row.date}</td>
+                                 <td className="py-3 px-3 font-medium text-slate-600">{formatDateDisp(row.date)}</td>
                                  <td className="py-3 px-3">
                                     <span className="font-bold text-slate-800 block">{row.desc}</span>
                                     <span className="block text-[9px] text-slate-400 mt-0.5">{row.ref}</span>
@@ -1274,7 +1305,7 @@
                       <div key={invoice.id} className="bg-white p-4 rounded-2xl border border-slate-200 flex justify-between items-center shadow-sm">
                         <div>
                           <p className="font-bold text-slate-800 text-sm">{invoice.customerName}</p>
-                          <p className="text-[11px] text-slate-500 font-medium mt-0.5">{invoice.id} • {invoice.date} • <span className={`font-bold ${invoice.status === 'Billed' ? 'text-indigo-600' : 'text-amber-500'}`}>{invoice.status}</span></p>
+                          <p className="text-[11px] text-slate-500 font-medium mt-0.5">{invoice.id} • {formatDateDisp(invoice.date)} • <span className={`font-bold ${invoice.status === 'Billed' ? 'text-indigo-600' : 'text-amber-500'}`}>{invoice.status}</span></p>
                         </div>
                         <div className="text-right">
                           <p className="font-extrabold text-slate-800 text-sm">Rs. {invoice.total.toLocaleString()}</p>
@@ -1377,7 +1408,7 @@
                   <div className="bg-white/80 backdrop-blur-md p-4 border-b border-slate-200 flex justify-between items-center sticky top-0 z-30 shadow-sm">
                     <div>
                       <h2 className="text-lg font-extrabold text-slate-800 tracking-tight">{isEdit ? `Edit ${currentInvoice.id}` : 'New Invoice'}</h2>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{getLocalDateStr()}</p>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{formatDateDisp(currentInvoice.date || getLocalDateStr())}</p>
                     </div>
                     <button onClick={() => setBillingView('list')} className="p-2 bg-slate-100 rounded-full text-slate-600 hover:bg-slate-200 transition-colors"><X size={20}/></button>
                   </div>
@@ -1581,7 +1612,7 @@
                        <div className="flex justify-between border-b border-slate-100 pb-3 mb-3 pl-3">
                          <div>
                            <h4 className="font-bold text-slate-800 text-sm">{o.customerName}</h4>
-                           <p className="text-[11px] text-slate-500 font-medium mt-0.5">{o.id} • {o.date} • <span className={`font-bold ${o.status === 'Billed' ? 'text-indigo-600' : 'text-amber-500'}`}>{o.status}</span></p>
+                           <p className="text-[11px] text-slate-500 font-medium mt-0.5">{o.id} • {formatDateDisp(o.date)} • <span className={`font-bold ${o.status === 'Billed' ? 'text-indigo-600' : 'text-amber-500'}`}>{o.status}</span></p>
                          </div>
                          <div className="text-right">
                            <p className="font-extrabold text-indigo-700 text-base">Rs. {o.total.toLocaleString()}</p>
@@ -2022,7 +2053,7 @@
                          <div key={exp.id} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex justify-between items-center">
                             <div>
                               <p className="font-bold text-slate-800 text-sm flex items-center gap-1.5"><Tag size={12} className="text-slate-400"/> {exp.category}</p>
-                              <p className="text-[11px] text-slate-500 font-medium mt-0.5">{exp.date} • {exp.note}</p>
+                              <p className="text-[11px] text-slate-500 font-medium mt-0.5">{formatDateDisp(exp.date)} • {exp.note}</p>
                             </div>
                             <div className="text-right">
                               <p className="font-extrabold text-rose-600 text-base">Rs. {exp.amount.toLocaleString()}</p>
