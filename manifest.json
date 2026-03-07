@@ -1,7 +1,9 @@
 {
+  "id": "/AnimalHealthPK-App-v1/",
   "name": "AnimalHealth.PK Customer Management App",
-  "short_name": "AnimalHealthPKApp",
+  "short_name": "AnimalHealthPK",
   "start_url": "./index.html",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#f8fafc",
   "theme_color": "#4f46e5",
