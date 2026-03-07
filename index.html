@@ -115,7 +115,7 @@
           
           useEffect(() => {
             const unsubscribe = onSnapshot(collection(db, collectionName), (snapshot) => {
-              if (snapshot.empty && data.length === 0) {
+              if (snapshot.empty) {
                 setData(initialFallback);
               } else {
                 const items = [];
