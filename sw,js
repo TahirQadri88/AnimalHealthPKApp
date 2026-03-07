@@ -1,4 +1,5 @@
-const CACHE_NAME = 'animalhealth-v1';
+// Changed cache name to force a fresh install
+const CACHE_NAME = 'animalhealth-v2-isolated';
 const ASSETS = [
   './',
   './index.html',
@@ -8,15 +9,27 @@ const ASSETS = [
 ];
 
 self.addEventListener('install', (event) => {
+  self.skipWaiting(); // Force the new service worker to activate immediately
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => cache.addAll(ASSETS))
-      .then(() => self.skipWaiting())
   );
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(self.clients.claim());
+  // Delete any old caches from previous apps on this domain
+  event.waitUntil(
+    caches.keys().then((cacheNames) => {
+      return Promise.all(
+        cacheNames.map((cacheName) => {
+          if (cacheName !== CACHE_NAME) {
+            return caches.delete(cacheName);
+          }
+        })
+      );
+    })
+  );
 });
 
 self.addEventListener('fetch', (event) => {
