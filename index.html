@@ -331,7 +331,7 @@
                    if (i.isBonus) savings += ((i.originalPrice || 0) * i.quantity);
                 });
                 if (data.deliveryBilled > 0) text += `Delivery: Rs.${data.deliveryBilled}\n`;
-                text += `\n*Total: Rs.${data.total}*\n`;
+                text += `\n*Current Bill: Rs.${data.total}*\n`;
                 if (savings > 0) text += `*Total Savings: Rs.${savings}*\n`;
                 text += `Status: ${data.paymentStatus}`;
               } else if (docType === 'dispatch') {
@@ -363,8 +363,8 @@
                 text += `*Remaining Balance: Rs.${data.newBalance}*\n\n`;
                 text += `Thank you for your business!`;
               } else if (docType === 'ledger') {
-                 text += `*ACCOUNT STATEMENT*\nCustomer: ${data.customerName}\nStatement Date: ${getLocalDateStr()}\n\n`;
-                 text += `Total Debits: Rs.${data.totalDebit}\nTotal Credits: Rs.${data.totalCredit}\n*Closing Balance: Rs.${data.closingBal}*\n\nPlease arrange payment at your earliest convenience.`;
+                 text += `*ACCOUNT STATEMENT*\nCustomer: ${data.customerName}\nStatement Period: ${data.dateRange.start} to ${data.dateRange.end}\n\n`;
+                 text += `Total Debits: Rs.${data.totalDebit}\nTotal Credits: Rs.${data.totalCredit}\n*Current Closing Balance: Rs.${data.closingBal}*\n\nPlease arrange payment at your earliest convenience.`;
               }
               return encodeURIComponent(text);
             };
@@ -520,21 +520,57 @@
                     </table>
 
                     {docType === 'invoice' && (
-                      <div className="border-t-2 border-slate-800 pt-2 w-full max-w-[250px] ml-auto text-slate-800">
-                        <div className="flex justify-between mb-1 font-medium">
-                          <span>Subtotal:</span>
-                          <span>Rs. {data.total - data.deliveryBilled}</span>
-                        </div>
-                        {data.deliveryBilled > 0 && (
-                          <div className="flex justify-between mb-1 font-medium text-slate-600">
-                            <span>Delivery ({data.vehicle}):</span>
-                            <span>Rs. {data.deliveryBilled}</span>
-                          </div>
-                        )}
-                        <div className="flex justify-between text-xl font-extrabold mt-2 border-t border-slate-300 pt-2">
-                          <span>Total:</span>
-                          <span>Rs. {data.total}</span>
-                        </div>
+                      <div className="border-t-2 border-slate-800 pt-2 w-full max-w-[280px] ml-auto text-slate-800">
+                        {(() => {
+                           const currentBillTotal = data.total;
+                           const ledger = getCustomerLedger(data.customerId);
+                           let prevBalance = 0;
+                           if (ledger) {
+                               const invIndex = ledger.rows.findIndex(r => r.id === data.id);
+                               if (invIndex > 0) prevBalance = ledger.rows[invIndex - 1].balance;
+                               else if (invIndex === 0) prevBalance = ledger.openingBal;
+                               else prevBalance = ledger.closingBal; // Fallback 
+                           }
+                           const subtotal = prevBalance + currentBillTotal;
+                           const received = data.receivedAmount || 0;
+                           const netBalance = subtotal - received;
+
+                           return (
+                             <>
+                               <div className="flex justify-between mb-1 font-medium text-sm">
+                                 <span>Items Subtotal:</span>
+                                 <span>Rs. {currentBillTotal - data.deliveryBilled}</span>
+                               </div>
+                               {data.deliveryBilled > 0 && (
+                                 <div className="flex justify-between mb-1 font-medium text-sm text-slate-600">
+                                   <span>Delivery ({data.vehicle}):</span>
+                                   <span>Rs. {data.deliveryBilled}</span>
+                                 </div>
+                               )}
+                               <div className="flex justify-between text-base font-extrabold mt-1 border-t border-slate-300 pt-1">
+                                 <span>Current Bill:</span>
+                                 <span>Rs. {currentBillTotal.toLocaleString()}</span>
+                               </div>
+                               
+                               <div className="flex justify-between mb-1 font-medium text-sm mt-3">
+                                 <span>Previous Balance:</span>
+                                 <span>Rs. {prevBalance.toLocaleString()}</span>
+                               </div>
+                               <div className="flex justify-between mb-1 font-bold text-sm border-t border-slate-200 pt-1">
+                                 <span>Subtotal:</span>
+                                 <span>Rs. {subtotal.toLocaleString()}</span>
+                               </div>
+                               <div className="flex justify-between mb-1 font-medium text-sm text-emerald-600">
+                                 <span>Payment Received:</span>
+                                 <span>- Rs. {received.toLocaleString()}</span>
+                               </div>
+                               <div className="flex justify-between text-xl font-black mt-2 border-t-2 border-slate-800 pt-2">
+                                 <span>Net Balance:</span>
+                                 <span>Rs. {netBalance.toLocaleString()}</span>
+                               </div>
+                             </>
+                           );
+                        })()}
                         
                         {(() => {
                            const totalSavings = data.items.reduce((sum, i) => sum + (i.isBonus ? (i.originalPrice || 0) * i.quantity : 0), 0);
@@ -570,10 +606,15 @@
 
                 {docType === 'ledger' && (
                    <>
-                     <div className="grid grid-cols-3 gap-2 mb-6 text-center border-y-2 border-slate-800 py-4">
-                       <div><p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Total Debits</p><p className="font-extrabold text-indigo-700 text-lg">Rs. {data.totalDebit.toLocaleString()}</p></div>
-                       <div><p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Total Credits</p><p className="font-extrabold text-emerald-600 text-lg">Rs. {data.totalCredit.toLocaleString()}</p></div>
-                       <div><p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Closing Balance</p><p className="font-extrabold text-rose-600 text-lg">Rs. {data.closingBal.toLocaleString()}</p></div>
+                     <div className="flex justify-between items-end mb-4 border-b-2 border-slate-800 pb-4 mt-2">
+                       <div>
+                          <p className="text-sm font-bold text-slate-700">Statement Period</p>
+                          <p className="text-base font-semibold">{data.dateRange.start} <span className="text-slate-400">to</span> {data.dateRange.end}</p>
+                       </div>
+                       <div className="text-right bg-rose-50 px-4 py-2 rounded-xl border border-rose-200">
+                          <p className="text-[10px] font-bold uppercase tracking-wider text-rose-600">Current Closing Balance</p>
+                          <p className="font-extrabold text-rose-700 text-xl">Rs. {data.closingBal.toLocaleString()}</p>
+                       </div>
                      </div>
                      
                      <table className="w-full text-left text-[11px] sm:text-xs border-collapse">
@@ -588,7 +629,7 @@
                        </thead>
                        <tbody className="divide-y divide-slate-100 text-slate-800">
                          <tr className="bg-slate-50/50">
-                            <td className="py-2 px-1 text-slate-500 font-medium" colSpan={4}>Opening Balance</td>
+                            <td className="py-2 px-1 text-slate-500 font-medium" colSpan={4}>Opening Balance (as of {data.dateRange.start})</td>
                             <td className="py-2 px-1 text-right font-bold">Rs. {data.openingBal.toLocaleString()}</td>
                          </tr>
                          {data.rows.map((row) => (
@@ -604,6 +645,14 @@
                            </tr>
                          ))}
                        </tbody>
+                       <tfoot className="bg-slate-50 border-t-2 border-slate-800">
+                         <tr>
+                           <td colSpan={2} className="py-3 px-1 font-bold text-right uppercase tracking-wider text-slate-600">Period Totals:</td>
+                           <td className="py-3 px-1 text-right font-extrabold text-indigo-700">Rs. {data.totalDebit.toLocaleString()}</td>
+                           <td className="py-3 px-1 text-right font-extrabold text-emerald-600">Rs. {data.totalCredit.toLocaleString()}</td>
+                           <td></td>
+                         </tr>
+                       </tfoot>
                      </table>
                    </>
                 )}
@@ -995,32 +1044,53 @@
           };
 
           const CustomerLedgerModal = () => {
-            const ledger = getCustomerLedger(selectedLedgerId);
-            if(!ledger) return null;
+            const [startDate, setStartDate] = useState(() => {
+               const d = new Date(); d.setMonth(d.getMonth() - 1); return getLocalDateStr(d);
+            });
+            const [endDate, setEndDate] = useState(getLocalDateStr());
+            const fullLedger = getCustomerLedger(selectedLedgerId);
+            
+            if(!fullLedger) return null;
+
+            const preRows = fullLedger.rows.filter(r => r.date < startDate);
+            const periodOpeningBal = fullLedger.openingBal + preRows.reduce((sum, r) => sum + r.debit - r.credit, 0);
+            
+            const filteredRows = fullLedger.rows.filter(r => r.date >= startDate && r.date <= endDate);
+            const periodTotalDebit = filteredRows.reduce((sum, r) => sum + r.debit, 0);
+            const periodTotalCredit = filteredRows.reduce((sum, r) => sum + r.credit, 0);
+
+            const printData = {
+               ...fullLedger,
+               dateRange: { start: startDate, end: endDate },
+               openingBal: periodOpeningBal,
+               rows: filteredRows,
+               totalDebit: periodTotalDebit,
+               totalCredit: periodTotalCredit
+            };
 
             return (
-              <ModalWrapper title={`${ledger.customerName} - Account Ledger`} onClose={() => setShowLedgerModal(false)}>
+              <ModalWrapper title={`${fullLedger.customerName} - Account Ledger`} onClose={() => setShowLedgerModal(false)}>
                 <div className="space-y-4 pb-10">
-                  <div className="grid grid-cols-3 gap-2 mb-2">
-                     <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200 text-center">
-                        <p className="text-[9px] font-bold uppercase text-slate-500 tracking-widest">Total Debits</p>
-                        <p className="text-sm font-extrabold text-indigo-700 mt-1">Rs. {ledger.totalDebit.toLocaleString()}</p>
-                     </div>
-                     <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200 text-center">
-                        <p className="text-[9px] font-bold uppercase text-slate-500 tracking-widest">Total Credits</p>
-                        <p className="text-sm font-extrabold text-emerald-600 mt-1">Rs. {ledger.totalCredit.toLocaleString()}</p>
-                     </div>
-                     <div className="bg-rose-50/50 p-3 rounded-2xl border border-rose-100 text-center">
-                        <p className="text-[9px] font-bold uppercase text-rose-600 tracking-widest">Closing Balance</p>
-                        <p className="text-sm font-extrabold text-rose-700 mt-1">Rs. {ledger.closingBal.toLocaleString()}</p>
-                     </div>
+                  <div className="flex items-center gap-2 mb-4 bg-slate-50 p-3 rounded-2xl border border-slate-200">
+                      <div className="flex-1">
+                         <label className="text-[9px] font-bold uppercase text-slate-500 block mb-1 tracking-wider">Start Date</label>
+                         <input type="date" value={startDate} onChange={e=>setStartDate(e.target.value)} className="w-full p-2 text-xs font-semibold rounded-lg border border-slate-300 outline-none focus:border-indigo-500 bg-white" />
+                      </div>
+                      <div className="flex-1">
+                         <label className="text-[9px] font-bold uppercase text-slate-500 block mb-1 tracking-wider">End Date</label>
+                         <input type="date" value={endDate} onChange={e=>setEndDate(e.target.value)} className="w-full p-2 text-xs font-semibold rounded-lg border border-slate-300 outline-none focus:border-indigo-500 bg-white" />
+                      </div>
+                      <div className="ml-2 text-right bg-rose-50 px-3 py-2 rounded-xl border border-rose-200 shadow-sm shrink-0">
+                         <p className="text-[9px] font-bold uppercase text-rose-600 tracking-widest">Current Balance</p>
+                         <p className="text-base font-black text-rose-700 mt-0.5">Rs. {fullLedger.closingBal.toLocaleString()}</p>
+                      </div>
                   </div>
                   
                   <div className="flex gap-2">
-                     <button onClick={() => { setSelectedCustomerForPayment(ledger.id); setShowPaymentModal(true); }} className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3.5 rounded-xl flex justify-center items-center gap-2 shadow-sm active:scale-[0.98] transition-all text-xs">
+                     <button onClick={() => { setSelectedCustomerForPayment(fullLedger.id); setShowPaymentModal(true); }} className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3.5 rounded-xl flex justify-center items-center gap-2 shadow-sm active:scale-[0.98] transition-all text-xs">
                         <Wallet size={16} /> Receive Payment
                      </button>
-                     <button onClick={() => setPrintConfig({docType: 'ledger', format: 'a5', data: ledger})} className="flex-1 bg-slate-800 hover:bg-slate-900 text-white font-bold py-3.5 rounded-xl flex justify-center items-center gap-2 shadow-sm active:scale-[0.98] transition-all text-xs">
+                     <button onClick={() => setPrintConfig({docType: 'ledger', format: 'a5', data: printData})} className="flex-1 bg-slate-800 hover:bg-slate-900 text-white font-bold py-3.5 rounded-xl flex justify-center items-center gap-2 shadow-sm active:scale-[0.98] transition-all text-xs">
                         <FileSpreadsheet size={16} /> Print Ledger
                      </button>
                   </div>
@@ -1040,11 +1110,11 @@
                           </thead>
                           <tbody className="divide-y divide-slate-100 text-slate-800">
                             <tr className="bg-slate-50/30">
-                               <td className="py-3 px-3 text-slate-500 font-medium" colSpan={4}>Opening Balance</td>
-                               <td className="py-3 px-3 text-right font-bold text-slate-700">Rs. {ledger.openingBal.toLocaleString()}</td>
+                               <td className="py-3 px-3 text-slate-500 font-medium" colSpan={4}>Opening Balance <span className="text-[9px]">(as of {startDate})</span></td>
+                               <td className="py-3 px-3 text-right font-bold text-slate-700">Rs. {periodOpeningBal.toLocaleString()}</td>
                                <td></td>
                             </tr>
-                            {ledger.rows.map(row => (
+                            {filteredRows.map(row => (
                                <tr key={row.id} className="hover:bg-slate-50 transition-colors">
                                  <td className="py-3 px-3 font-medium text-slate-600">{row.date}</td>
                                  <td className="py-3 px-3">
@@ -1056,15 +1126,23 @@
                                  <td className="py-3 px-3 text-right font-extrabold text-slate-800">{row.balance.toLocaleString()}</td>
                                  <td className="py-3 px-2 text-center">
                                     {row.credit > 0 && (
-                                       <button onClick={() => setPrintConfig({docType: 'receipt', format: 'thermal', data: generateReceiptData(ledger, row.id)})} title="Print Receipt" className="p-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-lg transition-colors"><Receipt size={14}/></button>
+                                       <button onClick={() => setPrintConfig({docType: 'receipt', format: 'thermal', data: generateReceiptData(fullLedger, row.id)})} title="Print Receipt" className="p-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-lg transition-colors"><Receipt size={14}/></button>
                                     )}
                                  </td>
                                </tr>
                             ))}
-                            {ledger.rows.length === 0 && (
-                               <tr><td colSpan={6} className="text-center py-6 text-slate-400 font-medium">No transactions found.</td></tr>
+                            {filteredRows.length === 0 && (
+                               <tr><td colSpan={6} className="text-center py-6 text-slate-400 font-medium">No transactions in this period.</td></tr>
                             )}
                           </tbody>
+                          <tfoot className="bg-slate-50 border-t border-slate-200">
+                            <tr>
+                               <td colSpan={2} className="py-3 px-3 font-bold text-right uppercase tracking-wider text-slate-500">Period Totals:</td>
+                               <td className="py-3 px-3 text-right font-black text-indigo-700">Rs. {periodTotalDebit.toLocaleString()}</td>
+                               <td className="py-3 px-3 text-right font-black text-emerald-600">Rs. {periodTotalCredit.toLocaleString()}</td>
+                               <td colSpan={2}></td>
+                            </tr>
+                          </tfoot>
                         </table>
                      </div>
                   </div>
