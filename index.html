@@ -54,7 +54,7 @@
           Plus, Search, Truck, CheckCircle2, AlertCircle, Users,
           Share2, Printer, Trash2, Edit, X, Lock, DollarSign, 
           TrendingUp, Receipt, FileSpreadsheet, Calendar, Save, ChevronRight,
-          Wallet, Download, Upload, TrendingDown, Filter, ArrowUpDown, Award, CreditCard, Copy, Tag
+          Wallet, Download, Upload, TrendingDown, Filter, ArrowUpDown, Award, CreditCard, Copy, Tag, MapPin
         } from 'lucide-react';
 
         // --- FIREBASE SETUP ---
@@ -76,7 +76,7 @@
 
         // --- CONSTANTS & HELPERS ---
         const APP_NAME = "AnimalHealth.PK";
-        const VEHICLES = ['Rider', 'Rickshaw', 'Suzuki', 'Self-Pickup'];
+        const VEHICLES = ['Rider', 'Rickshaw', 'Suzuki', 'Intercity Transport', 'Self-Pickup'];
 
         const getLocalDateStr = (date = new Date()) => {
           const offset = date.getTimezoneOffset() * 60000;
@@ -194,7 +194,7 @@
           const handleLogin = async (e) => {
             e.preventDefault();
             
-            // First-time DB initialization logic: Secure fallback to create the first admin
+            // First-time DB initialization logic
             if (appUsers.length === 0 && loginForm.name.toLowerCase() === 'tahir' && loginForm.password === '7869') {
                const initUser = { id: Date.now().toString(), name: 'Tahir', password: '7869', role: 'admin' };
                await saveToFirebase('app_users', initUser.id, initUser);
@@ -335,7 +335,26 @@
                 if (savings > 0) text += `*Total Savings: Rs.${savings}*\n`;
                 text += `Status: ${data.paymentStatus}`;
               } else if (docType === 'dispatch') {
-                text += `*DISPATCH NOTE #${data.id}*\nDate: ${data.date}\nCustomer: ${data.customerName}\nVehicle: ${data.vehicle}\n\n*Items to Deliver:*\n`;
+                text += `*DISPATCH NOTE #${data.id}*\n`;
+                text += `Date: ${data.date}\n`;
+                text += `*Customer:* ${data.customerName}\n`;
+                
+                if(data.customerDetails?.contactPerson || data.customerDetails?.phone) {
+                   text += `*Contact:* ${data.customerDetails?.contactPerson || 'N/A'} - ${data.customerDetails?.phone || ''}\n`;
+                }
+                if(data.customerDetails?.address1) text += `*Address 1:* ${data.customerDetails.address1}\n`;
+                if(data.customerDetails?.map1) text += `*Map 1:* ${data.customerDetails.map1}\n`;
+                if(data.customerDetails?.address2) text += `*Address 2:* ${data.customerDetails.address2}\n`;
+                if(data.customerDetails?.map2) text += `*Map 2:* ${data.customerDetails.map2}\n`;
+                
+                text += `\n*Vehicle/Transport:* ${data.vehicle}\n`;
+                if(data.vehicle === 'Intercity Transport') {
+                   text += `Transport Co: ${data.transportCompany || 'N/A'}\nBilty No: ${data.biltyNumber || 'N/A'}\n`;
+                } else if (['Rider', 'Rickshaw', 'Suzuki'].includes(data.vehicle)) {
+                   text += `Driver: ${data.driverName || 'N/A'} - ${data.driverPhone || ''}\n`;
+                }
+
+                text += `\n*Items to Deliver:*\n`;
                 data.items.forEach(i => text += `- ${i.name} ${i.isBonus ? '🎁 (BONUS)' : ''} -> ${getDispatchQtyStr(i)}\n`);
               } else if (docType === 'receipt') {
                 text += `*PAYMENT RECEIPT*\nRef: ${data.id}\nDate: ${data.date}\nCustomer: ${data.customerName}\n\n`;
@@ -377,6 +396,17 @@
                      <div>
                        <p className="text-slate-500 text-xs uppercase font-bold tracking-wider mb-1">Customer Details</p>
                        <p className="text-lg font-bold">{data.customerName}</p>
+                       
+                       {/* Enhanced Dispatch Note Customer Details */}
+                       {docType === 'dispatch' && data.customerDetails && (
+                         <div className="mt-2 text-xs space-y-1 text-slate-700 bg-slate-50 p-2 rounded border border-slate-200">
+                            {(data.customerDetails.contactPerson || data.customerDetails.phone) && (
+                               <p><strong>Contact:</strong> {data.customerDetails.contactPerson || 'N/A'} ({data.customerDetails.phone || ''})</p>
+                            )}
+                            {data.customerDetails.address1 && <p><strong>Addr 1:</strong> {data.customerDetails.address1}</p>}
+                            {data.customerDetails.address2 && <p><strong>Addr 2:</strong> {data.customerDetails.address2}</p>}
+                         </div>
+                       )}
                        {docType === 'ledger' && <p className="text-sm text-slate-600">{data.phone}</p>}
                      </div>
                      <div className="text-right">
@@ -394,6 +424,19 @@
                           </>
                         )}
                      </div>
+                   </div>
+                )}
+
+                {/* Dispatch Note Logistics Block */}
+                {docType === 'dispatch' && (
+                   <div className="mb-6 bg-slate-50 p-3 rounded-lg border border-slate-300 text-xs text-slate-800">
+                      <p className="font-bold uppercase tracking-wider text-[10px] text-slate-500 mb-1">Logistics / Delivery Info</p>
+                      <p><strong>Method:</strong> {data.vehicle}</p>
+                      {data.vehicle === 'Intercity Transport' ? (
+                         <p><strong>Transport Co:</strong> {data.transportCompany || '-'} &nbsp;|&nbsp; <strong>Bilty No:</strong> {data.biltyNumber || '-'}</p>
+                      ) : ['Rider', 'Rickshaw', 'Suzuki'].includes(data.vehicle) ? (
+                         <p><strong>Driver:</strong> {data.driverName || '-'} &nbsp;|&nbsp; <strong>Phone:</strong> {data.driverPhone || '-'}</p>
+                      ) : null}
                    </div>
                 )}
 
@@ -784,7 +827,17 @@
 
           const CustomerModal = () => {
             const isEdit = !!editingCustomer;
-            const [form, setForm] = useState(isEdit ? editingCustomer : { name: '', phone: '', address: '', openingBalance: 0 });
+            const [form, setForm] = useState(isEdit ? editingCustomer : { 
+               name: '', contactPerson: '', phone: '', 
+               address1: '', map1: '', address2: '', map2: '', openingBalance: 0 
+            });
+
+            // Backwards compatibility: If editing old customer with "address" field, map it to address1
+            useEffect(() => {
+               if (isEdit && editingCustomer.address && !editingCustomer.address1) {
+                  setForm(prev => ({...prev, address1: editingCustomer.address}));
+               }
+            }, [isEdit, editingCustomer]);
 
             const save = async () => {
               if(!form.name) return showToast("Customer Name required", "error");
@@ -792,6 +845,9 @@
 
               if(isEdit) {
                 const updatedCustomer = {...form, openingBalance: Number(form.openingBalance)};
+                // Remove legacy address property if it existed to keep DB clean
+                if(updatedCustomer.address) delete updatedCustomer.address; 
+                
                 await saveToFirebase('customers', form.id, updatedCustomer);
                 if(form.name !== editingCustomer.name) {
                    invoices.forEach(async o => {
@@ -812,30 +868,65 @@
               setShowCustomerModal(false);
             };
 
-            const inputClass = "w-full p-3.5 bg-white border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-sm text-slate-800 placeholder-slate-400";
+            const inputClass = "w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-sm text-slate-800 placeholder-slate-400";
 
             return (
-              <ModalWrapper title={isEdit ? "Edit Customer" : "Add Customer"} onClose={() => setShowCustomerModal(false)}>
-                <div className="space-y-4">
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Customer / Business Name</label>
-                    <input placeholder="e.g. Karachi Vet Clinic" className={inputClass} value={form.name} onChange={e => setForm({...form, name: e.target.value})} />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Phone Number</label>
-                    <input placeholder="03XXXXXXXXX" className={inputClass} value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Address (Optional)</label>
-                    <textarea placeholder="Complete Address" rows="2" className={inputClass} value={form.address} onChange={e => setForm({...form, address: e.target.value})} />
-                  </div>
-                  {isAdmin && (
+              <ModalWrapper title={isEdit ? "Edit Customer Profile" : "Add New Customer"} onClose={() => setShowCustomerModal(false)}>
+                <div className="space-y-5 pb-8">
+                  
+                  {/* Basic Info */}
+                  <div className="space-y-3">
+                     <h3 className="text-xs font-bold text-slate-800 uppercase tracking-widest border-b border-slate-200 pb-1">Basic Details</h3>
                      <div>
+                       <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Customer / Business Name *</label>
+                       <input placeholder="e.g. Karachi Vet Clinic" className={inputClass} value={form.name} onChange={e => setForm({...form, name: e.target.value})} />
+                     </div>
+                     <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Contact Person</label>
+                          <input placeholder="Name" className={inputClass} value={form.contactPerson || ''} onChange={e => setForm({...form, contactPerson: e.target.value})} />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Phone Number</label>
+                          <input placeholder="03XXXXXXXXX" className={inputClass} value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} />
+                        </div>
+                     </div>
+                  </div>
+
+                  {/* Address 1 */}
+                  <div className="space-y-3 bg-slate-100 p-3 rounded-xl border border-slate-200">
+                     <h3 className="text-xs font-bold text-slate-800 uppercase tracking-widest flex items-center gap-1"><MapPin size={14}/> Primary Location</h3>
+                     <div>
+                       <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Address 1</label>
+                       <textarea placeholder="Complete Delivery Address..." rows="2" className={inputClass} value={form.address1} onChange={e => setForm({...form, address1: e.target.value})} />
+                     </div>
+                     <div>
+                       <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Google Maps Link 1</label>
+                       <input placeholder="https://maps.app.goo.gl/..." className={inputClass} value={form.map1 || ''} onChange={e => setForm({...form, map1: e.target.value})} />
+                     </div>
+                  </div>
+
+                  {/* Address 2 */}
+                  <div className="space-y-3 p-3 rounded-xl border border-slate-200 border-dashed">
+                     <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1"><MapPin size={14}/> Secondary Location (Optional)</h3>
+                     <div>
+                       <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Address 2</label>
+                       <textarea placeholder="Alternative Address..." rows="2" className={inputClass} value={form.address2 || ''} onChange={e => setForm({...form, address2: e.target.value})} />
+                     </div>
+                     <div>
+                       <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Google Maps Link 2</label>
+                       <input placeholder="https://maps.app.goo.gl/..." className={inputClass} value={form.map2 || ''} onChange={e => setForm({...form, map2: e.target.value})} />
+                     </div>
+                  </div>
+
+                  {isAdmin && (
+                     <div className="bg-rose-50 p-3 rounded-xl border border-rose-100 mt-2">
                        <label className="text-[10px] font-bold text-rose-500 uppercase tracking-wider ml-1 mb-1 block">Opening Balance (Dr)</label>
-                       <input type="number" placeholder="0.00" className={inputClass} value={form.openingBalance} onChange={e => setForm({...form, openingBalance: e.target.value})} />
+                       <input type="number" placeholder="0.00" className={`${inputClass} !border-rose-200 focus:!border-rose-500`} value={form.openingBalance} onChange={e => setForm({...form, openingBalance: e.target.value})} />
                      </div>
                   )}
-                  <button onClick={save} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 rounded-xl mt-4 shadow-md shadow-indigo-600/20 active:scale-[0.98] transition-all">Save Customer</button>
+                  
+                  <button onClick={save} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 rounded-xl mt-4 shadow-md shadow-indigo-600/20 active:scale-[0.98] transition-all">Save Customer Profile</button>
                 </div>
               </ModalWrapper>
             );
@@ -1105,7 +1196,7 @@
                       <div key={invoice.id} className="bg-white p-4 rounded-2xl border border-slate-200 flex justify-between items-center shadow-sm">
                         <div>
                           <p className="font-bold text-slate-800 text-sm">{invoice.customerName}</p>
-                          <p className="text-[11px] text-slate-500 font-medium mt-0.5">{invoice.date} • <span className={`font-bold ${invoice.status === 'Billed' ? 'text-indigo-600' : 'text-amber-500'}`}>{invoice.status}</span></p>
+                          <p className="text-[11px] text-slate-500 font-medium mt-0.5">{invoice.id} • {invoice.date} • <span className={`font-bold ${invoice.status === 'Billed' ? 'text-indigo-600' : 'text-amber-500'}`}>{invoice.status}</span></p>
                         </div>
                         <div className="text-right">
                           <p className="font-extrabold text-slate-800 text-sm">Rs. {invoice.total.toLocaleString()}</p>
@@ -1126,9 +1217,10 @@
 
             const startNewInvoice = () => {
               setCurrentInvoice({
-                id: null, customerId: '', customerName: '', items: [], 
+                id: null, customerId: '', customerName: '', customerDetails: {}, items: [], 
                 deliveryBilled: 0, transportExpense: 0, vehicle: VEHICLES[0], 
-                paymentStatus: 'Pending', receivedAmount: 0 
+                paymentStatus: 'Pending', receivedAmount: 0,
+                transportCompany: '', biltyNumber: '', driverName: '', driverPhone: ''
               });
               setBillingView('form');
             };
@@ -1139,12 +1231,22 @@
               const totalItems = currentInvoice.items.reduce((sum, i) => sum + (i.price * i.quantity), 0);
               const grandTotal = totalItems + Number(currentInvoice.deliveryBilled);
               
+              const activeCustomer = customers.find(c => c.id === currentInvoice.customerId);
+              
               const finalInvoice = { 
                  ...currentInvoice, 
                  total: grandTotal, 
                  status: status,
                  salespersonId: currentUser.id,
-                 salespersonName: currentUser.name
+                 salespersonName: currentUser.name,
+                 customerDetails: activeCustomer ? {
+                     contactPerson: activeCustomer.contactPerson || '',
+                     phone: activeCustomer.phone || '',
+                     address1: activeCustomer.address1 || activeCustomer.address || '',
+                     map1: activeCustomer.map1 || '',
+                     address2: activeCustomer.address2 || '',
+                     map2: activeCustomer.map2 || ''
+                 } : {}
               };
 
               if (!finalInvoice.id) {
@@ -1162,12 +1264,25 @@
             const handleAddItem = (p, isBonus) => {
               const uniqueId = isBonus ? `${p.id}_bonus` : p.id;
               const existing = currentInvoice.items.find(i => (i.uniqueId || i.productId) === uniqueId);
+              
+              let historicalPrice = p.sellingPrice;
+              if (!isBonus && currentInvoice.customerId) {
+                  const pastInvs = invoices.filter(inv => inv.customerId === currentInvoice.customerId).sort((a,b) => new Date(b.date) - new Date(a.date) || b.id.localeCompare(a.id));
+                  for (let inv of pastInvs) {
+                      const pastItem = inv.items.find(i => (i.productId === p.id || i.uniqueId === p.id) && !i.isBonus);
+                      if (pastItem && pastItem.price !== undefined) { 
+                          historicalPrice = pastItem.price; 
+                          break; 
+                      }
+                  }
+              }
+
               if(existing) {
                 setCurrentInvoice({...currentInvoice, items: currentInvoice.items.map(i => (i.uniqueId || i.productId) === uniqueId ? {...i, quantity: i.quantity + 1} : i)});
               } else {
                 setCurrentInvoice({...currentInvoice, items: [...currentInvoice.items, { 
                   uniqueId: uniqueId, productId: p.id, name: p.name, 
-                  price: isBonus ? 0 : p.sellingPrice, originalPrice: p.sellingPrice, costPrice: p.costPrice, 
+                  price: isBonus ? 0 : historicalPrice, originalPrice: p.sellingPrice, costPrice: p.costPrice, 
                   company: getCompanyName(p.companyId), quantity: 1, unitsInBox: p.unitsInBox, 
                   unit: p.unit, isBonus: isBonus 
                 }]});
@@ -1177,7 +1292,6 @@
 
             if (billingView === 'form') {
               const isEdit = !!currentInvoice.id;
-              const activeCustomer = customers.find(c => c.id === Number(currentInvoice.customerId));
               const grandTotal = currentInvoice.items.reduce((s,i)=>s+(i.price*i.quantity),0) + Number(currentInvoice.deliveryBilled);
 
               return (
@@ -1195,7 +1309,27 @@
                     <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
                        <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5"><Users size={12}/> Select Customer</h3>
                        <div className="flex gap-2 items-center">
-                          <select className={inputClass} value={currentInvoice.customerId} onChange={e => setCurrentInvoice({...currentInvoice, customerId: Number(e.target.value), customerName: customers.find(c=>c.id === Number(e.target.value))?.name || ''})}>
+                          <select className={inputClass} value={currentInvoice.customerId} onChange={e => {
+                             const cid = Number(e.target.value);
+                             const cName = customers.find(c=>c.id === cid)?.name || '';
+                             
+                             // Fetch history for autofill logistics
+                             const pastInvs = invoices.filter(inv => inv.customerId === cid).sort((a,b) => new Date(b.date) - new Date(a.date) || b.id.localeCompare(a.id));
+                             const lastInv = pastInvs[0];
+                             
+                             setCurrentInvoice({
+                                ...currentInvoice, 
+                                customerId: cid, 
+                                customerName: cName,
+                                vehicle: lastInv ? (lastInv.vehicle || VEHICLES[0]) : VEHICLES[0],
+                                transportCompany: lastInv ? (lastInv.transportCompany || '') : '',
+                                biltyNumber: lastInv ? (lastInv.biltyNumber || '') : '',
+                                driverName: lastInv ? (lastInv.driverName || '') : '',
+                                driverPhone: lastInv ? (lastInv.driverPhone || '') : '',
+                                deliveryBilled: lastInv ? (lastInv.deliveryBilled || 0) : 0,
+                                transportExpense: lastInv ? (lastInv.transportExpense || 0) : 0
+                             });
+                          }}>
                              <option value="">-- Select Client --</option>
                              {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                           </select>
@@ -1225,28 +1359,43 @@
                          </div>
                        )}
 
-                       <div className="space-y-2">
+                       <div className="space-y-3">
                          {currentInvoice.items.map(item => {
                            const itemKey = item.uniqueId || item.productId;
                            return (
-                           <div key={itemKey} className="flex justify-between items-center bg-slate-50 p-3 rounded-xl border border-slate-100">
-                              <div className="flex-1">
+                           <div key={itemKey} className="bg-slate-50 p-3 rounded-xl border border-slate-200 shadow-sm">
+                              <div className="flex justify-between items-start mb-2">
                                 <p className="font-bold text-sm text-slate-800 leading-tight">
                                    {item.name}
                                    {item.isBonus && <span className="ml-2 text-[9px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider border border-emerald-200">Bonus</span>}
                                 </p>
-                                <div className="flex items-center gap-2 mt-0.5">
-                                   {item.isBonus ? (
-                                      <><span className="text-xs text-emerald-600 font-bold">FREE</span><span className="text-[10px] text-slate-400 font-medium line-through">Rs. {item.originalPrice}</span></>
-                                   ) : (
-                                      <span className="text-xs text-slate-500 font-medium">Rs. {item.price}</span>
-                                   )}
-                                </div>
+                                <button onClick={() => setCurrentInvoice({...currentInvoice, items: currentInvoice.items.filter(i => (i.uniqueId || i.productId) !== itemKey)})} className="text-slate-400 hover:text-rose-500"><X size={16}/></button>
                               </div>
-                              <div className="flex items-center gap-2 shrink-0 bg-white border border-slate-200 rounded-lg p-1 shadow-sm">
-                                 <button onClick={() => setCurrentInvoice({...currentInvoice, items: currentInvoice.items.map(i => (i.uniqueId || i.productId) === itemKey ? {...i, quantity: i.quantity - 1} : i).filter(i=>i.quantity>0)})} className="w-7 h-7 rounded-md bg-slate-100 text-slate-600 font-bold hover:bg-slate-200 transition-colors">-</button>
-                                 <span className="font-bold w-6 text-center text-sm text-slate-800">{item.quantity}</span>
-                                 <button onClick={() => setCurrentInvoice({...currentInvoice, items: currentInvoice.items.map(i => (i.uniqueId || i.productId) === itemKey ? {...i, quantity: i.quantity + 1} : i)})} className="w-7 h-7 rounded-md bg-indigo-50 text-indigo-600 font-bold hover:bg-indigo-100 transition-colors">+</button>
+                              <div className="flex items-center justify-between">
+                                 <div className="flex flex-col">
+                                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5 ml-1">Rate (Rs)</label>
+                                    <input 
+                                       type="number" 
+                                       className="w-24 p-1.5 text-sm font-extrabold text-indigo-700 bg-white border border-indigo-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-inner" 
+                                       value={item.price} 
+                                       disabled={item.isBonus}
+                                       onChange={(e) => setCurrentInvoice({...currentInvoice, items: currentInvoice.items.map(i => (i.uniqueId || i.productId) === itemKey ? {...i, price: Number(e.target.value)} : i)})}
+                                    />
+                                    {item.isBonus && <span className="text-[9px] text-slate-400 font-medium line-through mt-0.5">Rs. {item.originalPrice}</span>}
+                                 </div>
+                                 <div className="flex flex-col items-center">
+                                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Quantity</label>
+                                    <div className="flex items-center bg-white border border-slate-200 rounded-lg p-0.5 shadow-sm">
+                                       <button onClick={() => setCurrentInvoice({...currentInvoice, items: currentInvoice.items.map(i => (i.uniqueId || i.productId) === itemKey ? {...i, quantity: i.quantity - 1} : i).filter(i=>i.quantity>0)})} className="w-8 h-8 rounded-md bg-slate-50 text-slate-600 font-bold hover:bg-slate-100 transition-colors">-</button>
+                                       <input 
+                                          type="number" 
+                                          className="w-12 text-center text-sm font-bold bg-transparent outline-none appearance-none" 
+                                          value={item.quantity} 
+                                          onChange={(e) => setCurrentInvoice({...currentInvoice, items: currentInvoice.items.map(i => (i.uniqueId || i.productId) === itemKey ? {...i, quantity: Number(e.target.value)} : i)})}
+                                       />
+                                       <button onClick={() => setCurrentInvoice({...currentInvoice, items: currentInvoice.items.map(i => (i.uniqueId || i.productId) === itemKey ? {...i, quantity: i.quantity + 1} : i)})} className="w-8 h-8 rounded-md bg-indigo-50 text-indigo-600 font-bold hover:bg-indigo-100 transition-colors">+</button>
+                                    </div>
+                                 </div>
                               </div>
                            </div>
                          )})}
@@ -1255,13 +1404,42 @@
 
                     <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
                        <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5"><Truck size={12}/> Logistics</h3>
+                       
+                       <div className="mb-3">
+                         <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Vehicle / Transport Method</label>
+                         <select className={inputClass} value={currentInvoice.vehicle} onChange={e => setCurrentInvoice({...currentInvoice, vehicle: e.target.value})}>
+                           {VEHICLES.map(v => <option key={v} value={v}>{v}</option>)}
+                         </select>
+                       </div>
+
+                       {/* Conditional Logistics Fields */}
+                       {currentInvoice.vehicle === 'Intercity Transport' && (
+                          <div className="grid grid-cols-2 gap-3 mb-3 bg-amber-50 p-3 rounded-xl border border-amber-100">
+                             <div className="col-span-2">
+                                <label className="text-[10px] font-bold text-amber-700 uppercase tracking-wider ml-1 mb-1 block">Transport Company</label>
+                                <input placeholder="e.g. Daewoo Express" className={`${inputClass} !bg-white !border-amber-200`} value={currentInvoice.transportCompany || ''} onChange={e => setCurrentInvoice({...currentInvoice, transportCompany: e.target.value})} />
+                             </div>
+                             <div className="col-span-2">
+                                <label className="text-[10px] font-bold text-amber-700 uppercase tracking-wider ml-1 mb-1 block">Bilty / Bill-T Number</label>
+                                <input placeholder="Enter Bilty #" className={`${inputClass} !bg-white !border-amber-200`} value={currentInvoice.biltyNumber || ''} onChange={e => setCurrentInvoice({...currentInvoice, biltyNumber: e.target.value})} />
+                             </div>
+                          </div>
+                       )}
+
+                       {['Rider', 'Rickshaw', 'Suzuki'].includes(currentInvoice.vehicle) && (
+                          <div className="grid grid-cols-2 gap-3 mb-3 bg-indigo-50/50 p-3 rounded-xl border border-indigo-100">
+                             <div className="col-span-2 sm:col-span-1">
+                                <label className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider ml-1 mb-1 block">Driver Name</label>
+                                <input placeholder="Name" className={`${inputClass} !bg-white !border-indigo-200`} value={currentInvoice.driverName || ''} onChange={e => setCurrentInvoice({...currentInvoice, driverName: e.target.value})} />
+                             </div>
+                             <div className="col-span-2 sm:col-span-1">
+                                <label className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider ml-1 mb-1 block">Driver Phone</label>
+                                <input placeholder="03XX..." className={`${inputClass} !bg-white !border-indigo-200`} value={currentInvoice.driverPhone || ''} onChange={e => setCurrentInvoice({...currentInvoice, driverPhone: e.target.value})} />
+                             </div>
+                          </div>
+                       )}
+
                        <div className="grid grid-cols-2 gap-3 mb-2">
-                         <div className="col-span-2">
-                           <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Vehicle</label>
-                           <select className={inputClass} value={currentInvoice.vehicle} onChange={e => setCurrentInvoice({...currentInvoice, vehicle: e.target.value})}>
-                             {VEHICLES.map(v => <option key={v} value={v}>{v}</option>)}
-                           </select>
-                         </div>
                          <div>
                            <label className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider ml-1 mb-1 block">Delivery Billed (+)</label>
                            <input type="number" className={inputClass} value={currentInvoice.deliveryBilled} onChange={e => setCurrentInvoice({...currentInvoice, deliveryBilled: e.target.value})} />
@@ -1271,6 +1449,7 @@
                            <input type="number" className={inputClass} value={currentInvoice.transportExpense} onChange={e => setCurrentInvoice({...currentInvoice, transportExpense: e.target.value})} />
                          </div>
                        </div>
+                       
                        <div className="mt-4 bg-slate-50 p-3 rounded-xl border border-slate-200">
                           <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 block mb-2">Payment Received</label>
                           <div className="flex items-center gap-2">
@@ -1324,7 +1503,7 @@
                        <div className="flex justify-between border-b border-slate-100 pb-3 mb-3 pl-3">
                          <div>
                            <h4 className="font-bold text-slate-800 text-sm">{o.customerName}</h4>
-                           <p className="text-[11px] text-slate-500 font-medium mt-0.5">{o.id} • {o.date}</p>
+                           <p className="text-[11px] text-slate-500 font-medium mt-0.5">{o.id} • {o.date} • <span className={`font-bold ${o.status === 'Billed' ? 'text-indigo-600' : 'text-amber-500'}`}>{o.status}</span></p>
                          </div>
                          <div className="text-right">
                            <p className="font-extrabold text-indigo-700 text-base">Rs. {o.total.toLocaleString()}</p>
@@ -1417,7 +1596,7 @@
                          <div key={c.id} className="bg-white p-4 rounded-2xl border border-slate-200 flex justify-between items-center shadow-sm hover:border-indigo-200 transition-colors">
                             <div className="flex-1 cursor-pointer" onClick={() => { setSelectedLedgerId(c.id); setShowLedgerModal(true); }}>
                               <h4 className="font-bold text-slate-800 text-sm hover:text-indigo-600">{c.name}</h4>
-                              <p className="text-[11px] font-medium text-slate-500 mt-0.5">{c.phone}</p>
+                              <p className="text-[11px] font-medium text-slate-500 mt-0.5">{c.contactPerson ? `${c.contactPerson} - ` : ''}{c.phone}</p>
                               <div className="mt-2.5">
                                 <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-md ${bal > 0 ? 'bg-rose-50 text-rose-600 border border-rose-100' : bal < 0 ? 'bg-indigo-50 text-indigo-600 border border-indigo-100' : 'bg-emerald-50 text-emerald-600 border border-emerald-100'}`}>
                                    Bal: Rs. {bal.toLocaleString()} {bal > 0 ? '(Dr)' : bal < 0 ? '(Cr)' : ''}
@@ -1788,12 +1967,12 @@
                let updatedCount = 0;
                for (const bp of bulkProducts) {
                    const orig = products.find(p => p.id === bp.id);
-                   if (orig && (orig.costPrice !== bp.costPrice || orig.sellingPrice !== bp.sellingPrice || orig.available !== bp.available)) {
-                       await saveToFirebase('products', bp.id, bp);
+                   if (orig && (orig.costPrice !== bp.costPrice || orig.sellingPrice !== bp.sellingPrice || orig.available !== bp.available || orig.name !== bp.name || orig.unit !== bp.unit || orig.unitsInBox !== bp.unitsInBox)) {
+                       await saveToFirebase('products', bp.id, {...orig, ...bp});
                        updatedCount++;
                    }
                }
-               showToast(`Updated ${updatedCount} products!`);
+               showToast(`Updated ${updatedCount} items prospectively!`);
             };
 
             const downloadImportTemplate = () => {
@@ -1872,7 +2051,7 @@
                          exportToCSV(data, 'Products_Master.csv');
                        }} className="flex-1 bg-indigo-50 border border-indigo-100 text-indigo-700 py-2.5 rounded-xl font-bold text-xs shadow-sm">Export Items</button>
                        <button onClick={() => {
-                         const data = customers.map(c => ({ ID: c.id, Name: c.name, Phone: c.phone, Address: c.address }));
+                         const data = customers.map(c => ({ ID: c.id, Name: c.name, Contact: c.contactPerson, Phone: c.phone, Address1: c.address1, Map1: c.map1 }));
                          exportToCSV(data, 'Customers_Master.csv');
                        }} className="flex-1 bg-indigo-50 border border-indigo-100 text-indigo-700 py-2.5 rounded-xl font-bold text-xs shadow-sm">Export Clients</button>
                     </div>
@@ -1900,10 +2079,12 @@
                        <button onClick={handleBulkSave} className="bg-emerald-500 text-white px-4 py-2 rounded-lg font-bold text-xs shadow-sm">Save All</button>
                     </div>
                     <div className="flex-1 overflow-auto p-2">
-                       <table className="w-full text-left text-xs whitespace-nowrap min-w-[500px]">
+                       <table className="w-full text-left text-xs whitespace-nowrap min-w-[800px]">
                           <thead className="text-slate-500 uppercase font-bold tracking-wider">
                              <tr>
                                 <th className="p-2 pb-3">Product Name</th>
+                                <th className="p-2 pb-3 w-20">Unit</th>
+                                <th className="p-2 pb-3 w-20">Box Qty</th>
                                 <th className="p-2 pb-3 w-24">Cost</th>
                                 <th className="p-2 pb-3 w-24">Selling</th>
                                 <th className="p-2 pb-3 w-20 text-center">Active</th>
@@ -1912,7 +2093,9 @@
                           <tbody className="divide-y divide-slate-100">
                              {bulkProducts.map(p => (
                                 <tr key={p.id} className="hover:bg-slate-50">
-                                   <td className="p-2 font-semibold text-slate-700 truncate max-w-[150px]">{p.name}</td>
+                                   <td className="p-2"><input type="text" className="w-full p-1.5 bg-slate-50 border border-slate-200 rounded font-semibold text-slate-800 outline-none focus:border-indigo-400" value={p.name} onChange={e => setBulkProducts(bulkProducts.map(bp=>bp.id===p.id?{...bp, name: e.target.value}:bp))} /></td>
+                                   <td className="p-2"><input type="text" className="w-full p-1.5 bg-slate-50 border border-slate-200 rounded font-semibold text-slate-800 outline-none focus:border-indigo-400" value={p.unit} onChange={e => setBulkProducts(bulkProducts.map(bp=>bp.id===p.id?{...bp, unit: e.target.value}:bp))} /></td>
+                                   <td className="p-2"><input type="number" className="w-full p-1.5 bg-slate-50 border border-slate-200 rounded font-semibold text-slate-800 outline-none focus:border-indigo-400" value={p.unitsInBox} onChange={e => setBulkProducts(bulkProducts.map(bp=>bp.id===p.id?{...bp, unitsInBox: Number(e.target.value)}:bp))} /></td>
                                    <td className="p-2"><input type="number" className="w-full p-1.5 bg-slate-50 border border-slate-200 rounded font-bold text-slate-800 outline-none focus:border-indigo-400" value={p.costPrice} onChange={e => setBulkProducts(bulkProducts.map(bp=>bp.id===p.id?{...bp, costPrice: Number(e.target.value)}:bp))} /></td>
                                    <td className="p-2"><input type="number" className="w-full p-1.5 bg-slate-50 border border-slate-200 rounded font-bold text-emerald-700 outline-none focus:border-indigo-400" value={p.sellingPrice} onChange={e => setBulkProducts(bulkProducts.map(bp=>bp.id===p.id?{...bp, sellingPrice: Number(e.target.value)}:bp))} /></td>
                                    <td className="p-2 text-center"><input type="checkbox" checked={p.available} onChange={e => setBulkProducts(bulkProducts.map(bp=>bp.id===p.id?{...bp, available: e.target.checked}:bp))} className="w-4 h-4 accent-indigo-600" /></td>
@@ -1983,6 +2166,20 @@
                 @keyframes slide-up { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
                 .animate-slide-up { animation: slide-up 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
                 .scrollbar-hide::-webkit-scrollbar { display: none; }
+                /* Disable arrows on number inputs */
+                input[type="number"]::-webkit-inner-spin-button, 
+                input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+                input[type="number"] { -moz-appearance: textfield; }
+                
+                /* Multi-Page Safe Printing Rules */
+                @media print { 
+                    body { background: white !important; margin: 0 !important; padding: 0 !important; }
+                    table { page-break-inside: auto; width: 100%; border-collapse: collapse; } 
+                    tr { page-break-inside: avoid; page-break-after: auto; } 
+                    thead { display: table-header-group; } 
+                    tfoot { display: table-footer-group; }
+                    .print\\:hidden { display: none !important; }
+                }
               `}</style>
             </div>
           );
