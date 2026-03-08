@@ -25,6 +25,29 @@ jobs:
         with:
           node-version: 20
       - run: npm install
+      - name: Fix smart quotes (iPhone autocorrect fix)
+        run: |
+          python3 - <<'EOF'
+          import os, glob
+          replacements = [
+            ('\u2018', "'"), ('\u2019', "'"),
+            ('\u201c', '"'), ('\u201d', '"'),
+            ('\u2013', '-'), ('\u2014', '--'),
+            ('\u2026', '...'), ('\u2501', '-'),
+          ]
+          for path in glob.glob('src/**/*.jsx', recursive=True) + glob.glob('src/**/*.js', recursive=True):
+            with open(path, 'r', encoding='utf-8') as f:
+              content = f.read()
+            fixed = content
+            for bad, good in replacements:
+              fixed = fixed.replace(bad, good)
+            if fixed != content:
+              with open(path, 'w', encoding='utf-8') as f:
+                f.write(fixed)
+              print(f'Fixed: {path}')
+            else:
+              print(f'Clean: {path}')
+          EOF
       - run: npm run build
       - uses: actions/configure-pages@v4
       - uses: actions/upload-pages-artifact@v3
