@@ -1020,7 +1020,7 @@ const handleExport = (format) => {
     } else if (format === 'text') {
         let text = `*${APP_NAME} | ${title}*\nPeriod: ${dateFilter}\n\n`;
         if (view === 'Overview') {
-          text += `Product Sales: Rs. ${reportEngine.kpis.productRevenue.toLocaleString()}\nTotal COGS: Rs. ${reportEngine.kpis.totalCOGS.toLocaleString()}\nGross Margin: Rs. ${reportEngine.kpis.grossMargin.toLocaleString()}\nDelivery Billed: Rs. ${reportEngine.kpis.deliveryBilled.toLocaleString()}\nTransport Exp: Rs. ${reportEngine.kpis.transportExpense.toLocaleString()}\nOperational Exp: Rs. ${reportEngine.kpis.totalExpenses.toLocaleString()}\n━━━━━━━━━━━━━━━━━━\n*Net Profit: Rs. ${reportEngine.kpis.netProfit.toLocaleString()}*\n`;
+          text += `Product Sales: Rs. ${reportEngine.kpis.productRevenue.toLocaleString()}\nTotal COGS: Rs. ${reportEngine.kpis.totalCOGS.toLocaleString()}\nGross Margin: Rs. ${reportEngine.kpis.grossMargin.toLocaleString()}\nDelivery Billed: Rs. ${reportEngine.kpis.deliveryBilled.toLocaleString()}\nTransport Exp: Rs. ${reportEngine.kpis.transportExpense.toLocaleString()}\nOperational Exp: Rs. ${reportEngine.kpis.totalExpenses.toLocaleString()}\n------------------\n*Net Profit: Rs. ${reportEngine.kpis.netProfit.toLocaleString()}*\n`;
         } else {
           exportData.forEach((r, i) => { text += `${i+1}. *${r.Name}*${r.Company ? ` (${r.Company})` : ''}\n   Qty: ${(r.Qty||0).toLocaleString()} | Rev: Rs.${(r.Revenue||0).toLocaleString()} | GP: Rs.${(r.GrossProfit||r.Amount||0).toLocaleString()}\n`; });
         }
@@ -1087,7 +1087,7 @@ const renderTable = (dataObj, type) => {
   );
 };
 
-const filterLabel = dateFilter === 'Custom' ? `${customStart||'...'} → ${customEnd}` : dateFilter;
+const filterLabel = dateFilter === 'Custom' ? `${customStart||'...'} - ${customEnd}` : dateFilter;
 
 return (
   <div className="h-full flex flex-col p-4 overflow-hidden">
@@ -1358,7 +1358,7 @@ return (
 <div className="h-full flex flex-col p-4 pb-24 overflow-y-auto">
 <div className={`bg-white p-4 rounded-2xl border shadow-sm mb-4 ${editingExpense ? 'border-amber-300 bg-amber-50/30' : 'border-slate-200'}`}>
 <div className="flex justify-between items-center mb-3">
-<h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest">{editingExpense ? ‘✏️ Edit Expense’ : ‘Record New Expense’}</h3>
+<h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest">{editingExpense ? ‘– Edit Expense’ : ‘Record New Expense’}</h3>
 <div className="flex gap-2">
 {editingExpense && <button onClick={cancelEdit} className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded-md">Cancel</button>}
 <button onClick={() => setShowExpenseCatModal(true)} className=“text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded-md uppercase tracking-wider”>Manage Labels</button>
@@ -1387,7 +1387,7 @@ return (
 <div className="space-y-2.5">
 {filteredExpenses.map(exp => (
 <div key={exp.id} className={`bg-white p-3.5 rounded-2xl border shadow-sm flex justify-between items-center ${editingExpense?.id === exp.id ? 'border-amber-300 ring-2 ring-amber-200' : 'border-slate-200'}`}>
-<div><p className="font-bold text-slate-800 text-sm flex items-center gap-1.5"><Tag size={12} className="text-slate-400"/> {exp.category}</p><p className="text-[11px] text-slate-500 font-medium mt-0.5">{formatDateDisp(exp.date)} {exp.note ? `• ${exp.note}` : ‘’}</p></div>
+<div><p className="font-bold text-slate-800 text-sm flex items-center gap-1.5"><Tag size={12} className="text-slate-400"/> {exp.category}</p><p className="text-[11px] text-slate-500 font-medium mt-0.5">{formatDateDisp(exp.date)} {exp.note ? `- ${exp.note}` : ‘’}</p></div>
 <div className="text-right ml-3">
 <p className="font-extrabold text-rose-600 text-base">Rs.{exp.amount.toLocaleString()}</p>
 <div className="flex gap-2 mt-1 justify-end">
