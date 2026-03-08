@@ -1110,8 +1110,8 @@ Operational Exp: Rs. ${reportEngine.kpis.totalExpenses}\
        const reader = new FileReader();
        reader.onload = async (event) => {
           const text = event.target.result;
-          const rows = text.match(/[^\r\
-]+/g);
+          const rows = text.split(/\r?\n/).filter(r => r.trim());
+
           if(!rows || rows.length < 2) return showToast("File is empty or invalid", "error");
           const headers = rows[0].split(',').map(h => h.trim().toLowerCase().replace(/"/g, ''));
           const reqHeaders = ['name', 'company', 'unit', 'boxqty', 'cost', 'selling'];
