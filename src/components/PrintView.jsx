@@ -70,7 +70,7 @@ text += `Driver: ${data.driverName || 'N/A'} - ${data.driverPhone || ''}\ `;
 }
 text += `\ *Items to Deliver:*\ `;
 if (data.items && Array.isArray(data.items)) {
-data.items.forEach(i => text += `- ${i.name || 'Unknown'} ${i.isBonus ? '🎁 (BONUS)' : ''} -> ${getDispatchQtyStr(i)}\ `);
+data.items.forEach(i => text += `- ${i.name || 'Unknown'} ${i.isBonus ? '- (BONUS)' : ''} -> ${getDispatchQtyStr(i)}\ `);
 }
 text += `\ Total SKUs: ${(data.items || []).length} | Please confirm receipt upon delivery.`;
 } else if (docType === ‘receipt’) {
