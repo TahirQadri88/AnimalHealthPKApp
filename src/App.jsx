@@ -1290,9 +1290,9 @@ return (
       {view === 'Receivables' && (
         <div className="space-y-3 mt-3">
           {[
-            { label: '0–30 days', key: 'current', color: 'emerald' },
-            { label: '31–60 days', key: 'days30', color: 'amber' },
-            { label: '61–90 days', key: 'days60', color: 'orange' },
+            { label: '0-30 days', key: 'current', color: 'emerald' },
+            { label: '31-60 days', key: 'days30', color: 'amber' },
+            { label: '61-90 days', key: 'days60', color: 'orange' },
             { label: '90+ days', key: 'days90plus', color: 'rose' }
           ].map(({ label, key, color }) => {
             const bucket = reportEngine.agingBuckets[key];
