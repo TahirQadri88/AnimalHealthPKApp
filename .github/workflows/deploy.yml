@@ -25,29 +25,29 @@ jobs:
         with:
           node-version: 20
       - run: npm install
-      - name: Fix smart quotes (iPhone autocorrect fix)
+      - name: Fix iPhone autocorrect and copy-paste artifacts
         run: |
-          python3 - <<'EOF'
-          import os, glob
+          python3 - <<'PYEOF'
+          import glob
           replacements = [
             ('\u2018', "'"), ('\u2019', "'"),
             ('\u201c', '"'), ('\u201d', '"'),
             ('\u2013', '-'), ('\u2014', '--'),
             ('\u2026', '...'), ('\u2501', '-'),
           ]
+          fences = {'```', '```jsx', '```javascript'}
           for path in glob.glob('src/**/*.jsx', recursive=True) + glob.glob('src/**/*.js', recursive=True):
             with open(path, 'r', encoding='utf-8') as f:
-              content = f.read()
-            fixed = content
+              lines = f.readlines()
+            cleaned = [l for l in lines if l.strip() not in fences]
+            content = ''.join(cleaned)
             for bad, good in replacements:
-              fixed = fixed.replace(bad, good)
-            if fixed != content:
-              with open(path, 'w', encoding='utf-8') as f:
-                f.write(fixed)
-              print(f'Fixed: {path}')
-            else:
-              print(f'Clean: {path}')
-          EOF
+              content = content.replace(bad, good)
+            with open(path, 'w', encoding='utf-8') as f:
+              f.write(content)
+            removed = len(lines) - len(cleaned)
+            print(f'Processed {path}: {removed} fences removed')
+          PYEOF
       - run: npm run build
       - uses: actions/configure-pages@v4
       - uses: actions/upload-pages-artifact@v3
