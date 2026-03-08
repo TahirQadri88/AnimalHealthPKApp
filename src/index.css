@@ -1,0 +1,14 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@media print {
+  .no-print { display: none !important; }
+  body { background: white !important; margin: 0 !important; padding: 0 !important; }
+  table { page-break-inside: auto !important; width: 100% !important; border-collapse: collapse !important; }
+  thead { display: table-header-group !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+  tfoot { display: table-footer-group !important; }
+  tbody tr { page-break-inside: avoid !important; break-inside: avoid !important; }
+  .keep-together { page-break-inside: avoid !important; break-inside: avoid !important; }
+  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+}
