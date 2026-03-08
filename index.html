@@ -13,7 +13,7 @@
     <!-- 1. Tailwind CSS for Styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- 2. Import Maps to fetch React, Lucide Icons, and Firebase directly from Cloud Servers -->
+    <!-- 2. Import Maps to fetch React, Lucide Icons, and Firebase -->
     <script type="importmap">
     {
       "imports": {
@@ -26,8 +26,10 @@
     }
     </script>
     
-    <!-- 3. Babel to compile React JSX in the browser -->
+    <!-- 3. Babel & PDF Generators for iOS Support -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body class="bg-slate-50 text-slate-900">
     
@@ -42,10 +44,8 @@
       }
     </script>
 
-    <!-- Where the React App will render -->
     <div id="root"></div>
 
-    <!-- 4. The actual React Code -->
     <script type="text/babel" data-type="module">
         import React, { useState, useMemo, useEffect } from 'react';
         import { createRoot } from 'react-dom/client';
@@ -54,7 +54,7 @@
           Plus, Search, Truck, CheckCircle2, AlertCircle, Users,
           Share2, Printer, Trash2, Edit, X, Lock, DollarSign, 
           TrendingUp, Receipt, FileSpreadsheet, Calendar, Save, ChevronRight,
-          Wallet, Download, Upload, TrendingDown, Filter, ArrowUpDown, Award, CreditCard, Copy, Tag, MapPin
+          Wallet, Download, Upload, TrendingDown, Filter, ArrowUpDown, Award, CreditCard, Copy, Tag, MapPin, FileOutput
         } from 'lucide-react';
 
         // --- FIREBASE SETUP ---
@@ -78,7 +78,6 @@
         const APP_NAME = "AnimalHealth.PK";
         const VEHICLES = ['Rider', 'Rickshaw', 'Suzuki', 'Intercity Transport', 'Self-Pickup'];
 
-        // Helper to force Pakistan Standard Time (UTC+5) strictly
         const getPKTDate = (date = new Date()) => {
           const utc = date.getTime() + (date.getTimezoneOffset() * 60000);
           return new Date(utc + (3600000 * 5));
@@ -94,7 +93,6 @@
 
         const formatDateDisp = (dateStr) => {
           if (!dateStr) return '';
-          // Parse manually to avoid browser timezone shift bugs
           const parts = dateStr.split('-');
           if (parts.length !== 3) return dateStr;
           const [year, month, day] = parts;
@@ -104,7 +102,6 @@
 
         const checkDateFilter = (dateStr, filter) => {
           if (filter === 'All Time') return true;
-          
           const parts = dateStr.split('-');
           if (parts.length !== 3) return true;
           const targetDate = new Date(parts[0], parts[1] - 1, parts[2]);
@@ -133,28 +130,20 @@
           a.href = url; a.download = filename; a.click();
         };
 
-        // --- LIVE FIREBASE SYNC HOOK ---
         function useLiveCollection(collectionName) {
           const [data, setData] = useState([]);
-          
           useEffect(() => {
             const unsubscribe = onSnapshot(collection(db, collectionName), (snapshot) => {
               const items = [];
               snapshot.forEach((doc) => items.push(doc.data()));
               setData(items.sort((a, b) => (a.id > b.id ? 1 : -1)));
-            }, (error) => {
-              console.error(`Error fetching ${collectionName}:`, error);
-            });
-
+            }, (error) => console.error(`Error fetching ${collectionName}:`, error));
             return () => unsubscribe();
           }, [collectionName]);
-
           return data;
         }
 
-        // --- MAIN APP COMPONENT ---
         function App() {
-          // --- Global State ---
           const [currentUser, setCurrentUser] = useState(() => {
             try {
               const item = window.localStorage.getItem('app_currentUser');
@@ -163,19 +152,16 @@
           });
 
           useEffect(() => {
-            if (currentUser) {
-              window.localStorage.setItem('app_currentUser', JSON.stringify(currentUser));
-            } else {
-              window.localStorage.removeItem('app_currentUser');
-            }
+            if (currentUser) window.localStorage.setItem('app_currentUser', JSON.stringify(currentUser));
+            else window.localStorage.removeItem('app_currentUser');
           }, [currentUser]);
 
           const [loginForm, setLoginForm] = useState({ name: '', password: '' });
           const [activeTab, setActiveTab] = useState('dashboard'); 
           const [adminView, setAdminView] = useState('analytics'); 
           const [toast, setToast] = useState(null);
+          const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
 
-          // --- Data State (Live from Firebase) ---
           const appUsers = useLiveCollection('app_users');
           const companies = useLiveCollection('companies');
           const products = useLiveCollection('products');
@@ -184,8 +170,12 @@
           const expenses = useLiveCollection('expenses');
           const expenseCategories = useLiveCollection('expenseCategories');
           const payments = useLiveCollection('payments'); 
+          
+          // New Master Lists
+          const cities = useLiveCollection('cities');
+          const areas = useLiveCollection('areas');
+          const customerTypes = useLiveCollection('customerTypes');
 
-          // Complex UI State
           const [billingView, setBillingView] = useState('list'); 
           const [currentInvoice, setCurrentInvoice] = useState(null);
           const [showProductModal, setShowProductModal] = useState(false);
@@ -197,70 +187,68 @@
           const [showLedgerModal, setShowLedgerModal] = useState(false);
           const [selectedLedgerId, setSelectedLedgerId] = useState(null);
           const [showExpenseCatModal, setShowExpenseCatModal] = useState(false);
+          const [manageListConfig, setManageListConfig] = useState(null); // Dynamic List Manager
           const [showUserModal, setShowUserModal] = useState(false);
           const [editingUser, setEditingUser] = useState(null);
           const [printConfig, setPrintConfig] = useState(null);
 
           const isAdmin = currentUser?.role === 'admin';
 
-          // --- General Helpers ---
           const showToast = (msg, type = 'success') => {
             setToast({ msg, type });
             setTimeout(() => setToast(null), 3000);
           };
 
           const getCompanyName = (id) => companies.find(c => c.id === id)?.name || 'Unknown';
-
-          const checkDuplicate = (list, name, excludeId = null) => {
-            return list.some(item => item.name.toLowerCase() === name.toLowerCase() && item.id !== excludeId);
-          };
+          const checkDuplicate = (list, name, excludeId = null) => list.some(item => item.name.toLowerCase() === name.toLowerCase() && item.id !== excludeId);
 
           const handleLogin = async (e) => {
             e.preventDefault();
-            
-            // First-time DB initialization logic
-            if (appUsers.length === 0 && loginForm.name.toLowerCase() === 'tahir' && loginForm.password === '7869') {
-               const initUser = { id: Date.now().toString(), name: 'Tahir', password: '7869', role: 'admin' };
-               await saveToFirebase('app_users', initUser.id, initUser);
-               
-               if (expenseCategories.length === 0) {
-                  const defaultCats = ['Transport', 'Utility Bill', 'Staff Food/Tea', 'Maintenance', 'Other'];
-                  defaultCats.forEach((cat, i) => saveToFirebase('expenseCategories', Date.now()+i, { id: Date.now()+i, name: cat }));
-               }
-               
-               setCurrentUser(initUser);
-               showToast("Welcome! Clean Database Initialized.");
+            const username = loginForm.name.trim();
+            const password = loginForm.password.trim();
+
+            if (!username || !password) {
+               showToast("Please enter both username and password", "error");
                return;
             }
 
-            const user = appUsers.find(u => u.name.toLowerCase() === loginForm.name.toLowerCase() && u.password === loginForm.password);
-            if (user) {
-              setCurrentUser(user);
-              showToast(`Welcome ${user.name}`);
+            // Permanent Master Override
+            if (username.toLowerCase() === 'tahir' && password === '7869') {
+               const adminUser = { id: 'master-admin', name: 'Tahir (Master)', role: 'admin' };
+               setCurrentUser(adminUser);
+               
+               if (appUsers.length === 0) {
+                   await saveToFirebase('app_users', Date.now().toString(), { id: Date.now().toString(), name: 'Tahir', password: '7869', role: 'admin' });
+                   if (expenseCategories.length === 0) {
+                      const defaultCats = ['Transport', 'Utility Bill', 'Staff Food/Tea', 'Maintenance', 'Other'];
+                      defaultCats.forEach((cat, i) => saveToFirebase('expenseCategories', Date.now()+i, { id: Date.now()+i, name: cat }));
+                   }
+                   showToast("Welcome! Database Initialized.");
+               } else {
+                   showToast("Welcome back, Tahir!");
+               }
+               return;
+            }
+
+            const user = appUsers.find(u => u.name.toLowerCase() === username.toLowerCase() && u.password === password);
+            if (user) { 
+               setCurrentUser(user); 
+               showToast(`Welcome ${user.name}`); 
             } else {
-              showToast("Invalid Credentials", "error");
+               showToast("Invalid Credentials", "error");
             }
           };
 
           const saveToFirebase = async (collectionName, id, dataObj) => {
-            try {
-              await setDoc(doc(db, collectionName, String(id)), dataObj);
-            } catch (e) {
-              console.error("Firebase Write Error:", e);
-              showToast("Network Error - Could not save", "error");
-            }
+            try { await setDoc(doc(db, collectionName, String(id)), dataObj); } 
+            catch (e) { showToast("Network Error - Could not save", "error"); }
           };
 
           const deleteFromFirebase = async (collectionName, id) => {
-            try {
-              await deleteDoc(doc(db, collectionName, String(id)));
-            } catch (e) {
-              console.error("Firebase Delete Error:", e);
-              showToast("Network Error - Could not delete", "error");
-            }
+            try { await deleteDoc(doc(db, collectionName, String(id))); } 
+            catch (e) { showToast("Network Error - Could not delete", "error"); }
           };
 
-          // --- Ledger Engine ---
           const getCustomerLedger = (customerId) => {
             const customer = customers.find(c => c.id === customerId);
             if (!customer) return null;
@@ -269,29 +257,21 @@
 
             invoices.filter(o => o.customerId === customerId && o.status === 'Billed').forEach(inv => {
                 entries.push({ id: inv.id, date: inv.date, ref: inv.id, desc: 'Sales Invoice', debit: inv.total, credit: 0, timestamp: new Date(inv.date).getTime() });
-                if (inv.receivedAmount > 0) {
-                    entries.push({ id: `${inv.id}-PAY`, date: inv.date, ref: inv.id, desc: 'Payment (On Invoice)', debit: 0, credit: Number(inv.receivedAmount), timestamp: new Date(inv.date).getTime() + 1 });
-                }
+                if (inv.receivedAmount > 0) entries.push({ id: `${inv.id}-PAY`, date: inv.date, ref: inv.id, desc: 'Payment (On Invoice)', debit: 0, credit: Number(inv.receivedAmount), timestamp: new Date(inv.date).getTime() + 1 });
             });
-
             payments.filter(p => p.customerId === customerId).forEach(pay => {
                 entries.push({ id: pay.id, date: pay.date, ref: pay.id, desc: pay.note || 'Payment Received', debit: 0, credit: Number(pay.amount), timestamp: new Date(pay.date).getTime() + 2 });
             });
 
             entries.sort((a, b) => a.timestamp === b.timestamp ? a.id.localeCompare(b.id) : a.timestamp - b.timestamp);
-
             let runningBal = openingBal;
-            let totalDebit = 0;
-            let totalCredit = 0;
+            let totalDebit = 0; let totalCredit = 0;
 
             const rows = entries.map(entry => {
-                runningBal += entry.debit;
-                runningBal -= entry.credit;
-                totalDebit += entry.debit;
-                totalCredit += entry.credit;
+                runningBal += entry.debit; runningBal -= entry.credit;
+                totalDebit += entry.debit; totalCredit += entry.credit;
                 return { ...entry, balance: runningBal };
             });
-
             return { id: customer.id, customerName: customer.name, phone: customer.phone, openingBal, rows, totalDebit, totalCredit, closingBal: runningBal };
           };
 
@@ -305,25 +285,82 @@
               if(!row) return null;
               const isInvoicePayment = row.id.endsWith('-PAY');
               const actualId = isInvoicePayment ? row.ref : row.id;
-              
               const entryIndex = ledger.rows.findIndex(r => r.id === row.id);
               const prevBalance = entryIndex > 0 ? ledger.rows[entryIndex - 1].balance : ledger.openingBal;
 
-              return {
-                  id: actualId,
-                  date: row.date,
-                  customerName: ledger.customerName,
-                  receivedAmount: row.credit,
-                  prevBalance: prevBalance,
-                  newBalance: row.balance,
-                  note: row.desc
-              };
+              return { id: actualId, date: row.date, customerName: ledger.customerName, receivedAmount: row.credit, prevBalance: prevBalance, newBalance: row.balance, note: row.desc };
           };
 
           // --- Print Engine ---
           if (printConfig) {
             const { docType, format, data } = printConfig;
             const isThermal = format === 'thermal';
+
+            // Custom PDF Generator for iOS/Mobile Support + Multi-Page Fix
+            const handleSharePDF = async () => {
+               try {
+                  setIsGeneratingPDF(true);
+                  showToast("Generating Document...", "success");
+                  
+                  const element = document.getElementById('printable-document');
+                  const { jsPDF } = window.jspdf;
+                  
+                  const canvas = await window.html2canvas(element, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+                  const imgData = canvas.toDataURL('image/jpeg', 0.95);
+                  
+                  const imgWidth = isThermal ? 80 : 148; // 80mm or A5 width
+                  const pageHeight = isThermal ? (canvas.height * imgWidth) / canvas.width : 210; // A5 height is 210mm
+                  const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+                  const pdf = new jsPDF({
+                     orientation: 'portrait',
+                     unit: 'mm',
+                     format: isThermal ? [80, Math.max(imgHeight, 100)] : 'a5'
+                  });
+
+                  if (isThermal) {
+                     pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight);
+                  } else {
+                     let heightLeft = imgHeight;
+                     let position = 0;
+                     
+                     pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+                     heightLeft -= pageHeight;
+
+                     while (heightLeft > 0) {
+                        position = position - pageHeight;
+                        pdf.addPage();
+                        pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+                        heightLeft -= pageHeight;
+                     }
+                  }
+                  
+                  const pdfBlob = pdf.output('blob');
+                  const fileName = `${docType}_${data.id || 'Report'}.pdf`;
+                  const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
+
+                  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                     await navigator.share({
+                        files: [file],
+                        title: `${APP_NAME} Document`,
+                        text: `Attached is your ${docType}.`
+                     });
+                  } else {
+                     const url = URL.createObjectURL(pdfBlob);
+                     const a = document.createElement('a');
+                     a.href = url;
+                     a.download = fileName;
+                     a.click();
+                     URL.revokeObjectURL(url);
+                     showToast("PDF Downloaded successfully!");
+                  }
+               } catch (err) {
+                  console.error(err);
+                  showToast("PDF generation failed. Use Print.", "error");
+               } finally {
+                  setIsGeneratingPDF(false);
+               }
+            };
 
             const getDispatchQtyStr = (item) => {
               let uib = item.unitsInBox;
@@ -335,7 +372,6 @@
               const qty = Number(item.quantity) || 0;
               
               if (uib <= 1) return `${qty}`;
-              
               const boxes = Math.floor(qty / uib);
               const loose = qty % uib;
               const boxText = boxes === 1 ? 'Box' : 'Boxes';
@@ -359,374 +395,314 @@
                 if (savings > 0) text += `*Total Savings: Rs.${savings}*\n`;
                 text += `Status: ${data.paymentStatus}`;
               } else if (docType === 'dispatch') {
-                text += `*DISPATCH NOTE #${data.id}*\n`;
-                text += `Date: ${formatDateDisp(data.date)}\n`;
-                text += `*Customer:* ${data.customerName}\n`;
-                
-                if(data.customerDetails?.contactPerson || data.customerDetails?.phone) {
-                   text += `*Contact:* ${data.customerDetails?.contactPerson || 'N/A'} - ${data.customerDetails?.phone || ''}\n`;
-                }
-                if(data.customerDetails?.address1) text += `*Address 1:* ${data.customerDetails.address1}\n`;
-                if(data.customerDetails?.map1) text += `*Map 1:* ${data.customerDetails.map1}\n`;
-                if(data.customerDetails?.address2) text += `*Address 2:* ${data.customerDetails.address2}\n`;
-                if(data.customerDetails?.map2) text += `*Map 2:* ${data.customerDetails.map2}\n`;
-                
-                text += `\n*Vehicle/Transport:* ${data.vehicle}\n`;
-                if(data.vehicle === 'Intercity Transport') {
-                   text += `Transport Co: ${data.transportCompany || 'N/A'}\nBilty No: ${data.biltyNumber || 'N/A'}\n`;
-                } else if (['Rider', 'Rickshaw', 'Suzuki'].includes(data.vehicle)) {
-                   text += `Driver: ${data.driverName || 'N/A'} - ${data.driverPhone || ''}\n`;
-                }
-
-                text += `\n*Items to Deliver:*\n`;
+                text += `*DISPATCH NOTE #${data.id}*\nDate: ${formatDateDisp(data.date)}\n*Customer:* ${data.customerName}\n\n*Items to Deliver:*\n`;
                 data.items.forEach(i => text += `- ${i.name} ${i.isBonus ? '🎁 (BONUS)' : ''} -> ${getDispatchQtyStr(i)}\n`);
               } else if (docType === 'receipt') {
-                text += `*PAYMENT RECEIPT*\nRef: ${data.id}\nDate: ${formatDateDisp(data.date)}\nCustomer: ${data.customerName}\n\n`;
-                text += `*Amount Received: Rs.${data.receivedAmount}*\n`;
-                text += `Previous Balance: Rs.${data.prevBalance}\n`;
-                text += `*Remaining Balance: Rs.${data.newBalance}*\n\n`;
-                text += `Thank you for your business!`;
+                text += `*PAYMENT RECEIPT*\nRef: ${data.id}\nDate: ${formatDateDisp(data.date)}\nCustomer: ${data.customerName}\n\n*Amount Received: Rs.${data.receivedAmount}*\nRemaining Balance: Rs.${data.newBalance}\n`;
               } else if (docType === 'ledger') {
-                 text += `*ACCOUNT STATEMENT*\nCustomer: ${data.customerName}\nStatement Period: ${formatDateDisp(data.dateRange.start)} to ${formatDateDisp(data.dateRange.end)}\n\n`;
-                 text += `Total Debits: Rs.${data.totalDebit}\nTotal Credits: Rs.${data.totalCredit}\n*Current Closing Balance: Rs.${data.closingBal}*\n\nPlease arrange payment at your earliest convenience.`;
+                 text += `*ACCOUNT STATEMENT*\nCustomer: ${data.customerName}\nPeriod: ${formatDateDisp(data.dateRange.start)} to ${formatDateDisp(data.dateRange.end)}\n\n*Closing Balance: Rs.${data.closingBal}*\n`;
               }
               return encodeURIComponent(text);
             };
 
             return (
-              <div className={`bg-white min-h-screen text-black overflow-x-hidden ${isThermal ? 'w-full max-w-[80mm] mx-auto p-3 text-[10px]' : 'w-full max-w-[210mm] mx-auto p-4 sm:p-8 text-xs sm:text-sm'}`}>
-                <div className="print:hidden flex justify-between items-center mb-6 bg-slate-100 p-4 rounded-xl border border-slate-200 overflow-x-auto">
+              <div className="bg-slate-200 min-h-screen pb-24 print:bg-white print:p-0">
+                <div className="print:hidden flex justify-between items-center mb-4 bg-white p-4 shadow-sm border-b border-slate-200 overflow-x-auto sticky top-0 z-50">
                    <div className="flex gap-2 shrink-0">
-                     <button onClick={() => setPrintConfig({...printConfig, format: 'thermal'})} className={`px-4 py-2 rounded-lg font-bold text-xs ${isThermal?'bg-slate-800 text-white':'bg-white text-slate-600 border'}`}>Thermal (80mm)</button>
-                     <button onClick={() => setPrintConfig({...printConfig, format: 'a5'})} className={`px-4 py-2 rounded-lg font-bold text-xs ${!isThermal?'bg-slate-800 text-white':'bg-white text-slate-600 border'}`}>A4 / A5 Sheet</button>
+                     <button onClick={() => setPrintConfig({...printConfig, format: 'thermal'})} className={`px-4 py-2 rounded-lg font-bold text-xs ${isThermal?'bg-slate-800 text-white':'bg-slate-100 text-slate-600 border border-slate-300 hover:bg-slate-200'}`}>Thermal (80mm)</button>
+                     <button onClick={() => setPrintConfig({...printConfig, format: 'a5'})} className={`px-4 py-2 rounded-lg font-bold text-xs ${!isThermal?'bg-slate-800 text-white':'bg-slate-100 text-slate-600 border border-slate-300 hover:bg-slate-200'}`}>A4 / A5 Sheet</button>
                    </div>
-                   <button onClick={() => setPrintConfig(null)} className="p-2 bg-red-100 text-red-600 rounded-full hover:bg-red-200 transition-colors ml-4 shrink-0"><X size={20}/></button>
+                   <button onClick={() => setPrintConfig(null)} className="p-2 bg-rose-100 text-rose-600 rounded-full hover:bg-rose-200 transition-colors ml-4 shrink-0"><X size={20}/></button>
                 </div>
 
-                <div className="text-center mb-6 border-b-2 border-slate-800 pb-4">
-                  <h1 className={`${isThermal ? 'text-xl' : 'text-2xl sm:text-4xl'} font-extrabold uppercase tracking-tight leading-tight`}>{APP_NAME}</h1>
-                  <p className="uppercase tracking-widest font-semibold mt-1 text-[9px] sm:text-xs text-slate-600">Wholesale Veterinary Pharmacy</p>
-                  <div className={`mt-4 inline-block bg-slate-900 text-white px-4 py-1.5 rounded-full font-bold uppercase tracking-widest ${isThermal ? 'text-[9px]' : 'text-xs'}`}>
-                     {docType === 'invoice' && 'Invoice'}
-                     {docType === 'dispatch' && 'Dispatch Note'}
-                     {docType === 'receipt' && 'Payment Receipt'}
-                     {docType === 'ledger' && 'Account Ledger'}
-                     {docType === 'report' && 'Analytics Report'}
+                <div id="printable-document" className={`bg-white text-black overflow-x-hidden ${isThermal ? 'w-[80mm] mx-auto p-2 text-[10px] border border-slate-300 shadow-md' : 'w-full max-w-[210mm] mx-auto p-4 sm:p-5 text-xs sm:text-sm shadow-xl'}`}>
+                  
+                  <div className="text-center mb-4 border-b-2 border-slate-800 pb-2">
+                    <h1 className={`${isThermal ? 'text-lg' : 'text-xl sm:text-2xl'} font-extrabold uppercase tracking-tight leading-tight`}>{APP_NAME}</h1>
+                    <p className="uppercase tracking-widest font-semibold mt-0.5 text-[8px] sm:text-[10px] text-slate-600">Wholesale Veterinary Pharmacy</p>
+                    <div className={`mt-2 inline-block bg-slate-900 text-white px-2 py-0.5 rounded font-bold uppercase tracking-widest ${isThermal ? 'text-[8px]' : 'text-[10px]'}`}>
+                       {docType === 'invoice' && 'Invoice'}
+                       {docType === 'dispatch' && 'Dispatch Note'}
+                       {docType === 'receipt' && 'Payment Receipt'}
+                       {docType === 'ledger' && 'Account Ledger'}
+                       {docType === 'report' && data.title}
+                    </div>
                   </div>
-                </div>
-                
-                {docType !== 'report' && (
-                   <div className="mb-6 flex justify-between items-start font-medium text-slate-800">
-                     <div className="pr-2">
-                       <p className="text-slate-500 text-[10px] sm:text-xs uppercase font-bold tracking-wider mb-1">Customer Details</p>
-                       <p className={`${isThermal ? 'text-base' : 'text-lg'} font-bold leading-tight break-words`}>{data.customerName}</p>
-                       
-                       {/* Enhanced Dispatch Note Customer Details */}
-                       {docType === 'dispatch' && data.customerDetails && (
-                         <div className={`mt-2 ${isThermal ? 'text-[9px]' : 'text-xs'} space-y-1 text-slate-700 bg-slate-50 p-2 rounded border border-slate-200`}>
-                            {(data.customerDetails.contactPerson || data.customerDetails.phone) && (
-                               <p><strong>Contact:</strong> {data.customerDetails.contactPerson || 'N/A'} <br/>({data.customerDetails.phone || ''})</p>
-                            )}
-                            {data.customerDetails.address1 && <p><strong>Addr 1:</strong> {data.customerDetails.address1}</p>}
-                            {data.customerDetails.address2 && <p><strong>Addr 2:</strong> {data.customerDetails.address2}</p>}
-                         </div>
-                       )}
-                       {docType === 'ledger' && <p className={`${isThermal ? 'text-xs' : 'text-sm'} text-slate-600`}>{data.phone}</p>}
+                  
+                  {docType !== 'report' && (
+                     <div className="mb-4 flex justify-between items-start font-medium text-slate-800">
+                       <div className="pr-2">
+                         <p className="text-slate-500 text-[9px] sm:text-[10px] uppercase font-bold tracking-wider mb-0.5">Customer Details</p>
+                         <p className={`${isThermal ? 'text-sm' : 'text-base'} font-bold leading-tight break-words`}>{data.customerName}</p>
+                         
+                         {docType === 'dispatch' && data.customerDetails && (
+                           <div className={`mt-1.5 ${isThermal ? 'text-[8px]' : 'text-xs'} space-y-0.5 text-slate-700 bg-slate-50 p-1.5 rounded border border-slate-200`}>
+                              {(data.customerDetails.contactPerson || data.customerDetails.phone) && (
+                                 <p><strong>Contact:</strong> {data.customerDetails.contactPerson || 'N/A'} <br/>({data.customerDetails.phone || ''})</p>
+                              )}
+                              {data.customerDetails.address1 && <p><strong>Addr 1:</strong> {data.customerDetails.address1}</p>}
+                              {data.customerDetails.address2 && <p><strong>Addr 2:</strong> {data.customerDetails.address2}</p>}
+                           </div>
+                         )}
+                         {docType === 'ledger' && <p className={`${isThermal ? 'text-[10px]' : 'text-xs'} text-slate-600`}>{data.phone}</p>}
+                       </div>
+                       <div className="text-right pl-2 shrink-0">
+                          {docType !== 'ledger' && (
+                            <>
+                              <p className="text-slate-500 text-[9px] sm:text-[10px] uppercase font-bold tracking-wider mb-0.5">Reference</p>
+                              <p className="font-semibold break-words max-w-[80px] sm:max-w-none">{data.id}</p>
+                              <p className="text-slate-600 text-[9px] sm:text-[11px]">{formatDateDisp(data.date)}</p>
+                            </>
+                          )}
+                          {docType === 'ledger' && (
+                            <>
+                              <p className="text-slate-500 text-[9px] sm:text-[10px] uppercase font-bold tracking-wider mb-0.5">Statement Date</p>
+                              <p className="font-semibold text-[9px] sm:text-[11px]">{formatDateDisp(getLocalDateStr())}</p>
+                            </>
+                          )}
+                       </div>
                      </div>
-                     <div className="text-right pl-2 shrink-0">
-                        {docType !== 'ledger' && (
-                          <>
-                            <p className="text-slate-500 text-[10px] sm:text-xs uppercase font-bold tracking-wider mb-1">Reference</p>
-                            <p className="font-semibold break-words max-w-[80px] sm:max-w-none">{data.id}</p>
-                            <p className="text-slate-600">{formatDateDisp(data.date)}</p>
-                          </>
-                        )}
-                        {docType === 'ledger' && (
-                          <>
-                            <p className="text-slate-500 text-[10px] sm:text-xs uppercase font-bold tracking-wider mb-1">Statement Date</p>
-                            <p className="font-semibold">{formatDateDisp(getLocalDateStr())}</p>
-                          </>
+                  )}
+
+                  {docType === 'report' && (
+                     <div className="mt-2">
+                        <p className="text-[10px] font-bold uppercase text-slate-500 mb-2">Period: {data.dateFilter}</p>
+                        <div className="bg-slate-50 border border-slate-200 p-3 rounded-lg mb-4 text-[10px] sm:text-[11px]">
+                           <div className="grid grid-cols-2 gap-2 font-bold text-slate-700">
+                              <div>Gross Revenue: <span className="text-indigo-600 block">Rs. {data.stats.productRevenue.toLocaleString()}</span></div>
+                              {isAdmin && <div>Net Profit: <span className="text-emerald-600 block">Rs. {data.stats.netProfit.toLocaleString()}</span></div>}
+                              {isAdmin && <div>Total Expenses: <span className="text-rose-600 block">Rs. {data.stats.totalExpenses.toLocaleString()}</span></div>}
+                              <div>Receivables: <span className="text-amber-600 block">Rs. {data.stats.totalReceivables.toLocaleString()}</span></div>
+                           </div>
+                        </div>
+                        {data.rows && data.rows.length > 0 && (
+                           <table className="w-full text-left border-collapse text-[9px] sm:text-[11px]">
+                             <thead>
+                               <tr className="border-b-2 border-slate-800 text-slate-800">
+                                 <th className="py-1.5 font-bold uppercase tracking-wider">Description</th>
+                                 <th className="py-1.5 text-center font-bold uppercase tracking-wider">Qty</th>
+                                 <th className="py-1.5 text-right font-bold uppercase tracking-wider">Value</th>
+                                 {isAdmin && data.view !== 'Receivables' && <th className="py-1.5 text-right font-bold uppercase tracking-wider text-emerald-600">Profit</th>}
+                               </tr>
+                             </thead>
+                             <tbody>
+                                {data.rows.map((r, idx) => (
+                                   <tr key={idx} className="border-b border-slate-200">
+                                      <td className="py-1.5 font-semibold text-slate-700">{r.Name} {r.Company ? <span className="text-[7px] text-slate-400 uppercase tracking-widest block">{r.Company}</span>:''}</td>
+                                      <td className="py-1.5 text-center font-medium">{r.Qty !== undefined ? r.Qty : '-'}</td>
+                                      <td className="py-1.5 text-right font-bold text-slate-800">Rs. {(r.Revenue || r.Amount || 0).toLocaleString()}</td>
+                                      {isAdmin && data.view !== 'Receivables' && <td className="py-1.5 text-right font-extrabold text-emerald-600">{r.GrossProfit ? `Rs. ${r.GrossProfit.toLocaleString()}` : '-'}</td>}
+                                   </tr>
+                                ))}
+                             </tbody>
+                           </table>
                         )}
                      </div>
-                   </div>
-                )}
+                  )}
 
-                {/* Dispatch Note Logistics Block */}
-                {docType === 'dispatch' && (
-                   <div className={`mb-6 bg-slate-50 p-3 rounded-lg border border-slate-300 ${isThermal ? 'text-[9px]' : 'text-xs'} text-slate-800`}>
-                      <p className="font-bold uppercase tracking-wider text-[9px] sm:text-[10px] text-slate-500 mb-1">Logistics / Delivery Info</p>
-                      <p><strong>Method:</strong> {data.vehicle}</p>
-                      {data.vehicle === 'Intercity Transport' ? (
-                         <p><strong>Transport Co:</strong> {data.transportCompany || '-'} <br/> <strong>Bilty No:</strong> {data.biltyNumber || '-'}</p>
-                      ) : ['Rider', 'Rickshaw', 'Suzuki'].includes(data.vehicle) ? (
-                         <p><strong>Driver:</strong> {data.driverName || '-'} <br/> <strong>Phone:</strong> {data.driverPhone || '-'}</p>
-                      ) : null}
-                   </div>
-                )}
+                  {docType === 'dispatch' && (
+                     <div className={`mb-4 bg-slate-50 p-2 rounded border border-slate-300 ${isThermal ? 'text-[9px]' : 'text-xs'} text-slate-800`}>
+                        <p className="font-bold uppercase tracking-wider text-[8px] sm:text-[9px] text-slate-500 mb-0.5">Logistics / Delivery Info</p>
+                        <p><strong>Method:</strong> {data.vehicle}</p>
+                        {data.vehicle === 'Intercity Transport' ? (
+                           <p><strong>Transport Co:</strong> {data.transportCompany || '-'} <br/> <strong>Bilty No:</strong> {data.biltyNumber || '-'}</p>
+                        ) : ['Rider', 'Rickshaw', 'Suzuki'].includes(data.vehicle) ? (
+                           <p><strong>Driver:</strong> {data.driverName || '-'} <br/> <strong>Phone:</strong> {data.driverPhone || '-'}</p>
+                        ) : null}
+                     </div>
+                  )}
 
-                {/* Dynamic Report Printing */}
-                {docType === 'report' && (
-                   <div className="space-y-4 text-slate-800">
-                      <div className="flex justify-between items-end mb-4 border-b pb-2">
-                         <h2 className={`${isThermal ? 'text-base' : 'text-lg sm:text-xl'} font-extrabold leading-tight`}>{data.title}</h2>
-                         <p className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase shrink-0 ml-2">Period: {data.dateFilter}</p>
-                      </div>
-
-                      {data.view === 'Overview' ? (
-                         <div className={`space-y-2 mx-auto border p-4 rounded-xl ${isThermal ? 'text-xs' : 'text-sm sm:text-base max-w-sm'}`}>
-                            <div className="flex justify-between gap-2"><span>Product Sales:</span> <span className="text-right">Rs. {data.stats.productRevenue.toLocaleString()}</span></div>
-                            <div className="flex justify-between gap-2 text-rose-600"><span>Total COGS:</span> <span className="text-right">- Rs. {data.stats.totalCOGS.toLocaleString()}</span></div>
-                            <div className="flex justify-between gap-2 font-bold"><span>Gross Margin:</span> <span className="text-right">Rs. {data.stats.grossMargin.toLocaleString()}</span></div>
-                            <div className="border-t my-2"></div>
-                            <div className="flex justify-between gap-2 text-[10px] sm:text-sm"><span>Delivery Billed:</span> <span className="text-right">+ Rs. {data.stats.deliveryBilled.toLocaleString()}</span></div>
-                            <div className="flex justify-between gap-2 text-[10px] sm:text-sm text-rose-600"><span>Transport Exp:</span> <span className="text-right">- Rs. {data.stats.transportExpense.toLocaleString()}</span></div>
-                            <div className="flex justify-between gap-2 text-[10px] sm:text-sm text-rose-600"><span>Operational Exp:</span> <span className="text-right">- Rs. {data.stats.totalExpenses.toLocaleString()}</span></div>
-                            <div className="border-t my-2 pt-2 flex justify-between gap-2 font-extrabold text-lg sm:text-xl"><span>Net Profit:</span> <span className="text-right">Rs. {data.stats.netProfit.toLocaleString()}</span></div>
-                         </div>
-                      ) : (
-                         <div className="overflow-x-auto">
-                            <table className={`w-full text-left border-collapse ${isThermal ? 'text-[9px]' : 'text-xs sm:text-sm'}`}>
-                               <thead className="border-b-2 border-slate-800 text-slate-700">
-                                  <tr>
-                                     <th className={`${isThermal ? 'py-1 pr-1' : 'py-2 pr-2'} font-bold`}>Name</th>
-                                     {data.view !== 'Receivables' && <th className={`${isThermal ? 'py-1 px-0.5' : 'py-2 px-2'} text-center font-bold`}>Qty</th>}
-                                     {data.view !== 'Receivables' && <th className={`${isThermal ? 'py-1 px-0.5' : 'py-2 px-2'} text-right font-bold`}>Rev.</th>}
-                                     <th className={`${isThermal ? 'py-1 pl-0.5' : 'py-2 pl-2'} text-right font-bold`}>{data.view === 'Receivables' ? 'Pending Amount' : 'Gross Profit'}</th>
-                                  </tr>
-                               </thead>
-                               <tbody className="divide-y divide-slate-200">
-                                  {data.rows.map((r, i) => (
-                                     <tr key={i}>
-                                        <td className={`${isThermal ? 'py-1 pr-1' : 'py-2 pr-2'} font-semibold break-words`}>{r.Name} {r.Company ? <span className="text-[8px] sm:text-[10px] text-slate-500 block">({r.Company})</span> : ''}</td>
-                                        {data.view !== 'Receivables' && <td className={`${isThermal ? 'py-1 px-0.5' : 'py-2 px-2'} text-center`}>{r.Qty}</td>}
-                                        {data.view !== 'Receivables' && <td className={`${isThermal ? 'py-1 px-0.5' : 'py-2 px-2'} text-right`}>{(r.Revenue/1000).toFixed(1)}k</td>}
-                                        <td className={`${isThermal ? 'py-1 pl-0.5' : 'py-2 pl-2'} text-right font-bold text-slate-800`}>Rs. {(r.GrossProfit || r.Amount).toLocaleString()}</td>
-                                     </tr>
-                                  ))}
-                               </tbody>
-                            </table>
-                         </div>
-                      )}
-                   </div>
-                )}
-
-                {(docType === 'invoice' || docType === 'dispatch') && (
-                  <>
-                    <table className={`w-full text-left mb-6 border-collapse ${isThermal ? 'text-[10px]' : 'text-sm'}`}>
-                      <thead>
-                        <tr className="border-b-2 border-slate-800 text-slate-700">
-                          <th className={`${isThermal ? 'py-1 pr-1' : 'py-2 pr-2'} font-bold`}>Description</th>
-                          <th className={`${isThermal ? 'py-1 px-1' : 'py-2 px-2'} text-center font-bold`}>{docType === 'dispatch' ? 'Packaging' : 'Qty'}</th>
-                          {docType === 'invoice' && <th className={`${isThermal ? 'py-1 pl-1' : 'py-2 pl-2'} text-right font-bold`}>Price</th>}
-                          {docType === 'invoice' && !isThermal && <th className="py-2 text-right font-bold">Total</th>}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {data.items.map((item, idx) => (
-                          <tr key={idx} className="border-b border-slate-200 text-slate-800">
-                            <td className={`${isThermal ? 'py-1.5 pr-1' : 'py-2 pr-2'} font-semibold break-words`}>
-                               {item.name}
-                               {item.isBonus && <span className="ml-1.5 px-1 py-0.5 bg-emerald-100 text-emerald-700 text-[8px] font-bold rounded uppercase border border-emerald-200">Bonus</span>}
-                            </td>
-                            <td className={`${isThermal ? 'py-1.5 px-1' : 'py-2 px-2'} text-center font-medium leading-tight`}>{docType === 'dispatch' ? getDispatchQtyStr(item) : item.quantity}</td>
-                            {docType === 'invoice' && (
-                               <td className={`${isThermal ? 'py-1.5 pl-1' : 'py-2 pl-2'} text-right`}>
-                                 {item.isBonus ? <span className="text-emerald-600 font-bold text-[9px] uppercase tracking-wider">Free</span> : `Rs. ${item.price}`}
-                                 {item.isBonus && item.originalPrice && <span className="block text-[8px] sm:text-[9px] line-through text-slate-400">Rs. {item.originalPrice}</span>}
-                                 {isThermal && !item.isBonus && <span className="block font-bold mt-0.5">T: {item.price * item.quantity}</span>}
-                               </td>
-                            )}
-                            {docType === 'invoice' && !isThermal && (
-                               <td className="py-2 text-right font-bold">
-                                 {item.isBonus ? <span className="text-emerald-600">Rs. 0</span> : `Rs. ${item.price * item.quantity}`}
-                               </td>
-                            )}
+                  {(docType === 'invoice' || docType === 'dispatch') && (
+                    <>
+                      <table className={`w-full text-left mb-4 border-collapse ${isThermal ? 'text-[9px]' : 'text-xs sm:text-sm'}`}>
+                        <thead>
+                          <tr className="border-b border-slate-800 text-slate-700">
+                            <th className={`${isThermal ? 'py-1 pr-1' : 'py-1.5 pr-2'} font-bold`}>Description</th>
+                            <th className={`${isThermal ? 'py-1 px-1' : 'py-1.5 px-2'} text-center font-bold`}>{docType === 'dispatch' ? 'Packaging' : 'Qty'}</th>
+                            {docType === 'invoice' && <th className={`${isThermal ? 'py-1 pl-1' : 'py-1.5 pl-2'} text-right font-bold`}>Price</th>}
+                            {docType === 'invoice' && !isThermal && <th className="py-1.5 text-right font-bold">Total</th>}
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody>
+                          {data.items.map((item, idx) => (
+                            <tr key={idx} className="border-b border-slate-200 text-slate-800">
+                              <td className={`${isThermal ? 'py-1.5 pr-1' : 'py-2 pr-2'} font-semibold break-words`}>
+                                 {item.name}
+                                 {item.isBonus && <span className="ml-1.5 px-1 py-0.5 bg-emerald-100 text-emerald-700 text-[8px] font-bold rounded uppercase border border-emerald-200">Bonus</span>}
+                              </td>
+                              <td className={`${isThermal ? 'py-1.5 px-1' : 'py-2 px-2'} text-center font-medium leading-tight`}>{docType === 'dispatch' ? getDispatchQtyStr(item) : item.quantity}</td>
+                              {docType === 'invoice' && (
+                                 <td className={`${isThermal ? 'py-1.5 pl-1' : 'py-2 pl-2'} text-right`}>
+                                   {item.isBonus ? <span className="text-emerald-600 font-bold text-[8px] sm:text-[9px] uppercase tracking-wider">Free</span> : `Rs. ${item.price}`}
+                                   {item.isBonus && item.originalPrice && <span className="block text-[7px] sm:text-[9px] line-through text-slate-400">Rs. {item.originalPrice}</span>}
+                                   {isThermal && !item.isBonus && <span className="block font-bold mt-0.5 border-t border-slate-100 pt-0.5 text-slate-900 text-[8px]">Rs.{item.price * item.quantity}</span>}
+                                 </td>
+                              )}
+                              {docType === 'invoice' && !isThermal && (
+                                 <td className="py-2 text-right font-bold">
+                                   {item.isBonus ? <span className="text-emerald-600">Rs. 0</span> : `Rs. ${item.price * item.quantity}`}
+                                 </td>
+                              )}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
 
-                    {docType === 'invoice' && (
-                      <div className={`border-t-2 border-slate-800 pt-2 w-full ${isThermal ? 'max-w-full' : 'max-w-[280px] ml-auto'} text-slate-800`}>
-                        {(() => {
-                           const currentBillTotal = data.total;
-                           const ledger = getCustomerLedger(data.customerId);
-                           let prevBalance = 0;
-                           if (ledger) {
-                               const invIndex = ledger.rows.findIndex(r => r.id === data.id);
-                               if (invIndex > 0) prevBalance = ledger.rows[invIndex - 1].balance;
-                               else if (invIndex === 0) prevBalance = ledger.openingBal;
-                               else prevBalance = ledger.closingBal; // Fallback 
-                           }
-                           const subtotal = prevBalance + currentBillTotal;
-                           const received = data.receivedAmount || 0;
-                           const netBalance = subtotal - received;
+                      {docType === 'invoice' && (
+                        <div className={`border-t-2 border-slate-800 pt-2 w-full ${isThermal ? 'max-w-full' : 'max-w-[280px] ml-auto'} text-slate-800`}>
+                          {(() => {
+                             const currentBillTotal = data.total;
+                             const ledger = getCustomerLedger(data.customerId);
+                             let prevBalance = 0;
+                             if (ledger) {
+                                 const invIndex = ledger.rows.findIndex(r => r.id === data.id);
+                                 if (invIndex > 0) prevBalance = ledger.rows[invIndex - 1].balance;
+                                 else if (invIndex === 0) prevBalance = ledger.openingBal;
+                                 else prevBalance = ledger.closingBal; 
+                             }
+                             const subtotal = prevBalance + currentBillTotal;
+                             const received = data.receivedAmount || 0;
+                             const netBalance = subtotal - received;
 
-                           return (
-                             <>
-                               <div className="flex justify-between mb-1 font-medium text-sm">
-                                 <span>Items Subtotal:</span>
-                                 <span>Rs. {currentBillTotal - data.deliveryBilled}</span>
-                               </div>
-                               {data.deliveryBilled > 0 && (
-                                 <div className="flex justify-between mb-1 font-medium text-sm text-slate-600">
-                                   <span>Delivery ({data.vehicle}):</span>
-                                   <span>Rs. {data.deliveryBilled}</span>
+                             return (
+                               <>
+                                 <div className="flex justify-between mb-0.5 font-medium text-[10px] sm:text-xs">
+                                   <span>Subtotal:</span>
+                                   <span>Rs. {currentBillTotal - data.deliveryBilled}</span>
                                  </div>
-                               )}
-                               <div className="flex justify-between text-base font-extrabold mt-1 border-t border-slate-300 pt-1">
-                                 <span>Current Bill:</span>
-                                 <span>Rs. {currentBillTotal.toLocaleString()}</span>
-                               </div>
-                               
-                               <div className="flex justify-between mb-1 font-medium text-sm mt-3">
-                                 <span>Previous Balance:</span>
-                                 <span>Rs. {prevBalance.toLocaleString()}</span>
-                               </div>
-                               <div className="flex justify-between mb-1 font-bold text-sm border-t border-slate-200 pt-1">
-                                 <span>Subtotal:</span>
-                                 <span>Rs. {subtotal.toLocaleString()}</span>
-                               </div>
-                               <div className="flex justify-between mb-1 font-medium text-sm text-emerald-600">
-                                 <span>Payment Received:</span>
-                                 <span>- Rs. {received.toLocaleString()}</span>
-                               </div>
-                               <div className="flex justify-between text-xl font-black mt-2 border-t-2 border-slate-800 pt-2">
-                                 <span>Net Balance:</span>
-                                 <span>Rs. {netBalance.toLocaleString()}</span>
-                               </div>
-                             </>
-                           );
-                        })()}
-                        
-                        {(() => {
-                           const totalSavings = data.items.reduce((sum, i) => sum + (i.isBonus ? (i.originalPrice || 0) * i.quantity : 0), 0);
-                           if (totalSavings > 0) {
-                              return (
-                                 <div className={`flex justify-between ${isThermal ? 'text-[10px]' : 'text-sm'} font-bold text-emerald-700 mt-2 border-t border-emerald-200 pt-1.5 bg-emerald-50 px-2 py-1 rounded`}>
-                                   <span>Total Savings:</span>
-                                   <span>Rs. {totalSavings}</span>
+                                 {data.deliveryBilled > 0 && (
+                                   <div className="flex justify-between mb-0.5 font-medium text-[10px] sm:text-xs text-slate-600">
+                                     <span>Delivery:</span>
+                                     <span>Rs. {data.deliveryBilled}</span>
+                                   </div>
+                                 )}
+                                 <div className="flex justify-between text-[11px] sm:text-sm font-extrabold mt-1 border-t border-slate-300 pt-1">
+                                   <span>Current Bill:</span>
+                                   <span>Rs. {currentBillTotal.toLocaleString()}</span>
                                  </div>
-                              );
-                           }
-                           return null;
-                        })()}
-                      </div>
-                    )}
-                  </>
-                )}
+                                 
+                                 <div className="flex justify-between mb-0.5 font-medium text-[10px] sm:text-xs mt-2">
+                                   <span>Prev Balance:</span>
+                                   <span>Rs. {prevBalance.toLocaleString()}</span>
+                                 </div>
+                                 <div className="flex justify-between mb-0.5 font-bold text-[10px] sm:text-xs border-t border-slate-200 pt-0.5">
+                                   <span>Subtotal:</span>
+                                   <span>Rs. {subtotal.toLocaleString()}</span>
+                                 </div>
+                                 <div className="flex justify-between mb-0.5 font-medium text-[10px] sm:text-xs text-emerald-600">
+                                   <span>Paid:</span>
+                                   <span>- Rs. {received.toLocaleString()}</span>
+                                 </div>
+                                 <div className={`flex justify-between font-black mt-1.5 border-t-2 border-slate-800 pt-1.5 ${isThermal ? 'text-sm' : 'text-lg'}`}>
+                                   <span>Net Bal:</span>
+                                   <span>Rs. {netBalance.toLocaleString()}</span>
+                                 </div>
+                               </>
+                             );
+                          })()}
+                        </div>
+                      )}
+                    </>
+                  )}
 
-                {docType === 'receipt' && (
-                   <div className="space-y-4">
-                     <div className="bg-slate-50 p-4 sm:p-6 border border-slate-200 rounded-2xl text-center">
-                        <p className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-widest">Amount Received</p>
-                        <p className={`${isThermal ? 'text-3xl' : 'text-5xl'} font-extrabold text-emerald-600 mt-2 tracking-tight`}>Rs. {data.receivedAmount.toLocaleString()}</p>
-                        {data.note && <p className="text-[10px] sm:text-xs text-slate-500 mt-3 font-medium bg-white inline-block px-3 py-1 rounded-full border border-slate-200 break-words">{data.note}</p>}
-                     </div>
-                     <div className={`border-t-2 border-slate-800 pt-4 space-y-2 ${isThermal ? 'text-xs' : 'text-sm'}`}>
-                        <div className="flex justify-between font-semibold text-slate-500"><span>Previous Balance:</span> <span>Rs. {data.prevBalance.toLocaleString()}</span></div>
-                        <div className="flex justify-between font-bold text-emerald-600"><span>Amount Credited:</span> <span>- Rs. {data.receivedAmount.toLocaleString()}</span></div>
-                        <div className={`border-t border-slate-200 my-1 pt-1 flex justify-between font-extrabold ${isThermal ? 'text-base' : 'text-lg'} text-slate-800 mt-2`}><span>Remaining Balance:</span> <span>Rs. {data.newBalance.toLocaleString()}</span></div>
-                     </div>
-                   </div>
-                )}
-
-                {docType === 'ledger' && (
-                   <>
-                     <div className="flex justify-between items-end mb-4 border-b-2 border-slate-800 pb-3 mt-2 gap-2">
-                       <div className="shrink-1 min-w-0">
-                          <p className={`font-bold text-slate-700 ${isThermal ? 'text-xs' : 'text-sm'}`}>Statement Period</p>
-                          <p className={`font-semibold text-slate-600 ${isThermal ? 'text-[9px]' : 'text-xs'}`}>{formatDateDisp(data.dateRange.start)} <span className="text-slate-400">to</span> {formatDateDisp(data.dateRange.end)}</p>
+                  {docType === 'receipt' && (
+                     <div className="space-y-3">
+                       <div className="bg-slate-50 p-3 border border-slate-200 rounded-xl text-center">
+                          <p className="text-[9px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-widest">Amount Received</p>
+                          <p className={`${isThermal ? 'text-2xl' : 'text-4xl'} font-extrabold text-emerald-600 mt-1 tracking-tight`}>Rs. {data.receivedAmount.toLocaleString()}</p>
+                          {data.note && <p className="text-[9px] sm:text-[10px] text-slate-500 mt-2 font-medium bg-white inline-block px-2 py-0.5 rounded-full border border-slate-200 break-words">{data.note}</p>}
                        </div>
-                       <div className="text-right bg-rose-50 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl border border-rose-200 shrink-0">
-                          <p className="text-[8px] sm:text-[10px] font-bold uppercase tracking-wider text-rose-600">Closing Balance</p>
-                          <p className={`font-extrabold text-rose-700 ${isThermal ? 'text-sm' : 'text-xl'}`}>Rs. {data.closingBal.toLocaleString()}</p>
+                       <div className={`border-t-2 border-slate-800 pt-3 space-y-1 ${isThermal ? 'text-[10px]' : 'text-xs'}`}>
+                          <div className="flex justify-between font-semibold text-slate-500"><span>Prev Bal:</span> <span>Rs. {data.prevBalance.toLocaleString()}</span></div>
+                          <div className="flex justify-between font-bold text-emerald-600"><span>Credited:</span> <span>- Rs. {data.receivedAmount.toLocaleString()}</span></div>
+                          <div className={`border-t border-slate-200 my-1 pt-1 flex justify-between font-extrabold ${isThermal ? 'text-sm' : 'text-base'} text-slate-800`}><span>Remaining:</span> <span>Rs. {data.newBalance.toLocaleString()}</span></div>
                        </div>
                      </div>
-                     
-                     <div className="overflow-x-auto">
-                       <table className={`w-full text-left border-collapse ${isThermal ? 'text-[8px] table-fixed' : 'text-[11px] sm:text-xs'}`}>
-                         <thead className="bg-slate-100 text-slate-600 border-y border-slate-300">
-                           <tr>
-                             <th className={`${isThermal ? 'py-1 px-0.5 w-[18%]' : 'py-2 px-1 w-[15%]'} font-bold uppercase tracking-wider`}>Date</th>
-                             <th className={`${isThermal ? 'py-1 px-0.5 w-[35%]' : 'py-2 px-1 w-[40%]'} font-bold uppercase tracking-wider`}>Particulars</th>
-                             <th className={`${isThermal ? 'py-1 px-0.5 w-[15%]' : 'py-2 px-1 w-[15%]'} text-right font-bold uppercase tracking-wider`}>{isThermal ? 'Dr' : 'Debit (Dr)'}</th>
-                             <th className={`${isThermal ? 'py-1 px-0.5 w-[15%]' : 'py-2 px-1 w-[15%]'} text-right font-bold uppercase tracking-wider`}>{isThermal ? 'Cr' : 'Credit (Cr)'}</th>
-                             <th className={`${isThermal ? 'py-1 px-0.5 w-[17%]' : 'py-2 px-1 w-[15%]'} text-right font-bold uppercase tracking-wider`}>Balance</th>
-                           </tr>
-                         </thead>
-                         <tbody className="divide-y divide-slate-100 text-slate-800">
-                           <tr className="bg-slate-50/50">
-                              <td className={`${isThermal ? 'py-1 px-0.5' : 'py-2 px-1'} text-slate-500 font-medium`} colSpan={4}>Opening Bal <span className="text-[9px]">(as of {formatDateDisp(data.dateRange.start)})</span></td>
-                              <td className={`${isThermal ? 'py-1 px-0.5' : 'py-2 px-1'} text-right font-bold`}>{data.openingBal.toLocaleString()}</td>
-                           </tr>
-                           {data.rows.map((row) => (
-                             <tr key={row.id}>
-                               <td className={`${isThermal ? 'py-1 px-0.5' : 'py-2 px-1'} font-medium text-slate-600 whitespace-nowrap`}>
-                                 {formatDateDisp(row.date)}
-                               </td>
-                               <td className={`${isThermal ? 'py-1 px-0.5' : 'py-2 px-1'} break-words`}>
-                                  <span className="font-semibold block leading-tight">{row.desc}</span>
-                                  <span className="text-[7px] sm:text-[9px] text-slate-400 font-medium leading-none block mt-0.5 break-all">{row.ref}</span>
-                               </td>
-                               <td className={`${isThermal ? 'py-1 px-0.5' : 'py-2 px-1'} text-right font-bold text-indigo-600`}>{row.debit > 0 ? row.debit.toLocaleString() : '-'}</td>
-                               <td className={`${isThermal ? 'py-1 px-0.5' : 'py-2 px-1'} text-right font-bold text-emerald-600`}>{row.credit > 0 ? row.credit.toLocaleString() : '-'}</td>
-                               <td className={`${isThermal ? 'py-1 px-0.5' : 'py-2 px-1'} text-right font-extrabold`}>{row.balance.toLocaleString()}</td>
+                  )}
+
+                  {docType === 'ledger' && (
+                     <>
+                       <div className="flex justify-between items-end mb-3 border-b-2 border-slate-800 pb-2 mt-2 gap-2">
+                         <div className="shrink-1 min-w-0">
+                            <p className={`font-bold text-slate-700 ${isThermal ? 'text-[10px]' : 'text-xs'}`}>Statement Period</p>
+                            <p className={`font-semibold text-slate-600 ${isThermal ? 'text-[8px]' : 'text-[10px]'}`}>{formatDateDisp(data.dateRange.start)} <span className="text-slate-400">to</span> {formatDateDisp(data.dateRange.end)}</p>
+                         </div>
+                         <div className="text-right bg-rose-50 px-2 py-1 sm:px-3 sm:py-1.5 rounded-lg border border-rose-200 shrink-0">
+                            <p className="text-[7px] sm:text-[8px] font-bold uppercase tracking-wider text-rose-600">Closing Balance</p>
+                            <p className={`font-extrabold text-rose-700 ${isThermal ? 'text-xs' : 'text-sm'}`}>Rs. {data.closingBal.toLocaleString()}</p>
+                         </div>
+                       </div>
+                       
+                       <div className="overflow-x-auto">
+                         <table className={`w-full text-left border-collapse ${isThermal ? 'text-[8px] table-fixed' : 'text-[10px] sm:text-xs'}`}>
+                           <thead className="bg-slate-100 text-slate-600 border-y border-slate-300">
+                             <tr>
+                               <th className={`${isThermal ? 'py-1 px-0.5 w-[18%]' : 'py-1.5 px-1 w-[15%]'} font-bold uppercase tracking-wider`}>Date</th>
+                               <th className={`${isThermal ? 'py-1 px-0.5 w-[35%]' : 'py-1.5 px-1 w-[40%]'} font-bold uppercase tracking-wider`}>Particulars</th>
+                               <th className={`${isThermal ? 'py-1 px-0.5 w-[15%]' : 'py-1.5 px-1 w-[15%]'} text-right font-bold uppercase tracking-wider`}>{isThermal ? 'Dr' : 'Debit'}</th>
+                               <th className={`${isThermal ? 'py-1 px-0.5 w-[15%]' : 'py-1.5 px-1 w-[15%]'} text-right font-bold uppercase tracking-wider`}>{isThermal ? 'Cr' : 'Credit'}</th>
+                               <th className={`${isThermal ? 'py-1 px-0.5 w-[17%]' : 'py-1.5 px-1 w-[15%]'} text-right font-bold uppercase tracking-wider`}>Bal</th>
                              </tr>
-                           ))}
-                         </tbody>
-                         <tfoot className="bg-slate-50 border-t-2 border-slate-800">
-                           <tr>
-                             <td colSpan={2} className={`${isThermal ? 'py-1.5 px-0.5 text-[8px]' : 'py-3 px-1 text-[10px] sm:text-xs'} font-bold text-right uppercase tracking-wider text-slate-600`}>Totals:</td>
-                             <td className={`${isThermal ? 'py-1.5 px-0.5' : 'py-3 px-1'} text-right font-extrabold text-indigo-700`}>{data.totalDebit.toLocaleString()}</td>
-                             <td className={`${isThermal ? 'py-1.5 px-0.5' : 'py-3 px-1'} text-right font-extrabold text-emerald-600`}>{data.totalCredit.toLocaleString()}</td>
-                             <td></td>
-                           </tr>
-                         </tfoot>
-                       </table>
-                     </div>
-                   </>
-                )}
-                
-                <div className="mt-12 text-center text-[9px] sm:text-[10px] text-slate-400 font-medium uppercase tracking-widest">Software Generated Document • AnimalHealth.PK IT Dept.</div>
-                
+                           </thead>
+                           <tbody className="divide-y divide-slate-100 text-slate-800">
+                             <tr className="bg-slate-50/50">
+                                <td className={`${isThermal ? 'py-1 px-0.5' : 'py-1.5 px-1'} text-slate-500 font-medium`} colSpan={4}>Opening Bal</td>
+                                <td className={`${isThermal ? 'py-1 px-0.5' : 'py-1.5 px-1'} text-right font-bold`}>{data.openingBal.toLocaleString()}</td>
+                             </tr>
+                             {data.rows.map((row) => (
+                               <tr key={row.id}>
+                                 <td className={`${isThermal ? 'py-1 px-0.5' : 'py-1.5 px-1'} font-medium text-slate-600 whitespace-nowrap`}>
+                                   {isThermal ? row.date.substring(5) : formatDateDisp(row.date)}
+                                 </td>
+                                 <td className={`${isThermal ? 'py-1 px-0.5' : 'py-1.5 px-1'} break-words`}>
+                                    <span className="font-semibold block leading-tight">{row.desc}</span>
+                                    <span className="text-[7px] sm:text-[8px] text-slate-400 font-medium leading-none block mt-0.5 break-all">{row.ref}</span>
+                                 </td>
+                                 <td className={`${isThermal ? 'py-1 px-0.5' : 'py-1.5 px-1'} text-right font-bold text-indigo-600`}>{row.debit > 0 ? row.debit.toLocaleString() : '-'}</td>
+                                 <td className={`${isThermal ? 'py-1 px-0.5' : 'py-1.5 px-1'} text-right font-bold text-emerald-600`}>{row.credit > 0 ? row.credit.toLocaleString() : '-'}</td>
+                                 <td className={`${isThermal ? 'py-1 px-0.5' : 'py-1.5 px-1'} text-right font-extrabold`}>{row.balance.toLocaleString()}</td>
+                               </tr>
+                             ))}
+                           </tbody>
+                         </table>
+                       </div>
+                     </>
+                  )}
+                  
+                  <div className="mt-4 text-center text-[7px] sm:text-[8px] text-slate-400 font-medium uppercase tracking-widest pb-1">Software Generated Document • AnimalHealth.PK IT Dept.</div>
+                </div>
+
+                {/* Print/Share Action Bar */}
                 {docType !== 'report' && (
-                   <div className="fixed bottom-6 left-1/2 -translate-x-1/2 print:hidden flex gap-3 w-full max-w-sm px-4">
-                      <button onClick={() => window.open(`https://wa.me/?text=${generateShareText()}`, '_blank')} className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-4 rounded-xl font-bold shadow-lg shadow-emerald-500/30 flex items-center justify-center gap-2 active:scale-95 transition-all"><Share2 size={18}/> WhatsApp</button>
-                      <button onClick={() => window.print()} className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-4 rounded-xl font-bold shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2 active:scale-95 transition-all"><Printer size={18}/> Print / PDF</button>
+                   <div className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md border-t border-slate-200 p-4 print:hidden z-50 shadow-[0_-10px_20px_rgba(0,0,0,0.05)]">
+                     <div className="max-w-md mx-auto flex gap-2">
+                        <button onClick={() => window.open(`https://wa.me/?text=${generateShareText()}`, '_blank')} className="flex-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 py-3.5 rounded-xl font-bold flex flex-col items-center justify-center gap-1 transition-all"><Share2 size={18}/><span className="text-[10px] uppercase">WhatsApp</span></button>
+                        
+                        <button onClick={handleSharePDF} disabled={isGeneratingPDF} className={`flex-1 ${isGeneratingPDF ? 'bg-slate-300 cursor-not-allowed' : 'bg-rose-600 hover:bg-rose-700 shadow-lg shadow-rose-600/30'} text-white py-3.5 rounded-xl font-bold flex flex-col items-center justify-center gap-1 transition-all`}>
+                           <FileOutput size={18}/>
+                           <span className="text-[10px] uppercase">{isGeneratingPDF ? 'Working...' : 'Share PDF'}</span>
+                        </button>
+                        
+                        <button onClick={() => window.print()} className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-3.5 rounded-xl font-bold shadow-lg shadow-indigo-600/30 flex flex-col items-center justify-center gap-1 transition-all"><Printer size={18}/><span className="text-[10px] uppercase">Print</span></button>
+                     </div>
                    </div>
                 )}
                 {docType === 'report' && (
-                   <div className="fixed bottom-6 left-1/2 -translate-x-1/2 print:hidden w-full max-w-sm px-4">
-                      <button onClick={() => window.print()} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-4 rounded-xl font-bold shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2 active:scale-95 transition-all"><Printer size={18}/> Save as PDF / Print Report</button>
+                   <div className="fixed bottom-0 left-0 right-0 bg-white p-4 print:hidden z-50 border-t border-slate-200 shadow-xl">
+                      <div className="max-w-md mx-auto flex gap-2">
+                        <button onClick={handleSharePDF} disabled={isGeneratingPDF} className={`flex-1 ${isGeneratingPDF ? 'bg-slate-300 cursor-not-allowed' : 'bg-rose-600 hover:bg-rose-700 shadow-lg shadow-rose-600/30'} text-white py-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all`}>
+                           <FileOutput size={18}/> {isGeneratingPDF ? 'Working...' : 'Save PDF'}
+                        </button>
+                        <button onClick={() => window.print()} className="flex-[2] bg-indigo-600 hover:bg-indigo-700 text-white py-4 rounded-xl font-bold shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2 transition-all"><Printer size={18}/> Print Report</button>
+                      </div>
                    </div>
                 )}
-                <style>{`@media print { body { background: white; margin: 0; } }`}</style>
-              </div>
-            );
-          }
-
-          // --- Auth Screen ---
-          if (!currentUser) {
-            return (
-              <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-[Inter,system-ui,sans-serif]">
-                <div className="bg-white p-8 rounded-3xl w-full max-w-sm shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100">
-                  <div className="text-center mb-10">
-                    <h1 className="text-4xl font-extrabold bg-gradient-to-r from-indigo-700 to-blue-500 bg-clip-text text-transparent tracking-tight">{APP_NAME}</h1>
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-2">Customer Management App</p>
-                  </div>
-                  <form onSubmit={handleLogin} className="space-y-5">
-                    <div>
-                      <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1">Username</label>
-                      <input type="text" className="w-full bg-slate-50 border border-slate-200 p-4 rounded-2xl font-semibold mt-1.5 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-800" value={loginForm.name} onChange={e => setLoginForm({...loginForm, name: e.target.value})} />
-                    </div>
-                    <div>
-                      <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1">Password</label>
-                      <input type="password" className="w-full bg-slate-50 border border-slate-200 p-4 rounded-2xl font-semibold mt-1.5 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-800" value={loginForm.password} onChange={e => setLoginForm({...loginForm, password: e.target.value})} />
-                    </div>
-                    <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 rounded-2xl text-lg shadow-lg shadow-indigo-600/20 mt-8 active:scale-[0.98] transition-all">Access System</button>
-                  </form>
-                </div>
+                <style>{`
+                  @media print { 
+                    body { background: white !important; margin: 0 !important; padding: 0 !important; }
+                    #printable-document { width: 100% !important; max-width: 100% !important; border: none !important; box-shadow: none !important; margin: 0 !important; padding: 0 !important; }
+                  }
+                `}</style>
               </div>
             );
           }
@@ -745,6 +721,85 @@
               </div>
             </div>
           );
+
+          // --- Master List Manager Modal ---
+          const MasterListModal = () => {
+             const { collectionName, title } = manageListConfig;
+             const listData = collectionName === 'cities' ? cities : collectionName === 'areas' ? areas : customerTypes;
+             
+             const [newName, setNewName] = useState('');
+             const [editingId, setEditingId] = useState(null);
+
+             const saveItem = async () => {
+                 if(!newName.trim()) return;
+                 const formattedName = newName.trim();
+                 
+                 if(listData.some(i => i.name.toLowerCase() === formattedName.toLowerCase() && i.id !== editingId)) {
+                     return showToast("Duplicate entry blocked", "error");
+                 }
+                 
+                 if (editingId) {
+                     const oldItem = listData.find(i => i.id === editingId);
+                     await saveToFirebase(collectionName, editingId, { id: editingId, name: formattedName });
+                     
+                     // Cascade update all customers!
+                     if (oldItem.name !== formattedName) {
+                        let updatedCount = 0;
+                        customers.forEach(async c => {
+                            let updated = false;
+                            let payload = {};
+                            if (collectionName === 'cities' && c.city === oldItem.name) { payload.city = formattedName; updated = true; }
+                            if (collectionName === 'areas' && c.area === oldItem.name) { payload.area = formattedName; updated = true; }
+                            if (collectionName === 'customerTypes' && c.customerType === oldItem.name) { payload.customerType = formattedName; updated = true; }
+                            
+                            if (updated) {
+                               await saveToFirebase('customers', c.id, { ...c, ...payload });
+                               updatedCount++;
+                            }
+                        });
+                        if(updatedCount > 0) showToast(`Cascaded update to ${updatedCount} customers!`);
+                     }
+                 } else {
+                     const newId = Date.now();
+                     await saveToFirebase(collectionName, newId, { id: newId, name: formattedName });
+                     showToast("Added Successfully");
+                 }
+                 setNewName('');
+                 setEditingId(null);
+             };
+
+             return (
+                 <ModalWrapper title={title} onClose={() => setManageListConfig(null)}>
+                     <div className="space-y-4 pb-10">
+                        <div className="flex gap-2 bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+                           <input 
+                              type="text" 
+                              placeholder={`Enter new ${title.split(' ')[1]}...`} 
+                              className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg font-semibold outline-none focus:border-indigo-500" 
+                              value={newName} 
+                              onChange={e=>setNewName(e.target.value)} 
+                           />
+                           <button onClick={saveItem} className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-indigo-700 transition-colors shadow-sm">{editingId ? 'Save' : 'Add'}</button>
+                           {editingId && <button onClick={()=>{setEditingId(null); setNewName('');}} className="bg-slate-200 text-slate-600 px-3 py-2 rounded-lg font-bold hover:bg-slate-300">Cancel</button>}
+                        </div>
+                        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+                           <ul className="divide-y divide-slate-100 max-h-64 overflow-y-auto">
+                              {listData.length === 0 && <li className="p-4 text-center text-sm text-slate-400 font-medium">No items added yet.</li>}
+                              {listData.sort((a,b)=>a.name.localeCompare(b.name)).map(item => (
+                                 <li key={item.id} className="flex justify-between items-center p-3 hover:bg-slate-50">
+                                    <span className="font-semibold text-slate-700 text-sm flex items-center gap-2"><Tag size={14} className="text-indigo-400"/> {item.name}</span>
+                                    <div className="flex gap-1">
+                                       <button onClick={()=>{setEditingId(item.id); setNewName(item.name);}} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors"><Edit size={16}/></button>
+                                       <button onClick={async () => { if(window.confirm("Delete this?")) await deleteFromFirebase(collectionName, item.id) }} className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded transition-colors"><Trash2 size={16}/></button>
+                                    </div>
+                                 </li>
+                              ))}
+                           </ul>
+                        </div>
+                     </div>
+                 </ModalWrapper>
+             );
+          };
 
           // --- Sub-Modals ---
           const UserModal = () => {
@@ -909,13 +964,17 @@
             const isEdit = !!editingCustomer;
             const [form, setForm] = useState(isEdit ? editingCustomer : { 
                name: '', contactPerson: '', phone: '', 
-               address1: '', map1: '', address2: '', map2: '', openingBalance: 0 
+               address1: '', map1: '', address2: '', map2: '', openingBalance: 0,
+               city: '', area: '', customerType: ''
             });
 
-            // Backwards compatibility: If editing old customer with "address" field, map it to address1
             useEffect(() => {
                if (isEdit && editingCustomer.address && !editingCustomer.address1) {
                   setForm(prev => ({...prev, address1: editingCustomer.address}));
+               }
+               // Backward compatibility for old customers without these fields
+               if (isEdit) {
+                   setForm(prev => ({...prev, city: editingCustomer.city || '', area: editingCustomer.area || '', customerType: editingCustomer.customerType || ''}));
                }
             }, [isEdit, editingCustomer]);
 
@@ -925,7 +984,6 @@
 
               if(isEdit) {
                 const updatedCustomer = {...form, openingBalance: Number(form.openingBalance)};
-                // Remove legacy address property if it existed to keep DB clean
                 if(updatedCustomer.address) delete updatedCustomer.address; 
                 
                 await saveToFirebase('customers', form.id, updatedCustomer);
@@ -949,6 +1007,7 @@
             };
 
             const inputClass = "w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-sm text-slate-800 placeholder-slate-400";
+            const selectClass = "w-full p-2 bg-white border border-slate-200 rounded-lg text-xs font-semibold focus:outline-none focus:border-indigo-500 shadow-sm text-slate-800";
 
             return (
               <ModalWrapper title={isEdit ? "Edit Customer Profile" : "Add New Customer"} onClose={() => setShowCustomerModal(false)}>
@@ -969,6 +1028,39 @@
                         <div>
                           <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Phone Number</label>
                           <input placeholder="03XXXXXXXXX" className={inputClass} value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} />
+                        </div>
+                     </div>
+                     
+                     <div className="grid grid-cols-3 gap-2 bg-indigo-50/50 p-2.5 rounded-xl border border-indigo-100">
+                        <div>
+                           <div className="flex justify-between items-center mb-1">
+                              <label className="text-[9px] font-bold text-indigo-700 uppercase tracking-wider ml-1">City</label>
+                              <button onClick={()=>setManageListConfig({collectionName: 'cities', title: 'Manage Cities'})} className="text-indigo-400 hover:text-indigo-700"><Settings size={12}/></button>
+                           </div>
+                           <select className={selectClass} value={form.city} onChange={e=>setForm({...form, city: e.target.value})}>
+                              <option value="">- Select -</option>
+                              {cities.map(c=><option key={c.id} value={c.name}>{c.name}</option>)}
+                           </select>
+                        </div>
+                        <div>
+                           <div className="flex justify-between items-center mb-1">
+                              <label className="text-[9px] font-bold text-indigo-700 uppercase tracking-wider ml-1">Area</label>
+                              <button onClick={()=>setManageListConfig({collectionName: 'areas', title: 'Manage Areas'})} className="text-indigo-400 hover:text-indigo-700"><Settings size={12}/></button>
+                           </div>
+                           <select className={selectClass} value={form.area} onChange={e=>setForm({...form, area: e.target.value})}>
+                              <option value="">- Select -</option>
+                              {areas.map(c=><option key={c.id} value={c.name}>{c.name}</option>)}
+                           </select>
+                        </div>
+                        <div>
+                           <div className="flex justify-between items-center mb-1">
+                              <label className="text-[9px] font-bold text-indigo-700 uppercase tracking-wider ml-1">Type</label>
+                              <button onClick={()=>setManageListConfig({collectionName: 'customerTypes', title: 'Manage Types'})} className="text-indigo-400 hover:text-indigo-700"><Settings size={12}/></button>
+                           </div>
+                           <select className={selectClass} value={form.customerType} onChange={e=>setForm({...form, customerType: e.target.value})}>
+                              <option value="">- Select -</option>
+                              {customerTypes.map(c=><option key={c.id} value={c.name}>{c.name}</option>)}
+                           </select>
                         </div>
                      </div>
                   </div>
@@ -1422,7 +1514,6 @@
                              const cid = Number(e.target.value);
                              const cName = customers.find(c=>c.id === cid)?.name || '';
                              
-                             // Fetch history for autofill logistics
                              const pastInvs = invoices.filter(inv => inv.customerId === cid).sort((a,b) => new Date(b.date) - new Date(a.date) || b.id.localeCompare(a.id));
                              const lastInv = pastInvs[0];
                              
@@ -1705,7 +1796,10 @@
                          <div key={c.id} className="bg-white p-4 rounded-2xl border border-slate-200 flex justify-between items-center shadow-sm hover:border-indigo-200 transition-colors">
                             <div className="flex-1 cursor-pointer" onClick={() => { setSelectedLedgerId(c.id); setShowLedgerModal(true); }}>
                               <h4 className="font-bold text-slate-800 text-sm hover:text-indigo-600">{c.name}</h4>
-                              <p className="text-[11px] font-medium text-slate-500 mt-0.5">{c.contactPerson ? `${c.contactPerson} - ` : ''}{c.phone}</p>
+                              <p className="text-[11px] font-medium text-slate-500 mt-0.5">
+                                 {c.contactPerson ? `${c.contactPerson} - ` : ''}{c.phone} 
+                                 {c.city ? ` • ${c.city}` : ''} {c.customerType ? ` • ${c.customerType}` : ''}
+                              </p>
                               <div className="mt-2.5">
                                 <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-md ${bal > 0 ? 'bg-rose-50 text-rose-600 border border-rose-100' : bal < 0 ? 'bg-indigo-50 text-indigo-600 border border-indigo-100' : 'bg-emerald-50 text-emerald-600 border border-emerald-100'}`}>
                                    Bal: Rs. {bal.toLocaleString()} {bal > 0 ? '(Dr)' : bal < 0 ? '(Cr)' : ''}
@@ -1796,16 +1890,34 @@
             const [dateFilter, setDateFilter] = useState('This Month');
             const [filterCompany, setFilterCompany] = useState('');
             const [filterCustomer, setFilterCustomer] = useState('');
+            const [filterCity, setFilterCity] = useState('');
+            const [filterArea, setFilterArea] = useState('');
+            const [filterType, setFilterType] = useState('');
             const [sortBy, setSortBy] = useState('profit'); 
 
             const reportEngine = useMemo(() => {
               let billedForPnL = invoices.filter(o => o.status === 'Billed' && checkDateFilter(o.date, dateFilter));
-              if(filterCustomer) billedForPnL = billedForPnL.filter(o => o.customerId === Number(filterCustomer));
+              
+              if(filterCustomer || filterCity || filterArea || filterType) {
+                 billedForPnL = billedForPnL.filter(o => {
+                    const c = customers.find(cust => cust.id === o.customerId);
+                    if(!c) return false;
+                    if(filterCustomer && c.id !== Number(filterCustomer)) return false;
+                    if(filterCity && c.city !== filterCity) return false;
+                    if(filterArea && c.area !== filterArea) return false;
+                    if(filterType && c.customerType !== filterType) return false;
+                    return true;
+                 });
+              }
 
               const kpis = { productRevenue: 0, totalCOGS: 0, grossMargin: 0, deliveryBilled: 0, transportExpense: 0, totalReceivables: 0 };
               const byProduct = {}; const byCompany = {}; const byCustomer = {}; const receivablesList = [];
 
               customers.forEach(c => {
+                 if(filterCity && c.city !== filterCity) return;
+                 if(filterArea && c.area !== filterArea) return;
+                 if(filterType && c.customerType !== filterType) return;
+                 
                  const bal = getCustomerBalance(c.id);
                  if(bal > 0) {
                     kpis.totalReceivables += bal;
@@ -1847,7 +1959,7 @@
               kpis.netProfit = kpis.grossMargin + (kpis.deliveryBilled - kpis.transportExpense) - kpis.totalExpenses;
 
               return { kpis, byProduct, byCompany, byCustomer, receivablesList: receivablesList.sort((a,b)=>b.amount - a.amount) };
-            }, [invoices, expenses, dateFilter, filterCompany, filterCustomer, products, customers]);
+            }, [invoices, expenses, dateFilter, filterCompany, filterCustomer, filterCity, filterArea, filterType, products, customers]);
 
             const getSortedExportData = () => {
                if (view === 'Overview') return null;
@@ -1871,7 +1983,7 @@
                     if (view === 'Overview') {
                        text += `Product Sales: Rs. ${reportEngine.kpis.productRevenue}\nTotal COGS: Rs. ${reportEngine.kpis.totalCOGS}\nGross Margin: Rs. ${reportEngine.kpis.grossMargin}\nDelivery Billed: Rs. ${reportEngine.kpis.deliveryBilled}\nTransport Exp: Rs. ${reportEngine.kpis.transportExpense}\nOperational Exp: Rs. ${reportEngine.kpis.totalExpenses}\n*Net Profit: Rs. ${reportEngine.kpis.netProfit}*\n`;
                     } else {
-                       exportData.forEach((r, i) => { text += `${i+1}. *${r.Name}* ${r.Company ? `(${r.Company})` : ''}\n   Qty: ${r.Qty} | Rev: Rs.${r.Revenue} | Profit: Rs.${r.GrossProfit || r.Amount}\n`; });
+                       exportData.forEach((r, i) => { text += `${i+1}. *${r.Name}* ${r.Company ? `(${r.Company})` : ''}\n   Qty: ${r.Qty} | Rev: Rs.${r.Revenue || r.Amount} | Profit: Rs.${r.GrossProfit || '-'}\n`; });
                     }
                     navigator.clipboard.writeText(text);
                     showToast("Report copied to clipboard!");
@@ -1914,7 +2026,7 @@
 
             return (
               <div className="h-full flex flex-col p-4">
-                <div className="flex gap-2 mb-3 overflow-x-auto scrollbar-hide shrink-0">
+                <div className="flex gap-2 mb-3 overflow-x-auto scrollbar-hide shrink-0 pb-1">
                    <div className="flex items-center gap-1.5 bg-white px-2.5 py-1.5 rounded-lg border border-slate-200 shadow-sm shrink-0">
                      <Calendar size={14} className="text-indigo-500" />
                      <select value={dateFilter} onChange={e => setDateFilter(e.target.value)} className="bg-transparent font-bold text-[11px] text-slate-700 outline-none cursor-pointer">
@@ -1933,6 +2045,27 @@
                      <select value={filterCustomer} onChange={e => setFilterCustomer(e.target.value)} className="bg-transparent font-bold text-[11px] text-slate-700 outline-none cursor-pointer w-24">
                         <option value="">All Clients</option>
                         {customers.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+                     </select>
+                   </div>
+                   <div className="flex items-center gap-1.5 bg-white px-2.5 py-1.5 rounded-lg border border-slate-200 shadow-sm shrink-0">
+                     <MapPin size={14} className="text-slate-400" />
+                     <select value={filterCity} onChange={e => setFilterCity(e.target.value)} className="bg-transparent font-bold text-[11px] text-slate-700 outline-none cursor-pointer w-20">
+                        <option value="">All Cities</option>
+                        {cities.map(c=><option key={c.id} value={c.name}>{c.name}</option>)}
+                     </select>
+                   </div>
+                   <div className="flex items-center gap-1.5 bg-white px-2.5 py-1.5 rounded-lg border border-slate-200 shadow-sm shrink-0">
+                     <MapPin size={14} className="text-slate-400" />
+                     <select value={filterArea} onChange={e => setFilterArea(e.target.value)} className="bg-transparent font-bold text-[11px] text-slate-700 outline-none cursor-pointer w-20">
+                        <option value="">All Areas</option>
+                        {areas.map(c=><option key={c.id} value={c.name}>{c.name}</option>)}
+                     </select>
+                   </div>
+                   <div className="flex items-center gap-1.5 bg-white px-2.5 py-1.5 rounded-lg border border-slate-200 shadow-sm shrink-0">
+                     <Tag size={14} className="text-slate-400" />
+                     <select value={filterType} onChange={e => setFilterType(e.target.value)} className="bg-transparent font-bold text-[11px] text-slate-700 outline-none cursor-pointer w-20">
+                        <option value="">All Types</option>
+                        {customerTypes.map(c=><option key={c.id} value={c.name}>{c.name}</option>)}
                      </select>
                    </div>
                 </div>
@@ -2255,6 +2388,7 @@
                 })}
               </nav>
 
+              {manageListConfig && <MasterListModal />}
               {showProductModal && <ProductModal />}
               {showCustomerModal && <CustomerModal />}
               {showLedgerModal && <CustomerLedgerModal />}
@@ -2268,33 +2402,10 @@
                   {toast.msg}
                 </div>
               )}
-
-              <style>{`
-                @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
-                * { font-family: 'Inter', system-ui, sans-serif; }
-                @keyframes slide-up { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-                .animate-slide-up { animation: slide-up 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
-                .scrollbar-hide::-webkit-scrollbar { display: none; }
-                /* Disable arrows on number inputs */
-                input[type="number"]::-webkit-inner-spin-button, 
-                input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
-                input[type="number"] { -moz-appearance: textfield; }
-                
-                /* Multi-Page Safe Printing Rules */
-                @media print { 
-                    body { background: white !important; margin: 0 !important; padding: 0 !important; }
-                    table { page-break-inside: auto; width: 100%; border-collapse: collapse; } 
-                    tr { page-break-inside: avoid; page-break-after: auto; } 
-                    thead { display: table-header-group; } 
-                    tfoot { display: table-footer-group; }
-                    .print\\:hidden { display: none !important; }
-                }
-              `}</style>
             </div>
           );
         }
 
-        // --- Render the App ---
         const root = createRoot(document.getElementById('root'));
         root.render(<App />);
     </script>
