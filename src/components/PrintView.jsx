@@ -678,7 +678,7 @@ return (
               To ensure <strong>"Reliable, Authentic &amp; Storage Maintained"</strong> Vet. Medical Supplies, there is a <strong>No Return / No Exchange</strong> policy for the following items:
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: sz('1px','2px','3px'), color: '#1e293b', fontWeight: 700 }}>
-              {['1. Vaccines','2. Sprays','3. Imported Products','4. Surgical Items','5. Items with &lt;6 Months Expiry','6. Damaged / Soiled Package'].map((item, i) => (
+              {['1. Vaccines','2. Sprays','3. Imported Products','4. Surgical Items','5. Items with <6 Months Expiry','6. Damaged / Soiled Package'].map((item, i) => (
                 <div key={i} style={{ padding: sz('1.5px 0','2px 0','3px 0') }}>{item}</div>
               ))}
             </div>
