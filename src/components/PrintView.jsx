@@ -1,14 +1,14 @@
-import React, { useRef } from ‘react’;
-import { FileDown, Printer, Share2, X } from ‘lucide-react’;
-import { formatDateDisp, getLocalDateStr, APP_NAME } from ‘../helpers’;
+import React, { useRef } from 'react';
+import { FileDown, Printer, Share2, X } from 'lucide-react';
+import { formatDateDisp, getLocalDateStr, APP_NAME } from '../helpers';
 
 function PrintView({ printConfig, setPrintConfig, products, customers, getCustomerLedger, getCustomerBalance, showToast }) {
 const { docType, format, data } = printConfig;
-const isThermal = format === ‘thermal’;
+const isThermal = format === 'thermal';
 const printRef = useRef(null);
 
 const getDispatchQtyStr = (item) => {
-if (!item) return ‘0’;
+if (!item) return '0';
 let uib = item.unitsInBox;
 if (!uib) {
 const prod = products.find(p => p.id === item.productId);
@@ -19,16 +19,16 @@ const qty = Number(item.quantity) || 0;
 if (uib <= 1) return `${qty}`;
 const boxes = Math.floor(qty / uib);
 const loose = qty % uib;
-const boxText = boxes === 1 ? ‘Box’ : ‘Boxes’;
+const boxText = boxes === 1 ? 'Box' : 'Boxes';
 if (boxes > 0 && loose > 0) return `${qty} (${boxes} ${boxText}, ${loose} Loose)`;
 if (boxes > 0) return `${qty} (${boxes} ${boxText})`;
 return `${qty} (${loose} Loose)`;
 };
 
 const generateShareText = () => {
-if (!data) return ‘’;
+if (!data) return '';
 let text = `*AnimalHealth.PK*\ `;
-if (docType === ‘invoice’) {
+if (docType === 'invoice') {
 text += `*INVOICE #${data.id}*\ Date: ${formatDateDisp(data.date)}\ Customer: ${data.customerName}\ \ *Items:*\ `;
 let savings = 0;
 if (data.items && Array.isArray(data.items)) {
@@ -53,7 +53,7 @@ const netBal = prevBal + (data.total || 0) - received;
 text += `Previous Balance: Rs.${prevBal.toLocaleString()}\ `;
 if (received > 0) text += `Payment Received: Rs.${received.toLocaleString()}\ `;
 text += `*Net Balance: Rs.${netBal.toLocaleString()}*\ Status: ${data.paymentStatus || 'Pending'}`;
-} else if (docType === ‘dispatch’) {
+} else if (docType === 'dispatch') {
 text += `*DISPATCH NOTE #${data.id}*\ Date: ${formatDateDisp(data.date)}\ *Customer:* ${data.customerName}\ `;
 if(data.customerDetails?.contactPerson || data.customerDetails?.phone) {
 text += `*Contact:* ${data.customerDetails?.contactPerson || 'N/A'} - ${data.customerDetails?.phone || ''}\ `;
@@ -63,9 +63,9 @@ if(data.customerDetails?.map1) text += `*Map 1:* ${data.customerDetails.map1}\ `
 if(data.customerDetails?.address2) text += `*Address 2:* ${data.customerDetails.address2}\ `;
 if(data.customerDetails?.map2) text += `*Map 2:* ${data.customerDetails.map2}\ `;
 text += `\ *Vehicle/Transport:* ${data.vehicle || 'N/A'}\ `;
-if(data.vehicle === ‘Intercity Transport’) {
+if(data.vehicle === 'Intercity Transport') {
 text += `Transport Co: ${data.transportCompany || 'N/A'}\ Bilty No: ${data.biltyNumber || 'N/A'}\ `;
-} else if ([‘Rider’, ‘Rickshaw’, ‘Suzuki’].includes(data.vehicle)) {
+} else if (['Rider', 'Rickshaw', 'Suzuki'].includes(data.vehicle)) {
 text += `Driver: ${data.driverName || 'N/A'} - ${data.driverPhone || ''}\ `;
 }
 text += `\ *Items to Deliver:*\ `;
@@ -73,17 +73,17 @@ if (data.items && Array.isArray(data.items)) {
 data.items.forEach(i => text += `- ${i.name || 'Unknown'} ${i.isBonus ? '- (BONUS)' : ''} -> ${getDispatchQtyStr(i)}\ `);
 }
 text += `\ Total SKUs: ${(data.items || []).length} | Please confirm receipt upon delivery.`;
-} else if (docType === ‘receipt’) {
+} else if (docType === 'receipt') {
 text += `*PAYMENT RECEIPT*\ Ref: ${data.id}\ Date: ${formatDateDisp(data.date)}\ Customer: ${data.customerName}\ \ `;
 text += `*Amount Received: Rs.${data.receivedAmount || 0}*\ `;
 text += `Previous Balance: Rs.${data.prevBalance || 0}\ `;
 text += `*Remaining Balance: Rs.${data.newBalance || 0}*\ \ Thank you for your business!`;
-} else if (docType === ‘ledger’) {
+} else if (docType === 'ledger') {
 text += `*ACCOUNT STATEMENT*\ Customer: ${data.customerName}\ Statement Period: ${formatDateDisp(data.dateRange?.start)} to ${formatDateDisp(data.dateRange?.end)}\ \ `;
 text += `Total Debits: Rs.${data.totalDebit || 0}\ Total Credits: Rs.${data.totalCredit || 0}\ *Current Closing Balance: Rs.${data.closingBal || 0}*\ \ Please arrange payment at your earliest convenience.`;
-} else if (docType === ‘report’) {
+} else if (docType === 'report') {
 text += `*${data.title || 'Report'}*\ Period: ${data.dateFilter || 'All Time'}\ \ `;
-if (data.view === ‘Overview’) {
+if (data.view === 'Overview') {
 text += `*Financial Summary*\ `;
 text += `Product Sales: Rs.${(data.stats?.productRevenue || 0).toLocaleString()}\ `;
 text += `Total COGS: Rs.${(data.stats?.totalCOGS || 0).toLocaleString()}\ `;
@@ -92,7 +92,7 @@ text += `Delivery Billed: Rs.${(data.stats?.deliveryBilled || 0).toLocaleString(
 text += `Transport Exp: Rs.${(data.stats?.transportExpense || 0).toLocaleString()}\ `;
 text += `Operational Exp: Rs.${(data.stats?.totalExpenses || 0).toLocaleString()}\ `;
 text += `*Net Profit: Rs.${(data.stats?.netProfit || 0).toLocaleString()}*\ `;
-} else if (data.view === ‘Receivables’) {
+} else if (data.view === 'Receivables') {
 text += `*Customer Receivables*\ Top 10:\ `;
 if (data.rows && Array.isArray(data.rows)) {
 data.rows.slice(0, 10).forEach(r => { text += `- ${r.Name || 'Unknown'}: Rs.${(r.Amount || 0).toLocaleString()}\ `; });
@@ -113,8 +113,8 @@ const handlePrint = () => {
 // Temporarily inject thermal page size if needed
 let styleEl = null;
 if (isThermal) {
-styleEl = document.createElement(‘style’);
-styleEl.id = ‘thermal-print-style’;
+styleEl = document.createElement('style');
+styleEl.id = 'thermal-print-style';
 styleEl.textContent = `@page { size: 80mm auto; margin: 4mm; }`;
 document.head.appendChild(styleEl);
 }
@@ -126,12 +126,11 @@ if (styleEl) styleEl.remove();
 };
 
 const handlePDF = () => {
-const docLabels = { invoice: ‘Invoice’, dispatch: ‘DispatchNote’, receipt: ‘Receipt’, ledger: ‘Ledger’, report: ‘Report’ };
+const docLabels = { invoice: 'Invoice', dispatch: 'DispatchNote', receipt: 'Receipt', ledger: 'Ledger', report: 'Report' };
 const filename = `${docLabels[docType] || 'Document'}_${data?.id || Date.now()}.pdf`;
-const element = document.getElementById(‘print-document’);
-if (!element) { showToast(“Print element not found”, “error”); return; }
+const element = document.getElementById('print-document');
+if (!element) { showToast("Print element not found", "error"); return; }
 
-```
 showToast("Generating PDF...", "success");
 
 // Clone the element to measure natural height for thermal
@@ -192,7 +191,6 @@ if (isThermal) {
     .then(() => showToast("PDF downloaded!", "success"))
     .catch((err) => { console.error(err); showToast("PDF failed, use Print instead", "error"); });
 }
-```
 
 };
 
@@ -201,8 +199,8 @@ const safeItems = data?.items || [];
 const safeRows = data?.rows || [];
 
 // Width classes based on format
-const docWidth = isThermal ? ‘w-[80mm] min-w-[80mm] max-w-[80mm]’ : ‘w-full max-w-[210mm]’;
-const fontSize = isThermal ? ‘text-[10px]’ : ‘text-xs sm:text-sm’;
+const docWidth = isThermal ? 'w-[80mm] min-w-[80mm] max-w-[80mm]' : 'w-full max-w-[210mm]';
+const fontSize = isThermal ? 'text-[10px]' : 'text-xs sm:text-sm';
 
 return (
 <div className="fixed inset-0 bg-white z-[100] overflow-y-auto overflow-x-hidden" id="print-root">
@@ -210,23 +208,22 @@ return (
 <div className="no-print sticky top-0 z-50 bg-slate-100 border-b border-slate-200 p-3 sm:p-4">
 <div className="flex flex-wrap items-center justify-between gap-2 max-w-[210mm] mx-auto">
 <div className="flex items-center gap-2">
-<button onClick={() => setPrintConfig({…printConfig, format: ‘thermal’})} className={`px-3 py-2 rounded-lg font-bold text-xs transition-colors ${isThermal ? 'bg-slate-800 text-white' : 'bg-white text-slate-600 border border-slate-300'}`}>Thermal (80mm)</button>
-<button onClick={() => setPrintConfig({…printConfig, format: ‘a5’})} className={`px-3 py-2 rounded-lg font-bold text-xs transition-colors ${!isThermal ? 'bg-slate-800 text-white' : 'bg-white text-slate-600 border border-slate-300'}`}>A4 / A5 Sheet</button>
+<button onClick={() => setPrintConfig({...printConfig, format: 'thermal'})} className={`px-3 py-2 rounded-lg font-bold text-xs transition-colors ${isThermal ? 'bg-slate-800 text-white' : 'bg-white text-slate-600 border border-slate-300'}`}>Thermal (80mm)</button>
+<button onClick={() => setPrintConfig({...printConfig, format: 'a5'})} className={`px-3 py-2 rounded-lg font-bold text-xs transition-colors ${!isThermal ? 'bg-slate-800 text-white' : 'bg-white text-slate-600 border border-slate-300'}`}>A4 / A5 Sheet</button>
 </div>
 <div className="flex items-center gap-2">
 <button onClick={handlePDF} className="flex items-center gap-1.5 px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-xs transition-colors"><FileDown size={14}/> PDF</button>
 <button onClick={handlePrint} className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs transition-colors"><Printer size={14}/> Print</button>
-{docType !== ‘report’ && (
-<a href={`https://wa.me/?text=${generateShareText()}`} target=”_blank” rel=“noopener noreferrer” className=“flex items-center gap-1.5 px-3 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg font-bold text-xs transition-colors”>
+{docType !== 'report' && (
+<a href={`https://wa.me/?text=${generateShareText()}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-3 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg font-bold text-xs transition-colors">
 <Share2 size={14}/> Share
 </a>
 )}
-<button onClick={() => setPrintConfig(null)} className=“flex items-center gap-1.5 px-3 py-2 bg-rose-500 hover:bg-rose-600 text-white rounded-lg font-bold text-xs transition-colors”><X size={14}/> Close</button>
+<button onClick={() => setPrintConfig(null)} className="flex items-center gap-1.5 px-3 py-2 bg-rose-500 hover:bg-rose-600 text-white rounded-lg font-bold text-xs transition-colors"><X size={14}/> Close</button>
 </div>
 </div>
 </div>
 
-```
   {/* Print Document Content */}
   <div 
     id="print-document" 
@@ -576,6 +573,22 @@ return (
         max-width: none !important;
         min-width: unset !important;
         margin: 0 !important;
-```
+        padding: 6mm !important;
+        font-size: 10pt !important;
+        position: relative !important;
+      }
+      .keep-together { page-break-inside: avoid !important; break-inside: avoid !important; }
+      table { page-break-inside: auto !important; width: 100% !important; }
+      thead { display: table-header-group !important; }
+      tfoot { display: table-footer-group !important; }
+      tbody tr { page-break-inside: avoid !important; break-inside: avoid !important; }
+      * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
+    }
+  `}</style>
+</div>
+
+);
+}
+
 
 export default PrintView;
