@@ -46,14 +46,14 @@ const checkDateFilter = (dateStr, filter) => {
 
 const exportToCSV = (data, filename) => {
   if(!data || !data.length) return;
-  const headers = Object.keys(data[0]).join(',');
-  const rows = data.map(obj => Object.values(obj).map(val => `"${val}"`).join(',')).join('\
-');
-  const blob = new Blob([headers + '\
-' + rows], { type: 'text/csv' });
+  const q = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const headers = Object.keys(data[0]).map(q).join(',');
+  const rows = data.map(obj => Object.values(obj).map(q).join(',')).join('\n');
+  const blob = new Blob([headers + '\n' + rows], { type: 'text/csv' });
   const url = window.URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
 };
 
 export { APP_NAME, VEHICLES, getPKTDate, getLocalDateStr, formatDateDisp, checkDateFilter, exportToCSV };

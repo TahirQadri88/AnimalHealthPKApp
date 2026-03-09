@@ -15,6 +15,298 @@ import PrintView from './components/PrintView';
 
 const AppContext = createContext(null);
 
+// ─── TOP-LEVEL MODAL COMPONENTS (outside App to prevent focus-loss on re-render) ───
+
+const ModalWrapper = ({ title, children, onClose }) => {
+useEffect(() => {
+const prev = document.body.style.overflow;
+document.body.style.overflow = 'hidden';
+return () => { document.body.style.overflow = prev; };
+}, []);
+return (
+<div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex justify-center items-end sm:items-center" onMouseDown={(e) => { if(e.target === e.currentTarget) onClose(); }}>
+<div className="bg-white w-full max-w-lg rounded-t-3xl sm:rounded-3xl h-[85vh] sm:h-auto max-h-[90vh] flex flex-col animate-slide-up shadow-2xl" onMouseDown={e => e.stopPropagation()}>
+<div className="p-5 border-b border-slate-100 flex justify-between items-center bg-white rounded-t-3xl sm:rounded-t-3xl">
+<h2 className="text-lg font-bold text-slate-800">{title}</h2>
+<button onClick={onClose} className="p-2 bg-slate-100 rounded-full text-slate-500 hover:bg-slate-200 hover:text-slate-800 transition-colors"><X size={20}/></button>
+</div>
+<div className="flex-1 overflow-y-auto p-5 bg-slate-50/50">{children}</div>
+</div>
+</div>
+);
+};
+
+const UserModal = () => {
+const { editingUser, appUsers, checkDuplicate, saveToFirebase, showToast, setShowUserModal } = useContext(AppContext);
+const isEdit = !!editingUser;
+const [form, setForm] = useState(isEdit ? editingUser : { name: '', password: '', role: 'staff' });
+const save = async () => {
+if (!form.name || !form.password) return showToast("Name and Password are required", "error");
+if (checkDuplicate(appUsers, form.name, form.id)) return showToast("Username already exists", "error");
+const id = isEdit ? form.id : Date.now().toString();
+await saveToFirebase('app_users', id, { ...form, id });
+showToast(isEdit ? "User Updated" : "User Added");
+setShowUserModal(false);
+};
+const inputClass = "w-full p-3.5 bg-white border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-sm text-slate-800 placeholder-slate-400";
+return (
+<ModalWrapper title={isEdit ? "Edit Team Member" : "Add Team Member"} onClose={() => setShowUserModal(false)}>
+<div className="space-y-4">
+<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Full Name / Username</label><input className={inputClass} value={form.name} onChange={e=>setForm({...form, name: e.target.value})} placeholder="e.g. Ali Raza" /></div>
+<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Login Password</label><input type="text" className={inputClass} value={form.password} onChange={e=>setForm({...form, password: e.target.value})} placeholder="Set Password" /></div>
+<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">System Permissions</label><select className={inputClass} value={form.role} onChange={e=>setForm({...form, role: e.target.value})}><option value="staff">Sales Staff (Hidden Costs & Profits)</option><option value="admin">Administrator (Full Access)</option></select></div>
+<button onClick={save} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 rounded-xl mt-4 shadow-md shadow-indigo-600/20 active:scale-[0.98] transition-all">Save User Record</button>
+</div>
+</ModalWrapper>
+);
+};
+
+const ProductModal = () => {
+const { editingProduct, products, companies, invoices, isAdmin, checkDuplicate, saveToFirebase, showToast, setShowProductModal } = useContext(AppContext);
+const isEdit = !!editingProduct;
+const [form, setForm] = useState(isEdit ? editingProduct : { name: '', companyId: '', unit: '', unitsInBox: '', costPrice: '', sellingPrice: '', available: true });
+const originalCost = isEdit ? editingProduct.costPrice : '';
+const costChanged = isEdit && form.costPrice !== originalCost;
+const [effectiveDate, setEffectiveDate] = useState(getLocalDateStr());
+const [newCompany, setNewCompany] = useState('');
+const [isAddingCompany, setIsAddingCompany] = useState(false);
+const save = async () => {
+if(!form.name || !form.sellingPrice || !form.costPrice || !form.unit || !form.unitsInBox || (!form.companyId && !newCompany)) {
+return showToast("All fields (Name, Company, Unit, Qty, Cost, Selling) are compulsory.", "error");
+}
+if(checkDuplicate(products, form.name, form.id)) return showToast("Product Name must be unique", "error");
+let finalCompanyId = form.companyId;
+if (isAddingCompany) {
+if(checkDuplicate(companies, newCompany)) return showToast("Company Name already exists", "error");
+const newComp = { id: Date.now(), name: newCompany };
+await saveToFirebase('companies', newComp.id, newComp);
+finalCompanyId = newComp.id;
+}
+const newCost = Number(form.costPrice||0);
+const formatted = { ...form, companyId: Number(finalCompanyId), costPrice: newCost, sellingPrice: Number(form.sellingPrice), unitsInBox: Number(form.unitsInBox) };
+if (isEdit) {
+await saveToFirebase('products', form.id, formatted);
+if (costChanged) {
+invoices.forEach(async inv => {
+if (inv.date >= effectiveDate) {
+let updated = false;
+const updatedItems = inv.items.map(item => {
+if (item.productId === form.id) { updated = true; return { ...item, costPrice: newCost }; }
+return item;
+});
+if (updated) await saveToFirebase('invoices', inv.id, { ...inv, items: updatedItems });
+}
+});
+showToast(`Product Updated. Cost applied from ${effectiveDate}`);
+} else { showToast("Product Updated"); }
+} else {
+const newId = Date.now();
+await saveToFirebase('products', newId, { ...formatted, id: newId });
+showToast("Product Registered");
+}
+setShowProductModal(false);
+};
+const inputClass = "w-full p-3.5 bg-white border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-sm text-slate-800 placeholder-slate-400";
+return (
+<ModalWrapper title={isEdit ? "Edit Product" : "Register Product"} onClose={() => setShowProductModal(false)}>
+<div className="space-y-4 pb-10">
+<div><label className="text-[10px] font-bold text-rose-500 uppercase tracking-wider ml-1 mb-1 block">Product Name *</label><input placeholder="Unique Product Name" className={inputClass} value={form.name} onChange={e => setForm({...form, name: e.target.value})} /></div>
+<div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+<div className="flex justify-between items-center mb-3"><label className="text-[10px] font-bold text-rose-500 uppercase tracking-wider">Manufacturer / Company *</label><button onClick={() => setIsAddingCompany(!isAddingCompany)} className="text-xs font-bold text-indigo-600 hover:text-indigo-700 bg-indigo-50 px-2 py-1 rounded-md transition-colors">{isAddingCompany ? 'Select Existing' : '+ Add New'}</button></div>
+{isAddingCompany ? (<input placeholder="Enter New Company Name..." className={inputClass} value={newCompany} onChange={e => setNewCompany(e.target.value)} />) : (
+<select className={inputClass} value={form.companyId} onChange={e => setForm({...form, companyId: e.target.value})}><option value="">– Select Company –</option>{companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
+)}
+</div>
+<div className="grid grid-cols-2 gap-4">
+<div><label className="text-[10px] font-bold text-rose-500 uppercase tracking-wider ml-1 mb-1 block">Unit Type *</label><input placeholder="e.g. Vial" className={inputClass} value={form.unit} onChange={e => setForm({...form, unit: e.target.value})} /></div>
+<div><label className="text-[10px] font-bold text-rose-500 uppercase tracking-wider ml-1 mb-1 block">Units per Box *</label><input type="number" placeholder="Qty" className={inputClass} value={form.unitsInBox} onChange={e => setForm({...form, unitsInBox: e.target.value})} /></div>
+</div>
+<div className="grid grid-cols-2 gap-4 pt-2">
+{isAdmin && (<div className="col-span-2 sm:col-span-1"><label className="text-[10px] font-bold text-rose-500 uppercase tracking-wider ml-1 mb-1 block">Cost Price *</label><input type="number" placeholder="Cost" className={`${inputClass} !border-indigo-200 !bg-indigo-50/50 focus:!border-indigo-500`} value={form.costPrice} onChange={e => setForm({...form, costPrice: e.target.value})} /></div>)}
+<div className={isAdmin ? 'col-span-2 sm:col-span-1' : 'col-span-2'}><label className="text-[10px] font-bold text-rose-500 uppercase tracking-wider ml-1 mb-1 block">Selling Price *</label><input type="number" placeholder="Selling" className={`${inputClass} !border-emerald-200 !bg-emerald-50/50 focus:!border-emerald-500 text-emerald-700 font-bold`} value={form.sellingPrice} onChange={e => setForm({...form, sellingPrice: e.target.value})} /></div>
+</div>
+{costChanged && isAdmin && (
+<div className="bg-amber-50 p-4 rounded-xl border border-amber-200 animate-slide-up mt-2">
+<label className="text-[10px] font-bold text-amber-700 uppercase tracking-wider block mb-2 flex items-center gap-1"><AlertCircle size={14}/> Effective From Date</label>
+<input type="date" className={`${inputClass} !bg-white !border-amber-300 !text-amber-900`} value={effectiveDate} onChange={e => setEffectiveDate(e.target.value)} />
+<p className="text-[10px] text-amber-600 font-medium mt-2 leading-tight">This will retroactively update profitability on past invoices from this date onward.</p>
+</div>
+)}
+<button onClick={save} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 rounded-xl mt-6 shadow-md shadow-indigo-600/20 active:scale-[0.98] transition-all">Save Product</button>
+</div>
+</ModalWrapper>
+);
+};
+
+const CustomerModal = () => {
+const { editingCustomer, customers, invoices, billingView, currentInvoice, isAdmin, checkDuplicate, saveToFirebase, showToast, setShowCustomerModal, setCurrentInvoice } = useContext(AppContext);
+const isEdit = !!editingCustomer;
+const [form, setForm] = useState(isEdit ? editingCustomer : { name: '', contactPerson: '', phone: '', address1: '', map1: '', address2: '', map2: '', openingBalance: 0 });
+useEffect(() => { if (isEdit && editingCustomer.address && !editingCustomer.address1) { setForm(prev => ({...prev, address1: editingCustomer.address})); } }, [isEdit, editingCustomer]);
+const save = async () => {
+if(!form.name) return showToast("Customer Name required", "error");
+if(checkDuplicate(customers, form.name, form.id)) return showToast("Customer Name must be unique", "error");
+if(isEdit) {
+const updatedCustomer = {...form, openingBalance: Number(form.openingBalance)};
+if(updatedCustomer.address) delete updatedCustomer.address;
+await saveToFirebase('customers', form.id, updatedCustomer);
+if(form.name !== editingCustomer.name) { invoices.forEach(async o => { if (o.customerId === form.id) await saveToFirebase('invoices', o.id, {...o, customerName: form.name}); }); }
+showToast("Customer Updated");
+} else {
+const newId = Date.now();
+const newCust = { ...form, openingBalance: Number(form.openingBalance), id: newId };
+await saveToFirebase('customers', newId, newCust);
+if (billingView === 'form' && currentInvoice) { setCurrentInvoice({...currentInvoice, customerId: newCust.id, customerName: newCust.name}); }
+showToast("Customer Added");
+}
+setShowCustomerModal(false);
+};
+const inputClass = "w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-sm text-slate-800 placeholder-slate-400";
+return (
+<ModalWrapper title={isEdit ? "Edit Customer Profile" : "Add New Customer"} onClose={() => setShowCustomerModal(false)}>
+<div className="space-y-5 pb-8">
+<div className="space-y-3">
+<h3 className="text-xs font-bold text-slate-800 uppercase tracking-widest border-b border-slate-200 pb-1">Basic Details</h3>
+<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Customer / Business Name *</label><input placeholder="e.g. Karachi Vet Clinic" className={inputClass} value={form.name} onChange={e => setForm({...form, name: e.target.value})} /></div>
+<div className="grid grid-cols-2 gap-3">
+<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Contact Person</label><input placeholder="Name" className={inputClass} value={form.contactPerson || ''} onChange={e => setForm({...form, contactPerson: e.target.value})} /></div>
+<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Phone Number</label><input placeholder="03XXXXXXXXX" className={inputClass} value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} /></div>
+</div>
+</div>
+<div className="space-y-3 bg-slate-100 p-3 rounded-xl border border-slate-200">
+<h3 className="text-xs font-bold text-slate-800 uppercase tracking-widest flex items-center gap-1"><MapPin size={14}/> Primary Location</h3>
+<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Address 1</label><textarea placeholder="Complete Delivery Address..." rows="2" className={inputClass} value={form.address1} onChange={e => setForm({...form, address1: e.target.value})} /></div>
+<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Google Maps Link 1</label><input placeholder="https://maps.app.goo.gl/..." className={inputClass} value={form.map1 || ''} onChange={e => setForm({...form, map1: e.target.value})} /></div>
+</div>
+<div className="space-y-3 p-3 rounded-xl border border-slate-200 border-dashed">
+<h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1"><MapPin size={14}/> Secondary Location (Optional)</h3>
+<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Address 2</label><textarea placeholder="Alternative Address..." rows="2" className={inputClass} value={form.address2 || ''} onChange={e => setForm({...form, address2: e.target.value})} /></div>
+<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Google Maps Link 2</label><input placeholder="https://maps.app.goo.gl/..." className={inputClass} value={form.map2 || ''} onChange={e => setForm({...form, map2: e.target.value})} /></div>
+</div>
+{isAdmin && (
+<div className="bg-rose-50 p-3 rounded-xl border border-rose-100 mt-2">
+<label className="text-[10px] font-bold text-rose-500 uppercase tracking-wider ml-1 mb-1 block">Opening Balance (Dr)</label>
+<input type="number" placeholder="0.00" className={`${inputClass} !border-rose-200 focus:!border-rose-500`} value={form.openingBalance} onChange={e => setForm({...form, openingBalance: e.target.value})} />
+</div>
+)}
+<button onClick={save} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 rounded-xl mt-4 shadow-md shadow-indigo-600/20 active:scale-[0.98] transition-all">Save Customer Profile</button>
+</div>
+</ModalWrapper>
+);
+};
+
+const PaymentModal = () => {
+const { selectedCustomerForPayment, customers, getCustomerBalance, saveToFirebase, showToast, setShowPaymentModal } = useContext(AppContext);
+const [form, setForm] = useState({ customerId: selectedCustomerForPayment || '', amount: '', date: getLocalDateStr(), note: 'Cash Payment' });
+const save = async () => {
+if(!form.customerId || !form.amount) return showToast("Customer and Amount are required", "error");
+const newPayment = { id: `REC-${Math.floor(Math.random()*100000)}`, customerId: Number(form.customerId), amount: Number(form.amount), date: form.date, note: form.note };
+await saveToFirebase('payments', newPayment.id, newPayment);
+showToast("Payment Received & Ledger Updated!");
+setShowPaymentModal(false);
+};
+const inputClass = "w-full p-3.5 bg-white border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-sm text-slate-800 placeholder-slate-400";
+return (
+<ModalWrapper title="Receive Payment" onClose={() => setShowPaymentModal(false)}>
+<div className="space-y-4 pb-10">
+<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Select Client</label><select className={inputClass} value={form.customerId} onChange={e=>setForm({...form, customerId: e.target.value})}><option value="">– Choose Client –</option>{customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
+{form.customerId && (<div className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-center"><p className="text-[10px] uppercase font-bold text-slate-500 tracking-widest">Current Outstanding Balance</p><p className="text-xl font-black text-rose-600 mt-1">Rs. {getCustomerBalance(Number(form.customerId)).toLocaleString()}</p></div>)}
+<div className="grid grid-cols-2 gap-3">
+<div className="col-span-2"><label className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider ml-1 mb-1 block">Amount Received (Cr)</label><input type="number" placeholder="0.00" className={`${inputClass} !border-emerald-200 !text-emerald-700 !font-extrabold text-lg`} value={form.amount} onChange={e=>setForm({...form, amount: e.target.value})} /></div>
+<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Date</label><input type="date" className={inputClass} value={form.date} onChange={e=>setForm({...form, date: e.target.value})} /></div>
+<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Mode / Note</label><input type="text" placeholder="e.g. Cash / Cheque No." className={inputClass} value={form.note} onChange={e=>setForm({...form, note: e.target.value})} /></div>
+</div>
+<button onClick={save} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-4 rounded-xl mt-6 shadow-md shadow-emerald-500/20 active:scale-[0.98] transition-all">Process Payment</button>
+</div>
+</ModalWrapper>
+);
+};
+
+const CustomerLedgerModal = () => {
+const { selectedLedgerId, getCustomerLedger, generateReceiptData, setPrintConfig, setShowPaymentModal, setSelectedCustomerForPayment, setShowLedgerModal } = useContext(AppContext);
+const [startDate, setStartDate] = useState(() => { const d = new Date(); d.setMonth(d.getMonth() - 1); return getLocalDateStr(d); });
+const [endDate, setEndDate] = useState(getLocalDateStr());
+const fullLedger = getCustomerLedger(selectedLedgerId);
+if(!fullLedger) return null;
+const preRows = fullLedger.rows.filter(r => r.date < startDate);
+const periodOpeningBal = fullLedger.openingBal + preRows.reduce((sum, r) => sum + r.debit - r.credit, 0);
+const filteredRows = fullLedger.rows.filter(r => r.date >= startDate && r.date <= endDate);
+const periodTotalDebit = filteredRows.reduce((sum, r) => sum + r.debit, 0);
+const periodTotalCredit = filteredRows.reduce((sum, r) => sum + r.credit, 0);
+const printData = { ...fullLedger, dateRange: { start: startDate, end: endDate }, openingBal: periodOpeningBal, rows: filteredRows, totalDebit: periodTotalDebit, totalCredit: periodTotalCredit };
+return (
+<ModalWrapper title={`${fullLedger.customerName} - Account Ledger`} onClose={() => setShowLedgerModal(false)}>
+<div className="space-y-4 pb-10">
+<div className="flex items-center gap-2 mb-4 bg-slate-50 p-3 rounded-2xl border border-slate-200">
+<div className="flex-1"><label className="text-[9px] font-bold uppercase text-slate-500 block mb-1 tracking-wider">Start Date</label><input type="date" value={startDate} onChange={e=>setStartDate(e.target.value)} className="w-full p-2 text-xs font-semibold rounded-lg border border-slate-300 outline-none focus:border-indigo-500 bg-white" /></div>
+<div className="flex-1"><label className="text-[9px] font-bold uppercase text-slate-500 block mb-1 tracking-wider">End Date</label><input type="date" value={endDate} onChange={e=>setEndDate(e.target.value)} className="w-full p-2 text-xs font-semibold rounded-lg border border-slate-300 outline-none focus:border-indigo-500 bg-white" /></div>
+<div className="ml-2 text-right bg-rose-50 px-3 py-2 rounded-xl border border-rose-200 shadow-sm shrink-0"><p className="text-[9px] font-bold uppercase text-rose-600 tracking-widest">Current Balance</p><p className="text-base font-black text-rose-700 mt-0.5">Rs. {fullLedger.closingBal.toLocaleString()}</p></div>
+</div>
+<div className="flex gap-2">
+<button onClick={() => { setSelectedCustomerForPayment(fullLedger.id); setShowPaymentModal(true); }} className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3.5 rounded-xl flex justify-center items-center gap-2 shadow-sm active:scale-[0.98] transition-all text-xs"><Wallet size={16} /> Receive Payment</button>
+<button onClick={() => setPrintConfig({docType: 'ledger', format: 'a5', data: printData})} className="flex-1 bg-slate-800 hover:bg-slate-900 text-white font-bold py-3.5 rounded-xl flex justify-center items-center gap-2 shadow-sm active:scale-[0.98] transition-all text-xs"><FileSpreadsheet size={16} /> Print Ledger</button>
+</div>
+<div className="mt-6 border border-slate-200 rounded-2xl overflow-hidden shadow-sm bg-white">
+<div className="overflow-x-auto">
+<table className="w-full text-left text-[11px] sm:text-xs min-w-[500px]">
+<thead className="bg-slate-50 text-slate-500 border-b border-slate-200"><tr><th className="py-3 px-3 font-bold uppercase tracking-wider">Date</th><th className="py-3 px-3 font-bold uppercase tracking-wider">Particulars</th><th className="py-3 px-3 text-right font-bold uppercase tracking-wider">Debit (Dr)</th><th className="py-3 px-3 text-right font-bold uppercase tracking-wider">Credit (Cr)</th><th className="py-3 px-3 text-right font-bold uppercase tracking-wider">Balance</th><th className="py-3 px-2 text-center"></th></tr></thead>
+<tbody className="divide-y divide-slate-100 text-slate-800">
+<tr className="bg-slate-50/30"><td className="py-3 px-3 text-slate-500 font-medium" colSpan={4}>Opening Balance <span className="text-[9px]">(as of {formatDateDisp(startDate)})</span></td><td className="py-3 px-3 text-right font-bold text-slate-700">Rs. {periodOpeningBal.toLocaleString()}</td><td></td></tr>
+{filteredRows.map(row => (
+<tr key={row.id} className="hover:bg-slate-50 transition-colors">
+<td className="py-3 px-3 font-medium text-slate-600">{formatDateDisp(row.date)}</td>
+<td className="py-3 px-3"><span className="font-bold text-slate-800 block">{row.desc}</span><span className="block text-[9px] text-slate-400 mt-0.5">{row.ref}</span></td>
+<td className="py-3 px-3 text-right font-extrabold text-indigo-600">{row.debit > 0 ? row.debit.toLocaleString() : '-'}</td>
+<td className="py-3 px-3 text-right font-extrabold text-emerald-600">{row.credit > 0 ? row.credit.toLocaleString() : '-'}</td>
+<td className="py-3 px-3 text-right font-extrabold text-slate-800">{row.balance.toLocaleString()}</td>
+<td className="py-3 px-2 text-center">{row.credit > 0 && (<button onClick={() => setPrintConfig({docType: 'receipt', format: 'thermal', data: generateReceiptData(fullLedger, row.id)})} title="Print Receipt" className="p-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-lg transition-colors"><Receipt size={14}/></button>)}</td>
+</tr>
+))}
+{filteredRows.length === 0 && (<tr><td colSpan={6} className="text-center py-6 text-slate-400 font-medium">No transactions in this period.</td></tr>)}
+</tbody>
+<tfoot className="bg-slate-50 border-t border-slate-200">
+<tr><td colSpan={2} className="py-3 px-3 font-bold text-right uppercase tracking-wider text-slate-500">Period Totals:</td><td className="py-3 px-3 text-right font-black text-indigo-700">Rs. {periodTotalDebit.toLocaleString()}</td><td className="py-3 px-3 text-right font-black text-emerald-600">Rs. {periodTotalCredit.toLocaleString()}</td><td colSpan={2}></td></tr>
+</tfoot>
+</table>
+</div>
+</div>
+</div>
+</ModalWrapper>
+);
+};
+
+const ExpenseCategoryModal = () => {
+const { expenseCategories, saveToFirebase, deleteFromFirebase, showToast, setShowExpenseCatModal } = useContext(AppContext);
+const [newCat, setNewCat] = useState('');
+const addCat = async () => {
+if(!newCat) return;
+if(expenseCategories.some(c => c.name.toLowerCase() === newCat.toLowerCase())) return showToast("Category exists", "error");
+const catObj = { id: Date.now(), name: newCat };
+await saveToFirebase('expenseCategories', catObj.id, catObj);
+setNewCat('');
+showToast("Category Added");
+};
+return (
+<ModalWrapper title="Manage Expense Labels" onClose={() => setShowExpenseCatModal(false)}>
+<div className="space-y-4 pb-10">
+<div className="flex gap-2"><input type="text" placeholder="New category name..." className="flex-1 p-3 bg-slate-50 border border-slate-200 rounded-xl font-semibold outline-none focus:border-indigo-500" value={newCat} onChange={e=>setNewCat(e.target.value)} /><button onClick={addCat} className="bg-indigo-600 text-white px-4 rounded-xl font-bold hover:bg-indigo-700 transition-colors">Add</button></div>
+<div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+<ul className="divide-y divide-slate-100">
+{expenseCategories.map(c => (
+<li key={c.id} className="flex justify-between items-center p-3 hover:bg-slate-50">
+<span className="font-semibold text-slate-700 text-sm flex items-center gap-2"><Tag size={14} className="text-slate-400"/> {c.name}</span>
+<button onClick={async () => await deleteFromFirebase('expenseCategories', c.id)} className="p-2 text-slate-400 hover:text-rose-500 transition-colors"><Trash2 size={16}/></button>
+</li>
+))}
+</ul>
+</div>
+</div>
+</ModalWrapper>
+);
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 function useLiveCollection(collectionName) {
 const [data, setData] = React.useState([]);
 useEffect(() => {
@@ -206,290 +498,6 @@ return (
 );
 }
 
-// — Reusable Modal Wrapper —
-const ModalWrapper = ({ title, children, onClose }) => {
-useEffect(() => {
-const prev = document.body.style.overflow;
-document.body.style.overflow = 'hidden';
-return () => { document.body.style.overflow = prev; };
-}, []);
-return (
-<div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex justify-center items-end sm:items-center" onMouseDown={(e) => { if(e.target === e.currentTarget) onClose(); }}>
-<div className="bg-white w-full max-w-lg rounded-t-3xl sm:rounded-3xl h-[85vh] sm:h-auto max-h-[90vh] flex flex-col animate-slide-up shadow-2xl" onMouseDown={e => e.stopPropagation()}>
-<div className="p-5 border-b border-slate-100 flex justify-between items-center bg-white rounded-t-3xl sm:rounded-t-3xl">
-<h2 className="text-lg font-bold text-slate-800">{title}</h2>
-<button onClick={onClose} className="p-2 bg-slate-100 rounded-full text-slate-500 hover:bg-slate-200 hover:text-slate-800 transition-colors"><X size={20}/></button>
-</div>
-<div className="flex-1 overflow-y-auto p-5 bg-slate-50/50">{children}</div>
-</div>
-</div>
-);
-};
-
-// — Sub-Modals —
-const UserModal = () => {
-const isEdit = !!editingUser;
-const [form, setForm] = useState(isEdit ? editingUser : { name: '', password: '', role: 'staff' });
-const save = async () => {
-if (!form.name || !form.password) return showToast("Name and Password are required", "error");
-if (checkDuplicate(appUsers, form.name, form.id)) return showToast("Username already exists", "error");
-const id = isEdit ? form.id : Date.now().toString();
-await saveToFirebase('app_users', id, { ...form, id });
-showToast(isEdit ? "User Updated" : "User Added");
-setShowUserModal(false);
-};
-const inputClass = "w-full p-3.5 bg-white border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-sm text-slate-800 placeholder-slate-400";
-return (
-<ModalWrapper title={isEdit ? "Edit Team Member" : "Add Team Member"} onClose={() => setShowUserModal(false)}>
-<div className="space-y-4">
-<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Full Name / Username</label><input className={inputClass} value={form.name} onChange={e=>setForm({...form, name: e.target.value})} placeholder="e.g. Ali Raza" /></div>
-<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Login Password</label><input type="text" className={inputClass} value={form.password} onChange={e=>setForm({...form, password: e.target.value})} placeholder="Set Password" /></div>
-<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">System Permissions</label><select className={inputClass} value={form.role} onChange={e=>setForm({...form, role: e.target.value})}><option value="staff">Sales Staff (Hidden Costs & Profits)</option><option value="admin">Administrator (Full Access)</option></select></div>
-<button onClick={save} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 rounded-xl mt-4 shadow-md shadow-indigo-600/20 active:scale-[0.98] transition-all">Save User Record</button>
-</div>
-</ModalWrapper>
-);
-};
-
-const ProductModal = () => {
-const isEdit = !!editingProduct;
-const [form, setForm] = useState(isEdit ? editingProduct : { name: '', companyId: '', unit: '', unitsInBox: '', costPrice: '', sellingPrice: '', available: true });
-const originalCost = isEdit ? editingProduct.costPrice : '';
-const costChanged = isEdit && form.costPrice !== originalCost;
-const [effectiveDate, setEffectiveDate] = useState(getLocalDateStr());
-const [newCompany, setNewCompany] = useState('');
-const [isAddingCompany, setIsAddingCompany] = useState(false);
-const save = async () => {
-if(!form.name || !form.sellingPrice || !form.costPrice || !form.unit || !form.unitsInBox || (!form.companyId && !newCompany)) {
-return showToast("All fields (Name, Company, Unit, Qty, Cost, Selling) are compulsory.", "error");
-}
-if(checkDuplicate(products, form.name, form.id)) return showToast("Product Name must be unique", "error");
-let finalCompanyId = form.companyId;
-if (isAddingCompany) {
-if(checkDuplicate(companies, newCompany)) return showToast("Company Name already exists", "error");
-const newComp = { id: Date.now(), name: newCompany };
-await saveToFirebase('companies', newComp.id, newComp);
-finalCompanyId = newComp.id;
-}
-const newCost = Number(form.costPrice||0);
-const formatted = { ...form, companyId: Number(finalCompanyId), costPrice: newCost, sellingPrice: Number(form.sellingPrice), unitsInBox: Number(form.unitsInBox) };
-if (isEdit) {
-await saveToFirebase('products', form.id, formatted);
-if (costChanged) {
-invoices.forEach(async inv => {
-if (inv.date >= effectiveDate) {
-let updated = false;
-const updatedItems = inv.items.map(item => {
-if (item.productId === form.id) { updated = true; return { ...item, costPrice: newCost }; }
-return item;
-});
-if (updated) await saveToFirebase('invoices', inv.id, { ...inv, items: updatedItems });
-}
-});
-showToast(`Product Updated. Cost applied from ${effectiveDate}`);
-} else { showToast("Product Updated"); }
-} else {
-const newId = Date.now();
-await saveToFirebase('products', newId, { ...formatted, id: newId });
-showToast("Product Registered");
-}
-setShowProductModal(false);
-};
-const inputClass = "w-full p-3.5 bg-white border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-sm text-slate-800 placeholder-slate-400";
-return (
-<ModalWrapper title={isEdit ? "Edit Product" : "Register Product"} onClose={() => setShowProductModal(false)}>
-<div className="space-y-4 pb-10">
-<div><label className="text-[10px] font-bold text-rose-500 uppercase tracking-wider ml-1 mb-1 block">Product Name *</label><input placeholder="Unique Product Name" className={inputClass} value={form.name} onChange={e => setForm({...form, name: e.target.value})} /></div>
-<div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-<div className="flex justify-between items-center mb-3"><label className="text-[10px] font-bold text-rose-500 uppercase tracking-wider">Manufacturer / Company *</label><button onClick={() => setIsAddingCompany(!isAddingCompany)} className="text-xs font-bold text-indigo-600 hover:text-indigo-700 bg-indigo-50 px-2 py-1 rounded-md transition-colors">{isAddingCompany ? 'Select Existing' : '+ Add New'}</button></div>
-{isAddingCompany ? (<input placeholder="Enter New Company Name..." className={inputClass} value={newCompany} onChange={e => setNewCompany(e.target.value)} />) : (
-<select className={inputClass} value={form.companyId} onChange={e => setForm({...form, companyId: e.target.value})}><option value="">– Select Company –</option>{companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
-)}
-</div>
-<div className="grid grid-cols-2 gap-4">
-<div><label className="text-[10px] font-bold text-rose-500 uppercase tracking-wider ml-1 mb-1 block">Unit Type *</label><input placeholder="e.g. Vial" className={inputClass} value={form.unit} onChange={e => setForm({...form, unit: e.target.value})} /></div>
-<div><label className="text-[10px] font-bold text-rose-500 uppercase tracking-wider ml-1 mb-1 block">Units per Box *</label><input type="number" placeholder="Qty" className={inputClass} value={form.unitsInBox} onChange={e => setForm({...form, unitsInBox: e.target.value})} /></div>
-</div>
-<div className="grid grid-cols-2 gap-4 pt-2">
-{isAdmin && (<div className="col-span-2 sm:col-span-1"><label className="text-[10px] font-bold text-rose-500 uppercase tracking-wider ml-1 mb-1 block">Cost Price *</label><input type="number" placeholder="Cost" className={`${inputClass} !border-indigo-200 !bg-indigo-50/50 focus:!border-indigo-500`} value={form.costPrice} onChange={e => setForm({...form, costPrice: e.target.value})} /></div>)}
-<div className={isAdmin ? 'col-span-2 sm:col-span-1' : 'col-span-2'}><label className="text-[10px] font-bold text-rose-500 uppercase tracking-wider ml-1 mb-1 block">Selling Price *</label><input type="number" placeholder="Selling" className={`${inputClass} !border-emerald-200 !bg-emerald-50/50 focus:!border-emerald-500 text-emerald-700 font-bold`} value={form.sellingPrice} onChange={e => setForm({...form, sellingPrice: e.target.value})} /></div>
-</div>
-{costChanged && isAdmin && (
-<div className="bg-amber-50 p-4 rounded-xl border border-amber-200 animate-slide-up mt-2">
-<label className="text-[10px] font-bold text-amber-700 uppercase tracking-wider block mb-2 flex items-center gap-1"><AlertCircle size={14}/> Effective From Date</label>
-<input type="date" className={`${inputClass} !bg-white !border-amber-300 !text-amber-900`} value={effectiveDate} onChange={e => setEffectiveDate(e.target.value)} />
-<p className="text-[10px] text-amber-600 font-medium mt-2 leading-tight">This will retroactively update profitability on past invoices from this date onward.</p>
-</div>
-)}
-<button onClick={save} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 rounded-xl mt-6 shadow-md shadow-indigo-600/20 active:scale-[0.98] transition-all">Save Product</button>
-</div>
-</ModalWrapper>
-);
-};
-
-const CustomerModal = () => {
-const isEdit = !!editingCustomer;
-const [form, setForm] = useState(isEdit ? editingCustomer : { name: '', contactPerson: '', phone: '', address1: '', map1: '', address2: '', map2: '', openingBalance: 0 });
-useEffect(() => { if (isEdit && editingCustomer.address && !editingCustomer.address1) { setForm(prev => ({...prev, address1: editingCustomer.address})); } }, [isEdit, editingCustomer]);
-const save = async () => {
-if(!form.name) return showToast("Customer Name required", "error");
-if(checkDuplicate(customers, form.name, form.id)) return showToast("Customer Name must be unique", "error");
-if(isEdit) {
-const updatedCustomer = {...form, openingBalance: Number(form.openingBalance)};
-if(updatedCustomer.address) delete updatedCustomer.address;
-await saveToFirebase('customers', form.id, updatedCustomer);
-if(form.name !== editingCustomer.name) { invoices.forEach(async o => { if (o.customerId === form.id) await saveToFirebase('invoices', o.id, {...o, customerName: form.name}); }); }
-showToast("Customer Updated");
-} else {
-const newId = Date.now();
-const newCust = { ...form, openingBalance: Number(form.openingBalance), id: newId };
-await saveToFirebase('customers', newId, newCust);
-if (billingView === 'form' && currentInvoice) { setCurrentInvoice({...currentInvoice, customerId: newCust.id, customerName: newCust.name}); }
-showToast("Customer Added");
-}
-setShowCustomerModal(false);
-};
-const inputClass = "w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-sm text-slate-800 placeholder-slate-400";
-return (
-<ModalWrapper title={isEdit ? "Edit Customer Profile" : "Add New Customer"} onClose={() => setShowCustomerModal(false)}>
-<div className="space-y-5 pb-8">
-<div className="space-y-3">
-<h3 className="text-xs font-bold text-slate-800 uppercase tracking-widest border-b border-slate-200 pb-1">Basic Details</h3>
-<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Customer / Business Name *</label><input placeholder="e.g. Karachi Vet Clinic" className={inputClass} value={form.name} onChange={e => setForm({...form, name: e.target.value})} /></div>
-<div className="grid grid-cols-2 gap-3">
-<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Contact Person</label><input placeholder="Name" className={inputClass} value={form.contactPerson || ''} onChange={e => setForm({...form, contactPerson: e.target.value})} /></div>
-<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Phone Number</label><input placeholder="03XXXXXXXXX" className={inputClass} value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} /></div>
-</div>
-</div>
-<div className="space-y-3 bg-slate-100 p-3 rounded-xl border border-slate-200">
-<h3 className="text-xs font-bold text-slate-800 uppercase tracking-widest flex items-center gap-1"><MapPin size={14}/> Primary Location</h3>
-<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Address 1</label><textarea placeholder="Complete Delivery Address..." rows="2" className={inputClass} value={form.address1} onChange={e => setForm({...form, address1: e.target.value})} /></div>
-<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Google Maps Link 1</label><input placeholder="https://maps.app.goo.gl/..." className={inputClass} value={form.map1 || ''} onChange={e => setForm({...form, map1: e.target.value})} /></div>
-</div>
-<div className="space-y-3 p-3 rounded-xl border border-slate-200 border-dashed">
-<h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1"><MapPin size={14}/> Secondary Location (Optional)</h3>
-<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Address 2</label><textarea placeholder="Alternative Address..." rows="2" className={inputClass} value={form.address2 || ''} onChange={e => setForm({...form, address2: e.target.value})} /></div>
-<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Google Maps Link 2</label><input placeholder="https://maps.app.goo.gl/..." className={inputClass} value={form.map2 || ''} onChange={e => setForm({...form, map2: e.target.value})} /></div>
-</div>
-{isAdmin && (
-<div className="bg-rose-50 p-3 rounded-xl border border-rose-100 mt-2">
-<label className="text-[10px] font-bold text-rose-500 uppercase tracking-wider ml-1 mb-1 block">Opening Balance (Dr)</label>
-<input type="number" placeholder="0.00" className={`${inputClass} !border-rose-200 focus:!border-rose-500`} value={form.openingBalance} onChange={e => setForm({...form, openingBalance: e.target.value})} />
-</div>
-)}
-<button onClick={save} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 rounded-xl mt-4 shadow-md shadow-indigo-600/20 active:scale-[0.98] transition-all">Save Customer Profile</button>
-</div>
-</ModalWrapper>
-);
-};
-
-const PaymentModal = () => {
-const [form, setForm] = useState({ customerId: selectedCustomerForPayment || '', amount: '', date: getLocalDateStr(), note: 'Cash Payment' });
-const save = async () => {
-if(!form.customerId || !form.amount) return showToast("Customer and Amount are required", "error");
-const newPayment = { id: `REC-${Math.floor(Math.random()*100000)}`, customerId: Number(form.customerId), amount: Number(form.amount), date: form.date, note: form.note };
-await saveToFirebase('payments', newPayment.id, newPayment);
-showToast("Payment Received & Ledger Updated!");
-setShowPaymentModal(false);
-};
-const inputClass = "w-full p-3.5 bg-white border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-sm text-slate-800 placeholder-slate-400";
-return (
-<ModalWrapper title="Receive Payment" onClose={() => setShowPaymentModal(false)}>
-<div className="space-y-4 pb-10">
-<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Select Client</label><select className={inputClass} value={form.customerId} onChange={e=>setForm({...form, customerId: e.target.value})}><option value="">– Choose Client –</option>{customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
-{form.customerId && (<div className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-center"><p className="text-[10px] uppercase font-bold text-slate-500 tracking-widest">Current Outstanding Balance</p><p className="text-xl font-black text-rose-600 mt-1">Rs. {getCustomerBalance(Number(form.customerId)).toLocaleString()}</p></div>)}
-<div className="grid grid-cols-2 gap-3">
-<div className="col-span-2"><label className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider ml-1 mb-1 block">Amount Received (Cr)</label><input type="number" placeholder="0.00" className={`${inputClass} !border-emerald-200 !text-emerald-700 !font-extrabold text-lg`} value={form.amount} onChange={e=>setForm({...form, amount: e.target.value})} /></div>
-<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Date</label><input type="date" className={inputClass} value={form.date} onChange={e=>setForm({...form, date: e.target.value})} /></div>
-<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Mode / Note</label><input type="text" placeholder="e.g. Cash / Cheque No." className={inputClass} value={form.note} onChange={e=>setForm({...form, note: e.target.value})} /></div>
-</div>
-<button onClick={save} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-4 rounded-xl mt-6 shadow-md shadow-emerald-500/20 active:scale-[0.98] transition-all">Process Payment</button>
-</div>
-</ModalWrapper>
-);
-};
-
-const CustomerLedgerModal = () => {
-const [startDate, setStartDate] = useState(() => { const d = new Date(); d.setMonth(d.getMonth() - 1); return getLocalDateStr(d); });
-const [endDate, setEndDate] = useState(getLocalDateStr());
-const fullLedger = getCustomerLedger(selectedLedgerId);
-if(!fullLedger) return null;
-const preRows = fullLedger.rows.filter(r => r.date < startDate);
-const periodOpeningBal = fullLedger.openingBal + preRows.reduce((sum, r) => sum + r.debit - r.credit, 0);
-const filteredRows = fullLedger.rows.filter(r => r.date >= startDate && r.date <= endDate);
-const periodTotalDebit = filteredRows.reduce((sum, r) => sum + r.debit, 0);
-const periodTotalCredit = filteredRows.reduce((sum, r) => sum + r.credit, 0);
-const printData = { ...fullLedger, dateRange: { start: startDate, end: endDate }, openingBal: periodOpeningBal, rows: filteredRows, totalDebit: periodTotalDebit, totalCredit: periodTotalCredit };
-return (
-<ModalWrapper title={`${fullLedger.customerName} - Account Ledger`} onClose={() => setShowLedgerModal(false)}>
-<div className="space-y-4 pb-10">
-<div className="flex items-center gap-2 mb-4 bg-slate-50 p-3 rounded-2xl border border-slate-200">
-<div className="flex-1"><label className="text-[9px] font-bold uppercase text-slate-500 block mb-1 tracking-wider">Start Date</label><input type="date" value={startDate} onChange={e=>setStartDate(e.target.value)} className="w-full p-2 text-xs font-semibold rounded-lg border border-slate-300 outline-none focus:border-indigo-500 bg-white" /></div>
-<div className="flex-1"><label className="text-[9px] font-bold uppercase text-slate-500 block mb-1 tracking-wider">End Date</label><input type="date" value={endDate} onChange={e=>setEndDate(e.target.value)} className="w-full p-2 text-xs font-semibold rounded-lg border border-slate-300 outline-none focus:border-indigo-500 bg-white" /></div>
-<div className="ml-2 text-right bg-rose-50 px-3 py-2 rounded-xl border border-rose-200 shadow-sm shrink-0"><p className="text-[9px] font-bold uppercase text-rose-600 tracking-widest">Current Balance</p><p className="text-base font-black text-rose-700 mt-0.5">Rs. {fullLedger.closingBal.toLocaleString()}</p></div>
-</div>
-<div className="flex gap-2">
-<button onClick={() => { setSelectedCustomerForPayment(fullLedger.id); setShowPaymentModal(true); }} className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3.5 rounded-xl flex justify-center items-center gap-2 shadow-sm active:scale-[0.98] transition-all text-xs"><Wallet size={16} /> Receive Payment</button>
-<button onClick={() => setPrintConfig({docType: 'ledger', format: 'a5', data: printData})} className="flex-1 bg-slate-800 hover:bg-slate-900 text-white font-bold py-3.5 rounded-xl flex justify-center items-center gap-2 shadow-sm active:scale-[0.98] transition-all text-xs"><FileSpreadsheet size={16} /> Print Ledger</button>
-</div>
-<div className="mt-6 border border-slate-200 rounded-2xl overflow-hidden shadow-sm bg-white">
-<div className="overflow-x-auto">
-<table className="w-full text-left text-[11px] sm:text-xs min-w-[500px]">
-<thead className="bg-slate-50 text-slate-500 border-b border-slate-200"><tr><th className="py-3 px-3 font-bold uppercase tracking-wider">Date</th><th className="py-3 px-3 font-bold uppercase tracking-wider">Particulars</th><th className="py-3 px-3 text-right font-bold uppercase tracking-wider">Debit (Dr)</th><th className="py-3 px-3 text-right font-bold uppercase tracking-wider">Credit (Cr)</th><th className="py-3 px-3 text-right font-bold uppercase tracking-wider">Balance</th><th className="py-3 px-2 text-center"></th></tr></thead>
-<tbody className="divide-y divide-slate-100 text-slate-800">
-<tr className="bg-slate-50/30"><td className="py-3 px-3 text-slate-500 font-medium" colSpan={4}>Opening Balance <span className="text-[9px]">(as of {formatDateDisp(startDate)})</span></td><td className="py-3 px-3 text-right font-bold text-slate-700">Rs. {periodOpeningBal.toLocaleString()}</td><td></td></tr>
-{filteredRows.map(row => (
-<tr key={row.id} className="hover:bg-slate-50 transition-colors">
-<td className="py-3 px-3 font-medium text-slate-600">{formatDateDisp(row.date)}</td>
-<td className="py-3 px-3"><span className="font-bold text-slate-800 block">{row.desc}</span><span className="block text-[9px] text-slate-400 mt-0.5">{row.ref}</span></td>
-<td className="py-3 px-3 text-right font-extrabold text-indigo-600">{row.debit > 0 ? row.debit.toLocaleString() : '-'}</td>
-<td className="py-3 px-3 text-right font-extrabold text-emerald-600">{row.credit > 0 ? row.credit.toLocaleString() : '-'}</td>
-<td className="py-3 px-3 text-right font-extrabold text-slate-800">{row.balance.toLocaleString()}</td>
-<td className="py-3 px-2 text-center">{row.credit > 0 && (<button onClick={() => setPrintConfig({docType: 'receipt', format: 'thermal', data: generateReceiptData(fullLedger, row.id)})} title="Print Receipt" className="p-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-lg transition-colors"><Receipt size={14}/></button>)}</td>
-</tr>
-))}
-{filteredRows.length === 0 && (<tr><td colSpan={6} className="text-center py-6 text-slate-400 font-medium">No transactions in this period.</td></tr>)}
-</tbody>
-<tfoot className="bg-slate-50 border-t border-slate-200">
-<tr><td colSpan={2} className="py-3 px-3 font-bold text-right uppercase tracking-wider text-slate-500">Period Totals:</td><td className="py-3 px-3 text-right font-black text-indigo-700">Rs. {periodTotalDebit.toLocaleString()}</td><td className="py-3 px-3 text-right font-black text-emerald-600">Rs. {periodTotalCredit.toLocaleString()}</td><td colSpan={2}></td></tr>
-</tfoot>
-</table>
-</div>
-</div>
-</div>
-</ModalWrapper>
-);
-};
-
-const ExpenseCategoryModal = () => {
-const [newCat, setNewCat] = useState('');
-const addCat = async () => {
-if(!newCat) return;
-if(expenseCategories.some(c => c.name.toLowerCase() === newCat.toLowerCase())) return showToast("Category exists", "error");
-const catObj = { id: Date.now(), name: newCat };
-await saveToFirebase('expenseCategories', catObj.id, catObj);
-setNewCat('');
-showToast("Category Added");
-};
-return (
-<ModalWrapper title="Manage Expense Labels" onClose={() => setShowExpenseCatModal(false)}>
-<div className="space-y-4 pb-10">
-<div className="flex gap-2"><input type="text" placeholder="New category name..." className="flex-1 p-3 bg-slate-50 border border-slate-200 rounded-xl font-semibold outline-none focus:border-indigo-500" value={newCat} onChange={e=>setNewCat(e.target.value)} /><button onClick={addCat} className="bg-indigo-600 text-white px-4 rounded-xl font-bold hover:bg-indigo-700 transition-colors">Add</button></div>
-<div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-<ul className="divide-y divide-slate-100">
-{expenseCategories.map(c => (
-<li key={c.id} className="flex justify-between items-center p-3 hover:bg-slate-50">
-<span className="font-semibold text-slate-700 text-sm flex items-center gap-2"><Tag size={14} className="text-slate-400"/> {c.name}</span>
-<button onClick={async () => await deleteFromFirebase('expenseCategories', c.id)} className="p-2 text-slate-400 hover:text-rose-500 transition-colors"><Trash2 size={16}/></button>
-</li>
-))}
-</ul>
-</div>
-</div>
-</ModalWrapper>
-);
-};
-
 // — Tabs —
 const DashboardTab = () => {
 const [dateFilter, setDateFilter] = useState('This Month');
@@ -579,7 +587,7 @@ const [search, setSearch] = useState('');
 const [dateFilter, setDateFilter] = useState('All Time');
 const [prodSearch, setProdSearch] = useState('');
 const startNewInvoice = () => {
-setCurrentInvoice({ id: null, customerId: '', customerName: '', customerDetails: {}, items: [], deliveryBilled: 0, transportExpense: 0, vehicle: VEHICLES[0], paymentStatus: 'Pending', receivedAmount: 0, transportCompany: '', biltyNumber: '', driverName: '', driverPhone: '' });
+setCurrentInvoice({ id: null, customerId: '', customerName: '', customerDetails: {}, items: [], deliveryBilled: 0, transportExpense: 0, vehicle: VEHICLES[0], paymentStatus: 'Pending', receivedAmount: 0, transportCompany: '', biltyNumber: '', driverName: '', driverPhone: '', notes: '' });
 setBillingView('form');
 };
 const saveInvoice = async (status) => {
@@ -699,6 +707,10 @@ return (
 <button onClick={() => setCurrentInvoice({...currentInvoice, receivedAmount: grandTotal, paymentStatus: 'Paid'})} className="px-4 py-3 bg-indigo-50 text-indigo-700 font-bold rounded-xl text-xs whitespace-nowrap border border-indigo-100">Full Pay</button>
 </div>
 </div>
+</div>
+<div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+<h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5"><AlignLeft size={12}/> Notes / Remarks</h3>
+<textarea rows={3} placeholder="e.g. Special instructions, delivery notes, payment terms..." className={`${inputClass} resize-none`} value={currentInvoice.notes || ''} onChange={e => setCurrentInvoice({...currentInvoice, notes: e.target.value})} />
 </div>
 <div className="bg-gradient-to-br from-emerald-50 to-teal-50 p-6 rounded-2xl border border-emerald-100 text-center shadow-sm">
 <p className="text-emerald-600 font-bold uppercase text-[10px] tracking-widest mb-1">Grand Total</p>
@@ -1001,11 +1013,37 @@ const handleExport = (format) => {
     } else if (format === 'pdf') {
         setPrintConfig({ docType: 'report', format: 'a5', data: { title, dateFilter, view, stats: reportEngine.kpis, rows: exportData } });
     } else if (format === 'text') {
-        let text = `*${APP_NAME} | ${title}*\nPeriod: ${dateFilter}\n\n`;
+        const kpis = reportEngine.kpis;
+        const margin = kpis.productRevenue > 0 ? ((kpis.grossMargin / kpis.productRevenue) * 100).toFixed(1) : 0;
+        let text = `📊 *${APP_NAME}*\n*${title}* | Period: ${filterLabel}\n${'─'.repeat(30)}\n`;
         if (view === 'Overview') {
-          text += `Product Sales: Rs. ${reportEngine.kpis.productRevenue.toLocaleString()}\nTotal COGS: Rs. ${reportEngine.kpis.totalCOGS.toLocaleString()}\nGross Margin: Rs. ${reportEngine.kpis.grossMargin.toLocaleString()}\nDelivery Billed: Rs. ${reportEngine.kpis.deliveryBilled.toLocaleString()}\nTransport Exp: Rs. ${reportEngine.kpis.transportExpense.toLocaleString()}\nOperational Exp: Rs. ${reportEngine.kpis.totalExpenses.toLocaleString()}\n------------------\n*Net Profit: Rs. ${reportEngine.kpis.netProfit.toLocaleString()}*\n`;
+          text += `💰 *Sales & Profitability*\n`;
+          text += `Product Sales: Rs. ${kpis.productRevenue.toLocaleString()}\n`;
+          text += `Total COGS:    Rs. ${kpis.totalCOGS.toLocaleString()}\n`;
+          text += `Gross Margin:  Rs. ${kpis.grossMargin.toLocaleString()} (${margin}%)\n`;
+          text += `\n🚛 *Delivery*\n`;
+          text += `Billed: Rs. ${kpis.deliveryBilled.toLocaleString()} | Expense: Rs. ${kpis.transportExpense.toLocaleString()}\n`;
+          text += `\n💸 *Expenses*\n`;
+          text += `Operational: Rs. ${kpis.totalExpenses.toLocaleString()}\n`;
+          text += `\n${'─'.repeat(30)}\n`;
+          text += `✅ *Net Profit: Rs. ${kpis.netProfit.toLocaleString()}*\n`;
+          text += `📌 Receivables: Rs. ${kpis.totalReceivables.toLocaleString()}\n`;
+          if (reportEngine.trends.revenue !== null) text += `📈 Revenue trend: ${Number(reportEngine.trends.revenue) >= 0 ? '+' : ''}${reportEngine.trends.revenue}% vs prev period\n`;
         } else {
-          exportData.forEach((r, i) => { text += `${i+1}. *${r.Name}*${r.Company ? ` (${r.Company})` : ''}\n   Qty: ${(r.Qty||0).toLocaleString()} | Rev: Rs.${(r.Revenue||0).toLocaleString()} | GP: Rs.${(r.GrossProfit||r.Amount||0).toLocaleString()}\n`; });
+          exportData.forEach((r, i) => {
+            const gp = r.GrossProfit || r.Amount || 0;
+            const rev = r.Revenue || 0;
+            const gpMargin = rev > 0 ? ` (${((gp/rev)*100).toFixed(1)}%)` : '';
+            text += `${i+1}. *${r.Name}*${r.Company ? ` — ${r.Company}` : ''}\n`;
+            if (r.Qty) text += `   Qty: ${(r.Qty||0).toLocaleString()} | `;
+            if (r.Orders) text += `   Orders: ${r.Orders} | `;
+            text += `Rev: Rs.${rev.toLocaleString()} | GP: Rs.${gp.toLocaleString()}${gpMargin}\n`;
+          });
+          if (exportData.length > 0) {
+            const totalRev = exportData.reduce((s,r)=>s+(r.Revenue||0),0);
+            const totalGP = exportData.reduce((s,r)=>s+(r.GrossProfit||0),0);
+            text += `${'─'.repeat(30)}\nTotal Rev: Rs.${totalRev.toLocaleString()} | Total GP: Rs.${totalGP.toLocaleString()}\n`;
+          }
         }
         navigator.clipboard.writeText(text).catch(()=>{});
         window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank');
@@ -1422,6 +1460,9 @@ const reqHeaders = ['name', 'company', 'unit', 'boxqty', 'cost', 'selling'];
 const missing = reqHeaders.filter(h => !headers.includes(h));
 if(missing.length > 0) return showToast(`Missing columns: ${missing.join(', ')}`, "error");
 let addedCount = 0; let updatedCount = 0;
+// Build local map to prevent duplicate companies during batch import
+const localCompanyMap = {};
+companies.forEach(c => { localCompanyMap[c.name.toLowerCase()] = c.id; });
 for (let i = 1; i < rows.length; i++) {
 const cols = rows[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.replace(/^"|"$/g, '').trim());
 if(cols.length < reqHeaders.length) continue;
@@ -1430,10 +1471,11 @@ reqHeaders.forEach(h => { rowData[h] = cols[headers.indexOf(h)]; });
 if(!rowData.name || !rowData.selling || !rowData.cost) continue;
 let compId;
 const compName = rowData.company || 'Unknown';
-const existingComp = companies.find(c => c.name.toLowerCase() === compName.toLowerCase());
-if (existingComp) { compId = existingComp.id; } else {
+const compNameLower = compName.toLowerCase();
+if (localCompanyMap[compNameLower]) { compId = localCompanyMap[compNameLower]; } else {
 compId = Date.now() + Math.random();
 await saveToFirebase('companies', compId, { id: compId, name: compName });
+localCompanyMap[compNameLower] = compId;
 }
 const existingProd = products.find(p => p.name.toLowerCase() === rowData.name.toLowerCase());
 const prodObj = { name: rowData.name, companyId: compId, unit: rowData.unit || 'Unit', unitsInBox: Number(rowData.boxqty) || 1, costPrice: Number(rowData.cost) || 0, sellingPrice: Number(rowData.selling) || 0, available: true };
@@ -1471,13 +1513,17 @@ reader.readAsText(file);
 e.target.value = '';
 };
 const exportAll = () => {
+const q = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
 const wb = [];
 wb.push('=== ITEMS ===');
-wb.push('ID,Name,Company,Unit,BoxQty,Cost,Selling,Status');
-products.forEach(p => wb.push(`${p.id},"${p.name}","${getCompanyName(p.companyId)}",${p.unit},${p.unitsInBox},${p.costPrice},${p.sellingPrice},${p.available?'Active':'Inactive'}`));
+wb.push(['ID','Name','Company','Unit','BoxQty','Cost','Selling','Status'].join(','));
+products.forEach(p => wb.push([p.id, q(p.name), q(getCompanyName(p.companyId)), q(p.unit), p.unitsInBox, p.costPrice, p.sellingPrice, p.available?'Active':'Inactive'].join(',')));
 wb.push(''); wb.push('=== CUSTOMERS ===');
-wb.push('ID,Name,Contact,Phone,Address1,Map1,Address2,Map2,OpeningBalance');
-customers.forEach(c => wb.push(`${c.id},"${c.name}","${c.contactPerson||''}","${c.phone||''}","${c.address1||''}","${c.map1||''}","${c.address2||''}","${c.map2||''}",${c.openingBalance||0}`));
+wb.push(['ID','Name','Contact','Phone','Address1','Map1','Address2','Map2','OpeningBalance'].join(','));
+customers.forEach(c => wb.push([c.id, q(c.name), q(c.contactPerson||''), q(c.phone||''), q(c.address1||''), q(c.map1||''), q(c.address2||''), q(c.map2||''), c.openingBalance||0].join(',')));
+wb.push(''); wb.push('=== INVOICES ===');
+wb.push(['ID','Date','Customer','Status','Total','Delivery','Transport','Received','Salesperson','Payment','Notes'].join(','));
+invoices.forEach(o => wb.push([q(o.id), o.date, q(o.customerName), o.status, o.total, o.deliveryBilled||0, o.transportExpense||0, o.receivedAmount||0, q(o.salespersonName||''), o.paymentStatus||'', q(o.notes||'')].join(',')));
 const blob = new Blob([wb.join('\n')], {type:'text/csv'});
 const url = URL.createObjectURL(blob);
 const a = document.createElement('a'); a.href = url; a.download = 'AnimalHealthPK_MasterData.csv'; a.click(); URL.revokeObjectURL(url);
@@ -1557,7 +1603,21 @@ return (
 };
 
 // — Main Render —
+const ctx = {
+isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers,
+showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData,
+billingView, setBillingView, currentInvoice, setCurrentInvoice,
+activeTab, setActiveTab, adminView, setAdminView,
+editingProduct, setEditingProduct, showProductModal, setShowProductModal,
+editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal,
+showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment,
+showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId,
+showExpenseCatModal, setShowExpenseCatModal,
+showUserModal, setShowUserModal, editingUser, setEditingUser,
+setPrintConfig, printConfig,
+};
 return (
+<AppContext.Provider value={ctx}>
 <div className="h-screen bg-slate-50 text-slate-900 font-[Inter,system-ui,sans-serif] flex flex-col max-w-md mx-auto relative shadow-2xl overflow-hidden print:hidden">
 <header className="bg-white/80 backdrop-blur-md px-5 py-4 flex justify-between items-center shadow-sm z-10 sticky top-0 border-b border-slate-100">
 <div>
@@ -1625,6 +1685,7 @@ return (
     input[type="number"] { -moz-appearance: textfield; }
   `}</style>
 </div>
+</AppContext.Provider>
 
 );
 }
