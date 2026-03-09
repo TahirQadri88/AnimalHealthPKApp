@@ -1,0 +1,23 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@media print {
+  @page { margin: 10mm 8mm 12mm 8mm; }
+  html, body { height: auto !important; overflow: visible !important; }
+  .no-print { display: none !important; }
+  #print-document {
+    box-shadow: none !important;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 6mm !important;
+    font-size: 10pt !important;
+  }
+  .keep-together { page-break-inside: avoid !important; break-inside: avoid !important; }
+  table { page-break-inside: auto !important; width: 100% !important; }
+  thead { display: table-header-group !important; }
+  tfoot { display: table-footer-group !important; }
+  tbody tr { page-break-inside: avoid !important; break-inside: avoid !important; }
+  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
+}
