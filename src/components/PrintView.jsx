@@ -70,8 +70,8 @@ const generateShareText = () => {
 
     text += `*INVOICE #${data.id}*\n`;
     text += `${hr}\n`;
-    text += `📅 Date: ${formatDateDisp(data.date)}\n`;
-    text += `👤 Customer: *${data.customerName}*\n\n`;
+    text += `Date: ${formatDateDisp(data.date)}\n`;
+    text += `Customer: *${data.customerName}*\n\n`;
     text += `*Items:*\n`;
     (data.items || []).forEach(i => {
       const lineTotal = i.isBonus ? 'FREE' : `Rs.${((i.price || 0) * (i.quantity || 0)).toLocaleString()}`;
@@ -83,21 +83,21 @@ const generateShareText = () => {
     text += `*Current Bill: Rs.${(data.total || 0).toLocaleString()}*\n`;
     if (savings > 0) text += `🎁 Savings: Rs.${savings.toLocaleString()}\n`;
     text += `Previous Bal: Rs.${prevBal.toLocaleString()}\n`;
-    if (received > 0) text += `✅ Paid: Rs.${received.toLocaleString()}\n`;
+    if (received > 0) text += `Paid: Rs.${received.toLocaleString()}\n`;
     text += `*Net Balance: Rs.${netBal.toLocaleString()}*\n`;
     text += `Status: ${data.paymentStatus || 'Pending'}\n`;
 
   } else if (docType === 'dispatch') {
     text += `*DISPATCH NOTE #${data.id}*\n`;
     text += `${hr}\n`;
-    text += `📅 Date: ${formatDateDisp(data.date)}\n`;
-    text += `👤 *${data.customerName}*\n`;
+    text += `Date: ${formatDateDisp(data.date)}\n`;
+    text += `*${data.customerName}*\n`;
     if (data.customerDetails?.contactPerson || data.customerDetails?.phone)
-      text += `📞 ${data.customerDetails?.contactPerson || ''} ${data.customerDetails?.phone ? '- ' + data.customerDetails.phone : ''}\n`;
-    if (data.customerDetails?.address1) text += `📍 ${data.customerDetails.address1}\n`;
-    if (data.customerDetails?.map1) text += `🗺️ ${data.customerDetails.map1}\n`;
-    if (data.customerDetails?.address2) text += `📍 Alt: ${data.customerDetails.address2}\n`;
-    if (data.customerDetails?.map2) text += `🗺️ ${data.customerDetails.map2}\n`;
+      text += `${data.customerDetails?.contactPerson || ''} ${data.customerDetails?.phone ? '- ' + data.customerDetails.phone : ''}\n`;
+    if (data.customerDetails?.address1) text += `${data.customerDetails.address1}\n`;
+    if (data.customerDetails?.map1) text += `${data.customerDetails.map1}\n`;
+    if (data.customerDetails?.address2) text += `Alt: ${data.customerDetails.address2}\n`;
+    if (data.customerDetails?.map2) text += `${data.customerDetails.map2}\n`;
     text += `\n🚚 *${data.vehicle || 'N/A'}*`;
     if (data.vehicle === 'Intercity Transport') {
       text += `\nTransport: ${data.transportCompany || '-'} | Bilty: ${data.biltyNumber || '-'}`;
@@ -115,10 +115,10 @@ const generateShareText = () => {
     text += `*PAYMENT RECEIPT*\n`;
     text += `${hr}\n`;
     text += `🔖 Ref: ${data.id}\n`;
-    text += `📅 Date: ${formatDateDisp(data.date)}\n`;
-    text += `👤 Customer: *${data.customerName}*\n`;
+    text += `Date: ${formatDateDisp(data.date)}\n`;
+    text += `Customer: *${data.customerName}*\n`;
     text += `${hr}\n`;
-    text += `✅ *Amount Received: Rs.${(data.receivedAmount || 0).toLocaleString()}*\n`;
+    text += `*Amount Received: Rs.${(data.receivedAmount || 0).toLocaleString()}*\n`;
     if (data.note) text += `📝 Mode: ${data.note}\n`;
     text += `Previous Bal: Rs.${(data.prevBalance || 0).toLocaleString()}\n`;
     text += `*Remaining Bal: Rs.${(data.newBalance || 0).toLocaleString()}*\n\n`;
@@ -127,9 +127,9 @@ const generateShareText = () => {
   } else if (docType === 'ledger') {
     text += `*ACCOUNT STATEMENT*\n`;
     text += `${hr}\n`;
-    text += `👤 *${data.customerName}*\n`;
-    if (data.phone) text += `📞 ${data.phone}\n`;
-    text += `📅 Period: ${formatDateDisp(data.dateRange?.start)} to ${formatDateDisp(data.dateRange?.end)}\n`;
+    text += `*${data.customerName}*\n`;
+    if (data.phone) text += `${data.phone}\n`;
+    text += `Period: ${formatDateDisp(data.dateRange?.start)} to ${formatDateDisp(data.dateRange?.end)}\n`;
     text += `${hr}\n`;
     text += `Total Debits: Rs.${(data.totalDebit || 0).toLocaleString()}\n`;
     text += `Total Credits: Rs.${(data.totalCredit || 0).toLocaleString()}\n`;
@@ -139,7 +139,7 @@ const generateShareText = () => {
   } else if (docType === 'report') {
     text += `*${data.title || 'Analytics Report'}*\n`;
     text += `${hr}\n`;
-    text += `📅 Period: ${data.dateFilter || 'All Time'}\n\n`;
+    text += `Period: ${data.dateFilter || 'All Time'}\n\n`;
     if (data.view === 'Overview') {
       const s = data.stats || {};
       text += `*Financial Summary:*\n`;
@@ -171,7 +171,7 @@ const handlePrint = () => {
   if (isThermal) {
     styleEl = document.createElement('style');
     styleEl.id = 'thermal-print-style';
-    styleEl.textContent = `@page { size: 80mm auto; margin: 4mm; }`;
+    styleEl.textContent = `@page { size: 80mm auto !important; margin: 2mm 3mm; } body { width: 80mm; } #print-document { width: 80mm !important; max-width: 80mm !important; padding: 3mm !important; }`;
     document.head.appendChild(styleEl);
   } else if (isA5) {
     styleEl = document.createElement('style');
@@ -195,7 +195,7 @@ const handlePDF = () => {
       filename: getFileName(),
       image: { type: 'jpeg', quality: 0.98 },
       html2canvas: { scale: 3, useCORS: true, logging: false, letterRendering: true, width: 302, windowWidth: 302 },
-      jsPDF: { unit: 'mm', format: [80, 600], orientation: 'portrait', hotfixes: ['px_scaling'] },
+      jsPDF: { unit: 'mm', format: [80, 900], orientation: 'portrait', hotfixes: ['px_scaling'] },
       pagebreak: { mode: ['avoid-all'], avoid: ['tr', '.keep-together', 'thead', 'tfoot'] },
     };
     html2pdf().set(opt).from(element).save()
@@ -211,7 +211,7 @@ const handlePDF = () => {
       image: { type: 'jpeg', quality: 0.98 },
       html2canvas: { scale: 2, useCORS: true, logging: false, letterRendering: true, windowWidth: winW },
       jsPDF: { unit: 'mm', format: pageFormat, orientation: 'portrait', hotfixes: ['px_scaling'] },
-      pagebreak: { mode: ['css', 'legacy'], avoid: ['tr', '.keep-together'], before: ['.page-break-before'] },
+      pagebreak: { mode: ['avoid-all', 'css'], avoid: ['tr', '.no-break', '.keep-together'], before: ['.page-break-before'], after: ['.page-break-after'] },
     };
     html2pdf().set(opt).from(element).save()
       .then(() => showToast('PDF saved!'))
@@ -373,26 +373,26 @@ return (
           {docType === 'dispatch' && data.customerDetails && (
             <div style={{ marginTop: '8px', fontSize: '8.5px', color: '#334155', background: '#f8fafc', padding: '8px 10px', borderRadius: '8px', border: '1px solid #e2e8f0', lineHeight: 1.7 }}>
               {(data.customerDetails.contactPerson || data.customerDetails.phone) && (
-                <div>📞 <strong>{data.customerDetails.contactPerson || 'N/A'}</strong>
+                <div><strong>{data.customerDetails.contactPerson || 'N/A'}</strong>
                   {data.customerDetails.phone ? ` · ${data.customerDetails.phone}` : ''}
                 </div>
               )}
               {data.customerDetails.address1 && (
-                <div style={{ marginTop: '3px' }}>📍 {data.customerDetails.address1}</div>
+                <div style={{ marginTop: '3px' }}>{data.customerDetails.address1}</div>
               )}
               {data.customerDetails.map1 && (
-                <div style={{ fontSize: '7.5px', color: '#6366f1', marginTop: '2px', wordBreak: 'break-all' }}>🗺 {data.customerDetails.map1}</div>
+                <div style={{ fontSize: '7.5px', color: '#6366f1', marginTop: '2px', wordBreak: 'break-all' }}>Map: {data.customerDetails.map1}</div>
               )}
               {data.customerDetails.address2 && (
-                <div style={{ marginTop: '4px', color: '#64748b' }}>📍 Alt: {data.customerDetails.address2}</div>
+                <div style={{ marginTop: '4px', color: '#64748b' }}>Alt: {data.customerDetails.address2}</div>
               )}
               {data.customerDetails.map2 && (
-                <div style={{ fontSize: '7.5px', color: '#6366f1', marginTop: '2px', wordBreak: 'break-all' }}>🗺 {data.customerDetails.map2}</div>
+                <div style={{ fontSize: '7.5px', color: '#6366f1', marginTop: '2px', wordBreak: 'break-all' }}>Map: {data.customerDetails.map2}</div>
               )}
             </div>
           )}
           {docType === 'ledger' && data.phone && (
-            <div style={{ fontSize: '10px', color: '#64748b', marginTop: '3px' }}>📞 {data.phone}</div>
+            <div style={{ fontSize: '10px', color: '#64748b', marginTop: '3px' }}>{data.phone}</div>
           )}
         </div>
 
@@ -425,7 +425,7 @@ return (
     {docType === 'dispatch' && data && (
       <div className="keep-together" style={{ marginBottom: sz('12px','16px','18px'), background: '#fffbeb', padding: sz('8px','10px','12px'), borderRadius: '8px', border: '1px solid #fcd34d', fontSize: sz('8.5px','9px','9.5px'), color: '#78350f' }}>
         <div style={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '5px', fontSize: '7.5px', color: '#92400e' }}>
-          🚚 Logistics / Delivery
+          Logistics / Delivery
         </div>
         <div><strong>Method:</strong> {data.vehicle || 'N/A'}</div>
         {data.vehicle === 'Intercity Transport' && (
@@ -651,7 +651,7 @@ return (
               )}
               {totalSavings > 0 && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: sz('6px','8px','10px'), padding: sz('5px 8px','6px 10px','8px 12px'), background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: '8px', fontWeight: 800, fontSize: sz('8px','9px','10px'), color: '#065f46' }}>
-                  <span>🎁 Total Savings:</span>
+                  <span>Bonus Savings:</span>
                   <span>Rs. {totalSavings.toLocaleString()}</span>
                 </div>
               )}
@@ -663,7 +663,7 @@ return (
         {/* ── Invoice Notes ── */}
         {data?.notes && (
           <div className="keep-together" style={{ marginTop: sz('10px','14px','18px'), padding: sz('8px 10px','10px 14px','12px 16px'), background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', fontSize: sz('8px','9px','10px'), color: '#78350f' }}>
-            <div style={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '4px', fontSize: sz('7px','7.5px','8px'), color: '#92400e' }}>📋 Notes / Remarks</div>
+            <div style={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '4px', fontSize: sz('7px','7.5px','8px'), color: '#92400e' }}>Notes / Remarks</div>
             <div style={{ lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{data.notes}</div>
           </div>
         )}
@@ -671,7 +671,7 @@ return (
         {/* ── Return / Exchange Policy ── */}
         <div className="keep-together" style={{ marginTop: sz('12px','16px','20px'), border: '1.5px solid #1e293b', borderRadius: '8px', overflow: 'hidden', fontSize: sz('6.5px','7.5px','8.5px') }}>
           <div style={{ background: '#1e293b', color: 'white', padding: sz('4px 8px','5px 12px','6px 14px'), fontWeight: 900, textAlign: 'center', letterSpacing: '0.5px', textTransform: 'uppercase', fontSize: sz('6.5px','7px','8px') }}>
-            🚫 "No" Return / Exchange Policy on Some Items
+            "No" Return / Exchange Policy on Some Items
           </div>
           <div style={{ padding: sz('6px 8px','8px 12px','10px 14px'), background: '#f8fafc' }}>
             <div style={{ color: '#334155', lineHeight: 1.7, marginBottom: sz('4px','5px','6px') }}>
@@ -702,7 +702,7 @@ return (
           </div>
           {data.note && (
             <div style={{ display: 'inline-block', marginTop: sz('8px','10px','12px'), padding: sz('3px 10px','4px 14px','6px 16px'), background: 'white', borderRadius: '999px', border: '1px solid #86efac', fontSize: sz('9px','10px','11px'), fontWeight: 600, color: '#15803d', wordBreak: 'break-word' }}>
-              📝 {data.note}
+              {data.note}
             </div>
           )}
         </div>
@@ -821,7 +821,8 @@ return (
       margin-bottom: 40px;
     }
     @media print {
-      @page { margin: 10mm 8mm 12mm 8mm; }
+      @page { margin: 8mm; }
+      @page :first { margin-top: 8mm; }
       html, body { height: auto !important; overflow: visible !important; }
       #print-root { display: block !important; position: relative !important; }
       .no-print { display: none !important; }

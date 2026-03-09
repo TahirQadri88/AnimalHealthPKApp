@@ -321,185 +321,9 @@ return data;
 }
 
 
-function App() {
-const [currentUser, setCurrentUser] = useState(() => {
-try {
-const item = window.localStorage.getItem('app_currentUser');
-return item ? JSON.parse(item) : null;
-} catch (error) { return null; }
-});
-
-useEffect(() => {
-if (currentUser) {
-window.localStorage.setItem('app_currentUser', JSON.stringify(currentUser));
-} else {
-window.localStorage.removeItem('app_currentUser');
-}
-}, [currentUser]);
-
-const [loginForm, setLoginForm] = useState({ name: '', password: '' });
-const [activeTab, setActiveTab] = useState('dashboard');
-const [adminView, setAdminView] = useState('analytics');
-const [toast, setToast] = useState(null);
-
-// — Data State (Live from Firebase) —
-const appUsers = useLiveCollection('app_users');
-const companies = useLiveCollection('companies');
-const products = useLiveCollection('products');
-const customers = useLiveCollection('customers');
-const invoices = useLiveCollection('invoices');
-const expenses = useLiveCollection('expenses');
-const expenseCategories = useLiveCollection('expenseCategories');
-const payments = useLiveCollection('payments');
-
-// Complex UI State
-const [billingView, setBillingView] = useState('list');
-const [currentInvoice, setCurrentInvoice] = useState(null);
-const [showProductModal, setShowProductModal] = useState(false);
-const [editingProduct, setEditingProduct] = useState(null);
-const [showCustomerModal, setShowCustomerModal] = useState(false);
-const [editingCustomer, setEditingCustomer] = useState(null);
-const [showPaymentModal, setShowPaymentModal] = useState(false);
-const [selectedCustomerForPayment, setSelectedCustomerForPayment] = useState(null);
-const [showLedgerModal, setShowLedgerModal] = useState(false);
-const [selectedLedgerId, setSelectedLedgerId] = useState(null);
-const [showExpenseCatModal, setShowExpenseCatModal] = useState(false);
-const [showUserModal, setShowUserModal] = useState(false);
-const [editingUser, setEditingUser] = useState(null);
-const [printConfig, setPrintConfig] = useState(null);
-
-const isAdmin = currentUser?.role === 'admin';
-
-const showToast = (msg, type = 'success') => {
-setToast({ msg, type });
-setTimeout(() => setToast(null), 3000);
-};
-
-const getCompanyName = (id) => companies.find(c => c.id === id)?.name || 'Unknown';
-
-const checkDuplicate = (list, name, excludeId = null) => {
-return list.some(item => item.name.toLowerCase() === name.toLowerCase() && item.id !== excludeId);
-};
-
-const handleLogin = async (e) => {
-e.preventDefault();
-if (appUsers.length === 0 && loginForm.name.toLowerCase() === 'tahir' && loginForm.password === '7869') {
-const initUser = { id: Date.now().toString(), name: 'Tahir', password: '7869', role: 'admin' };
-await saveToFirebase('app_users', initUser.id, initUser);
-if (expenseCategories.length === 0) {
-const defaultCats = ['Transport', 'Utility Bill', 'Staff Food/Tea', 'Maintenance', 'Other'];
-defaultCats.forEach((cat, i) => saveToFirebase('expenseCategories', Date.now()+i, { id: Date.now()+i, name: cat }));
-}
-setCurrentUser(initUser);
-showToast("Welcome! Clean Database Initialized.");
-return;
-}
-const user = appUsers.find(u => u.name.toLowerCase() === loginForm.name.toLowerCase() && u.password === loginForm.password);
-if (user) {
-setCurrentUser(user);
-showToast(`Welcome ${user.name}`);
-} else {
-showToast("Invalid Credentials", "error");
-}
-};
-
-const saveToFirebase = async (collectionName, id, dataObj) => {
-try {
-await setDoc(doc(db, collectionName, String(id)), dataObj);
-} catch (e) {
-console.error("Firebase Write Error:", e);
-showToast("Network Error - Could not save", "error");
-}
-};
-
-const deleteFromFirebase = async (collectionName, id) => {
-try {
-await deleteDoc(doc(db, collectionName, String(id)));
-} catch (e) {
-console.error("Firebase Delete Error:", e);
-showToast("Network Error - Could not delete", "error");
-}
-};
-
-// — Ledger Engine —
-const getCustomerLedger = (customerId) => {
-const customer = customers.find(c => c.id === customerId);
-if (!customer) return null;
-const openingBal = customer.openingBalance || 0;
-let entries = [];
-invoices.filter(o => o.customerId === customerId && o.status === 'Billed').forEach(inv => {
-entries.push({ id: inv.id, date: inv.date, ref: inv.id, desc: 'Sales Invoice', debit: inv.total, credit: 0, timestamp: new Date(inv.date).getTime() });
-if (inv.receivedAmount > 0) {
-entries.push({ id: `${inv.id}-PAY`, date: inv.date, ref: inv.id, desc: 'Payment (On Invoice)', debit: 0, credit: Number(inv.receivedAmount), timestamp: new Date(inv.date).getTime() + 1 });
-}
-});
-payments.filter(p => p.customerId === customerId).forEach(pay => {
-entries.push({ id: pay.id, date: pay.date, ref: pay.id, desc: pay.note || 'Payment Received', debit: 0, credit: Number(pay.amount), timestamp: new Date(pay.date).getTime() + 2 });
-});
-entries.sort((a, b) => a.timestamp === b.timestamp ? a.id.localeCompare(b.id) : a.timestamp - b.timestamp);
-let runningBal = openingBal;
-let totalDebit = 0;
-let totalCredit = 0;
-const rows = entries.map(entry => {
-runningBal += entry.debit;
-runningBal -= entry.credit;
-totalDebit += entry.debit;
-totalCredit += entry.credit;
-return { ...entry, balance: runningBal };
-});
-return { id: customer.id, customerName: customer.name, phone: customer.phone, openingBal, rows, totalDebit, totalCredit, closingBal: runningBal };
-};
-
-const getCustomerBalance = (customerId) => {
-const ledger = getCustomerLedger(customerId);
-return ledger ? ledger.closingBal : 0;
-};
-
-const generateReceiptData = (ledger, rowId) => {
-const row = ledger.rows.find(r => r.id === rowId);
-if(!row) return null;
-const isInvoicePayment = row.id.endsWith('-PAY');
-const actualId = isInvoicePayment ? row.ref : row.id;
-const entryIndex = ledger.rows.findIndex(r => r.id === row.id);
-const prevBalance = entryIndex > 0 ? ledger.rows[entryIndex - 1].balance : ledger.openingBal;
-return {
-id: actualId,
-date: row.date,
-customerName: ledger.customerName,
-receivedAmount: row.credit,
-prevBalance: prevBalance,
-newBalance: row.balance,
-note: row.desc
-};
-};
-
-// — Auth Screen —
-if (!currentUser) {
-return (
-<div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-[Inter,system-ui,sans-serif]">
-<div className="bg-white p-8 rounded-3xl w-full max-w-sm shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100">
-<div className="text-center mb-10">
-<h1 className="text-4xl font-extrabold bg-gradient-to-r from-indigo-700 to-blue-500 bg-clip-text text-transparent tracking-tight">{APP_NAME}</h1>
-<p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-2">Customer Management App</p>
-</div>
-<form onSubmit={handleLogin} className="space-y-5">
-<div>
-<label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1">Username</label>
-<input type="text" className="w-full bg-slate-50 border border-slate-200 p-4 rounded-2xl font-semibold mt-1.5 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-800" value={loginForm.name} onChange={e => setLoginForm({...loginForm, name: e.target.value})} />
-</div>
-<div>
-<label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1">Password</label>
-<input type="password" className="w-full bg-slate-50 border border-slate-200 p-4 rounded-2xl font-semibold mt-1.5 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-800" value={loginForm.password} onChange={e => setLoginForm({...loginForm, password: e.target.value})} />
-</div>
-<button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 rounded-2xl text-lg shadow-lg shadow-indigo-600/20 mt-8 active:scale-[0.98] transition-all">Access System</button>
-</form>
-</div>
-</div>
-);
-}
-
 // — Tabs —
 const DashboardTab = () => {
+const { isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig } = useContext(AppContext);
 const [dateFilter, setDateFilter] = useState('This Month');
 const filteredInvoices = invoices.filter(o => o.status === 'Billed' && checkDateFilter(o.date, dateFilter));
 const filteredExpenses = expenses.filter(e => checkDateFilter(e.date, dateFilter));
@@ -583,6 +407,7 @@ return (
 };
 
 const BillingTab = () => {
+const { isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig } = useContext(AppContext);
 const [search, setSearch] = useState('');
 const [dateFilter, setDateFilter] = useState('All Time');
 const [prodSearch, setProdSearch] = useState('');
@@ -757,6 +582,7 @@ return (
 };
 
 const ProductsTab = () => {
+const { isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig } = useContext(AppContext);
 const [search, setSearch] = useState('');
 return (
 <div className="p-4 flex flex-col h-full">
@@ -783,6 +609,7 @@ return (
 };
 
 const CustomersTab = () => {
+const { isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig } = useContext(AppContext);
 const [search, setSearch] = useState('');
 return (
 <div className="p-4 flex flex-col h-full">
@@ -818,6 +645,7 @@ Bal: Rs. {bal.toLocaleString()} {bal > 0 ? '(Dr)' : bal < 0 ? '(Cr)' : ''}
 };
 
 const AdminTab = () => {
+const { isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig } = useContext(AppContext);
 if(!isAdmin) return <div className="p-10 text-center font-bold text-slate-400 flex flex-col items-center mt-20"><Lock className="mb-4 text-slate-300" size={48}/> <p className="text-sm uppercase tracking-widest">Admin Access Required</p></div>;
 return (
 <div className="h-full flex flex-col">
@@ -841,6 +669,7 @@ return (
 };
 
 const UserManagementView = () => {
+const { isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig } = useContext(AppContext);
 const [userDateFilter, setUserDateFilter] = useState('This Month');
 return (
 <div className="h-full flex flex-col p-4 pb-24 overflow-y-auto">
@@ -899,6 +728,7 @@ return (
 };
 
 const AnalyticsView = () => {
+const { isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig } = useContext(AppContext);
 const [view, setView] = useState('Overview');
 const [dateFilter, setDateFilter] = useState('This Month');
 const [customStart, setCustomStart] = useState('');
@@ -1351,6 +1181,7 @@ return (
 };
 
 const ExpensesView = () => {
+const { isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig } = useContext(AppContext);
 const [date, setDate] = useState(getLocalDateStr());
 const [amount, setAmount] = useState('');
 const [category, setCategory] = useState(expenseCategories[0]?.name || '');
@@ -1428,6 +1259,7 @@ return (
 };
 
 const BulkOpsView = () => {
+const { isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig } = useContext(AppContext);
 const [bulkProducts, setBulkProducts] = useState([]);
 const [bulkSearch, setBulkSearch] = useState('');
 const [activeExportTab, setActiveExportTab] = useState('items');
@@ -1602,7 +1434,214 @@ return (
 
 };
 
+
+function App() {
+const [currentUser, setCurrentUser] = useState(() => {
+try {
+const item = window.localStorage.getItem('app_currentUser');
+return item ? JSON.parse(item) : null;
+} catch (error) { return null; }
+});
+
+useEffect(() => {
+if (currentUser) {
+window.localStorage.setItem('app_currentUser', JSON.stringify(currentUser));
+} else {
+window.localStorage.removeItem('app_currentUser');
+}
+}, [currentUser]);
+
+const [loginForm, setLoginForm] = useState({ name: '', password: '' });
+const [activeTab, setActiveTab] = useState('dashboard');
+const [adminView, setAdminView] = useState('analytics');
+const [toast, setToast] = useState(null);
+
+// — Data State (Live from Firebase) —
+const appUsers = useLiveCollection('app_users');
+const companies = useLiveCollection('companies');
+const products = useLiveCollection('products');
+const customers = useLiveCollection('customers');
+const invoices = useLiveCollection('invoices');
+const expenses = useLiveCollection('expenses');
+const expenseCategories = useLiveCollection('expenseCategories');
+const payments = useLiveCollection('payments');
+
+// Complex UI State
+const [billingView, setBillingView] = useState('list');
+const [currentInvoice, setCurrentInvoice] = useState(null);
+const [showProductModal, setShowProductModal] = useState(false);
+const [editingProduct, setEditingProduct] = useState(null);
+const [showCustomerModal, setShowCustomerModal] = useState(false);
+const [editingCustomer, setEditingCustomer] = useState(null);
+const [showPaymentModal, setShowPaymentModal] = useState(false);
+const [selectedCustomerForPayment, setSelectedCustomerForPayment] = useState(null);
+const [showLedgerModal, setShowLedgerModal] = useState(false);
+const [selectedLedgerId, setSelectedLedgerId] = useState(null);
+const [showExpenseCatModal, setShowExpenseCatModal] = useState(false);
+const [showUserModal, setShowUserModal] = useState(false);
+const [editingUser, setEditingUser] = useState(null);
+const [printConfig, setPrintConfig] = useState(null);
+
+const isAdmin = currentUser?.role === 'admin';
+
+const showToast = (msg, type = 'success') => {
+setToast({ msg, type });
+setTimeout(() => setToast(null), 3000);
+};
+
+const getCompanyName = (id) => companies.find(c => c.id === id)?.name || 'Unknown';
+
+const checkDuplicate = (list, name, excludeId = null) => {
+return list.some(item => item.name.toLowerCase() === name.toLowerCase() && item.id !== excludeId);
+};
+
+const handleLogin = async (e) => {
+e.preventDefault();
+if (appUsers.length === 0 && loginForm.name.toLowerCase() === 'tahir' && loginForm.password === '7869') {
+const initUser = { id: Date.now().toString(), name: 'Tahir', password: '7869', role: 'admin' };
+await saveToFirebase('app_users', initUser.id, initUser);
+if (expenseCategories.length === 0) {
+const defaultCats = ['Transport', 'Utility Bill', 'Staff Food/Tea', 'Maintenance', 'Other'];
+defaultCats.forEach((cat, i) => saveToFirebase('expenseCategories', Date.now()+i, { id: Date.now()+i, name: cat }));
+}
+setCurrentUser(initUser);
+showToast("Welcome! Clean Database Initialized.");
+return;
+}
+const user = appUsers.find(u => u.name.toLowerCase() === loginForm.name.toLowerCase() && u.password === loginForm.password);
+if (user) {
+setCurrentUser(user);
+showToast(`Welcome ${user.name}`);
+} else {
+showToast("Invalid Credentials", "error");
+}
+};
+
+const saveToFirebase = async (collectionName, id, dataObj) => {
+try {
+await setDoc(doc(db, collectionName, String(id)), dataObj);
+} catch (e) {
+console.error("Firebase Write Error:", e);
+showToast("Network Error - Could not save", "error");
+}
+};
+
+const deleteFromFirebase = async (collectionName, id) => {
+try {
+await deleteDoc(doc(db, collectionName, String(id)));
+} catch (e) {
+console.error("Firebase Delete Error:", e);
+showToast("Network Error - Could not delete", "error");
+}
+};
+
+// — Ledger Engine —
+const getCustomerLedger = (customerId) => {
+const customer = customers.find(c => c.id === customerId);
+if (!customer) return null;
+const openingBal = customer.openingBalance || 0;
+let entries = [];
+invoices.filter(o => o.customerId === customerId && o.status === 'Billed').forEach(inv => {
+entries.push({ id: inv.id, date: inv.date, ref: inv.id, desc: 'Sales Invoice', debit: inv.total, credit: 0, timestamp: new Date(inv.date).getTime() });
+if (inv.receivedAmount > 0) {
+entries.push({ id: `${inv.id}-PAY`, date: inv.date, ref: inv.id, desc: 'Payment (On Invoice)', debit: 0, credit: Number(inv.receivedAmount), timestamp: new Date(inv.date).getTime() + 1 });
+}
+});
+payments.filter(p => p.customerId === customerId).forEach(pay => {
+entries.push({ id: pay.id, date: pay.date, ref: pay.id, desc: pay.note || 'Payment Received', debit: 0, credit: Number(pay.amount), timestamp: new Date(pay.date).getTime() + 2 });
+});
+entries.sort((a, b) => a.timestamp === b.timestamp ? a.id.localeCompare(b.id) : a.timestamp - b.timestamp);
+let runningBal = openingBal;
+let totalDebit = 0;
+let totalCredit = 0;
+const rows = entries.map(entry => {
+runningBal += entry.debit;
+runningBal -= entry.credit;
+totalDebit += entry.debit;
+totalCredit += entry.credit;
+return { ...entry, balance: runningBal };
+});
+return { id: customer.id, customerName: customer.name, phone: customer.phone, openingBal, rows, totalDebit, totalCredit, closingBal: runningBal };
+};
+
+const getCustomerBalance = (customerId) => {
+const ledger = getCustomerLedger(customerId);
+return ledger ? ledger.closingBal : 0;
+};
+
+const generateReceiptData = (ledger, rowId) => {
+const row = ledger.rows.find(r => r.id === rowId);
+if(!row) return null;
+const isInvoicePayment = row.id.endsWith('-PAY');
+const actualId = isInvoicePayment ? row.ref : row.id;
+const entryIndex = ledger.rows.findIndex(r => r.id === row.id);
+const prevBalance = entryIndex > 0 ? ledger.rows[entryIndex - 1].balance : ledger.openingBal;
+return {
+id: actualId,
+date: row.date,
+customerName: ledger.customerName,
+receivedAmount: row.credit,
+prevBalance: prevBalance,
+newBalance: row.balance,
+note: row.desc
+};
+};
+
+// — Auth Screen —
+if (!currentUser) {
+return (
+<div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-[Inter,system-ui,sans-serif]">
+<div className="bg-white p-8 rounded-3xl w-full max-w-sm shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100">
+<div className="text-center mb-10">
+<h1 className="text-4xl font-extrabold bg-gradient-to-r from-indigo-700 to-blue-500 bg-clip-text text-transparent tracking-tight">{APP_NAME}</h1>
+<p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-2">Customer Management App</p>
+</div>
+<form onSubmit={handleLogin} className="space-y-5">
+<div>
+<label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1">Username</label>
+<input type="text" className="w-full bg-slate-50 border border-slate-200 p-4 rounded-2xl font-semibold mt-1.5 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-800" value={loginForm.name} onChange={e => setLoginForm({...loginForm, name: e.target.value})} />
+</div>
+<div>
+<label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1">Password</label>
+<input type="password" className="w-full bg-slate-50 border border-slate-200 p-4 rounded-2xl font-semibold mt-1.5 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-800" value={loginForm.password} onChange={e => setLoginForm({...loginForm, password: e.target.value})} />
+</div>
+<button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 rounded-2xl text-lg shadow-lg shadow-indigo-600/20 mt-8 active:scale-[0.98] transition-all">Access System</button>
+</form>
+</div>
+</div>
+);
+}
+
 // — Main Render —
+const TABS = [
+  { id: 'dashboard', icon: LayoutDashboard, label: 'Home' },
+  { id: 'products', icon: Package, label: 'Items' },
+  { id: 'billing', icon: ReceiptText, label: 'Billing' },
+  { id: 'customers', icon: Users, label: 'Clients' },
+  { id: 'admin', icon: Settings, label: 'Admin', adminOnly: true },
+];
+// Global keyboard shortcuts
+useEffect(() => {
+  const handler = (e) => {
+    if (e.altKey) {
+      const map = { d: 'dashboard', i: 'products', b: 'billing', c: 'customers', a: 'admin' };
+      if (map[e.key]) { e.preventDefault(); setActiveTab(map[e.key]); }
+    }
+    if (e.key === 'Escape') {
+      if (printConfig) setPrintConfig(null);
+      else if (showProductModal) setShowProductModal(false);
+      else if (showCustomerModal) setShowCustomerModal(false);
+      else if (showPaymentModal) setShowPaymentModal(false);
+      else if (showLedgerModal) setShowLedgerModal(false);
+      else if (showUserModal) setShowUserModal(false);
+      else if (showExpenseCatModal) setShowExpenseCatModal(false);
+      else if (billingView === 'form') setBillingView('list');
+    }
+  };
+  window.addEventListener('keydown', handler);
+  return () => window.removeEventListener('keydown', handler);
+}, [printConfig, showProductModal, showCustomerModal, showPaymentModal, showLedgerModal, showUserModal, showExpenseCatModal, billingView]);
+
 const ctx = {
 isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers,
 showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData,
@@ -1618,41 +1657,90 @@ setPrintConfig, printConfig,
 };
 return (
 <AppContext.Provider value={ctx}>
-<div className="h-screen bg-slate-50 text-slate-900 font-[Inter,system-ui,sans-serif] flex flex-col max-w-md mx-auto relative shadow-2xl overflow-hidden print:hidden">
-<header className="bg-white/80 backdrop-blur-md px-5 py-4 flex justify-between items-center shadow-sm z-10 sticky top-0 border-b border-slate-100">
-<div>
-<h1 className="text-xl font-extrabold bg-gradient-to-r from-indigo-700 to-blue-500 bg-clip-text text-transparent tracking-tight leading-none pb-0.5">{APP_NAME}</h1>
-<p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1.5 flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> {currentUser?.name}</p>
-</div>
-<button onClick={() => setCurrentUser(null)} className="text-[10px] font-bold uppercase tracking-widest text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg hover:bg-slate-200">Log Out</button>
-</header>
+{/* ── Responsive wrapper: side-by-side on desktop, stacked on mobile ── */}
+<div className="h-screen bg-slate-100 text-slate-900 font-[Inter,system-ui,sans-serif] flex flex-row print:hidden" style={{fontFamily:"'Inter',system-ui,sans-serif"}}>
 
-  <main className="flex-1 overflow-hidden h-full">
-    {activeTab === 'dashboard' && <DashboardTab />}
-    {activeTab === 'products' && <ProductsTab />}
-    {activeTab === 'billing' && <BillingTab />}
-    {activeTab === 'customers' && <CustomersTab />}
-    {activeTab === 'admin' && <AdminTab />}
-  </main>
+  {/* ── Desktop Sidebar Navigation (hidden on mobile) ── */}
+  <aside className="hidden lg:flex flex-col w-56 bg-white border-r border-slate-200 shadow-sm z-20 shrink-0">
+    <div className="px-5 py-5 border-b border-slate-100">
+      <h1 className="text-base font-extrabold bg-gradient-to-r from-indigo-700 to-blue-500 bg-clip-text text-transparent tracking-tight leading-none">{APP_NAME}</h1>
+      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1.5 flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>{currentUser?.name}</p>
+    </div>
+    <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+      {TABS.map(tab => {
+        if (tab.adminOnly && !isAdmin) return null;
+        const active = activeTab === tab.id;
+        return (
+          <button key={tab.id} onClick={() => setActiveTab(tab.id)} title={`Alt+${tab.label[0].toLowerCase()}`}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-semibold text-sm transition-all ${active ? 'bg-indigo-50 text-indigo-700 shadow-sm' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'}`}>
+            <tab.icon size={18} strokeWidth={active ? 2.5 : 2} />
+            <span>{tab.label}</span>
+            {active && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-indigo-500"></span>}
+          </button>
+        );
+      })}
+    </nav>
+    <div className="px-3 py-3 border-t border-slate-100">
+      <div className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mb-2 px-1">Shortcuts: Alt+B=Billing, Alt+C=Clients</div>
+      <button onClick={() => setCurrentUser(null)} className="w-full text-xs font-bold uppercase tracking-widest text-slate-500 bg-slate-100 px-3 py-2 rounded-lg hover:bg-slate-200 transition-colors">Log Out</button>
+    </div>
+  </aside>
 
-  <nav className="bg-white/90 backdrop-blur-md border-t border-slate-200 flex items-center justify-between pb-6 pt-3 px-2 z-10 fixed bottom-0 w-full max-w-md shadow-[0_-10px_20px_rgba(0,0,0,0.03)]">
-    {[{ id: 'dashboard', icon: LayoutDashboard, label: 'Home' }, { id: 'products', icon: Package, label: 'Items' }, { id: 'billing', icon: ReceiptText, label: 'Billing' }, { id: 'customers', icon: Users, label: 'Clients' }, { id: 'admin', icon: Settings, label: 'Admin', adminOnly: true }].map(tab => {
-      if (tab.adminOnly && !isAdmin) return null;
-      const active = activeTab === tab.id;
-      return (
-        <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex flex-col items-center justify-center w-full transition-all ${active ? 'text-indigo-600' : 'text-slate-400'}`}>
-          <div className={`p-1.5 rounded-xl transition-all ${active ? 'bg-indigo-50 shadow-sm' : ''}`}><tab.icon size={22} strokeWidth={active ? 2.5 : 2} /></div>
-          <span className={`text-[9px] font-bold uppercase tracking-widest ${active ? 'text-indigo-700 mt-1' : 'mt-0.5'}`}>{tab.label}</span>
-        </button>
-      );
-    })}
-  </nav>
+  {/* ── Main content area ── */}
+  <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+    {/* Mobile/tablet header */}
+    <header className="lg:hidden bg-white/90 backdrop-blur-md px-5 py-4 flex justify-between items-center shadow-sm z-10 sticky top-0 border-b border-slate-100">
+      <div>
+        <h1 className="text-xl font-extrabold bg-gradient-to-r from-indigo-700 to-blue-500 bg-clip-text text-transparent tracking-tight leading-none pb-0.5">{APP_NAME}</h1>
+        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1.5 flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>{currentUser?.name}</p>
+      </div>
+      <button onClick={() => setCurrentUser(null)} className="text-[10px] font-bold uppercase tracking-widest text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg hover:bg-slate-200">Log Out</button>
+    </header>
+
+    {/* Desktop top bar */}
+    <header className="hidden lg:flex bg-white border-b border-slate-200 px-6 py-3 items-center justify-between shadow-sm z-10">
+      <h2 className="text-base font-bold text-slate-800 capitalize">{TABS.find(t=>t.id===activeTab)?.label || ''}</h2>
+      <div className="flex items-center gap-3">
+        {activeTab === 'billing' && billingView === 'list' && (
+          <button onClick={() => { setCurrentInvoice({ id: null, customerId: '', customerName: '', customerDetails: {}, items: [], deliveryBilled: 0, transportExpense: 0, vehicle: VEHICLES[0], paymentStatus: 'Pending', receivedAmount: 0, transportCompany: '', biltyNumber: '', driverName: '', driverPhone: '', notes: '' }); setBillingView('form'); }} className="flex items-center gap-1.5 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700 transition-colors shadow-sm"><Plus size={16}/> New Invoice <kbd className="ml-1 text-[9px] bg-indigo-500 px-1.5 py-0.5 rounded font-mono">Alt+B</kbd></button>
+        )}
+        {activeTab === 'customers' && (
+          <button onClick={() => { setSelectedCustomerForPayment(null); setShowPaymentModal(true); }} className="flex items-center gap-1.5 bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-emerald-600 transition-colors shadow-sm"><Wallet size={16}/> Receive Payment</button>
+        )}
+        <span className="text-[10px] text-slate-400 font-medium">Esc = back/close</span>
+      </div>
+    </header>
+
+    <main className="flex-1 overflow-hidden h-full bg-slate-50 lg:bg-slate-100">
+      <div className="h-full lg:max-w-4xl lg:mx-auto lg:my-0 bg-slate-50 lg:shadow-sm overflow-hidden flex flex-col">
+        {activeTab === 'dashboard' && <DashboardTab />}
+        {activeTab === 'products' && <ProductsTab />}
+        {activeTab === 'billing' && <BillingTab />}
+        {activeTab === 'customers' && <CustomersTab />}
+        {activeTab === 'admin' && <AdminTab />}
+      </div>
+    </main>
+
+    {/* Mobile bottom nav */}
+    <nav className="lg:hidden bg-white/90 backdrop-blur-md border-t border-slate-200 flex items-center justify-between pb-6 pt-3 px-2 z-10 shadow-[0_-10px_20px_rgba(0,0,0,0.03)]">
+      {TABS.map(tab => {
+        if (tab.adminOnly && !isAdmin) return null;
+        const active = activeTab === tab.id;
+        return (
+          <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex flex-col items-center justify-center w-full transition-all ${active ? 'text-indigo-600' : 'text-slate-400'}`}>
+            <div className={`p-1.5 rounded-xl transition-all ${active ? 'bg-indigo-50 shadow-sm' : ''}`}><tab.icon size={22} strokeWidth={active ? 2.5 : 2} /></div>
+            <span className={`text-[9px] font-bold uppercase tracking-widest ${active ? 'text-indigo-700 mt-1' : 'mt-0.5'}`}>{tab.label}</span>
+          </button>
+        );
+      })}
+    </nav>
+  </div>
 
   {/* Print View - Rendered as separate component */}
   {printConfig && (
-    <PrintView 
-      printConfig={printConfig} 
-      setPrintConfig={setPrintConfig} 
+    <PrintView
+      printConfig={printConfig}
+      setPrintConfig={setPrintConfig}
       products={products}
       customers={customers}
       getCustomerLedger={getCustomerLedger}
@@ -1669,7 +1757,7 @@ return (
   {showUserModal && <UserModal />}
 
   {toast && (
-    <div className={`fixed top-24 left-1/2 -translate-x-1/2 px-5 py-3 rounded-2xl shadow-xl z-[100] font-semibold text-white flex items-center gap-2.5 text-sm transition-all animate-slide-up ${toast.type === 'error' ? 'bg-rose-600' : 'bg-slate-800'}`}>
+    <div className={`fixed top-6 right-6 lg:left-auto left-1/2 lg:-translate-x-0 -translate-x-1/2 px-5 py-3 rounded-2xl shadow-xl z-[100] font-semibold text-white flex items-center gap-2.5 text-sm transition-all animate-slide-up ${toast.type === 'error' ? 'bg-rose-600' : 'bg-slate-800'}`}>
       {toast.type === 'error' ? <AlertCircle size={18}/> : <CheckCircle2 size={18} className="text-emerald-400"/>}
       {toast.msg}
     </div>
