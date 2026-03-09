@@ -1379,6 +1379,38 @@ return (
 {activeExportTab === 'all' && <button onClick={exportAll} className="w-full bg-indigo-600 text-white py-2.5 rounded-xl font-bold text-xs shadow-sm">Export Full Master Data (CSV)</button>}
 </div>
 
+     {/* Fix Duplicate Companies */}
+     {isAdmin && (() => {
+       const seen = {}; const dupes = [];
+       companies.forEach(c => {
+         const k = c.name.trim().toLowerCase();
+         if (seen[k]) dupes.push(c); else seen[k] = c;
+       });
+       if (dupes.length === 0) return null;
+       return (
+         <div className="bg-rose-50 border border-rose-200 p-4 rounded-2xl mb-4">
+           <p className="text-xs font-bold text-rose-700 mb-2 flex items-center gap-1.5"><AlertCircle size={14}/> {dupes.length} Duplicate {dupes.length === 1 ? 'Company' : 'Companies'} Found</p>
+           <p className="text-[10px] text-rose-600 mb-3">These were created by previous imports. Click to merge them and fix all product references.</p>
+           <button onClick={async () => {
+             const canonical = {};
+             companies.forEach(c => { const k = c.name.trim().toLowerCase(); if (!canonical[k]) canonical[k] = c.id; });
+             let fixed = 0;
+             for (const dupe of dupes) {
+               const keepId = canonical[dupe.name.trim().toLowerCase()];
+               if (keepId === dupe.id) continue;
+               const affected = products.filter(p => String(p.companyId) === String(dupe.id));
+               for (const p of affected) { await saveToFirebase('products', p.id, { ...p, companyId: keepId }); }
+               await deleteFromFirebase('companies', dupe.id);
+               fixed++;
+             }
+             showToast(`Merged ${fixed} duplicate companies`);
+           }} className="w-full bg-rose-600 text-white py-2 rounded-xl font-bold text-xs hover:bg-rose-700 transition-colors">
+             Fix {dupes.length} Duplicate{dupes.length > 1 ? 's' : ''} Now
+           </button>
+         </div>
+       );
+     })()}
+
      {/* Import Section */}
      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm mb-4">
         <h3 className="text-xs font-bold text-slate-800 uppercase tracking-widest mb-2 flex items-center gap-1.5"><Upload size={14} className="text-emerald-600"/> Import Data</h3>

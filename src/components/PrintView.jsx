@@ -190,28 +190,38 @@ const handlePDF = () => {
   showToast('Generating PDF…');
 
   if (isThermal) {
+    // Thermal: fixed 80mm (302px) width — never use scrollWidth which picks up overflow
+    const thermalPx = 302;
+    const pdfW = 80;
+    const margins = [3, 3, 3, 3];
+    const contentWmm = pdfW - margins[1] - margins[3];
+    const pdfH = Math.ceil((element.scrollHeight / thermalPx) * contentWmm) + margins[0] + margins[2] + 6;
     const opt = {
-      margin: [3, 3, 3, 3],
+      margin: margins,
       filename: getFileName(),
       image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 3, useCORS: true, logging: false, letterRendering: true, width: 302, windowWidth: 302 },
-      jsPDF: { unit: 'mm', format: [80, 900], orientation: 'portrait', hotfixes: ['px_scaling'] },
-      pagebreak: { mode: ['avoid-all'], avoid: ['tr', '.keep-together', 'thead', 'tfoot'] },
+      html2canvas: { scale: 3, useCORS: true, logging: false, letterRendering: true, scrollY: 0, scrollX: 0, width: thermalPx, windowWidth: thermalPx },
+      jsPDF: { unit: 'mm', format: [pdfW, pdfH], orientation: 'portrait' },
+      pagebreak: { mode: 'avoid-all' },
     };
     html2pdf().set(opt).from(element).save()
       .then(() => showToast('PDF saved!'))
       .catch(() => showToast('PDF failed — use Print instead', 'error'));
   } else {
-    const pageFormat = isA5 ? [148, 210] : 'a4';
+    // A4/A5: use offsetWidth (rendered width, no overflow) so canvas exactly matches element
+    const elW = element.offsetWidth || (isA5 ? 560 : 794);
+    const elH = element.scrollHeight;
+    const pdfW = isA5 ? 148 : 210;
     const margins = isA5 ? [8, 8, 12, 8] : [10, 10, 15, 10];
-    const winW = isA5 ? 560 : 794;
+    const contentWmm = pdfW - margins[1] - margins[3];
+    const pdfH = Math.ceil((elH / elW) * contentWmm) + margins[0] + margins[2] + 20;
     const opt = {
       margin: margins,
       filename: getFileName(),
       image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true, logging: false, letterRendering: true, windowWidth: winW },
-      jsPDF: { unit: 'mm', format: pageFormat, orientation: 'portrait', hotfixes: ['px_scaling'] },
-      pagebreak: { mode: ['avoid-all', 'css'], avoid: ['tr', '.no-break', '.keep-together'], before: ['.page-break-before'], after: ['.page-break-after'] },
+      html2canvas: { scale: 2, useCORS: true, logging: false, letterRendering: true, scrollY: 0, scrollX: 0, width: elW, windowWidth: elW },
+      jsPDF: { unit: 'mm', format: [pdfW, pdfH], orientation: 'portrait' },
+      pagebreak: { mode: 'avoid-all' },
     };
     html2pdf().set(opt).from(element).save()
       .then(() => showToast('PDF saved!'))
