@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, createContext, useContext } from 'react';
 import {
 LayoutDashboard, Package, ReceiptText, BarChart3, Settings,
 Plus, Search, Truck, CheckCircle2, AlertCircle, Users,
@@ -12,6 +12,8 @@ AlignLeft, Bell, Star, Layers, Globe, PhoneCall, MapPin, Briefcase, ClipboardLis
 import { db, collection, onSnapshot, doc, setDoc, deleteDoc } from './firebase';
 import { APP_NAME, VEHICLES, getPKTDate, getLocalDateStr, formatDateDisp, checkDateFilter, exportToCSV } from './helpers';
 import PrintView from './components/PrintView';
+
+const AppContext = createContext(null);
 
 function useLiveCollection(collectionName) {
 const [data, setData] = React.useState([]);

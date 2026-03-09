@@ -659,6 +659,34 @@ return (
           );
         })()}
         <div style={{ clear: 'both' }}></div>
+
+        {/* ── Invoice Notes ── */}
+        {data?.notes && (
+          <div className="keep-together" style={{ marginTop: sz('10px','14px','18px'), padding: sz('8px 10px','10px 14px','12px 16px'), background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', fontSize: sz('8px','9px','10px'), color: '#78350f' }}>
+            <div style={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '4px', fontSize: sz('7px','7.5px','8px'), color: '#92400e' }}>📋 Notes / Remarks</div>
+            <div style={{ lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{data.notes}</div>
+          </div>
+        )}
+
+        {/* ── Return / Exchange Policy ── */}
+        <div className="keep-together" style={{ marginTop: sz('12px','16px','20px'), border: '1.5px solid #1e293b', borderRadius: '8px', overflow: 'hidden', fontSize: sz('6.5px','7.5px','8.5px') }}>
+          <div style={{ background: '#1e293b', color: 'white', padding: sz('4px 8px','5px 12px','6px 14px'), fontWeight: 900, textAlign: 'center', letterSpacing: '0.5px', textTransform: 'uppercase', fontSize: sz('6.5px','7px','8px') }}>
+            🚫 "No" Return / Exchange Policy on Some Items
+          </div>
+          <div style={{ padding: sz('6px 8px','8px 12px','10px 14px'), background: '#f8fafc' }}>
+            <div style={{ color: '#334155', lineHeight: 1.7, marginBottom: sz('4px','5px','6px') }}>
+              To ensure <strong>"Reliable, Authentic &amp; Storage Maintained"</strong> Vet. Medical Supplies, there is a <strong>No Return / No Exchange</strong> policy for the following items:
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: sz('1px','2px','3px'), color: '#1e293b', fontWeight: 700 }}>
+              {['1. Vaccines','2. Sprays','3. Imported Products','4. Surgical Items','5. Items with &lt;6 Months Expiry','6. Damaged / Soiled Package'].map((item, i) => (
+                <div key={i} style={{ padding: sz('1.5px 0','2px 0','3px 0') }}>{item}</div>
+              ))}
+            </div>
+            <div style={{ marginTop: sz('4px','6px','8px'), textAlign: 'center', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '1px', fontSize: sz('6px','7px','7.5px'), borderTop: '1px dashed #cbd5e1', paddingTop: sz('4px','5px','6px') }}>
+              Khyber Traders · Wholesale Veterinary Pharmacy · Karachi
+            </div>
+          </div>
+        </div>
       </>
     )}
 
