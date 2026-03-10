@@ -189,30 +189,16 @@ const handlePDF = () => {
   if (!element) { showToast('Print element not found', 'error'); return; }
 
   const printRoot = document.getElementById('print-root');
+  if (printRoot) printRoot.scrollTop = 0;
 
   showToast('Generating PDF…');
 
-  if (isThermal) {
-    // Thermal: fixed 80mm width
-    const thermalPx = 302;
-    const pdfW = 80;
-    const margins = [3, 3, 3, 3];
-    const contentWmm = pdfW - margins[1] - margins[3];
-
-    // Save + override styles for capture
-    const prevRootOverflow = printRoot ? printRoot.style.overflow : '';
-    const prevW = element.style.width, prevMaxW = element.style.maxWidth, prevMinW = element.style.minWidth;
-    if (printRoot) { printRoot.scrollTop = 0; printRoot.style.overflow = 'visible'; }
-    element.style.width = thermalPx + 'px';
-    element.style.maxWidth = thermalPx + 'px';
-    element.style.minWidth = thermalPx + 'px';
-
-    const restore = () => {
-      element.style.width = prevW; element.style.maxWidth = prevMaxW; element.style.minWidth = prevMinW;
-      if (printRoot) printRoot.style.overflow = prevRootOverflow;
-    };
-
-    setTimeout(() => {
+  setTimeout(() => {
+    if (isThermal) {
+      const thermalPx = 302;
+      const pdfW = 80;
+      const margins = [3, 3, 3, 3];
+      const contentWmm = pdfW - margins[1] - margins[3];
       const elH = element.scrollHeight;
       const pdfH = Math.ceil((elH / thermalPx) * contentWmm) + margins[0] + margins[2] + 20;
       const opt = {
@@ -225,32 +211,13 @@ const handlePDF = () => {
       };
       html2pdf().set(opt).from(element).save()
         .then(() => showToast('PDF saved!'))
-        .catch(() => showToast('PDF failed — use Print instead', 'error'))
-        .finally(restore);
-    }, 80);
-
-  } else {
-    // A4/A5: fixed pixel widths at 96dpi (A4=794px, A5=559px)
-    const pdfW = isA5 ? 148 : 210;
-    const margins = isA5 ? [8, 8, 12, 8] : [10, 10, 15, 10];
-    const elW = isA5 ? 559 : 794;
-    const contentWmm = pdfW - margins[1] - margins[3];
-
-    // Save + override styles for capture — MUST stay overridden until .finally()
-    const prevRootOverflow = printRoot ? printRoot.style.overflow : '';
-    const prevW = element.style.width, prevMaxW = element.style.maxWidth, prevMinW = element.style.minWidth;
-    if (printRoot) { printRoot.scrollTop = 0; printRoot.style.overflow = 'visible'; }
-    element.style.width = elW + 'px';
-    element.style.maxWidth = elW + 'px';
-    element.style.minWidth = elW + 'px';
-
-    const restore = () => {
-      element.style.width = prevW; element.style.maxWidth = prevMaxW; element.style.minWidth = prevMinW;
-      if (printRoot) printRoot.style.overflow = prevRootOverflow;
-    };
-
-    setTimeout(() => {
+        .catch(() => showToast('PDF failed — use Print instead', 'error'));
+    } else {
+      const elW = element.offsetWidth || (isA5 ? 559 : 794);
       const elH = element.scrollHeight;
+      const pdfW = isA5 ? 148 : 210;
+      const margins = isA5 ? [8, 8, 12, 8] : [10, 10, 15, 10];
+      const contentWmm = pdfW - margins[1] - margins[3];
       const pdfH = Math.ceil((elH / elW) * contentWmm) + margins[0] + margins[2] + 60;
       const opt = {
         margin: margins,
@@ -262,10 +229,9 @@ const handlePDF = () => {
       };
       html2pdf().set(opt).from(element).save()
         .then(() => showToast('PDF saved!'))
-        .catch(() => showToast('PDF failed — use Print instead', 'error'))
-        .finally(restore);
-    }, 80);
-  }
+        .catch(() => showToast('PDF failed — use Print instead', 'error'));
+    }
+  }, 100);
 };
 
 // ── Layout helpers ────────────────────────────────────────────────────────
