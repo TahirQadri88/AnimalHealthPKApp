@@ -1619,6 +1619,29 @@ note: row.desc
 };
 };
 
+// Global keyboard shortcuts — must be BEFORE any conditional return (Rules of Hooks)
+useEffect(() => {
+  if (!currentUser) return;
+  const handler = (e) => {
+    if (e.altKey) {
+      const map = { d: 'dashboard', i: 'products', b: 'billing', c: 'customers', a: 'admin' };
+      if (map[e.key]) { e.preventDefault(); setActiveTab(map[e.key]); }
+    }
+    if (e.key === 'Escape') {
+      if (printConfig) setPrintConfig(null);
+      else if (showProductModal) setShowProductModal(false);
+      else if (showCustomerModal) setShowCustomerModal(false);
+      else if (showPaymentModal) setShowPaymentModal(false);
+      else if (showLedgerModal) setShowLedgerModal(false);
+      else if (showUserModal) setShowUserModal(false);
+      else if (showExpenseCatModal) setShowExpenseCatModal(false);
+      else if (billingView === 'form') setBillingView('list');
+    }
+  };
+  window.addEventListener('keydown', handler);
+  return () => window.removeEventListener('keydown', handler);
+}, [currentUser, printConfig, showProductModal, showCustomerModal, showPaymentModal, showLedgerModal, showUserModal, showExpenseCatModal, billingView]);
+
 // — Auth Screen —
 if (!currentUser) {
 return (
@@ -1652,28 +1675,6 @@ const TABS = [
   { id: 'customers', icon: Users, label: 'Clients' },
   { id: 'admin', icon: Settings, label: 'Admin', adminOnly: true },
 ];
-// Global keyboard shortcuts
-useEffect(() => {
-  const handler = (e) => {
-    if (e.altKey) {
-      const map = { d: 'dashboard', i: 'products', b: 'billing', c: 'customers', a: 'admin' };
-      if (map[e.key]) { e.preventDefault(); setActiveTab(map[e.key]); }
-    }
-    if (e.key === 'Escape') {
-      if (printConfig) setPrintConfig(null);
-      else if (showProductModal) setShowProductModal(false);
-      else if (showCustomerModal) setShowCustomerModal(false);
-      else if (showPaymentModal) setShowPaymentModal(false);
-      else if (showLedgerModal) setShowLedgerModal(false);
-      else if (showUserModal) setShowUserModal(false);
-      else if (showExpenseCatModal) setShowExpenseCatModal(false);
-      else if (billingView === 'form') setBillingView('list');
-    }
-  };
-  window.addEventListener('keydown', handler);
-  return () => window.removeEventListener('keydown', handler);
-}, [printConfig, showProductModal, showCustomerModal, showPaymentModal, showLedgerModal, showUserModal, showExpenseCatModal, billingView]);
-
 const ctx = {
 isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers,
 showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData,
