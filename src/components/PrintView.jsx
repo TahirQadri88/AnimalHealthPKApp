@@ -195,7 +195,7 @@ const handlePDF = () => {
 
   setTimeout(() => {
     if (isThermal) {
-      const thermalPx = 302;
+      const thermalPx = 302; // 80mm at 96dpi
       const pdfW = 80;
       const margins = [3, 3, 3, 3];
       const contentWmm = pdfW - margins[1] - margins[3];
@@ -205,7 +205,8 @@ const handlePDF = () => {
         margin: margins,
         filename: getFileName(),
         image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 3, useCORS: true, logging: false, letterRendering: true, scrollY: 0, scrollX: 0, width: thermalPx, windowWidth: thermalPx, height: elH },
+        // No height: let html2canvas auto-measure — avoids blank capture
+        html2canvas: { scale: 3, useCORS: true, logging: false, letterRendering: true, scrollY: 0, scrollX: 0, width: thermalPx, windowWidth: thermalPx },
         jsPDF: { unit: 'mm', format: [pdfW, pdfH], orientation: 'portrait' },
         pagebreak: { mode: 'avoid-all' },
       };
@@ -213,17 +214,19 @@ const handlePDF = () => {
         .then(() => showToast('PDF saved!'))
         .catch(() => showToast('PDF failed — use Print instead', 'error'));
     } else {
-      const elW = element.offsetWidth || (isA5 ? 559 : 794);
+      // Use fixed pixel widths (not offsetWidth which varies by screen size)
+      const fixedW = isA5 ? 559 : 794; // 148mm / 210mm at 96dpi
       const elH = element.scrollHeight;
       const pdfW = isA5 ? 148 : 210;
       const margins = isA5 ? [8, 8, 12, 8] : [10, 10, 15, 10];
       const contentWmm = pdfW - margins[1] - margins[3];
-      const pdfH = Math.ceil((elH / elW) * contentWmm) + margins[0] + margins[2] + 60;
+      const pdfH = Math.ceil((elH / fixedW) * contentWmm) + margins[0] + margins[2] + 60;
       const opt = {
         margin: margins,
         filename: getFileName(),
         image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, logging: false, letterRendering: true, scrollY: 0, scrollX: 0, width: elW, windowWidth: elW, height: elH },
+        // No height: let html2canvas auto-measure — avoids content clipping
+        html2canvas: { scale: 2, useCORS: true, logging: false, letterRendering: true, scrollY: 0, scrollX: 0, width: fixedW, windowWidth: fixedW },
         jsPDF: { unit: 'mm', format: [pdfW, pdfH], orientation: 'portrait' },
         pagebreak: { mode: 'avoid-all' },
       };
@@ -231,7 +234,7 @@ const handlePDF = () => {
         .then(() => showToast('PDF saved!'))
         .catch(() => showToast('PDF failed — use Print instead', 'error'));
     }
-  }, 100);
+  }, 300);
 };
 
 // ── Layout helpers ────────────────────────────────────────────────────────

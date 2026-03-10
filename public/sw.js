@@ -1,4 +1,4 @@
-const CACHE_NAME = 'animalhealth-v2';
+const CACHE_NAME = 'animalhealth-v5';
 const STATIC_ASSETS = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', event => {
@@ -27,7 +27,21 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // Cache-first for everything else (app shell + assets)
+  // Network-first for JS/CSS assets so new deploys always load fresh
+  if (event.request.url.includes('/assets/')) {
+    event.respondWith(
+      fetch(event.request).then(response => {
+        if (response.ok) {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+        }
+        return response;
+      }).catch(() => caches.match(event.request))
+    );
+    return;
+  }
+
+  // Cache-first for static shell (icons, manifest)
   event.respondWith(
     caches.match(event.request).then(cached => {
       const network = fetch(event.request).then(response => {
