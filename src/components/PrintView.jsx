@@ -187,46 +187,64 @@ const handlePrint = () => {
 const handlePDF = () => {
   const element = document.getElementById('print-document');
   if (!element) { showToast('Print element not found', 'error'); return; }
+
+  // Scroll the print container to top so html2canvas captures from the beginning
+  const printRoot = document.getElementById('print-root');
+  if (printRoot) printRoot.scrollTop = 0;
+
   showToast('Generating PDF…');
 
-  if (isThermal) {
-    // Thermal: fixed 80mm (302px) width — never use scrollWidth which picks up overflow
-    const thermalPx = 302;
-    const pdfW = 80;
-    const margins = [3, 3, 3, 3];
-    const contentWmm = pdfW - margins[1] - margins[3];
-    const pdfH = Math.ceil((element.scrollHeight / thermalPx) * contentWmm) + margins[0] + margins[2] + 6;
-    const opt = {
-      margin: margins,
-      filename: getFileName(),
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 3, useCORS: true, logging: false, letterRendering: true, scrollY: 0, scrollX: 0, width: thermalPx, windowWidth: thermalPx },
-      jsPDF: { unit: 'mm', format: [pdfW, pdfH], orientation: 'portrait' },
-      pagebreak: { mode: 'avoid-all' },
-    };
-    html2pdf().set(opt).from(element).save()
-      .then(() => showToast('PDF saved!'))
-      .catch(() => showToast('PDF failed — use Print instead', 'error'));
-  } else {
-    // A4/A5: use offsetWidth (rendered width, no overflow) so canvas exactly matches element
-    const elW = element.offsetWidth || (isA5 ? 560 : 794);
-    const elH = element.scrollHeight;
-    const pdfW = isA5 ? 148 : 210;
-    const margins = isA5 ? [8, 8, 12, 8] : [10, 10, 15, 10];
-    const contentWmm = pdfW - margins[1] - margins[3];
-    const pdfH = Math.ceil((elH / elW) * contentWmm) + margins[0] + margins[2] + 20;
-    const opt = {
-      margin: margins,
-      filename: getFileName(),
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true, logging: false, letterRendering: true, scrollY: 0, scrollX: 0, width: elW, windowWidth: elW },
-      jsPDF: { unit: 'mm', format: [pdfW, pdfH], orientation: 'portrait' },
-      pagebreak: { mode: 'avoid-all' },
-    };
-    html2pdf().set(opt).from(element).save()
-      .then(() => showToast('PDF saved!'))
-      .catch(() => showToast('PDF failed — use Print instead', 'error'));
-  }
+  // Delay slightly so scroll settles before capture
+  setTimeout(() => {
+    if (isThermal) {
+      // Thermal: fixed 80mm (302px) width — never use scrollWidth which picks up overflow
+      const thermalPx = 302;
+      const pdfW = 80;
+      const margins = [3, 3, 3, 3];
+      const contentWmm = pdfW - margins[1] - margins[3];
+      const elH = element.scrollHeight;
+      const pdfH = Math.ceil((elH / thermalPx) * contentWmm) + margins[0] + margins[2] + 20;
+      const opt = {
+        margin: margins,
+        filename: getFileName(),
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 3, useCORS: true, logging: false, letterRendering: true, scrollY: 0, scrollX: 0, width: thermalPx, windowWidth: thermalPx, height: elH },
+        jsPDF: { unit: 'mm', format: [pdfW, pdfH], orientation: 'portrait' },
+        pagebreak: { mode: 'avoid-all' },
+      };
+      html2pdf().set(opt).from(element).save()
+        .then(() => showToast('PDF saved!'))
+        .catch(() => showToast('PDF failed — use Print instead', 'error'));
+    } else {
+      // A4/A5: use FIXED pixel widths matching the paper size at 96dpi
+      // (NOT element.offsetWidth which is the screen width and causes side cuts on narrow screens)
+      const pdfW = isA5 ? 148 : 210;
+      const margins = isA5 ? [8, 8, 12, 8] : [10, 10, 15, 10];
+      // 96dpi: 1mm = 3.7795px → A4=794px, A5=559px
+      const elW = isA5 ? 559 : 794;
+      const contentWmm = pdfW - margins[1] - margins[3];
+      // Measure height at the fixed render width by temporarily resizing
+      const prevWidth = element.style.width;
+      const prevMaxWidth = element.style.maxWidth;
+      element.style.width = elW + 'px';
+      element.style.maxWidth = elW + 'px';
+      const elH = element.scrollHeight;
+      element.style.width = prevWidth;
+      element.style.maxWidth = prevMaxWidth;
+      const pdfH = Math.ceil((elH / elW) * contentWmm) + margins[0] + margins[2] + 60;
+      const opt = {
+        margin: margins,
+        filename: getFileName(),
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, logging: false, letterRendering: true, scrollY: 0, scrollX: 0, width: elW, windowWidth: elW, height: elH },
+        jsPDF: { unit: 'mm', format: [pdfW, pdfH], orientation: 'portrait' },
+        pagebreak: { mode: 'avoid-all' },
+      };
+      html2pdf().set(opt).from(element).save()
+        .then(() => showToast('PDF saved!'))
+        .catch(() => showToast('PDF failed — use Print instead', 'error'));
+    }
+  }, 100);
 };
 
 // ── Layout helpers ────────────────────────────────────────────────────────
