@@ -194,43 +194,54 @@ const handlePDF = () => {
   showToast('Generating PDF…');
 
   setTimeout(() => {
+    const fixedW = isThermal ? 302 : (isA5 ? 559 : 794);
+
+    // Step 1: measure height at the exact target width (live element may be narrower on phone)
+    const probe = element.cloneNode(true);
+    Object.assign(probe.style, {
+      position: 'fixed', left: '-9999px', top: '0',
+      width: fixedW + 'px', maxWidth: fixedW + 'px', minWidth: fixedW + 'px',
+      margin: '0', visibility: 'hidden', boxShadow: 'none',
+    });
+    document.body.appendChild(probe);
+    const elH = probe.scrollHeight;
+    document.body.removeChild(probe);
+
+    // Step 2: onclone pins captured element to (0,0) — fixes left/right cut on all formats
+    const onclone = (_doc, el) => {
+      Object.assign(el.style, {
+        position: 'absolute', left: '0', top: '0', margin: '0',
+        width: fixedW + 'px', maxWidth: fixedW + 'px', minWidth: fixedW + 'px',
+        boxShadow: 'none',
+      });
+    };
+
     if (isThermal) {
-      const thermalPx = 302; // 80mm at 96dpi
       const pdfW = 80;
       const margins = [3, 3, 3, 3];
       const contentWmm = pdfW - margins[1] - margins[3];
-      const elH = element.scrollHeight;
-      const pdfH = Math.ceil((elH / thermalPx) * contentWmm) + margins[0] + margins[2] + 20;
-      const opt = {
-        margin: margins,
-        filename: getFileName(),
+      const pdfH = Math.ceil((elH / fixedW) * contentWmm) + margins[0] + margins[2] + 20;
+      html2pdf().set({
+        margin: margins, filename: getFileName(),
         image: { type: 'jpeg', quality: 0.98 },
-        // No height: let html2canvas auto-measure — avoids blank capture
-        html2canvas: { scale: 3, useCORS: true, logging: false, letterRendering: true, scrollY: 0, scrollX: 0, width: thermalPx, windowWidth: thermalPx },
+        html2canvas: { scale: 3, useCORS: true, logging: false, letterRendering: true, scrollY: 0, scrollX: 0, width: fixedW, windowWidth: fixedW, onclone },
         jsPDF: { unit: 'mm', format: [pdfW, pdfH], orientation: 'portrait' },
         pagebreak: { mode: 'avoid-all' },
-      };
-      html2pdf().set(opt).from(element).save()
+      }).from(element).save()
         .then(() => showToast('PDF saved!'))
         .catch(() => showToast('PDF failed — use Print instead', 'error'));
     } else {
-      // Use fixed pixel widths (not offsetWidth which varies by screen size)
-      const fixedW = isA5 ? 559 : 794; // 148mm / 210mm at 96dpi
-      const elH = element.scrollHeight;
       const pdfW = isA5 ? 148 : 210;
       const margins = isA5 ? [8, 8, 12, 8] : [10, 10, 15, 10];
       const contentWmm = pdfW - margins[1] - margins[3];
       const pdfH = Math.ceil((elH / fixedW) * contentWmm) + margins[0] + margins[2] + 60;
-      const opt = {
-        margin: margins,
-        filename: getFileName(),
+      html2pdf().set({
+        margin: margins, filename: getFileName(),
         image: { type: 'jpeg', quality: 0.98 },
-        // No height: let html2canvas auto-measure — avoids content clipping
-        html2canvas: { scale: 2, useCORS: true, logging: false, letterRendering: true, scrollY: 0, scrollX: 0, width: fixedW, windowWidth: fixedW },
+        html2canvas: { scale: 2, useCORS: true, logging: false, letterRendering: true, scrollY: 0, scrollX: 0, width: fixedW, windowWidth: fixedW, onclone },
         jsPDF: { unit: 'mm', format: [pdfW, pdfH], orientation: 'portrait' },
         pagebreak: { mode: 'avoid-all' },
-      };
-      html2pdf().set(opt).from(element).save()
+      }).from(element).save()
         .then(() => showToast('PDF saved!'))
         .catch(() => showToast('PDF failed — use Print instead', 'error'));
     }
