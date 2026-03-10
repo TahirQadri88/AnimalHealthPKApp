@@ -216,13 +216,21 @@ const handlePDF = () => {
         .then(() => showToast('PDF saved!'))
         .catch(() => showToast('PDF failed — use Print instead', 'error'));
     } else {
-      // A4/A5: use offsetWidth (rendered width, no overflow) so canvas exactly matches element
-      const elW = element.offsetWidth || (isA5 ? 560 : 794);
-      const elH = element.scrollHeight;
+      // A4/A5: use FIXED pixel widths matching the paper size at 96dpi
+      // (NOT element.offsetWidth which is the screen width and causes side cuts on narrow screens)
       const pdfW = isA5 ? 148 : 210;
       const margins = isA5 ? [8, 8, 12, 8] : [10, 10, 15, 10];
+      // 96dpi: 1mm = 3.7795px → A4=794px, A5=559px
+      const elW = isA5 ? 559 : 794;
       const contentWmm = pdfW - margins[1] - margins[3];
-      // +60mm buffer (up from +20) to ensure nothing is cut off at the bottom
+      // Measure height at the fixed render width by temporarily resizing
+      const prevWidth = element.style.width;
+      const prevMaxWidth = element.style.maxWidth;
+      element.style.width = elW + 'px';
+      element.style.maxWidth = elW + 'px';
+      const elH = element.scrollHeight;
+      element.style.width = prevWidth;
+      element.style.maxWidth = prevMaxWidth;
       const pdfH = Math.ceil((elH / elW) * contentWmm) + margins[0] + margins[2] + 60;
       const opt = {
         margin: margins,
