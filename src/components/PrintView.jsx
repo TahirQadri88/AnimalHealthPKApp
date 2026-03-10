@@ -188,12 +188,18 @@ const handleShareHTML = async () => {
   const element = document.getElementById('print-document');
   if (!element) { showToast('Document not found', 'error'); return; }
 
-  // Clone and force correct paper width inline — Tailwind classes won't work outside app
+  // Clone and apply inline styles — Tailwind classes won't work outside the app
   const clone = element.cloneNode(true);
+  clone.removeAttribute('class'); // strip Tailwind, use inline only
   const paperW = isThermal ? '80mm' : isA5 ? '148mm' : '210mm';
   const padding = isThermal ? '12px' : isA5 ? '20px' : '28px';
+  // A4/A5: width:100% + max-width so it fills small screens without overflowing
+  // Thermal: fixed 80mm (always narrower than phone screens)
+  const widthCss = isThermal
+    ? `width:80mm;max-width:80mm;min-width:80mm`
+    : `width:100%;max-width:${paperW}`;
   clone.style.cssText = [
-    `width:${paperW}`, `max-width:${paperW}`, `min-width:${paperW}`,
+    widthCss,
     'margin:0 auto', `padding:${padding}`, 'background:white',
     "font-family:'Inter',system-ui,sans-serif",
     `font-size:${isThermal ? '10px' : isA5 ? '11px' : '12px'}`,
@@ -202,7 +208,7 @@ const handleShareHTML = async () => {
 
   const pageSize   = isThermal ? '80mm auto' : isA5 ? 'A5 portrait' : 'A4 portrait';
   const pageMargin = isThermal ? '3mm' : '10mm';
-  const bodyPad    = isThermal ? '8px' : '20px';
+  const bodyPad    = isThermal ? '8px' : '16px';
   const docTitle   = getFileName().replace(/\.[^.]+$/, '');
 
   const html = `<!DOCTYPE html>
@@ -215,11 +221,12 @@ const handleShareHTML = async () => {
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
   <style>
     *{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
-    body{margin:0;padding:${bodyPad};background:#f1f5f9;font-family:'Inter',system-ui,sans-serif;display:flex;justify-content:center;}
-    @media print{body{padding:0;background:white;}@page{size:${pageSize};margin:${pageMargin};}}
+    body{margin:0;padding:${bodyPad};background:#f1f5f9;font-family:'Inter',system-ui,sans-serif;}
+    @media print{body{padding:0;background:white;}@page{size:${pageSize};margin:${pageMargin};}
+      #doc{width:100%!important;max-width:none!important;padding:0!important;}}
   </style>
 </head>
-<body>${clone.outerHTML}</body>
+<body><div id="doc">${clone.outerHTML}</div></body>
 </html>`;
 
   const fileName = getFileName().replace(/\.[^.]+$/, '.html');
