@@ -204,34 +204,46 @@ return (
 };
 
 const PaymentModal = () => {
-const { selectedCustomerForPayment, customers, getCustomerBalance, saveToFirebase, showToast, setShowPaymentModal } = useContext(AppContext);
-const [form, setForm] = useState({ customerId: selectedCustomerForPayment || '', amount: '', date: getLocalDateStr(), note: 'Cash Payment' });
+const { selectedCustomerForPayment, customers, getCustomerBalance, saveToFirebase, showToast, setShowPaymentModal, editingPayment, setEditingPayment } = useContext(AppContext);
+const isEdit = !!editingPayment;
+const [form, setForm] = useState(
+  isEdit
+    ? { customerId: editingPayment.customerId, amount: editingPayment.amount, date: editingPayment.date, note: editingPayment.note || 'Cash Payment' }
+    : { customerId: selectedCustomerForPayment || '', amount: '', date: getLocalDateStr(), note: 'Cash Payment' }
+);
+const handleClose = () => { setEditingPayment(null); setShowPaymentModal(false); };
 const save = async () => {
 if(!form.customerId || !form.amount) return showToast("Customer and Amount are required", "error");
-const newPayment = { id: `REC-${Math.floor(Math.random()*100000)}`, customerId: Number(form.customerId), amount: Number(form.amount), date: form.date, note: form.note };
-await saveToFirebase('payments', newPayment.id, newPayment);
-showToast("Payment Received & Ledger Updated!");
-setShowPaymentModal(false);
+if (isEdit) {
+  const updated = { ...editingPayment, customerId: Number(form.customerId), amount: Number(form.amount), date: form.date, note: form.note };
+  await saveToFirebase('payments', updated.id, updated);
+  showToast("Payment Receipt Updated!");
+} else {
+  const newPayment = { id: `REC-${Math.floor(Math.random()*100000)}`, customerId: Number(form.customerId), amount: Number(form.amount), date: form.date, note: form.note };
+  await saveToFirebase('payments', newPayment.id, newPayment);
+  showToast("Payment Received & Ledger Updated!");
+}
+handleClose();
 };
 const inputClass = "w-full p-3.5 bg-white border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-sm text-slate-800 placeholder-slate-400";
 return (
-<ModalWrapper title="Receive Payment" onClose={() => setShowPaymentModal(false)}>
+<ModalWrapper title={isEdit ? "Edit Payment Receipt" : "Receive Payment"} onClose={handleClose}>
 <div className="space-y-4 pb-10">
-<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Select Client</label><select className={inputClass} value={form.customerId} onChange={e=>setForm({...form, customerId: e.target.value})}><option value="">– Choose Client –</option>{customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
+<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Select Client</label><select className={inputClass} value={form.customerId} onChange={e=>setForm({...form, customerId: e.target.value})} disabled={isEdit}><option value="">– Choose Client –</option>{customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
 {form.customerId && (<div className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-center"><p className="text-[10px] uppercase font-bold text-slate-500 tracking-widest">Current Outstanding Balance</p><p className="text-xl font-black text-rose-600 mt-1">Rs. {getCustomerBalance(Number(form.customerId)).toLocaleString()}</p></div>)}
 <div className="grid grid-cols-2 gap-3">
 <div className="col-span-2"><label className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider ml-1 mb-1 block">Amount Received (Cr)</label><input type="number" placeholder="0.00" className={`${inputClass} !border-emerald-200 !text-emerald-700 !font-extrabold text-lg`} value={form.amount} onChange={e=>setForm({...form, amount: e.target.value})} /></div>
 <div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Date</label><input type="date" className={inputClass} value={form.date} onChange={e=>setForm({...form, date: e.target.value})} /></div>
 <div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Mode / Note</label><input type="text" placeholder="e.g. Cash / Cheque No." className={inputClass} value={form.note} onChange={e=>setForm({...form, note: e.target.value})} /></div>
 </div>
-<button onClick={save} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-4 rounded-xl mt-6 shadow-md shadow-emerald-500/20 active:scale-[0.98] transition-all">Process Payment</button>
+<button onClick={save} className={`w-full text-white font-bold py-4 rounded-xl mt-6 shadow-md active:scale-[0.98] transition-all ${isEdit ? 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-500/20' : 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/20'}`}>{isEdit ? 'Update Payment' : 'Process Payment'}</button>
 </div>
 </ModalWrapper>
 );
 };
 
 const CustomerLedgerModal = () => {
-const { selectedLedgerId, getCustomerLedger, generateReceiptData, setPrintConfig, setShowPaymentModal, setSelectedCustomerForPayment, setShowLedgerModal, deleteFromFirebase, saveToFirebase, invoices, isAdmin } = useContext(AppContext);
+const { selectedLedgerId, getCustomerLedger, generateReceiptData, setPrintConfig, setShowPaymentModal, setSelectedCustomerForPayment, setShowLedgerModal, deleteFromFirebase, saveToFirebase, invoices, isAdmin, setEditingPayment, payments } = useContext(AppContext);
 const [startDate, setStartDate] = useState(() => { const d = new Date(); d.setMonth(d.getMonth() - 1); return getLocalDateStr(d); });
 const [endDate, setEndDate] = useState(getLocalDateStr());
 const fullLedger = getCustomerLedger(selectedLedgerId);
@@ -251,7 +263,7 @@ return (
 <div className="ml-2 text-right bg-rose-50 px-3 py-2 rounded-xl border border-rose-200 shadow-sm shrink-0"><p className="text-[9px] font-bold uppercase text-rose-600 tracking-widest">Current Balance</p><p className="text-base font-black text-rose-700 mt-0.5">Rs. {fullLedger.closingBal.toLocaleString()}</p></div>
 </div>
 <div className="flex gap-2">
-<button onClick={() => { setSelectedCustomerForPayment(fullLedger.id); setShowPaymentModal(true); }} className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3.5 rounded-xl flex justify-center items-center gap-2 shadow-sm active:scale-[0.98] transition-all text-xs"><Wallet size={16} /> Receive Payment</button>
+{isAdmin && <button onClick={() => { setEditingPayment(null); setSelectedCustomerForPayment(fullLedger.id); setShowPaymentModal(true); }} className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3.5 rounded-xl flex justify-center items-center gap-2 shadow-sm active:scale-[0.98] transition-all text-xs"><Wallet size={16} /> Receive Payment</button>}
 <button onClick={() => setPrintConfig({docType: 'ledger', format: 'a5', data: printData})} className="flex-1 bg-slate-800 hover:bg-slate-900 text-white font-bold py-3.5 rounded-xl flex justify-center items-center gap-2 shadow-sm active:scale-[0.98] transition-all text-xs"><FileSpreadsheet size={16} /> Print Ledger</button>
 </div>
 <div className="mt-6 border border-slate-200 rounded-2xl overflow-hidden shadow-sm bg-white">
@@ -270,6 +282,9 @@ return (
 <td className="py-3 px-2 text-center">
 <div className="flex gap-1 justify-center">
 {row.credit > 0 && (<button onClick={() => setPrintConfig({docType: 'receipt', format: 'thermal', data: generateReceiptData(fullLedger, row.id)})} title="Print Receipt" className="p-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-lg transition-colors"><Receipt size={14}/></button>)}
+{isAdmin && row.credit > 0 && row.id.startsWith('REC-') && (
+<button title="Edit Payment" onClick={() => { const pay = payments.find(p => p.id === row.id); if(pay){ setEditingPayment(pay); setSelectedCustomerForPayment(fullLedger.id); setShowPaymentModal(true); }}} className="p-1.5 bg-amber-50 hover:bg-amber-100 text-amber-600 rounded-lg transition-colors"><Edit size={14}/></button>
+)}
 {isAdmin && row.credit > 0 && (
 <button title="Delete Payment" onClick={async () => {
   if (!window.confirm('Delete this payment record?')) return;
@@ -432,6 +447,7 @@ const arr = Object.entries(byProduct).map(([name, data]) => ({name, ...data}));
 return { topValue: [...arr].sort((a,b)=>b.revenue - a.revenue).slice(0,5), topQty: [...arr].sort((a,b)=>b.qty - a.qty).slice(0,5), topProfit: [...arr].sort((a,b)=>b.profit - a.profit).slice(0,5) };
 }, [filteredInvoices]);
 return (
+<div className="h-full overflow-y-auto">
 <div className="p-5 space-y-6 pb-24">
 <div className="flex justify-between items-center">
 <h2 className="text-2xl font-extrabold text-slate-800 tracking-tight">Overview</h2>
@@ -486,6 +502,7 @@ return (
 </div>
 </div>
 ))}
+</div>
 </div>
 </div>
 </div>
@@ -686,7 +703,7 @@ return (
 </div>
 <div className="flex justify-between items-end border-t border-slate-100 pt-3 mt-1">
 <div className="flex flex-col"><span className="text-indigo-700 font-extrabold text-lg">Rs. {p.sellingPrice.toLocaleString()}</span>{isAdmin && <span className="text-slate-400 text-[9px] font-bold uppercase mt-0.5">Cost: Rs. {p.costPrice}</span>}</div>
-<button onClick={async () => { await saveToFirebase('products', p.id, {...p, available: !p.available}) }} className={`px-3 py-1.5 rounded-lg text-[9px] font-bold uppercase ${p.available ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-rose-50 text-rose-600 border border-rose-100'}`}>{p.available ? 'In Stock' : 'Out Stock'}</button>
+{isAdmin ? (<button onClick={async () => { await saveToFirebase('products', p.id, {...p, available: !p.available}) }} className={`px-3 py-1.5 rounded-lg text-[9px] font-bold uppercase ${p.available ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-rose-50 text-rose-600 border border-rose-100'}`}>{p.available ? 'In Stock' : 'Out Stock'}</button>) : (<span className={`px-3 py-1.5 rounded-lg text-[9px] font-bold uppercase ${p.available ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-rose-50 text-rose-600 border border-rose-100'}`}>{p.available ? 'In Stock' : 'Out Stock'}</span>)}
 </div>
 </div>
 ))}
@@ -703,8 +720,8 @@ return (
 <div className="flex justify-between items-center mb-4">
 <h2 className="text-2xl font-extrabold text-slate-800 tracking-tight">Ledgers</h2>
 <div className="flex gap-2">
-<button onClick={() => { setSelectedCustomerForPayment(null); setShowPaymentModal(true); }} className="bg-emerald-500 text-white p-2 px-3 rounded-xl shadow-md flex items-center gap-1 text-xs font-bold"><Wallet size={16}/> Pay</button>
-<button onClick={() => { setEditingCustomer(null); setShowCustomerModal(true); }} className="bg-indigo-600 text-white p-2 rounded-xl shadow-md"><Plus size={18}/></button>
+{isAdmin && <button onClick={() => { setSelectedCustomerForPayment(null); setShowPaymentModal(true); }} className="bg-emerald-500 text-white p-2 px-3 rounded-xl shadow-md flex items-center gap-1 text-xs font-bold"><Wallet size={16}/> Pay</button>}
+{isAdmin && <button onClick={() => { setEditingCustomer(null); setShowCustomerModal(true); }} className="bg-indigo-600 text-white p-2 rounded-xl shadow-md"><Plus size={18}/></button>}
 </div>
 </div>
 <div className="relative mb-4"><Search className="absolute left-3.5 top-3.5 text-slate-400" size={18} /><input placeholder="Search Clients..." className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl font-semibold outline-none shadow-sm text-sm" value={search} onChange={e => setSearch(e.target.value)} /></div>
@@ -731,6 +748,224 @@ Bal: Rs. {bal.toLocaleString()} {bal > 0 ? '(Dr)' : bal < 0 ? '(Cr)' : ''}
 );
 };
 
+// ─── Payments / Receipts Tab ───
+const PaymentsTab = () => {
+const { isAdmin, customers, payments, invoices, deleteFromFirebase, showToast, setShowPaymentModal, setSelectedCustomerForPayment, setEditingPayment } = useContext(AppContext);
+const [search, setSearch] = useState('');
+const [dateFilter, setDateFilter] = useState('This Month');
+const [customerFilter, setCustomerFilter] = useState('');
+const allPayments = useMemo(() => {
+  const standalone = payments.map(p => ({
+    id: p.id, date: p.date, customerId: p.customerId,
+    customerName: customers.find(c => c.id === p.customerId)?.name || 'Unknown',
+    amount: Number(p.amount), note: p.note || 'Payment', type: 'receipt', raw: p
+  }));
+  const invPays = invoices.filter(inv => Number(inv.receivedAmount) > 0).map(inv => ({
+    id: `${inv.id}-PAY`, date: inv.date, customerId: inv.customerId,
+    customerName: inv.customerName, amount: Number(inv.receivedAmount),
+    note: `On Invoice ${inv.id}`, type: 'invoice', raw: inv
+  }));
+  return [...standalone, ...invPays].sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
+}, [payments, invoices, customers]);
+const filtered = allPayments.filter(p => {
+  const matchSearch = !search || p.customerName.toLowerCase().includes(search.toLowerCase()) || p.id.toLowerCase().includes(search.toLowerCase());
+  const matchCustomer = !customerFilter || String(p.customerId) === customerFilter;
+  const matchDate = checkDateFilter(p.date, dateFilter);
+  return matchSearch && matchCustomer && matchDate;
+});
+const totalAmount = filtered.reduce((sum, p) => sum + p.amount, 0);
+return (
+<div className="p-4 flex flex-col h-full">
+  <div className="flex justify-between items-center mb-4">
+    <h2 className="text-2xl font-extrabold text-slate-800 tracking-tight">Receipts</h2>
+    {isAdmin && (
+      <button onClick={() => { setEditingPayment(null); setSelectedCustomerForPayment(null); setShowPaymentModal(true); }}
+        className="bg-emerald-500 text-white px-3 py-2.5 rounded-xl shadow-md font-bold flex items-center gap-1.5 text-xs active:scale-95 transition-all">
+        <Plus size={16}/> New Receipt
+      </button>
+    )}
+  </div>
+  <div className="space-y-2 mb-3">
+    <div className="relative"><Search className="absolute left-3.5 top-3.5 text-slate-400" size={16}/><input placeholder="Search client or receipt ID..." className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl font-semibold outline-none shadow-sm text-sm" value={search} onChange={e=>setSearch(e.target.value)} /></div>
+    <div className="flex gap-2">
+      <select value={dateFilter} onChange={e=>setDateFilter(e.target.value)} className="flex-1 bg-white border border-slate-200 px-3 py-2 rounded-lg font-bold text-sm text-slate-700 outline-none shadow-sm">
+        <option>All Time</option><option>Today</option><option>This Week</option><option>This Month</option><option>This Year</option>
+      </select>
+      <select value={customerFilter} onChange={e=>setCustomerFilter(e.target.value)} className="flex-1 bg-white border border-slate-200 px-3 py-2 rounded-lg font-semibold text-sm text-slate-700 outline-none shadow-sm">
+        <option value="">All Clients</option>
+        {customers.map(c=><option key={c.id} value={String(c.id)}>{c.name}</option>)}
+      </select>
+    </div>
+  </div>
+  <div className="bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-2.5 mb-3 flex justify-between items-center">
+    <span className="text-xs font-bold text-emerald-700 uppercase tracking-widest">{filtered.length} Receipts</span>
+    <span className="font-black text-emerald-800 text-sm">Total: Rs. {totalAmount.toLocaleString()}</span>
+  </div>
+  <div className="flex-1 overflow-y-auto space-y-2.5 pb-24 pr-1">
+    {filtered.map(p => (
+      <div key={p.id} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm hover:border-emerald-200 transition-colors">
+        <div className="flex justify-between items-center">
+          <div className="flex-1 min-w-0">
+            <p className="font-bold text-slate-800 text-sm truncate">{p.customerName}</p>
+            <p className="text-[11px] text-slate-500 font-medium mt-0.5">{p.id} &bull; {formatDateDisp(p.date)}</p>
+            {p.note && <p className="text-[11px] text-slate-400 mt-0.5 italic truncate">{p.note}</p>}
+          </div>
+          <div className="text-right ml-3 shrink-0">
+            <p className="font-extrabold text-emerald-600 text-base">Rs. {p.amount.toLocaleString()}</p>
+            {isAdmin && (
+              <div className="flex gap-1 mt-1.5 justify-end">
+                {p.type === 'receipt' && (
+                  <button onClick={() => { setEditingPayment(p.raw); setSelectedCustomerForPayment(p.customerId); setShowPaymentModal(true); }} className="p-1.5 bg-slate-50 hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 rounded-lg border border-slate-200 transition-colors"><Edit size={13}/></button>
+                )}
+                {p.type === 'receipt' && (
+                  <button onClick={async()=>{if(window.confirm('Delete this payment receipt?')){await deleteFromFirebase('payments',p.id);showToast('Payment deleted');}}} className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-500 rounded-lg border border-rose-100 transition-colors"><Trash2 size={13}/></button>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    ))}
+    {filtered.length === 0 && (
+      <div className="text-center py-16">
+        <Receipt size={40} className="text-slate-200 mx-auto mb-3"/>
+        <p className="text-slate-400 font-medium text-sm">No receipts found for this period.</p>
+      </div>
+    )}
+  </div>
+</div>
+);
+};
+
+// ─── Company Manager sub-component ───
+const CompanyManager = () => {
+const { companies, saveToFirebase, deleteFromFirebase, showToast, checkDuplicate } = useContext(AppContext);
+const [newName, setNewName] = useState('');
+const [editingId, setEditingId] = useState(null);
+const [editVal, setEditVal] = useState('');
+const add = async () => {
+  if (!newName.trim()) return;
+  if (checkDuplicate(companies, newName)) return showToast("Company already exists", "error");
+  const id = Date.now();
+  await saveToFirebase('companies', id, { id, name: newName.trim() });
+  setNewName(''); showToast("Company added");
+};
+const saveEdit = async (item) => {
+  if (!editVal.trim()) return;
+  await saveToFirebase('companies', item.id, { ...item, name: editVal.trim() });
+  setEditingId(null); showToast("Company updated");
+};
+return (
+<div className="space-y-2">
+  <div className="flex gap-2">
+    <input type="text" placeholder="New company name..." className="flex-1 p-2.5 bg-white border border-slate-200 rounded-xl font-semibold outline-none focus:border-indigo-500 text-sm shadow-sm" value={newName} onChange={e=>setNewName(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')add();}} />
+    <button onClick={add} className="bg-indigo-600 text-white px-4 rounded-xl font-bold text-sm hover:bg-indigo-700 transition-colors">Add</button>
+  </div>
+  {companies.map(c=>(
+    <div key={c.id} className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex items-center gap-2">
+      {editingId===c.id ? (
+        <>
+          <input autoFocus className="flex-1 p-2 text-sm font-semibold border border-indigo-300 rounded-lg outline-none" value={editVal} onChange={e=>setEditVal(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')saveEdit(c);if(e.key==='Escape')setEditingId(null);}} />
+          <button onClick={()=>saveEdit(c)} className="text-xs font-bold text-indigo-600 px-3 py-1.5 bg-indigo-50 rounded-lg hover:bg-indigo-100">Save</button>
+          <button onClick={()=>setEditingId(null)} className="text-xs font-bold text-slate-500 px-2 py-1.5 bg-slate-100 rounded-lg">✕</button>
+        </>
+      ) : (
+        <>
+          <span className="flex-1 font-semibold text-slate-700 text-sm flex items-center gap-2"><Building2 size={14} className="text-slate-400"/> {c.name}</span>
+          <button onClick={()=>{setEditingId(c.id);setEditVal(c.name);}} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"><Edit size={14}/></button>
+          <button onClick={async()=>{if(window.confirm(`Delete "${c.name}"?`))await deleteFromFirebase('companies',c.id);}} className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"><Trash2 size={14}/></button>
+        </>
+      )}
+    </div>
+  ))}
+</div>
+);
+};
+
+// ─── Master Records View ───
+const MastersView = () => {
+const { products, customers, expenseCategories, getCompanyName, deleteFromFirebase, showToast, setEditingProduct, setShowProductModal, setEditingCustomer, setShowCustomerModal, setShowExpenseCatModal } = useContext(AppContext);
+const [tab, setTab] = useState('products');
+const [search, setSearch] = useState('');
+const tabConfig = [
+  { id: 'products', label: 'Items' },
+  { id: 'customers', label: 'Clients' },
+  { id: 'companies', label: 'Companies' },
+  { id: 'categories', label: 'Exp. Labels' },
+];
+return (
+<div className="h-full flex flex-col p-4 pb-6 overflow-y-auto space-y-4">
+  <div className="flex bg-slate-100 p-1 rounded-xl gap-1 overflow-x-auto scrollbar-hide">
+    {tabConfig.map(t=>(
+      <button key={t.id} onClick={()=>{setTab(t.id);setSearch('');}} className={`flex-1 py-2 px-2 rounded-lg font-bold text-xs whitespace-nowrap transition-colors ${tab===t.id?'bg-white text-teal-700 shadow-sm':'text-slate-500'}`}>{t.label}</button>
+    ))}
+  </div>
+  <div className="flex gap-2">
+    <div className="relative flex-1"><Search className="absolute left-3 top-3 text-slate-400" size={14}/><input placeholder="Search..." className="w-full pl-9 pr-3 py-2.5 bg-white border border-slate-200 rounded-xl font-semibold outline-none text-sm shadow-sm focus:border-indigo-400" value={search} onChange={e=>setSearch(e.target.value)} /></div>
+    {tab !== 'companies' && tab !== 'categories' && (
+      <button onClick={() => {
+        if (tab === 'products') { setEditingProduct(null); setShowProductModal(true); }
+        else if (tab === 'customers') { setEditingCustomer(null); setShowCustomerModal(true); }
+      }} className="bg-indigo-600 text-white px-4 py-2.5 rounded-xl font-bold text-sm shadow-sm hover:bg-indigo-700 transition-colors flex items-center gap-1.5">
+        <Plus size={16}/> Add
+      </button>
+    )}
+    {tab === 'categories' && (
+      <button onClick={()=>setShowExpenseCatModal(true)} className="bg-indigo-600 text-white px-4 py-2.5 rounded-xl font-bold text-sm shadow-sm hover:bg-indigo-700 transition-colors flex items-center gap-1.5"><Plus size={16}/> Add</button>
+    )}
+  </div>
+
+  {tab === 'products' && (
+    <div className="space-y-2 pb-10">
+      {products.filter(p=>p.name.toLowerCase().includes(search.toLowerCase())).map(p=>(
+        <div key={p.id} className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex justify-between items-center">
+          <div className="flex-1 min-w-0 mr-2">
+            <p className="font-bold text-slate-800 text-sm truncate">{p.name}</p>
+            <p className="text-[10px] text-slate-400 font-medium mt-0.5 uppercase tracking-wider">{getCompanyName(p.companyId)} &bull; {p.unit} &bull; Cost: {p.costPrice} &bull; Sell: {p.sellingPrice}</p>
+            <span className={`text-[9px] font-bold mt-1 inline-block px-1.5 py-0.5 rounded uppercase ${p.available?'bg-emerald-50 text-emerald-600 border border-emerald-100':'bg-rose-50 text-rose-500 border border-rose-100'}`}>{p.available?'In Stock':'Out of Stock'}</span>
+          </div>
+          <div className="flex gap-1.5 shrink-0">
+            <button onClick={()=>{setEditingProduct(p);setShowProductModal(true);}} className="p-2 bg-slate-50 text-slate-600 rounded-lg hover:bg-indigo-50 hover:text-indigo-600 transition-colors"><Edit size={14}/></button>
+            <button onClick={async()=>{if(window.confirm(`Delete ${p.name}?`))await deleteFromFirebase('products',p.id);}} className="p-2 bg-rose-50 text-rose-500 rounded-lg hover:bg-rose-100 transition-colors"><Trash2 size={14}/></button>
+          </div>
+        </div>
+      ))}
+    </div>
+  )}
+
+  {tab === 'customers' && (
+    <div className="space-y-2 pb-10">
+      {customers.filter(c=>c.name.toLowerCase().includes(search.toLowerCase())).map(c=>(
+        <div key={c.id} className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex justify-between items-center">
+          <div className="flex-1 min-w-0 mr-2">
+            <p className="font-bold text-slate-800 text-sm truncate">{c.name}</p>
+            <p className="text-[10px] text-slate-400 font-medium mt-0.5 truncate">{[c.contactPerson, c.phone, c.city].filter(Boolean).join(' • ')}</p>
+          </div>
+          <div className="flex gap-1.5 shrink-0">
+            <button onClick={()=>{setEditingCustomer(c);setShowCustomerModal(true);}} className="p-2 bg-slate-50 text-slate-600 rounded-lg hover:bg-indigo-50 hover:text-indigo-600 transition-colors"><Edit size={14}/></button>
+            <button onClick={async()=>{if(window.confirm(`Permanently delete ${c.name}?`))await deleteFromFirebase('customers',c.id);}} className="p-2 bg-rose-50 text-rosese-500 rounded-lg hover:bg-rose-100 transition-colors"><Trash2 size={14}/></button>
+          </div>
+        </div>
+      ))}
+    </div>
+  )}
+
+  {tab === 'companies' && <CompanyManager />}
+
+  {tab === 'categories' && (
+    <div className="space-y-2 pb-10">
+      {expenseCategories.filter(c=>c.name.toLowerCase().includes(search.toLowerCase())).map(c=>(
+        <div key={c.id} className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex justify-between items-center">
+          <span className="font-semibold text-slate-700 text-sm flex items-center gap-2"><Tag size={14} className="text-slate-400"/> {c.name}</span>
+          <button onClick={async()=>await deleteFromFirebase('expenseCategories',c.id)} className="p-2 bg-rose-50 text-rose-500 rounded-lg hover:bg-rose-100 transition-colors"><Trash2 size={14}/></button>
+        </div>
+      ))}
+    </div>
+  )}
+</div>
+);
+};
+
 const AdminTab = () => {
 const { isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig } = useContext(AppContext);
 if(!isAdmin) return <div className="p-10 text-center font-bold text-slate-400 flex flex-col items-center mt-20"><Lock className="mb-4 text-slate-300" size={48}/> <p className="text-sm uppercase tracking-widest">Admin Access Required</p></div>;
@@ -741,6 +976,7 @@ return (
 <div className="flex bg-slate-200 p-1 rounded-xl overflow-x-auto scrollbar-hide">
 <button onClick={()=>setAdminView('analytics')} className={`flex-1 py-2 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 whitespace-nowrap ${adminView==='analytics'?'bg-white text-indigo-700 shadow-sm':'text-slate-500'}`}><BarChart3 size={14}/> Analytics</button>
 <button onClick={()=>setAdminView('expenses')} className={`flex-1 py-2 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 whitespace-nowrap ${adminView==='expenses'?'bg-white text-rose-600 shadow-sm':'text-slate-500'}`}><Wallet size={14}/> Expenses</button>
+<button onClick={()=>setAdminView('masters')} className={`flex-1 py-2 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 whitespace-nowrap ${adminView==='masters'?'bg-white text-teal-600 shadow-sm':'text-slate-500'}`}><Archive size={14}/> Masters</button>
 <button onClick={()=>setAdminView('bulk')} className={`flex-1 py-2 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 whitespace-nowrap ${adminView==='bulk'?'bg-white text-emerald-600 shadow-sm':'text-slate-500'}`}><Upload size={14}/> Bulk Ops</button>
 <button onClick={()=>setAdminView('segments')} className={`flex-1 py-2 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 whitespace-nowrap ${adminView==='segments'?'bg-white text-purple-600 shadow-sm':'text-slate-500'}`}><Globe size={14}/> Segments</button>
 <button onClick={()=>setAdminView('users')} className={`flex-1 py-2 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 whitespace-nowrap ${adminView==='users'?'bg-white text-amber-600 shadow-sm':'text-slate-500'}`}><Users size={14}/> Users</button>
@@ -749,6 +985,7 @@ return (
 <div className="flex-1 overflow-hidden">
 <div style={{display: adminView === 'analytics' ? 'flex' : 'none', flexDirection: 'column', height: '100%'}}><AnalyticsView /></div>
 <div style={{display: adminView === 'expenses' ? 'flex' : 'none', flexDirection: 'column', height: '100%'}}><ExpensesView /></div>
+<div style={{display: adminView === 'masters' ? 'flex' : 'none', flexDirection: 'column', height: '100%'}}><MastersView /></div>
 <div style={{display: adminView === 'bulk' ? 'flex' : 'none', flexDirection: 'column', height: '100%'}}><BulkOpsView /></div>
 <div style={{display: adminView === 'segments' ? 'flex' : 'none', flexDirection: 'column', height: '100%'}}><SegmentsAdminView /></div>
 <div style={{display: adminView === 'users' ? 'flex' : 'none', flexDirection: 'column', height: '100%'}}><UserManagementView /></div>
@@ -1741,6 +1978,7 @@ const [showUserModal, setShowUserModal] = useState(false);
 const [editingUser, setEditingUser] = useState(null);
 const [printConfig, setPrintConfig] = useState(null);
 const [showSegmentsModal, setShowSegmentsModal] = useState(false);
+const [editingPayment, setEditingPayment] = useState(null);
 
 const isAdmin = currentUser?.role === 'admin';
 
@@ -1859,7 +2097,7 @@ useEffect(() => {
       if (printConfig) setPrintConfig(null);
       else if (showProductModal) setShowProductModal(false);
       else if (showCustomerModal) setShowCustomerModal(false);
-      else if (showPaymentModal) setShowPaymentModal(false);
+      else if (showPaymentModal) { setEditingPayment(null); setShowPaymentModal(false); }
       else if (showLedgerModal) setShowLedgerModal(false);
       else if (showUserModal) setShowUserModal(false);
       else if (showExpenseCatModal) setShowExpenseCatModal(false);
@@ -1902,6 +2140,7 @@ const TABS = [
   { id: 'products', icon: Package, label: 'Items' },
   { id: 'billing', icon: ReceiptText, label: 'Billing' },
   { id: 'customers', icon: Users, label: 'Clients' },
+  { id: 'payments', icon: Wallet, label: 'Receipts' },
   { id: 'admin', icon: Settings, label: 'Admin', adminOnly: true },
 ];
 const ctx = {
@@ -1918,6 +2157,7 @@ showExpenseCatModal, setShowExpenseCatModal,
 showUserModal, setShowUserModal, editingUser, setEditingUser,
 setPrintConfig, printConfig,
 showSegmentsModal, setShowSegmentsModal,
+editingPayment, setEditingPayment,
 };
 return (
 <AppContext.Provider value={ctx}>
@@ -1981,6 +2221,7 @@ return (
         {activeTab === 'products' && <ProductsTab />}
         {activeTab === 'billing' && <BillingTab />}
         {activeTab === 'customers' && <CustomersTab />}
+        {activeTab === 'payments' && <PaymentsTab />}
         {activeTab === 'admin' && <AdminTab />}
       </div>
     </main>
