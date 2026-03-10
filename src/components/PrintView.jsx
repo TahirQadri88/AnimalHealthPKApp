@@ -34,7 +34,7 @@ const getFileName = () => {
   const custName = safeStr(data?.customerName || data?.title || 'Doc');
   const ref = safeStr(data?.id || '');
   const dateStr = (data?.date || getLocalDateStr()).replace(/-/g, '');
-  const labels = { invoice: 'Invoice', dispatch: 'DispatchNote', receipt: 'Receipt', ledger: 'Ledger', report: 'Report' };
+  const labels = { invoice: 'Invoice', dispatch: 'DispatchNote', receipt: 'Receipt', ledger: 'Ledger', report: 'Report', estimate: 'Estimate' };
   const label = labels[docType] || 'Document';
   if (docType === 'ledger') {
     const start = (data?.dateRange?.start || '').replace(/-/g, '');
@@ -86,6 +86,24 @@ const generateShareText = () => {
     if (received > 0) text += `Paid: Rs.${received.toLocaleString()}\n`;
     text += `*Net Balance: Rs.${netBal.toLocaleString()}*\n`;
     text += `Status: ${data.paymentStatus || 'Pending'}\n`;
+
+  } else if (docType === 'estimate') {
+    text += `*PRICE ESTIMATE / QUOTATION*\n`;
+    text += `${hr}\n`;
+    text += `Ref: ${data.id}\n`;
+    text += `Date: ${formatDateDisp(data.date)}\n`;
+    text += `For: *${data.customerName}*\n\n`;
+    text += `*Items:*\n`;
+    const estimateItemsTotal = (data.items || []).reduce((s, i) => s + (i?.isBonus ? 0 : (i?.price || 0) * (i?.quantity || 0)), 0);
+    (data.items || []).forEach(i => {
+      const lineTotal = i.isBonus ? 'FREE' : `Rs.${((i.price || 0) * (i.quantity || 0)).toLocaleString()}`;
+      text += `• ${i.name}${i.isBonus ? ' 🎁' : ''} x${i.quantity} @ Rs.${i.price || 0} = ${lineTotal}\n`;
+    });
+    if ((data.deliveryBilled || 0) > 0) text += `🚚 Delivery: Rs.${Number(data.deliveryBilled).toLocaleString()}\n`;
+    text += `${hr}\n`;
+    text += `*Estimated Total: Rs.${(estimateItemsTotal + (data.deliveryBilled || 0)).toLocaleString()}*\n\n`;
+    text += `⚠ _Rates and availability can change anytime without prior notice._\n`;
+    text += `This estimate is for reference only and does not constitute a final invoice.`;
 
   } else if (docType === 'dispatch') {
     text += `*DISPATCH NOTE #${data.id}*\n`;
@@ -346,6 +364,7 @@ const docLabel = {
   receipt: 'Payment Receipt',
   ledger: 'Account Statement',
   report: 'Analytics Report',
+  estimate: 'Price Estimate / Quotation',
 }[docType] || 'Document';
 
 // Sizing helpers
@@ -633,7 +652,7 @@ return (
     )}
 
     {/* ── Invoice / Dispatch Items Table ── */}
-    {(docType === 'invoice' || docType === 'dispatch') && (
+    {(docType === 'invoice' || docType === 'dispatch' || docType === 'estimate') && (
       <>
         <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: sz('12px','16px','20px'), fontSize: sz('8.5px','10px','11px') }}>
           <thead>
@@ -644,12 +663,12 @@ return (
               <th style={{ padding: sz('4px 2px','7px 4px','8px 6px'), textAlign: 'center', fontWeight: 800, color: '#475569', textTransform: 'uppercase', fontSize: sz('7px','7.5px','8px'), letterSpacing: '0.5px', whiteSpace: 'nowrap' }}>
                 {docType === 'dispatch' ? 'Qty / Pack' : 'Qty'}
               </th>
-              {docType === 'invoice' && (
+              {(docType === 'invoice' || docType === 'estimate') && (
                 <th style={{ padding: sz('4px 2px','7px 4px','8px 6px'), textAlign: 'right', fontWeight: 800, color: '#475569', textTransform: 'uppercase', fontSize: sz('7px','7.5px','8px'), letterSpacing: '0.5px' }}>
                   Rate
                 </th>
               )}
-              {docType === 'invoice' && !isThermal && (
+              {(docType === 'invoice' || docType === 'estimate') && !isThermal && (
                 <th style={{ padding: sz('','7px 4px 7px 0','8px 0 8px 4px'), textAlign: 'right', fontWeight: 800, color: '#475569', textTransform: 'uppercase', fontSize: '8px', letterSpacing: '0.5px' }}>
                   Amount
                 </th>
@@ -670,7 +689,7 @@ return (
                 <td style={{ padding: sz('5px 2px','7px 4px','8px 6px'), textAlign: 'center', fontWeight: 600, lineHeight: 1.3, color: '#334155' }}>
                   {docType === 'dispatch' ? getDispatchQtyStr(item) : (item?.quantity || 0)}
                 </td>
-                {docType === 'invoice' && (
+                {(docType === 'invoice' || docType === 'estimate') && (
                   <td style={{ padding: sz('5px 2px','7px 4px','8px 6px'), textAlign: 'right', color: '#475569' }}>
                     {item?.isBonus ? (
                       <span style={{ color: '#059669', fontWeight: 800, fontSize: sz('7px','8px','9px'), textTransform: 'uppercase' }}>Free</span>
@@ -691,7 +710,7 @@ return (
                     )}
                   </td>
                 )}
-                {docType === 'invoice' && !isThermal && (
+                {(docType === 'invoice' || docType === 'estimate') && !isThermal && (
                   <td style={{ padding: sz('','7px 4px 7px 0','8px 0 8px 4px'), textAlign: 'right', fontWeight: 800, color: '#1e293b' }}>
                     {item?.isBonus
                       ? <span style={{ color: '#059669' }}>Rs. 0</span>
@@ -702,7 +721,7 @@ return (
             ))}
             {safeItems.length === 0 && (
               <tr>
-                <td colSpan={docType === 'invoice' ? (isThermal ? 3 : 4) : 2} style={{ padding: '16px', textAlign: 'center', color: '#94a3b8' }}>
+                <td colSpan={(docType === 'invoice' || docType === 'estimate') ? (isThermal ? 3 : 4) : 2} style={{ padding: '16px', textAlign: 'center', color: '#94a3b8' }}>
                   No items
                 </td>
               </tr>
@@ -721,6 +740,26 @@ return (
             </tfoot>
           )}
         </table>
+
+        {/* Estimate Totals */}
+        {docType === 'estimate' && data && (() => {
+          const estimateSubtotal = safeItems.reduce((s, i) => s + (i?.isBonus ? 0 : (i?.price || 0) * (i?.quantity || 0)), 0);
+          const estimateGrandTotal = estimateSubtotal + (data.deliveryBilled || 0);
+          return (
+            <div className="keep-together" style={{ float: 'right', width: isThermal ? '100%' : sz('','240px','280px'), borderTop: '2px solid #7c3aed', paddingTop: sz('8px','10px','12px') }}>
+              {[
+                { label: 'Items Subtotal', val: `Rs. ${estimateSubtotal.toLocaleString()}` },
+                (data.deliveryBilled || 0) > 0 && { label: 'Delivery', val: `Rs. ${Number(data.deliveryBilled).toLocaleString()}`, muted: true },
+                { label: 'Estimated Total', val: `Rs. ${estimateGrandTotal.toLocaleString()}`, bold: true, large: true, divider: true },
+              ].filter(Boolean).map((row, i) => (
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: sz('3px','4px','5px'), borderTop: row.divider ? '1px solid #e2e8f0' : 'none', paddingTop: row.divider ? sz('5px','6px','8px') : 0, marginTop: row.divider ? sz('4px','5px','6px') : 0, fontWeight: row.bold ? 800 : 500, fontSize: row.large ? sz('12px','14px','16px') : sz('8px','9px','10px') }}>
+                  <span style={{ color: row.muted ? '#94a3b8' : '#475569' }}>{row.label}:</span>
+                  <span style={{ color: row.bold ? '#7c3aed' : '#1e293b' }}>{row.val}</span>
+                </div>
+              ))}
+            </div>
+          );
+        })()}
 
         {/* Invoice Totals */}
         {docType === 'invoice' && data && (() => {
@@ -773,8 +812,20 @@ return (
           </div>
         )}
 
+        {/* ── Estimate Disclaimer ── */}
+        {docType === 'estimate' && (
+          <div className="keep-together" style={{ marginTop: sz('12px','16px','20px'), border: '1.5px solid #7c3aed', borderRadius: '8px', overflow: 'hidden', fontSize: sz('6.5px','7.5px','8.5px') }}>
+            <div style={{ background: '#7c3aed', color: 'white', padding: sz('4px 8px','5px 12px','6px 14px'), fontWeight: 900, textAlign: 'center', letterSpacing: '0.5px', textTransform: 'uppercase', fontSize: sz('6.5px','7px','8px') }}>
+              Important Notice — Rates &amp; Availability
+            </div>
+            <div style={{ padding: sz('6px 8px','8px 12px','10px 14px'), background: '#faf5ff', color: '#4c1d95', lineHeight: 1.7, fontWeight: 600, fontSize: sz('7px','8px','9px') }}>
+              ⚠ Rates and availability can change anytime without prior notice. This estimate is for reference purposes only and does <strong>not</strong> constitute a final invoice. Final pricing will be confirmed at the time of order.
+            </div>
+          </div>
+        )}
+
         {/* ── Return / Exchange Policy ── */}
-        <div className="keep-together" style={{ marginTop: sz('12px','16px','20px'), border: '1.5px solid #1e293b', borderRadius: '8px', overflow: 'hidden', fontSize: sz('6.5px','7.5px','8.5px') }}>
+        {docType !== 'estimate' && <div className="keep-together" style={{ marginTop: sz('12px','16px','20px'), border: '1.5px solid #1e293b', borderRadius: '8px', overflow: 'hidden', fontSize: sz('6.5px','7.5px','8.5px') }}>
           <div style={{ background: '#1e293b', color: 'white', padding: sz('4px 8px','5px 12px','6px 14px'), fontWeight: 900, textAlign: 'center', letterSpacing: '0.5px', textTransform: 'uppercase', fontSize: sz('6.5px','7px','8px') }}>
             "No" Return / Exchange Policy on Some Items
           </div>
@@ -791,7 +842,7 @@ return (
               Khyber Traders · Wholesale Veterinary Pharmacy · Karachi
             </div>
           </div>
-        </div>
+        </div>}
       </>
     )}
 
