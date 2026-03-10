@@ -196,25 +196,24 @@ const handlePDF = () => {
   setTimeout(() => {
     const fixedW = isThermal ? 302 : (isA5 ? 559 : 794);
 
-    // Step 1: measure height at the exact target width (live element may be narrower on phone)
-    const probe = element.cloneNode(true);
-    Object.assign(probe.style, {
-      position: 'fixed', left: '-9999px', top: '0',
-      width: fixedW + 'px', maxWidth: fixedW + 'px', minWidth: fixedW + 'px',
-      margin: '0', visibility: 'hidden', boxShadow: 'none',
+    // Clone the element off-screen at exact target width — html2pdf captures the clone,
+    // so there is no coordinate offset from centering/mx-auto on the live element
+    const clone = element.cloneNode(true);
+    Object.assign(clone.style, {
+      position: 'fixed',
+      left: '-9999px',
+      top: '0',
+      width: fixedW + 'px',
+      maxWidth: fixedW + 'px',
+      minWidth: fixedW + 'px',
+      margin: '0',
+      boxShadow: 'none',
+      zIndex: '-1',
     });
-    document.body.appendChild(probe);
-    const elH = probe.scrollHeight;
-    document.body.removeChild(probe);
+    document.body.appendChild(clone);
+    const elH = clone.scrollHeight;
 
-    // Step 2: onclone pins captured element to (0,0) — fixes left/right cut on all formats
-    const onclone = (_doc, el) => {
-      Object.assign(el.style, {
-        position: 'absolute', left: '0', top: '0', margin: '0',
-        width: fixedW + 'px', maxWidth: fixedW + 'px', minWidth: fixedW + 'px',
-        boxShadow: 'none',
-      });
-    };
+    const cleanup = () => { if (document.body.contains(clone)) document.body.removeChild(clone); };
 
     if (isThermal) {
       const pdfW = 80;
@@ -224,12 +223,12 @@ const handlePDF = () => {
       html2pdf().set({
         margin: margins, filename: getFileName(),
         image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 3, useCORS: true, logging: false, letterRendering: true, scrollY: 0, scrollX: 0, width: fixedW, windowWidth: fixedW, onclone },
+        html2canvas: { scale: 3, useCORS: true, logging: false, letterRendering: true, scrollY: 0, scrollX: 0, width: fixedW, windowWidth: fixedW },
         jsPDF: { unit: 'mm', format: [pdfW, pdfH], orientation: 'portrait' },
         pagebreak: { mode: 'avoid-all' },
-      }).from(element).save()
-        .then(() => showToast('PDF saved!'))
-        .catch(() => showToast('PDF failed — use Print instead', 'error'));
+      }).from(clone).save()
+        .then(() => { cleanup(); showToast('PDF saved!'); })
+        .catch(() => { cleanup(); showToast('PDF failed — use Print instead', 'error'); });
     } else {
       const pdfW = isA5 ? 148 : 210;
       const margins = isA5 ? [8, 8, 12, 8] : [10, 10, 15, 10];
@@ -238,12 +237,12 @@ const handlePDF = () => {
       html2pdf().set({
         margin: margins, filename: getFileName(),
         image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, logging: false, letterRendering: true, scrollY: 0, scrollX: 0, width: fixedW, windowWidth: fixedW, onclone },
+        html2canvas: { scale: 2, useCORS: true, logging: false, letterRendering: true, scrollY: 0, scrollX: 0, width: fixedW, windowWidth: fixedW },
         jsPDF: { unit: 'mm', format: [pdfW, pdfH], orientation: 'portrait' },
         pagebreak: { mode: 'avoid-all' },
-      }).from(element).save()
-        .then(() => showToast('PDF saved!'))
-        .catch(() => showToast('PDF failed — use Print instead', 'error'));
+      }).from(clone).save()
+        .then(() => { cleanup(); showToast('PDF saved!'); })
+        .catch(() => { cleanup(); showToast('PDF failed — use Print instead', 'error'); });
     }
   }, 300);
 };
