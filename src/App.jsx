@@ -192,9 +192,9 @@ return (
 </div>
 </div>
 {isAdmin && (
-<div className="bg-rose-50 p-3 rounded-xl border border-rose-100 mt-2">
-<label className="text-[10px] font-bold text-rose-500 uppercase tracking-wider ml-1 mb-1 block">Opening Balance (Dr)</label>
-<input type="number" placeholder="0.00" className={`${inputClass} !border-rose-200 focus:!border-rose-500`} value={form.openingBalance} onChange={e => setForm({...form, openingBalance: e.target.value})} />
+<div className="bg-rose-50 p-3 rounded-xl border border-rose-100 mt-2 space-y-3">
+<div><label className="text-[10px] font-bold text-rose-500 uppercase tracking-wider ml-1 mb-1 block">Opening Balance (Dr)</label><input type="number" placeholder="0.00" className={`${inputClass} !border-rose-200 focus:!border-rose-500`} value={form.openingBalance} onChange={e => setForm({...form, openingBalance: e.target.value})} /></div>
+<div><label className="text-[10px] font-bold text-amber-600 uppercase tracking-wider ml-1 mb-1 block">Credit Limit (Rs) — 0 = no limit</label><input type="number" placeholder="0 = unlimited" className={`${inputClass} !border-amber-200 !bg-amber-50/50 focus:!border-amber-500`} value={form.creditLimit||0} onChange={e => setForm({...form, creditLimit: e.target.value})} /></div>
 </div>
 )}
 <button onClick={save} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 rounded-xl mt-4 shadow-md shadow-indigo-600/20 active:scale-[0.98] transition-all">Save Customer Profile</button>
@@ -567,6 +567,21 @@ setCurrentInvoice({ ...currentInvoice, customerId: cid, customerName: cName, veh
 }}><option value="">– Select Client –</option>{customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
 <button onClick={() => { setEditingCustomer(null); setShowCustomerModal(true); }} className="p-3 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-xl font-black shrink-0 transition-colors"><Plus size={18}/></button>
 </div>
+{currentInvoice.customerId && (() => {
+  const cust = customers.find(c => c.id === currentInvoice.customerId);
+  const bal = getCustomerBalance(currentInvoice.customerId);
+  const limit = Number(cust?.creditLimit || 0);
+  if (bal > 0 || (limit > 0 && bal >= limit * 0.8)) {
+    const overLimit = limit > 0 && bal >= limit;
+    return (
+      <div className={`mt-2 p-2.5 rounded-xl border text-xs font-semibold flex items-center gap-2 ${overLimit ? 'bg-rose-50 border-rose-200 text-rose-700' : 'bg-amber-50 border-amber-200 text-amber-700'}`}>
+        <AlertCircle size={14} className="shrink-0"/>
+        <span>{overLimit ? `⚠ Credit limit exceeded! Balance Rs.${bal.toLocaleString()} ≥ limit Rs.${limit.toLocaleString()}` : `Outstanding balance: Rs.${bal.toLocaleString()}${limit > 0 ? ` (limit: Rs.${limit.toLocaleString()})` : ''}`}</span>
+      </div>
+    );
+  }
+  return null;
+})()}
 </div>
 <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
 <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5"><Package size={12}/> Products</h3>
@@ -1235,13 +1250,33 @@ const reportEngine = useMemo(() => {
     const daysDiff = lastInv ? Math.floor((new Date(today) - new Date(lastInv.date)) / 86400000) : 999;
     r.daysSince = daysDiff;
     r.lastInvDate = lastInv?.date;
+    r.phone = customers.find(c => c.id === r.id)?.phone || '';
     if (daysDiff <= 30) agingBuckets.current.push(r);
     else if (daysDiff <= 60) agingBuckets.days30.push(r);
     else if (daysDiff <= 90) agingBuckets.days60.push(r);
     else agingBuckets.days90plus.push(r);
   });
-  return { kpis, byProduct, byCompany, byCustomer, bySalesperson, byCity, byArea, byType, receivablesList: receivablesList.sort((a,b)=>b.amount-a.amount), trends, dailyBreakdown, byExpenseCategory, agingBuckets };
-}, [invoices, expenses, dateFilter, customStart, customEnd, filterCompany, filterCustomer, filterSalesperson, products, customers]);
+  // All-time monthly breakdown (last 24 months, ignores current date filter)
+  const monthlyData = {};
+  invoices.filter(o => o.status === 'Billed').forEach(o => {
+    const month = o.date.slice(0, 7);
+    if (!monthlyData[month]) monthlyData[month] = { revenue: 0, profit: 0, orders: 0, cost: 0 };
+    o.items.forEach(item => { monthlyData[month].revenue += item.price * item.quantity; monthlyData[month].cost += (item.costPrice||0) * item.quantity; monthlyData[month].profit += (item.price - (item.costPrice||0)) * item.quantity; });
+    monthlyData[month].orders += 1;
+  });
+  // Payment collection rate for filtered period
+  const totalBilledAmt = billedForPnL.reduce((s, o) => s + o.total, 0);
+  const invoiceCollected = billedForPnL.reduce((s, o) => s + Number(o.receivedAmount||0), 0);
+  const standaloneCollectedAmt = payments.filter(p => checkCustomFilter(p.date)).reduce((s, p) => s + Number(p.amount), 0);
+  const collectionRate = totalBilledAmt > 0 ? Math.min(((invoiceCollected + standaloneCollectedAmt) / totalBilledAmt) * 100, 100).toFixed(1) : '0.0';
+  // New vs repeat customers in period
+  const custFirstOrderDate = {};
+  invoices.filter(o => o.status === 'Billed').sort((a,b)=>a.date.localeCompare(b.date)).forEach(o => { if (!custFirstOrderDate[o.customerId]) custFirstOrderDate[o.customerId] = o.date; });
+  const periodCustIds = [...new Set(billedForPnL.map(o => o.customerId))];
+  let newCustCount = 0, repeatCustCount = 0;
+  periodCustIds.forEach(id => { if (billedForPnL.some(o => o.customerId === id && o.date === custFirstOrderDate[id])) newCustCount++; else repeatCustCount++; });
+  return { kpis, byProduct, byCompany, byCustomer, bySalesperson, byCity, byArea, byType, receivablesList: receivablesList.sort((a,b)=>b.amount-a.amount), trends, dailyBreakdown, byExpenseCategory, agingBuckets, monthlyData, collectionRate, newCustCount, repeatCustCount, totalBilledAmt };
+}, [invoices, expenses, payments, dateFilter, customStart, customEnd, filterCompany, filterCustomer, filterSalesperson, products, customers]);
 
 const getSortedExportData = () => {
    if (view === 'Overview') return null;
@@ -1305,11 +1340,28 @@ const renderTable = (dataObj, type) => {
     if (sortBy === 'revenue') return (b.revenue||b.productRevenue||0) - (a.revenue||a.productRevenue||0);
     return b.profit - a.profit;
   });
-  const maxProfit = arr[0]?.profit || 1;
+  // ABC classification by cumulative revenue share
+  const totalRevAll = arr.reduce((s, r) => s + (r.revenue || r.productRevenue || 0), 0);
+  let cumRev = 0;
+  const arrWithABC = arr.map(r => {
+    const rev = r.revenue || r.productRevenue || 0;
+    cumRev += rev;
+    const pct = totalRevAll > 0 ? cumRev / totalRevAll : 1;
+    const tier = pct <= 0.8 ? 'A' : pct <= 0.95 ? 'B' : 'C';
+    return { ...r, abcTier: tier };
+  });
+  const maxProfit = arrWithABC[0]?.profit || 1;
+  const totalRev = arrWithABC.reduce((s, r) => s + (r.revenue || r.productRevenue || 0), 0);
+  const totalGP = arrWithABC.reduce((s, r) => s + (r.profit || 0), 0);
+  const totalQtyOrOrders = arrWithABC.reduce((s, r) => s + (r.qty || r.orders || 0), 0);
+  const tierColors = { A: 'bg-emerald-100 text-emerald-700 border-emerald-200', B: 'bg-amber-100 text-amber-700 border-amber-200', C: 'bg-slate-100 text-slate-500 border-slate-200' };
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mt-3">
        <div className="bg-slate-50 border-b border-slate-200 p-2 flex justify-between items-center">
-         <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-2">{arr.length} {type}s</span>
+         <div className="flex items-center gap-2 ml-1">
+           <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{arrWithABC.length} {type}s</span>
+           <span className="text-[9px] text-slate-400 font-medium">| ABC = revenue tier</span>
+         </div>
          <select value={sortBy} onChange={e=>setSortBy(e.target.value)} className="bg-white border border-slate-200 rounded px-2 py-1 text-xs font-bold text-slate-600 outline-none">
            <option value="profit">Sort: Highest GP</option>
            <option value="revenue">Sort: Highest Revenue</option>
@@ -1324,32 +1376,48 @@ const renderTable = (dataObj, type) => {
                 {type !== 'Customer' && <th className="p-3 text-center">Qty</th>}
                 {type === 'Customer' && <th className="p-3 text-center">Orders</th>}
                 <th className="p-3 text-right">Revenue</th>
+                <th className="p-3 text-right">Rev%</th>
                 <th className="p-3 text-right text-emerald-600">GP</th>
                 <th className="p-3 text-right text-indigo-500">Margin%</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
-              {arr.map((row, i) => {
+              {arrWithABC.map((row, i) => {
                 const rev = row.revenue || row.productRevenue || 0;
                 const gp = row.profit || 0;
                 const margin = rev > 0 ? ((gp / rev) * 100).toFixed(1) : 0;
+                const revShare = totalRev > 0 ? ((rev / totalRev) * 100).toFixed(1) : 0;
                 const barW = maxProfit > 0 ? Math.max((gp / maxProfit) * 100, 0) : 0;
                 return (
                   <tr key={i} className="hover:bg-slate-50">
                     <td className="p-3">
-                      <div className="font-bold text-slate-800">{row.key}</div>
-                      {row.company && <div className="text-[9px] text-slate-400 uppercase tracking-widest">{row.company}</div>}
+                      <div className="flex items-center gap-1.5">
+                        <span className={`text-[9px] font-black px-1 py-0.5 rounded border ${tierColors[row.abcTier]}`}>{row.abcTier}</span>
+                        <div className="font-bold text-slate-800">{row.key}</div>
+                      </div>
+                      {row.company && <div className="text-[9px] text-slate-400 uppercase tracking-widest mt-0.5">{row.company}</div>}
                       <div className="w-full bg-slate-100 rounded-full h-1 mt-1.5 max-w-[100px]"><div className="bg-emerald-400 h-1 rounded-full" style={{width:`${barW}%`}}></div></div>
                     </td>
                     {type !== 'Customer' && <td className="p-3 text-center bg-slate-50/50 font-bold">{(row.qty||0).toLocaleString()}</td>}
                     {type === 'Customer' && <td className="p-3 text-center bg-slate-50/50 font-bold">{row.orders||0}</td>}
                     <td className="p-3 text-right text-slate-800 font-bold">Rs.{rev.toLocaleString()}</td>
+                    <td className="p-3 text-right text-slate-500">{revShare}%</td>
                     <td className="p-3 text-right font-bold" style={{color: gp >= 0 ? '#059669' : '#e11d48'}}>Rs.{gp.toLocaleString()}</td>
                     <td className="p-3 text-right text-indigo-600 font-bold">{margin}%</td>
                   </tr>
                 );
               })}
             </tbody>
+            <tfoot className="bg-slate-50 border-t-2 border-slate-300 font-black text-slate-800 text-xs">
+              <tr>
+                <td className="p-3 uppercase tracking-wider text-slate-600">Totals</td>
+                <td className="p-3 text-center">{totalQtyOrOrders.toLocaleString()}</td>
+                <td className="p-3 text-right">Rs.{totalRev.toLocaleString()}</td>
+                <td className="p-3 text-right text-slate-500">100%</td>
+                <td className="p-3 text-right text-emerald-700">Rs.{totalGP.toLocaleString()}</td>
+                <td className="p-3 text-right text-indigo-700">{totalRev > 0 ? ((totalGP/totalRev)*100).toFixed(1) : 0}%</td>
+              </tr>
+            </tfoot>
          </table>
        </div>
     </div>
@@ -1438,7 +1506,7 @@ return (
 
     {/* View Tabs */}
     <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide shrink-0">
-       {['Overview','By Product','By Company','By Customer','By City','By Area','By Type','By Salesperson','Receivables'].map(v => (
+       {['Overview','Insights','Monthly Trend','By Product','By Company','By Customer','By City','By Area','By Type','By Salesperson','Receivables'].map(v => (
          <button key={v} onClick={() => setView(v)} className={`px-3 py-1.5 rounded-xl font-bold text-[11px] whitespace-nowrap shadow-sm transition-colors ${view === v ? 'bg-slate-800 text-white' : 'bg-white text-slate-600 border border-slate-200'}`}>{v}</button>
        ))}
     </div>
@@ -1473,6 +1541,22 @@ return (
                  ) : <p className="text-xs text-slate-400 mt-1">No prior data</p>}
                </div>
              ))}
+           </div>
+
+           {/* New vs Repeat + Collection Rate quick stats */}
+           <div className="grid grid-cols-3 gap-2">
+             <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm text-center">
+               <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">New Clients</p>
+               <p className="text-xl font-black text-indigo-600 mt-0.5">{reportEngine.newCustCount}</p>
+             </div>
+             <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm text-center">
+               <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Repeat</p>
+               <p className="text-xl font-black text-emerald-600 mt-0.5">{reportEngine.repeatCustCount}</p>
+             </div>
+             <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm text-center">
+               <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Collected</p>
+               <p className={`text-xl font-black mt-0.5 ${Number(reportEngine.collectionRate) >= 80 ? 'text-emerald-600' : Number(reportEngine.collectionRate) >= 50 ? 'text-amber-600' : 'text-rose-600'}`}>{reportEngine.collectionRate}%</p>
+             </div>
            </div>
 
            {/* Daily chart - revenue + profit bars */}
@@ -1582,18 +1666,25 @@ return (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs whitespace-nowrap">
               <thead className="bg-slate-50 text-slate-500 uppercase font-bold tracking-wider border-b border-slate-200">
-                <tr><th className="p-3">Staff</th><th className="p-3 text-center">Orders</th><th className="p-3 text-right">Revenue</th><th className="p-3 text-right text-emerald-600">GP</th></tr>
+                <tr><th className="p-3">Staff</th><th className="p-3 text-center">Orders</th><th className="p-3 text-right">Revenue</th><th className="p-3 text-right text-emerald-600">GP</th><th className="p-3 text-right text-indigo-500">Margin%</th></tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {Object.entries(reportEngine.bySalesperson).sort((a,b)=>b[1].revenue-a[1].revenue).map(([name, data], i) => (
-                  <tr key={i} className="hover:bg-slate-50">
-                    <td className="p-3 font-bold text-slate-800">{name}</td>
-                    <td className="p-3 text-center font-bold">{data.orders}</td>
-                    <td className="p-3 text-right font-bold text-slate-800">Rs.{data.revenue.toLocaleString()}</td>
-                    <td className="p-3 text-right font-bold text-emerald-600">Rs.{data.profit.toLocaleString()}</td>
-                  </tr>
-                ))}
+                {Object.entries(reportEngine.bySalesperson).sort((a,b)=>b[1].revenue-a[1].revenue).map(([name, data], i) => {
+                  const margin = data.revenue > 0 ? ((data.profit / data.revenue) * 100).toFixed(1) : 0;
+                  return (
+                    <tr key={i} className="hover:bg-slate-50">
+                      <td className="p-3 font-bold text-slate-800">{name}</td>
+                      <td className="p-3 text-center font-bold">{data.orders}</td>
+                      <td className="p-3 text-right font-bold text-slate-800">Rs.{data.revenue.toLocaleString()}</td>
+                      <td className="p-3 text-right font-bold text-emerald-600">Rs.{data.profit.toLocaleString()}</td>
+                      <td className="p-3 text-right font-bold text-indigo-600">{margin}%</td>
+                    </tr>
+                  );
+                })}
               </tbody>
+              <tfoot className="bg-slate-50 border-t-2 border-slate-300 font-black text-xs">
+                {(() => { const totalRev = Object.values(reportEngine.bySalesperson).reduce((s,d)=>s+d.revenue,0); const totalGP = Object.values(reportEngine.bySalesperson).reduce((s,d)=>s+d.profit,0); const totalOrders = Object.values(reportEngine.bySalesperson).reduce((s,d)=>s+d.orders,0); return (<tr><td className="p-3 text-slate-600 uppercase tracking-wider">Totals</td><td className="p-3 text-center">{totalOrders}</td><td className="p-3 text-right">Rs.{totalRev.toLocaleString()}</td><td className="p-3 text-right text-emerald-700">Rs.{totalGP.toLocaleString()}</td><td className="p-3 text-right text-indigo-700">{totalRev > 0 ? ((totalGP/totalRev)*100).toFixed(1) : 0}%</td></tr>); })()}
+              </tfoot>
             </table>
           </div>
         </div>
@@ -1601,28 +1692,54 @@ return (
 
       {view === 'Receivables' && (
         <div className="space-y-3 mt-3">
+          {/* Collection rate summary */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Collection Rate</p>
+              <p className={`text-2xl font-black mt-1 ${Number(reportEngine.collectionRate) >= 80 ? 'text-emerald-600' : Number(reportEngine.collectionRate) >= 50 ? 'text-amber-600' : 'text-rose-600'}`}>{reportEngine.collectionRate}%</p>
+              <p className="text-[10px] text-slate-400 mt-1">of billed amount collected</p>
+            </div>
+            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Outstanding</p>
+              <p className="text-2xl font-black mt-1 text-rose-600">Rs.{reportEngine.kpis.totalReceivables.toLocaleString()}</p>
+              <p className="text-[10px] text-slate-400 mt-1">{reportEngine.receivablesList.length} customers with balance</p>
+            </div>
+          </div>
           {[
-            { label: '0-30 days', key: 'current', color: 'emerald' },
-            { label: '31-60 days', key: 'days30', color: 'amber' },
-            { label: '61-90 days', key: 'days60', color: 'orange' },
-            { label: '90+ days', key: 'days90plus', color: 'rose' }
+            { label: '0–30 days', key: 'current', color: 'emerald' },
+            { label: '31–60 days', key: 'days30', color: 'amber' },
+            { label: '61–90 days', key: 'days60', color: 'orange' },
+            { label: '90+ days (overdue)', key: 'days90plus', color: 'rose' }
           ].map(({ label, key, color }) => {
             const bucket = reportEngine.agingBuckets[key];
             if (!bucket.length) return null;
             const total = bucket.reduce((s,r)=>s+r.amount,0);
             return (
               <div key={key} className={`bg-white rounded-2xl shadow-sm border border-${color}-100 overflow-hidden`}>
-                <div className={`bg-${color}-50 border-b border-${color}-100 p-3 flex justify-between`}>
+                <div className={`bg-${color}-50 border-b border-${color}-100 p-3 flex justify-between items-center`}>
                   <span className={`text-xs font-bold text-${color}-700 uppercase tracking-widest`}>{label} ({bucket.length})</span>
                   <span className={`text-xs font-black text-${color}-700`}>Rs.{total.toLocaleString()}</span>
                 </div>
                 <div className="divide-y divide-slate-100">
-                  {bucket.map((r,i) => (
-                    <div key={i} className="flex justify-between items-center p-3">
-                      <div><p className="font-semibold text-sm text-slate-800">{r.name}</p><p className="text-[10px] text-slate-400">{r.daysSince} days since last invoice</p></div>
-                      <span className="font-extrabold text-rose-600 text-sm">Rs.{r.amount.toLocaleString()}</span>
-                    </div>
-                  ))}
+                  {bucket.map((r,i) => {
+                    const waMsg = `Assalam o Alaikum ${r.name},\n\nYour outstanding balance with ${APP_NAME} is *Rs. ${r.amount.toLocaleString()}*.\n\nKindly process the payment at your earliest convenience.\n\nJazakAllah Khair`;
+                    return (
+                      <div key={i} className="flex justify-between items-center p-3">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-sm text-slate-800 truncate">{r.name}</p>
+                          <p className="text-[10px] text-slate-400">{r.daysSince} days since last invoice {r.lastInvDate ? `(${formatDateDisp(r.lastInvDate)})` : ''}</p>
+                        </div>
+                        <div className="flex items-center gap-2 ml-2 shrink-0">
+                          <span className="font-extrabold text-rose-600 text-sm">Rs.{r.amount.toLocaleString()}</span>
+                          {r.phone && (
+                            <a href={`https://wa.me/92${r.phone.replace(/^0/,'').replace(/\D/g,'')}?text=${encodeURIComponent(waMsg)}`} target="_blank" rel="noopener noreferrer" className="p-1.5 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 transition-colors border border-green-100" title="Send WhatsApp reminder">
+                              <PhoneCall size={13}/>
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             );
@@ -1635,6 +1752,138 @@ return (
           )}
         </div>
       )}
+
+      {/* ── Insights View ── */}
+      {view === 'Insights' && (() => {
+        const kpis = reportEngine.kpis;
+        const gpMargin = kpis.productRevenue > 0 ? ((kpis.grossMargin / kpis.productRevenue) * 100).toFixed(1) : '0.0';
+        const netMargin = kpis.productRevenue > 0 ? ((kpis.netProfit / kpis.productRevenue) * 100).toFixed(1) : '0.0';
+        const topProduct = Object.entries(reportEngine.byProduct).sort((a,b)=>b[1].profit-a[1].profit)[0];
+        const topCustomer = Object.entries(reportEngine.byCustomer).sort((a,b)=>b[1].productRevenue-a[1].productRevenue)[0];
+        const aProducts = Object.entries(reportEngine.byProduct).filter(([,v]) => {
+          let cum = 0; const total = Object.values(reportEngine.byProduct).reduce((s,r)=>s+r.revenue,0);
+          return (Object.entries(reportEngine.byProduct).sort((a,b)=>b[1].revenue-a[1].revenue).every(([k,d]) => { cum += d.revenue; return cum / total <= 0.8 || k === Object.keys(reportEngine.byProduct)[0]; }));
+        }).length || Math.max(1, Math.ceil(Object.keys(reportEngine.byProduct).length * 0.2));
+        const insightCards = [
+          { label: 'Gross Margin', value: `${gpMargin}%`, sub: `Rs.${kpis.grossMargin.toLocaleString()} on Rs.${kpis.productRevenue.toLocaleString()} sales`, color: Number(gpMargin) >= 25 ? 'emerald' : Number(gpMargin) >= 15 ? 'amber' : 'rose', icon: TrendingUp },
+          { label: 'Net Profit Margin', value: `${netMargin}%`, sub: `Rs.${kpis.netProfit.toLocaleString()} after all expenses`, color: Number(netMargin) >= 15 ? 'emerald' : Number(netMargin) >= 5 ? 'amber' : 'rose', icon: DollarSign },
+          { label: 'Collection Rate', value: `${reportEngine.collectionRate}%`, sub: `of billed amount recovered`, color: Number(reportEngine.collectionRate) >= 80 ? 'emerald' : Number(reportEngine.collectionRate) >= 50 ? 'amber' : 'rose', icon: Wallet },
+          { label: 'Active Customers', value: `${reportEngine.newCustCount + reportEngine.repeatCustCount}`, sub: `${reportEngine.newCustCount} new · ${reportEngine.repeatCustCount} repeat`, color: 'indigo', icon: Users },
+        ];
+        return (
+          <div className="space-y-4 mt-2">
+            <div className="grid grid-cols-2 gap-3">
+              {insightCards.map(card => (
+                <div key={card.label} className={`bg-${card.color}-50 p-4 rounded-2xl border border-${card.color}-100 shadow-sm`}>
+                  <p className={`text-[10px] font-bold text-${card.color}-600 uppercase tracking-wider mb-1 flex items-center gap-1`}><card.icon size={11}/> {card.label}</p>
+                  <p className={`text-2xl font-black text-${card.color}-700`}>{card.value}</p>
+                  <p className={`text-[10px] text-${card.color}-500 mt-1`}>{card.sub}</p>
+                </div>
+              ))}
+            </div>
+            {/* Key callouts */}
+            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5"><Zap size={12} className="text-amber-500"/> Smart Callouts</p>
+              {topProduct && <div className="flex items-start gap-2 text-sm"><span className="text-emerald-600 font-black shrink-0">★</span><p className="text-slate-700"><span className="font-bold">{topProduct[0]}</span> is your most profitable product — Rs.{topProduct[1].profit.toLocaleString()} GP ({topProduct[1].qty} units sold)</p></div>}
+              {topCustomer && <div className="flex items-start gap-2 text-sm"><span className="text-indigo-600 font-black shrink-0">★</span><p className="text-slate-700"><span className="font-bold">{topCustomer[0]}</span> is your top customer — Rs.{(topCustomer[1].productRevenue||0).toLocaleString()} revenue in {topCustomer[1].orders} orders</p></div>}
+              {reportEngine.agingBuckets.days90plus.length > 0 && <div className="flex items-start gap-2 text-sm"><span className="text-rose-600 font-black shrink-0">!</span><p className="text-slate-700"><span className="font-bold text-rose-600">{reportEngine.agingBuckets.days90plus.length} customer{reportEngine.agingBuckets.days90plus.length>1?'s':''}</span> overdue 90+ days — Rs.{reportEngine.agingBuckets.days90plus.reduce((s,r)=>s+r.amount,0).toLocaleString()} at risk</p></div>}
+              {reportEngine.trends.revenue !== null && <div className="flex items-start gap-2 text-sm"><span className={`font-black shrink-0 ${Number(reportEngine.trends.revenue)>=0?'text-emerald-600':'text-rose-600'}`}>{Number(reportEngine.trends.revenue)>=0?'↑':'↓'}</span><p className="text-slate-700">Revenue is <span className="font-bold">{Number(reportEngine.trends.revenue)>=0?'up':'down'} {Math.abs(reportEngine.trends.revenue)}%</span> vs previous period</p></div>}
+              {kpis.deliveryBilled > kpis.transportExpense && <div className="flex items-start gap-2 text-sm"><span className="text-emerald-600 font-black shrink-0">+</span><p className="text-slate-700">Delivery net contribution: <span className="font-bold text-emerald-700">Rs.{(kpis.deliveryBilled - kpis.transportExpense).toLocaleString()}</span></p></div>}
+            </div>
+            {/* P&L summary */}
+            <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white p-5 rounded-3xl shadow-xl">
+              <p className="text-[10px] uppercase font-bold text-slate-400 mb-4 tracking-widest">P&L Summary · {filterLabel}</p>
+              {[
+                ['Gross Sales', `Rs.${kpis.productRevenue.toLocaleString()}`, 'text-white'],
+                ['COGS', `- Rs.${kpis.totalCOGS.toLocaleString()}`, 'text-rose-300'],
+                ['Gross Profit', `Rs.${kpis.grossMargin.toLocaleString()} (${gpMargin}%)`, 'text-indigo-300'],
+                ['Delivery Net', `+ Rs.${(kpis.deliveryBilled-kpis.transportExpense).toLocaleString()}`, 'text-slate-300'],
+                ['Operational Expenses', `- Rs.${kpis.totalExpenses.toLocaleString()}`, 'text-rose-300'],
+                ['Net Profit', `Rs.${kpis.netProfit.toLocaleString()} (${netMargin}%)`, kpis.netProfit >= 0 ? 'text-emerald-400 text-lg font-black' : 'text-rose-400 text-lg font-black'],
+              ].map(([label, val, cls]) => (
+                <div key={label} className="flex justify-between items-center text-sm py-1.5 border-b border-slate-700 last:border-0">
+                  <span className="text-slate-400">{label}</span>
+                  <span className={`font-bold ${cls}`}>{val}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ── Monthly Trend View ── */}
+      {view === 'Monthly Trend' && (() => {
+        const months = Object.keys(reportEngine.monthlyData).sort().slice(-18);
+        if (months.length === 0) return <div className="text-center py-16 text-slate-400">No billing data yet.</div>;
+        const maxRev = Math.max(...months.map(m => reportEngine.monthlyData[m].revenue), 1);
+        const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        return (
+          <div className="space-y-4 mt-2">
+            {/* Chart */}
+            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+              <div className="flex justify-between items-center mb-3">
+                <p className="text-[10px] font-bold uppercase text-slate-500 tracking-wider">Monthly Revenue & Profit</p>
+                <div className="flex gap-2 text-[9px] font-bold"><span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-indigo-400 inline-block"></span>Revenue</span><span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-emerald-400 inline-block"></span>Profit</span></div>
+              </div>
+              <div className="flex items-end gap-1.5 overflow-x-auto pb-2" style={{height:'130px'}}>
+                {months.map(m => {
+                  const d = reportEngine.monthlyData[m];
+                  const rH = Math.max((d.revenue / maxRev) * 100, 3);
+                  const pH = Math.max((Math.max(d.profit,0) / maxRev) * 100, 0);
+                  const [yr, mo] = m.split('-');
+                  return (
+                    <div key={m} className="flex flex-col items-center min-w-[28px] group relative flex-1">
+                      <div className="absolute bottom-7 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-[9px] font-bold px-2 py-1.5 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-none shadow-lg">
+                        {monthNames[parseInt(mo)-1]} {yr.slice(2)}<br/>Rev: Rs.{d.revenue.toLocaleString()}<br/>GP: Rs.{d.profit.toLocaleString()}<br/>Orders: {d.orders}
+                      </div>
+                      <div className="flex gap-0.5 items-end" style={{height:'100px'}}>
+                        <div className="w-3 bg-indigo-400 rounded-t-sm" style={{height:`${rH}%`}}></div>
+                        <div className="w-3 bg-emerald-400 rounded-t-sm" style={{height:`${pH}%`}}></div>
+                      </div>
+                      <span className="text-[8px] text-slate-400 mt-1 font-semibold">{monthNames[parseInt(mo)-1].slice(0,3)}</span>
+                      <span className="text-[7px] text-slate-300">{yr.slice(2)}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            {/* Monthly table */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="bg-slate-50 border-b border-slate-200 p-3">
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Month-by-Month Breakdown</p>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs text-left whitespace-nowrap">
+                  <thead className="bg-slate-50 text-slate-500 uppercase font-bold tracking-wider border-b border-slate-200">
+                    <tr><th className="p-3">Month</th><th className="p-3 text-center">Orders</th><th className="p-3 text-right">Revenue</th><th className="p-3 text-right">Cost</th><th className="p-3 text-right text-emerald-600">GP</th><th className="p-3 text-right text-indigo-500">Margin%</th></tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
+                    {months.slice().reverse().map(m => {
+                      const d = reportEngine.monthlyData[m];
+                      const margin = d.revenue > 0 ? ((d.profit / d.revenue) * 100).toFixed(1) : 0;
+                      const [yr, mo] = m.split('-');
+                      return (
+                        <tr key={m} className="hover:bg-slate-50">
+                          <td className="p-3 font-bold text-slate-800">{monthNames[parseInt(mo)-1]} {yr}</td>
+                          <td className="p-3 text-center">{d.orders}</td>
+                          <td className="p-3 text-right">Rs.{d.revenue.toLocaleString()}</td>
+                          <td className="p-3 text-right text-rose-500">Rs.{d.cost.toLocaleString()}</td>
+                          <td className="p-3 text-right font-bold text-emerald-600">Rs.{d.profit.toLocaleString()}</td>
+                          <td className="p-3 text-right text-indigo-600">{margin}%</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  <tfoot className="bg-slate-50 border-t-2 border-slate-300 font-black text-xs">
+                    {(() => { const totRev = months.reduce((s,m)=>s+reportEngine.monthlyData[m].revenue,0); const totGP = months.reduce((s,m)=>s+reportEngine.monthlyData[m].profit,0); const totOrd = months.reduce((s,m)=>s+reportEngine.monthlyData[m].orders,0); const totCost = months.reduce((s,m)=>s+reportEngine.monthlyData[m].cost,0); return (<tr><td className="p-3 text-slate-600 uppercase tracking-wider">Totals ({months.length}mo)</td><td className="p-3 text-center">{totOrd}</td><td className="p-3 text-right">Rs.{totRev.toLocaleString()}</td><td className="p-3 text-right text-rose-600">Rs.{totCost.toLocaleString()}</td><td className="p-3 text-right text-emerald-700">Rs.{totGP.toLocaleString()}</td><td className="p-3 text-right text-indigo-700">{totRev > 0 ? ((totGP/totRev)*100).toFixed(1) : 0}%</td></tr>); })()}
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
     </div>
   </div>
 );
@@ -2174,10 +2423,14 @@ return (
       {TABS.map(tab => {
         if (tab.adminOnly && !isAdmin) return null;
         const active = activeTab === tab.id;
+        const draftCount = tab.id === 'billing' ? invoices.filter(o => o.status === 'Booked').length : 0;
         return (
           <button key={tab.id} onClick={() => setActiveTab(tab.id)} title={`Alt+${tab.label[0].toLowerCase()}`}
             className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-semibold text-sm transition-all ${active ? 'bg-indigo-50 text-indigo-700 shadow-sm' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'}`}>
-            <tab.icon size={18} strokeWidth={active ? 2.5 : 2} />
+            <div className="relative shrink-0">
+              <tab.icon size={18} strokeWidth={active ? 2.5 : 2} />
+              {draftCount > 0 && <span className="absolute -top-1.5 -right-1.5 bg-amber-500 text-white text-[7px] font-black w-3.5 h-3.5 rounded-full flex items-center justify-center leading-none">{draftCount > 9 ? '9+' : draftCount}</span>}
+            </div>
             <span>{tab.label}</span>
             {active && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-indigo-500"></span>}
           </button>
@@ -2231,9 +2484,13 @@ return (
       {TABS.map(tab => {
         if (tab.adminOnly && !isAdmin) return null;
         const active = activeTab === tab.id;
+        const draftCount = tab.id === 'billing' ? invoices.filter(o => o.status === 'Booked').length : 0;
         return (
           <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex flex-col items-center justify-center w-full transition-all ${active ? 'text-indigo-600' : 'text-slate-400'}`}>
-            <div className={`p-1.5 rounded-xl transition-all ${active ? 'bg-indigo-50 shadow-sm' : ''}`}><tab.icon size={22} strokeWidth={active ? 2.5 : 2} /></div>
+            <div className={`relative p-1.5 rounded-xl transition-all ${active ? 'bg-indigo-50 shadow-sm' : ''}`}>
+              <tab.icon size={22} strokeWidth={active ? 2.5 : 2} />
+              {draftCount > 0 && <span className="absolute -top-1 -right-1 bg-amber-500 text-white text-[8px] font-black w-4 h-4 rounded-full flex items-center justify-center leading-none">{draftCount > 9 ? '9+' : draftCount}</span>}
+            </div>
             <span className={`text-[9px] font-bold uppercase tracking-widest ${active ? 'text-indigo-700 mt-1' : 'mt-0.5'}`}>{tab.label}</span>
           </button>
         );
