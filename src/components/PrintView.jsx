@@ -165,29 +165,10 @@ const generateShareText = () => {
   return encodeURIComponent(text);
 };
 
-// ── Print ─────────────────────────────────────────────────────────────────
-const handlePrint = () => {
-  let styleEl = null;
-  if (isThermal) {
-    styleEl = document.createElement('style');
-    styleEl.id = 'thermal-print-style';
-    styleEl.textContent = `@page { size: 80mm auto !important; margin: 2mm 3mm; } body { width: 80mm; } #print-document { width: 80mm !important; max-width: 80mm !important; padding: 3mm !important; }`;
-    document.head.appendChild(styleEl);
-  } else if (isA5) {
-    styleEl = document.createElement('style');
-    styleEl.id = 'a5-print-style';
-    styleEl.textContent = `@page { size: A5 portrait; margin: 10mm; }`;
-    document.head.appendChild(styleEl);
-  }
-  window.print();
-  setTimeout(() => { if (styleEl) styleEl.remove(); }, 1500);
-};
-
-// ── HTML Share / Download ─────────────────────────────────────────────────
-const handleShareHTML = () => {
+// ── Build standalone HTML doc (shared by print + share) ──────────────────
+const buildHtmlDoc = () => {
   const element = document.getElementById('print-document');
-  if (!element) { showToast('Document not found', 'error'); return; }
-
+  if (!element) return null;
   const clone = element.cloneNode(true);
   clone.removeAttribute('class');
   const paperW  = isThermal ? '80mm' : isA5 ? '148mm' : '210mm';
@@ -201,12 +182,10 @@ const handleShareHTML = () => {
     `font-size:${isThermal ? '10px' : isA5 ? '11px' : '12px'}`,
     'line-height:1.5', 'box-sizing:border-box',
   ].join(';');
-
   const pageSize   = isThermal ? '80mm auto' : isA5 ? 'A5 portrait' : 'A4 portrait';
   const pageMargin = isThermal ? '3mm' : '10mm';
   const bodyPad    = isThermal ? '8px' : '16px';
   const docTitle   = getFileName().replace(/\.[^.]+$/, '');
-
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -222,9 +201,53 @@ const handleShareHTML = () => {
 </head>
 <body><div id="doc">${clone.outerHTML}</div></body>
 </html>`;
+  return { html, docTitle };
+};
 
-  // Open in new browser tab — renders immediately, user can print/share from browser
-  // Must stay synchronous (no await) to preserve user-gesture context for window.open
+// ── Print — opens clean new window and auto-triggers print dialog ─────────
+const handlePrint = () => {
+  const result = buildHtmlDoc();
+  if (!result) { showToast('Document not found', 'error'); return; }
+  const { html } = result;
+  const newWin = window.open('', '_blank');
+  if (!newWin) { showToast('Allow popups to enable printing', 'error'); return; }
+  newWin.document.open();
+  newWin.document.write(html);
+  newWin.document.close();
+  // onload fires after content is rendered; fallback setTimeout for slower devices
+  newWin.onload = () => { newWin.focus(); newWin.print(); };
+  setTimeout(() => { try { newWin.focus(); newWin.print(); } catch (e) {} }, 900);
+};
+
+// ── HTML Share / Download ─────────────────────────────────────────────────
+const handleShareHTML = () => {
+  const result = buildHtmlDoc();
+  if (!result) { showToast('Document not found', 'error'); return; }
+  const { html, docTitle } = result;
+  const blob     = new Blob([html], { type: 'text/html;charset=utf-8' });
+  const fileName = docTitle + '.html';
+
+  const downloadFallback = () => {
+    const url = URL.createObjectURL(blob);
+    const a   = document.createElement('a');
+    a.href = url; a.download = fileName;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+    showToast('Downloaded! Open in browser to share or print');
+  };
+
+  // Native share sheet: iOS 15+, Android Chrome 86+ — must call synchronously
+  // within the user-gesture to keep the activation context alive
+  if (navigator.canShare) {
+    const file = new File([blob], fileName, { type: 'text/html' });
+    if (navigator.canShare({ files: [file] })) {
+      navigator.share({ files: [file], title: docTitle })
+        .catch(e => { if (e.name !== 'AbortError') downloadFallback(); });
+      return;
+    }
+  }
+
+  // Desktop / tablets without share API: open in new tab
   const newWin = window.open('', '_blank');
   if (newWin) {
     newWin.document.open();
@@ -233,14 +256,8 @@ const handleShareHTML = () => {
     return;
   }
 
-  // Fallback: download file if popup blocked
-  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href = url; a.download = docTitle + '.html';
-  document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(url), 10000);
-  showToast('Downloaded! Open in browser to share or print');
+  // Final fallback: download
+  downloadFallback();
 };
 
 // ── PDF download ──────────────────────────────────────────────────────────

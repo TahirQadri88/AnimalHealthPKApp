@@ -139,9 +139,9 @@ return (
 };
 
 const CustomerModal = () => {
-const { editingCustomer, customers, invoices, billingView, currentInvoice, isAdmin, checkDuplicate, saveToFirebase, showToast, setShowCustomerModal, setCurrentInvoice } = useContext(AppContext);
+const { editingCustomer, customers, invoices, billingView, currentInvoice, isAdmin, checkDuplicate, saveToFirebase, showToast, setShowCustomerModal, setCurrentInvoice, cities, areas, customerTypes, setShowSegmentsModal } = useContext(AppContext);
 const isEdit = !!editingCustomer;
-const [form, setForm] = useState(isEdit ? editingCustomer : { name: '', contactPerson: '', phone: '', address1: '', map1: '', address2: '', map2: '', openingBalance: 0 });
+const [form, setForm] = useState(isEdit ? editingCustomer : { name: '', contactPerson: '', phone: '', address1: '', map1: '', address2: '', map2: '', openingBalance: 0, city: '', area: '', customerType: '' });
 useEffect(() => { if (isEdit && editingCustomer.address && !editingCustomer.address1) { setForm(prev => ({...prev, address1: editingCustomer.address})); } }, [isEdit, editingCustomer]);
 const save = async () => {
 if(!form.name) return showToast("Customer Name required", "error");
@@ -183,6 +183,14 @@ return (
 <div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Address 2</label><textarea placeholder="Alternative Address..." rows="2" className={inputClass} value={form.address2 || ''} onChange={e => setForm({...form, address2: e.target.value})} /></div>
 <div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Google Maps Link 2</label><input placeholder="https://maps.app.goo.gl/..." className={inputClass} value={form.map2 || ''} onChange={e => setForm({...form, map2: e.target.value})} /></div>
 </div>
+<div className="space-y-3 bg-indigo-50/50 p-3 rounded-xl border border-indigo-100">
+<div className="flex justify-between items-center"><h3 className="text-xs font-bold text-slate-800 uppercase tracking-widest flex items-center gap-1"><Globe size={14}/> Segment / Classification</h3><button type="button" onClick={()=>setShowSegmentsModal(true)} className="text-[10px] font-bold text-indigo-600 bg-indigo-100 hover:bg-indigo-200 px-2 py-1 rounded-md transition-colors">+ Manage</button></div>
+<div className="grid grid-cols-3 gap-2">
+<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">City</label><select className={inputClass} value={form.city||''} onChange={e=>setForm({...form,city:e.target.value})}><option value="">–</option>{cities.map(c=><option key={c.id} value={c.name}>{c.name}</option>)}</select></div>
+<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Area</label><select className={inputClass} value={form.area||''} onChange={e=>setForm({...form,area:e.target.value})}><option value="">–</option>{areas.map(a=><option key={a.id} value={a.name}>{a.name}</option>)}</select></div>
+<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Type</label><select className={inputClass} value={form.customerType||''} onChange={e=>setForm({...form,customerType:e.target.value})}><option value="">–</option>{customerTypes.map(t=><option key={t.id} value={t.name}>{t.name}</option>)}</select></div>
+</div>
+</div>
 {isAdmin && (
 <div className="bg-rose-50 p-3 rounded-xl border border-rose-100 mt-2">
 <label className="text-[10px] font-bold text-rose-500 uppercase tracking-wider ml-1 mb-1 block">Opening Balance (Dr)</label>
@@ -223,7 +231,7 @@ return (
 };
 
 const CustomerLedgerModal = () => {
-const { selectedLedgerId, getCustomerLedger, generateReceiptData, setPrintConfig, setShowPaymentModal, setSelectedCustomerForPayment, setShowLedgerModal } = useContext(AppContext);
+const { selectedLedgerId, getCustomerLedger, generateReceiptData, setPrintConfig, setShowPaymentModal, setSelectedCustomerForPayment, setShowLedgerModal, deleteFromFirebase, saveToFirebase, invoices, isAdmin } = useContext(AppContext);
 const [startDate, setStartDate] = useState(() => { const d = new Date(); d.setMonth(d.getMonth() - 1); return getLocalDateStr(d); });
 const [endDate, setEndDate] = useState(getLocalDateStr());
 const fullLedger = getCustomerLedger(selectedLedgerId);
@@ -259,7 +267,22 @@ return (
 <td className="py-3 px-3 text-right font-extrabold text-indigo-600">{row.debit > 0 ? row.debit.toLocaleString() : '-'}</td>
 <td className="py-3 px-3 text-right font-extrabold text-emerald-600">{row.credit > 0 ? row.credit.toLocaleString() : '-'}</td>
 <td className="py-3 px-3 text-right font-extrabold text-slate-800">{row.balance.toLocaleString()}</td>
-<td className="py-3 px-2 text-center">{row.credit > 0 && (<button onClick={() => setPrintConfig({docType: 'receipt', format: 'thermal', data: generateReceiptData(fullLedger, row.id)})} title="Print Receipt" className="p-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-lg transition-colors"><Receipt size={14}/></button>)}</td>
+<td className="py-3 px-2 text-center">
+<div className="flex gap-1 justify-center">
+{row.credit > 0 && (<button onClick={() => setPrintConfig({docType: 'receipt', format: 'thermal', data: generateReceiptData(fullLedger, row.id)})} title="Print Receipt" className="p-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-lg transition-colors"><Receipt size={14}/></button>)}
+{isAdmin && row.credit > 0 && (
+<button title="Delete Payment" onClick={async () => {
+  if (!window.confirm('Delete this payment record?')) return;
+  if (row.id.startsWith('REC-')) {
+    await deleteFromFirebase('payments', row.id);
+  } else if (row.id.endsWith('-PAY')) {
+    const inv = invoices.find(i => i.id === row.ref);
+    if (inv) await saveToFirebase('invoices', inv.id, { ...inv, receivedAmount: 0, paymentStatus: 'Pending' });
+  }
+}} className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-500 rounded-lg transition-colors"><Trash2 size={14}/></button>
+)}
+</div>
+</td>
 </tr>
 ))}
 {filteredRows.length === 0 && (<tr><td colSpan={6} className="text-center py-6 text-slate-400 font-medium">No transactions in this period.</td></tr>)}
@@ -320,6 +343,69 @@ return () => unsubscribe();
 return data;
 }
 
+
+const SegmentsModal = () => {
+const { cities, areas, customerTypes, saveToFirebase, deleteFromFirebase, showToast, setShowSegmentsModal } = useContext(AppContext);
+const [tab, setTab] = useState('cities');
+const [newVal, setNewVal] = useState('');
+const [editingId, setEditingId] = useState(null);
+const [editVal, setEditVal] = useState('');
+const colMap = { cities: cities, areas: areas, customerTypes: customerTypes };
+const fireMap = { cities: 'cities', areas: 'areas', customerTypes: 'customerTypes' };
+const labelMap = { cities: 'City', areas: 'Area', customerTypes: 'Customer Type' };
+const list = colMap[tab];
+const col = fireMap[tab];
+const add = async () => {
+  if (!newVal.trim()) return;
+  if (list.some(i => i.name.toLowerCase() === newVal.toLowerCase())) return showToast(`${labelMap[tab]} already exists`, 'error');
+  const id = Date.now();
+  await saveToFirebase(col, id, { id, name: newVal.trim() });
+  setNewVal('');
+};
+const save = async (item) => {
+  if (!editVal.trim()) return;
+  if (list.some(i => i.id !== item.id && i.name.toLowerCase() === editVal.toLowerCase())) return showToast('Name already exists', 'error');
+  await saveToFirebase(col, item.id, { ...item, name: editVal.trim() });
+  setEditingId(null);
+};
+return (
+<ModalWrapper title="Manage Segments" onClose={() => setShowSegmentsModal(false)}>
+<div className="space-y-4 pb-10">
+<div className="flex bg-slate-100 p-1 rounded-xl gap-1">
+{['cities','areas','customerTypes'].map(t => (
+<button key={t} onClick={() => { setTab(t); setNewVal(''); setEditingId(null); }} className={`flex-1 py-2 px-2 rounded-lg font-bold text-xs transition-colors ${tab===t?'bg-white text-indigo-700 shadow-sm':'text-slate-500'}`}>{labelMap[t]}s</button>
+))}
+</div>
+<div className="flex gap-2">
+<input type="text" placeholder={`New ${labelMap[tab]}...`} className="flex-1 p-3 bg-slate-50 border border-slate-200 rounded-xl font-semibold outline-none focus:border-indigo-500 text-sm" value={newVal} onChange={e=>setNewVal(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')add();}} />
+<button onClick={add} className="bg-indigo-600 text-white px-4 rounded-xl font-bold hover:bg-indigo-700 transition-colors">Add</button>
+</div>
+<div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+{list.length === 0 && <p className="text-center py-6 text-sm text-slate-400">No {labelMap[tab]}s yet. Add one above.</p>}
+<ul className="divide-y divide-slate-100">
+{list.map(item => (
+<li key={item.id} className="flex items-center gap-2 p-3 hover:bg-slate-50">
+{editingId === item.id ? (
+<>
+<input autoFocus className="flex-1 p-2 text-sm font-semibold border border-indigo-300 rounded-lg outline-none" value={editVal} onChange={e=>setEditVal(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')save(item);if(e.key==='Escape')setEditingId(null);}} />
+<button onClick={()=>save(item)} className="text-xs font-bold text-indigo-600 px-3 py-1.5 bg-indigo-50 rounded-lg hover:bg-indigo-100">Save</button>
+<button onClick={()=>setEditingId(null)} className="text-xs font-bold text-slate-500 px-2 py-1.5 bg-slate-100 rounded-lg">Cancel</button>
+</>
+) : (
+<>
+<span className="flex-1 font-semibold text-slate-700 text-sm">{item.name}</span>
+<button onClick={()=>{setEditingId(item.id);setEditVal(item.name);}} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"><Edit size={14}/></button>
+<button onClick={async()=>{if(window.confirm(`Delete "${item.name}"?`))await deleteFromFirebase(col,item.id);}} className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"><Trash2 size={14}/></button>
+</>
+)}
+</li>
+))}
+</ul>
+</div>
+</div>
+</ModalWrapper>
+);
+};
 
 // — Tabs —
 const DashboardTab = () => {
@@ -570,6 +656,7 @@ return (
 <div className="flex items-center gap-2"><span className={`text-[9px] px-2 py-0.5 rounded font-bold uppercase tracking-wider ${o.paymentStatus==='Paid'?'bg-emerald-100 text-emerald-700':o.paymentStatus==='Partial'?'bg-amber-100 text-amber-700':'bg-rose-100 text-rose-700'}`}>{o.paymentStatus}</span></div>
 <div className="flex gap-1.5">
 {isAdmin && <button onClick={() => { setCurrentInvoice(o); setBillingView('form'); }} className="p-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 rounded-lg"><Edit size={16}/></button>}
+{isAdmin && <button onClick={async () => { if(window.confirm(`Delete ${o.id}?`)) await deleteFromFirebase('invoices', o.id); }} title="Delete" className="p-2 bg-rose-50 text-rose-500 hover:bg-rose-100 rounded-lg"><Trash2 size={16}/></button>}
 <button onClick={() => setPrintConfig({docType: 'dispatch', format: 'thermal', data: o})} title="Dispatch" className="p-2 bg-amber-50 text-amber-600 rounded-lg"><Truck size={16}/></button>
 <button onClick={() => setPrintConfig({docType: 'invoice', format: 'thermal', data: o})} title="Print" className="p-2 bg-indigo-50 text-indigo-600 rounded-lg"><ReceiptText size={16}/></button>
 </div>
@@ -655,6 +742,7 @@ return (
 <button onClick={()=>setAdminView('analytics')} className={`flex-1 py-2 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 whitespace-nowrap ${adminView==='analytics'?'bg-white text-indigo-700 shadow-sm':'text-slate-500'}`}><BarChart3 size={14}/> Analytics</button>
 <button onClick={()=>setAdminView('expenses')} className={`flex-1 py-2 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 whitespace-nowrap ${adminView==='expenses'?'bg-white text-rose-600 shadow-sm':'text-slate-500'}`}><Wallet size={14}/> Expenses</button>
 <button onClick={()=>setAdminView('bulk')} className={`flex-1 py-2 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 whitespace-nowrap ${adminView==='bulk'?'bg-white text-emerald-600 shadow-sm':'text-slate-500'}`}><Upload size={14}/> Bulk Ops</button>
+<button onClick={()=>setAdminView('segments')} className={`flex-1 py-2 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 whitespace-nowrap ${adminView==='segments'?'bg-white text-purple-600 shadow-sm':'text-slate-500'}`}><Globe size={14}/> Segments</button>
 <button onClick={()=>setAdminView('users')} className={`flex-1 py-2 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 whitespace-nowrap ${adminView==='users'?'bg-white text-amber-600 shadow-sm':'text-slate-500'}`}><Users size={14}/> Users</button>
 </div>
 </div>
@@ -662,6 +750,7 @@ return (
 <div style={{display: adminView === 'analytics' ? 'flex' : 'none', flexDirection: 'column', height: '100%'}}><AnalyticsView /></div>
 <div style={{display: adminView === 'expenses' ? 'flex' : 'none', flexDirection: 'column', height: '100%'}}><ExpensesView /></div>
 <div style={{display: adminView === 'bulk' ? 'flex' : 'none', flexDirection: 'column', height: '100%'}}><BulkOpsView /></div>
+<div style={{display: adminView === 'segments' ? 'flex' : 'none', flexDirection: 'column', height: '100%'}}><SegmentsAdminView /></div>
 <div style={{display: adminView === 'users' ? 'flex' : 'none', flexDirection: 'column', height: '100%'}}><UserManagementView /></div>
 </div>
 </div>
@@ -727,8 +816,88 @@ return (
 );
 };
 
+const SegmentsAdminView = () => {
+const { cities, areas, customerTypes, customers, invoices, saveToFirebase, deleteFromFirebase, showToast, getCustomerBalance, setShowSegmentsModal } = useContext(AppContext);
+const [tab, setTab] = useState('cities');
+const [newVal, setNewVal] = useState('');
+const [editingId, setEditingId] = useState(null);
+const [editVal, setEditVal] = useState('');
+const colMap = { cities: cities, areas: areas, customerTypes: customerTypes };
+const fireMap = { cities: 'cities', areas: 'areas', customerTypes: 'customerTypes' };
+const labelMap = { cities: 'City', areas: 'Area', customerTypes: 'Type' };
+const list = colMap[tab]; const col = fireMap[tab];
+const add = async () => {
+  if (!newVal.trim()) return;
+  if (list.some(i => i.name.toLowerCase() === newVal.toLowerCase())) return showToast('Already exists', 'error');
+  const id = Date.now();
+  await saveToFirebase(col, id, { id, name: newVal.trim() });
+  setNewVal('');
+};
+const saveEdit = async (item) => {
+  if (!editVal.trim()) return;
+  await saveToFirebase(col, item.id, { ...item, name: editVal.trim() });
+  setEditingId(null);
+};
+// Compute sales per segment value
+const segKey = tab === 'cities' ? 'city' : tab === 'areas' ? 'area' : 'customerType';
+const custMap = {}; customers.forEach(c => { custMap[c.name] = c[segKey] || ''; });
+const segStats = {};
+invoices.filter(o => o.status === 'Billed').forEach(o => {
+  const seg = custMap[o.customerName] || '';
+  if (!seg) return;
+  if (!segStats[seg]) segStats[seg] = { orders: 0, revenue: 0, customers: new Set() };
+  segStats[seg].orders += 1;
+  segStats[seg].revenue += o.total;
+  segStats[seg].customers.add(o.customerName);
+});
+return (
+<div className="h-full flex flex-col p-4 pb-24 overflow-y-auto space-y-4">
+<div className="flex justify-between items-center">
+<h3 className="text-xs font-bold text-slate-800 uppercase tracking-widest">Customer Segments</h3>
+</div>
+<div className="flex bg-slate-200 p-1 rounded-xl gap-1">
+{['cities','areas','customerTypes'].map(t => (
+<button key={t} onClick={() => { setTab(t); setNewVal(''); setEditingId(null); }} className={`flex-1 py-2 px-2 rounded-lg font-bold text-xs transition-colors ${tab===t?'bg-white text-purple-700 shadow-sm':'text-slate-500'}`}>{labelMap[t]}s</button>
+))}
+</div>
+<div className="flex gap-2">
+<input type="text" placeholder={`New ${labelMap[tab]}...`} className="flex-1 p-3 bg-white border border-slate-200 rounded-xl font-semibold outline-none focus:border-indigo-500 text-sm" value={newVal} onChange={e=>setNewVal(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')add();}} />
+<button onClick={add} className="bg-indigo-600 text-white px-4 rounded-xl font-bold hover:bg-indigo-700 transition-colors">Add</button>
+</div>
+<div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+{list.length === 0 && <p className="text-center py-6 text-sm text-slate-400">No {labelMap[tab]}s yet.</p>}
+<ul className="divide-y divide-slate-100">
+{list.map(item => {
+  const stats = segStats[item.name] || { orders: 0, revenue: 0, customers: new Set() };
+  return (
+  <li key={item.id} className="p-3 hover:bg-slate-50">
+  {editingId === item.id ? (
+  <div className="flex gap-2 items-center">
+  <input autoFocus className="flex-1 p-2 text-sm font-semibold border border-indigo-300 rounded-lg outline-none" value={editVal} onChange={e=>setEditVal(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')saveEdit(item);if(e.key==='Escape')setEditingId(null);}} />
+  <button onClick={()=>saveEdit(item)} className="text-xs font-bold text-indigo-600 px-3 py-1.5 bg-indigo-50 rounded-lg">Save</button>
+  <button onClick={()=>setEditingId(null)} className="text-xs font-bold text-slate-500 px-2 py-1.5 bg-slate-100 rounded-lg">Cancel</button>
+  </div>
+  ) : (
+  <div className="flex items-center gap-2">
+  <div className="flex-1">
+  <div className="flex items-center gap-2"><span className="font-bold text-slate-800 text-sm">{item.name}</span>{stats.orders > 0 && <span className="text-[9px] font-bold bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded border border-indigo-100">{stats.orders} orders</span>}</div>
+  {stats.orders > 0 && <p className="text-[10px] text-slate-400 mt-0.5">{stats.customers.size} clients · Rs.{stats.revenue.toLocaleString()} revenue</p>}
+  </div>
+  <button onClick={()=>{setEditingId(item.id);setEditVal(item.name);}} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg"><Edit size={14}/></button>
+  <button onClick={async()=>{if(window.confirm(`Delete "${item.name}"?`))await deleteFromFirebase(col,item.id);}} className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg"><Trash2 size={14}/></button>
+  </div>
+  )}
+  </li>
+  );
+})}
+</ul>
+</div>
+</div>
+);
+};
+
 const AnalyticsView = () => {
-const { isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig } = useContext(AppContext);
+const { isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, cities, areas, customerTypes, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig } = useContext(AppContext);
 const [view, setView] = useState('Overview');
 const [dateFilter, setDateFilter] = useState('This Month');
 const [customStart, setCustomStart] = useState('');
@@ -751,6 +920,10 @@ const reportEngine = useMemo(() => {
   const kpis = { productRevenue: 0, totalCOGS: 0, grossMargin: 0, deliveryBilled: 0, transportExpense: 0, totalReceivables: 0 };
   const byProduct = {}; const byCompany = {}; const byCustomer = {}; const receivablesList = [];
   const bySalesperson = {};
+  const byCity = {}; const byArea = {}; const byType = {};
+  // Build customer segment lookup
+  const custSegment = {};
+  customers.forEach(c => { custSegment[c.name] = { city: c.city || '', area: c.area || '', type: c.customerType || '' }; });
   customers.forEach(c => { const bal = getCustomerBalance(c.id); if(bal > 0) { kpis.totalReceivables += bal; receivablesList.push({ name: c.name, id: c.id, amount: bal }); } });
   billedForPnL.forEach(o => {
     kpis.deliveryBilled += Number(o.deliveryBilled || 0);
@@ -775,6 +948,14 @@ const reportEngine = useMemo(() => {
     kpis.productRevenue += orderItemRevenue; kpis.totalCOGS += orderItemCost;
     byCustomer[o.customerName].productRevenue += orderItemRevenue; byCustomer[o.customerName].cost += orderItemCost; byCustomer[o.customerName].profit += (orderItemRevenue - orderItemCost);
     bySalesperson[spName].revenue += orderItemRevenue; bySalesperson[spName].profit += (orderItemRevenue - orderItemCost);
+    const seg = custSegment[o.customerName] || {};
+    const gp = orderItemRevenue - orderItemCost;
+    ['city','area','type'].forEach(k => {
+      const val = seg[k] || 'Unknown';
+      const map = k === 'city' ? byCity : k === 'area' ? byArea : byType;
+      if (!map[val]) map[val] = { revenue: 0, profit: 0, orders: 0 };
+      map[val].revenue += orderItemRevenue; map[val].profit += gp; map[val].orders += 1;
+    });
   });
   kpis.grossMargin = kpis.productRevenue - kpis.totalCOGS;
   const filteredExpenses = expenses.filter(e => checkCustomFilter(e.date));
@@ -822,7 +1003,7 @@ const reportEngine = useMemo(() => {
     else if (daysDiff <= 90) agingBuckets.days60.push(r);
     else agingBuckets.days90plus.push(r);
   });
-  return { kpis, byProduct, byCompany, byCustomer, bySalesperson, receivablesList: receivablesList.sort((a,b)=>b.amount-a.amount), trends, dailyBreakdown, byExpenseCategory, agingBuckets };
+  return { kpis, byProduct, byCompany, byCustomer, bySalesperson, byCity, byArea, byType, receivablesList: receivablesList.sort((a,b)=>b.amount-a.amount), trends, dailyBreakdown, byExpenseCategory, agingBuckets };
 }, [invoices, expenses, dateFilter, customStart, customEnd, filterCompany, filterCustomer, filterSalesperson, products, customers]);
 
 const getSortedExportData = () => {
@@ -938,6 +1119,46 @@ const renderTable = (dataObj, type) => {
   );
 };
 
+const renderSegmentTable = (dataObj, label) => {
+  const arr = Object.entries(dataObj).map(([key, val]) => ({ key, ...val })).sort((a,b) => b.revenue - a.revenue);
+  const maxRev = arr[0]?.revenue || 1;
+  return (
+    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mt-3">
+      <div className="bg-slate-50 border-b border-slate-200 p-2 flex justify-between items-center">
+        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-2">{arr.length} {label}s</span>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-left text-xs whitespace-nowrap">
+          <thead className="bg-slate-50 text-slate-500 uppercase font-bold tracking-wider border-b border-slate-200">
+            <tr><th className="p-3">{label}</th><th className="p-3 text-center">Orders</th><th className="p-3 text-right">Revenue</th><th className="p-3 text-right text-emerald-600">GP</th><th className="p-3 text-right text-indigo-500">Margin%</th></tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
+            {arr.map((row, i) => {
+              const rev = row.revenue || 0;
+              const gp = row.profit || 0;
+              const margin = rev > 0 ? ((gp / rev) * 100).toFixed(1) : 0;
+              const barW = maxRev > 0 ? Math.max((rev / maxRev) * 100, 0) : 0;
+              return (
+                <tr key={i} className="hover:bg-slate-50">
+                  <td className="p-3">
+                    <div className="font-bold text-slate-800">{row.key || '—'}</div>
+                    <div className="w-full bg-slate-100 rounded-full h-1 mt-1.5 max-w-[100px]"><div className="bg-indigo-400 h-1 rounded-full" style={{width:`${barW}%`}}></div></div>
+                  </td>
+                  <td className="p-3 text-center bg-slate-50/50 font-bold">{row.orders||0}</td>
+                  <td className="p-3 text-right font-bold text-slate-800">Rs.{rev.toLocaleString()}</td>
+                  <td className="p-3 text-right font-bold" style={{color: gp >= 0 ? '#059669' : '#e11d48'}}>Rs.{gp.toLocaleString()}</td>
+                  <td className="p-3 text-right text-indigo-600 font-bold">{margin}%</td>
+                </tr>
+              );
+            })}
+            {arr.length === 0 && <tr><td colSpan={5} className="p-6 text-center text-slate-400">No data. Add city/area/type to customers first.</td></tr>}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
 const filterLabel = dateFilter === 'Custom' ? `${customStart||'...'} - ${customEnd}` : dateFilter;
 
 return (
@@ -980,7 +1201,7 @@ return (
 
     {/* View Tabs */}
     <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide shrink-0">
-       {['Overview','By Product','By Company','By Customer','By Salesperson','Receivables'].map(v => (
+       {['Overview','By Product','By Company','By Customer','By City','By Area','By Type','By Salesperson','Receivables'].map(v => (
          <button key={v} onClick={() => setView(v)} className={`px-3 py-1.5 rounded-xl font-bold text-[11px] whitespace-nowrap shadow-sm transition-colors ${view === v ? 'bg-slate-800 text-white' : 'bg-white text-slate-600 border border-slate-200'}`}>{v}</button>
        ))}
     </div>
@@ -1112,6 +1333,9 @@ return (
       {view === 'By Product' && renderTable(reportEngine.byProduct, 'Product')}
       {view === 'By Company' && renderTable(reportEngine.byCompany, 'Company')}
       {view === 'By Customer' && renderTable(reportEngine.byCustomer, 'Customer')}
+      {view === 'By City' && renderSegmentTable(reportEngine.byCity, 'City')}
+      {view === 'By Area' && renderSegmentTable(reportEngine.byArea, 'Area')}
+      {view === 'By Type' && renderSegmentTable(reportEngine.byType, 'Type')}
 
       {view === 'By Salesperson' && (
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mt-3">
@@ -1497,6 +1721,9 @@ const invoices = useLiveCollection('invoices');
 const expenses = useLiveCollection('expenses');
 const expenseCategories = useLiveCollection('expenseCategories');
 const payments = useLiveCollection('payments');
+const cities = useLiveCollection('cities');
+const areas = useLiveCollection('areas');
+const customerTypes = useLiveCollection('customerTypes');
 
 // Complex UI State
 const [billingView, setBillingView] = useState('list');
@@ -1513,6 +1740,7 @@ const [showExpenseCatModal, setShowExpenseCatModal] = useState(false);
 const [showUserModal, setShowUserModal] = useState(false);
 const [editingUser, setEditingUser] = useState(null);
 const [printConfig, setPrintConfig] = useState(null);
+const [showSegmentsModal, setShowSegmentsModal] = useState(false);
 
 const isAdmin = currentUser?.role === 'admin';
 
@@ -1635,12 +1863,13 @@ useEffect(() => {
       else if (showLedgerModal) setShowLedgerModal(false);
       else if (showUserModal) setShowUserModal(false);
       else if (showExpenseCatModal) setShowExpenseCatModal(false);
+      else if (showSegmentsModal) setShowSegmentsModal(false);
       else if (billingView === 'form') setBillingView('list');
     }
   };
   window.addEventListener('keydown', handler);
   return () => window.removeEventListener('keydown', handler);
-}, [currentUser, printConfig, showProductModal, showCustomerModal, showPaymentModal, showLedgerModal, showUserModal, showExpenseCatModal, billingView]);
+}, [currentUser, printConfig, showProductModal, showCustomerModal, showPaymentModal, showLedgerModal, showUserModal, showExpenseCatModal, showSegmentsModal, billingView]);
 
 // — Auth Screen —
 if (!currentUser) {
@@ -1677,6 +1906,7 @@ const TABS = [
 ];
 const ctx = {
 isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers,
+cities, areas, customerTypes,
 showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData,
 billingView, setBillingView, currentInvoice, setCurrentInvoice,
 activeTab, setActiveTab, adminView, setAdminView,
@@ -1687,6 +1917,7 @@ showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId,
 showExpenseCatModal, setShowExpenseCatModal,
 showUserModal, setShowUserModal, editingUser, setEditingUser,
 setPrintConfig, printConfig,
+showSegmentsModal, setShowSegmentsModal,
 };
 return (
 <AppContext.Provider value={ctx}>
@@ -1788,6 +2019,7 @@ return (
   {showPaymentModal && <PaymentModal />}
   {showExpenseCatModal && <ExpenseCategoryModal />}
   {showUserModal && <UserModal />}
+  {showSegmentsModal && <SegmentsModal />}
 
   {toast && (
     <div className={`fixed top-6 right-6 lg:left-auto left-1/2 lg:-translate-x-0 -translate-x-1/2 px-5 py-3 rounded-2xl shadow-xl z-[100] font-semibold text-white flex items-center gap-2.5 text-sm transition-all animate-slide-up ${toast.type === 'error' ? 'bg-rose-600' : 'bg-slate-800'}`}>
