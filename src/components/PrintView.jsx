@@ -183,25 +183,21 @@ const handlePrint = () => {
   setTimeout(() => { if (styleEl) styleEl.remove(); }, 1500);
 };
 
-// ── HTML Share / Download (replaces broken PDF) ───────────────────────────
-const handleShareHTML = async () => {
+// ── HTML Share / Download ─────────────────────────────────────────────────
+const handleShareHTML = () => {
   const element = document.getElementById('print-document');
   if (!element) { showToast('Document not found', 'error'); return; }
 
-  // Clone and apply inline styles — Tailwind classes won't work outside the app
   const clone = element.cloneNode(true);
-  clone.removeAttribute('class'); // strip Tailwind, use inline only
-  const paperW = isThermal ? '80mm' : isA5 ? '148mm' : '210mm';
+  clone.removeAttribute('class');
+  const paperW  = isThermal ? '80mm' : isA5 ? '148mm' : '210mm';
   const padding = isThermal ? '12px' : isA5 ? '20px' : '28px';
-  // A4/A5: width:100% + max-width so it fills small screens without overflowing
-  // Thermal: fixed 80mm (always narrower than phone screens)
   const widthCss = isThermal
-    ? `width:80mm;max-width:80mm;min-width:80mm`
+    ? 'width:80mm;max-width:80mm;min-width:80mm'
     : `width:100%;max-width:${paperW}`;
   clone.style.cssText = [
-    widthCss,
-    'margin:0 auto', `padding:${padding}`, 'background:white',
-    "font-family:'Inter',system-ui,sans-serif",
+    widthCss, 'margin:0 auto', `padding:${padding}`, 'background:white',
+    'font-family:system-ui,-apple-system,sans-serif',
     `font-size:${isThermal ? '10px' : isA5 ? '11px' : '12px'}`,
     'line-height:1.5', 'box-sizing:border-box',
   ].join(';');
@@ -217,35 +213,34 @@ const handleShareHTML = async () => {
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>${docTitle}</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com"/>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
   <style>
     *{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
-    body{margin:0;padding:${bodyPad};background:#f1f5f9;font-family:'Inter',system-ui,sans-serif;}
+    body{margin:0;padding:${bodyPad};background:#f1f5f9;font-family:system-ui,-apple-system,sans-serif;}
     @media print{body{padding:0;background:white;}@page{size:${pageSize};margin:${pageMargin};}
-      #doc{width:100%!important;max-width:none!important;padding:0!important;}}
+      #doc>*{width:100%!important;max-width:none!important;padding:0!important;}}
   </style>
 </head>
 <body><div id="doc">${clone.outerHTML}</div></body>
 </html>`;
 
-  const fileName = getFileName().replace(/\.[^.]+$/, '.html');
-  const blob = new Blob([html], { type: 'text/html' });
-  const file = new File([blob], fileName, { type: 'text/html' });
-
-  // iOS / Android: native share sheet → WhatsApp, Files, AirDrop, etc.
-  if (navigator.canShare && navigator.canShare({ files: [file] })) {
-    try { await navigator.share({ files: [file], title: docTitle }); return; }
-    catch (e) { if (e.name === 'AbortError') return; }
+  // Open in new browser tab — renders immediately, user can print/share from browser
+  // Must stay synchronous (no await) to preserve user-gesture context for window.open
+  const newWin = window.open('', '_blank');
+  if (newWin) {
+    newWin.document.open();
+    newWin.document.write(html);
+    newWin.document.close();
+    return;
   }
 
-  // Desktop / fallback: direct download
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = fileName;
+  // Fallback: download file if popup blocked
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = docTitle + '.html';
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   setTimeout(() => URL.revokeObjectURL(url), 10000);
-  showToast('Saved! Open the file in browser to view or print');
+  showToast('Downloaded! Open in browser to share or print');
 };
 
 // ── PDF download ──────────────────────────────────────────────────────────
