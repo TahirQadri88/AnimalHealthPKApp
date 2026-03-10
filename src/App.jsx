@@ -7,7 +7,8 @@ TrendingUp, Receipt, FileSpreadsheet, Calendar, Save, ChevronRight,
 Wallet, Download, Upload, TrendingDown, Filter, ArrowUpDown, Award, CreditCard,
 FileDown, BookOpen, ShoppingCart, Tag, Building2, BarChart2, PieChart, Activity,
 Percent, Hash, Zap, Archive, RefreshCw, Eye, EyeOff, ChevronDown, ChevronUp,
-AlignLeft, Bell, Star, Layers, Globe, PhoneCall, MapPin, Briefcase, ClipboardList, Copy
+AlignLeft, Bell, Star, Layers, Globe, PhoneCall, MapPin, Briefcase, ClipboardList, Copy,
+RotateCcw, FileText
 } from 'lucide-react';
 import { db, collection, onSnapshot, doc, setDoc, deleteDoc } from './firebase';
 import { APP_NAME, VEHICLES, getPKTDate, getLocalDateStr, formatDateDisp, checkDateFilter, exportToCSV } from './helpers';
@@ -243,7 +244,7 @@ return (
 };
 
 const CustomerLedgerModal = () => {
-const { selectedLedgerId, getCustomerLedger, generateReceiptData, setPrintConfig, setShowPaymentModal, setSelectedCustomerForPayment, setShowLedgerModal, deleteFromFirebase, saveToFirebase, invoices, isAdmin, setEditingPayment, payments } = useContext(AppContext);
+const { selectedLedgerId, getCustomerLedger, generateReceiptData, setPrintConfig, setShowPaymentModal, setSelectedCustomerForPayment, setShowLedgerModal, deleteFromFirebase, saveToFirebase, invoices, isAdmin, setEditingPayment, payments, setShowCreditNoteModal, setEditingCreditNote } = useContext(AppContext);
 const [startDate, setStartDate] = useState(() => { const d = new Date(); d.setMonth(d.getMonth() - 1); return getLocalDateStr(d); });
 const [endDate, setEndDate] = useState(getLocalDateStr());
 const fullLedger = getCustomerLedger(selectedLedgerId);
@@ -263,8 +264,9 @@ return (
 <div className="ml-2 text-right bg-rose-50 px-3 py-2 rounded-xl border border-rose-200 shadow-sm shrink-0"><p className="text-[9px] font-bold uppercase text-rose-600 tracking-widest">Current Balance</p><p className="text-base font-black text-rose-700 mt-0.5">Rs. {fullLedger.closingBal.toLocaleString()}</p></div>
 </div>
 <div className="flex gap-2">
-{isAdmin && <button onClick={() => { setEditingPayment(null); setSelectedCustomerForPayment(fullLedger.id); setShowPaymentModal(true); }} className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3.5 rounded-xl flex justify-center items-center gap-2 shadow-sm active:scale-[0.98] transition-all text-xs"><Wallet size={16} /> Receive Payment</button>}
-<button onClick={() => setPrintConfig({docType: 'ledger', format: 'a5', data: printData})} className="flex-1 bg-slate-800 hover:bg-slate-900 text-white font-bold py-3.5 rounded-xl flex justify-center items-center gap-2 shadow-sm active:scale-[0.98] transition-all text-xs"><FileSpreadsheet size={16} /> Print Ledger</button>
+{isAdmin && <button onClick={() => { setEditingPayment(null); setSelectedCustomerForPayment(fullLedger.id); setShowPaymentModal(true); }} className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 rounded-xl flex justify-center items-center gap-1.5 shadow-sm active:scale-[0.98] transition-all text-xs"><Wallet size={15} /> Receive Payment</button>}
+{isAdmin && <button onClick={() => { setEditingCreditNote({customerId: fullLedger.id, id: ''}); setShowCreditNoteModal(true); }} className="flex-1 bg-rose-500 hover:bg-rose-600 text-white font-bold py-3 rounded-xl flex justify-center items-center gap-1.5 shadow-sm active:scale-[0.98] transition-all text-xs"><RotateCcw size={15} /> Credit Note</button>}
+<button onClick={() => setPrintConfig({docType: 'ledger', format: 'a5', data: printData})} className="flex-1 bg-slate-800 hover:bg-slate-900 text-white font-bold py-3 rounded-xl flex justify-center items-center gap-1.5 shadow-sm active:scale-[0.98] transition-all text-xs"><FileSpreadsheet size={15} /> Print</button>
 </div>
 <div className="mt-6 border border-slate-200 rounded-2xl overflow-hidden shadow-sm bg-white">
 <div className="overflow-x-auto">
@@ -275,17 +277,36 @@ return (
 {filteredRows.map(row => (
 <tr key={row.id} className="hover:bg-slate-50 transition-colors">
 <td className="py-3 px-3 font-medium text-slate-600">{formatDateDisp(row.date)}</td>
-<td className="py-3 px-3"><span className="font-bold text-slate-800 block">{row.desc}</span><span className="block text-[9px] text-slate-400 mt-0.5">{row.ref}</span></td>
+<td className="py-3 px-3 max-w-[200px]">
+<span className={`font-bold block ${row.isCreditNote ? 'text-rose-700' : 'text-slate-800'}`}>{row.desc}</span>
+<span className="block text-[9px] text-slate-400 mt-0.5">{row.ref}</span>
+{row.isCreditNote && <span className="text-[9px] bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded font-bold uppercase mt-1 inline-block">Credit Note</span>}
+{(row.lineItems || []).length > 0 && (
+  <div className="mt-1.5 space-y-0.5 border-t border-slate-100 pt-1.5">
+    {row.lineItems.map((li, idx) => (
+      <div key={idx} className="text-[10px] text-slate-600 font-medium flex justify-between gap-2">
+        <span className="flex-1 truncate">{li.isBonus ? '🎁 ' : '• '}{li.name} ×{li.qty}{!li.isBonus && <span className="text-slate-400"> @ Rs.{li.price.toLocaleString()}</span>}</span>
+        <span className="font-bold text-slate-700 shrink-0">{li.isBonus ? 'FREE' : `Rs.${li.subtotal.toLocaleString()}`}</span>
+      </div>
+    ))}
+    {(row.deliveryBilled || 0) > 0 && (
+      <div className="text-[10px] text-slate-500 flex justify-between"><span>+ Delivery</span><span>Rs.{row.deliveryBilled.toLocaleString()}</span></div>
+    )}
+  </div>
+)}
+</td>
 <td className="py-3 px-3 text-right font-extrabold text-indigo-600">{row.debit > 0 ? row.debit.toLocaleString() : '-'}</td>
 <td className="py-3 px-3 text-right font-extrabold text-emerald-600">{row.credit > 0 ? row.credit.toLocaleString() : '-'}</td>
 <td className="py-3 px-3 text-right font-extrabold text-slate-800">{row.balance.toLocaleString()}</td>
 <td className="py-3 px-2 text-center">
-<div className="flex gap-1 justify-center">
-{row.credit > 0 && (<button onClick={() => setPrintConfig({docType: 'receipt', format: 'thermal', data: generateReceiptData(fullLedger, row.id)})} title="Print Receipt" className="p-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-lg transition-colors"><Receipt size={14}/></button>)}
+<div className="flex gap-1 justify-center flex-wrap">
+{row.debit > 0 && !row.isCreditNote && (<button onClick={() => { const inv = invoices.find(o => o.id === row.id); if(inv) setPrintConfig({docType:'invoice', format:'thermal', data: inv}); }} title="Print Invoice" className="p-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-500 rounded-lg transition-colors"><ReceiptText size={13}/></button>)}
+{row.isCreditNote && (<button onClick={() => { const cn = invoices.find(o => o.id === row.id); if(cn) setPrintConfig({docType:'creditnote', format:'a4', data: cn}); }} title="Print Credit Note" className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-500 rounded-lg transition-colors"><FileText size={13}/></button>)}
+{row.credit > 0 && !row.isCreditNote && (<button onClick={() => setPrintConfig({docType: 'receipt', format: 'thermal', data: generateReceiptData(fullLedger, row.id)})} title="Print Receipt" className="p-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 rounded-lg transition-colors"><Receipt size={13}/></button>)}
 {isAdmin && row.credit > 0 && row.id.startsWith('REC-') && (
-<button title="Edit Payment" onClick={() => { const pay = payments.find(p => p.id === row.id); if(pay){ setEditingPayment(pay); setSelectedCustomerForPayment(fullLedger.id); setShowPaymentModal(true); }}} className="p-1.5 bg-amber-50 hover:bg-amber-100 text-amber-600 rounded-lg transition-colors"><Edit size={14}/></button>
+<button title="Edit Payment" onClick={() => { const pay = payments.find(p => p.id === row.id); if(pay){ setEditingPayment(pay); setSelectedCustomerForPayment(fullLedger.id); setShowPaymentModal(true); }}} className="p-1.5 bg-amber-50 hover:bg-amber-100 text-amber-600 rounded-lg transition-colors"><Edit size={13}/></button>
 )}
-{isAdmin && row.credit > 0 && (
+{isAdmin && row.credit > 0 && !row.isCreditNote && (
 <button title="Delete Payment" onClick={async () => {
   if (!window.confirm('Delete this payment record?')) return;
   if (row.id.startsWith('REC-')) {
@@ -510,7 +531,7 @@ return (
 };
 
 const BillingTab = () => {
-const { isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig } = useContext(AppContext);
+const { isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig, setShowCreditNoteModal, setEditingCreditNote } = useContext(AppContext);
 const [search, setSearch] = useState('');
 const [dateFilter, setDateFilter] = useState('All Time');
 const [statusFilter, setStatusFilter] = useState('All');
@@ -681,26 +702,27 @@ return (
 </div>
 <div className="flex items-center gap-2 mb-3"><Calendar size={18} className="text-slate-400" /><select value={dateFilter} onChange={e => setDateFilter(e.target.value)} className="bg-white border border-slate-200 px-3 py-2 rounded-lg font-bold text-sm text-slate-700 outline-none flex-1"><option>All Time</option><option>Today</option><option>This Week</option><option>This Month</option><option>This Year</option></select></div>
 <div className="flex gap-1.5 mb-4">
-{[{v:'All',l:'All'},{v:'Estimate',l:'Quotes'},{v:'Booked',l:'Orders'},{v:'Billed',l:'Invoices'}].map(({v,l}) => (
-<button key={v} onClick={() => setStatusFilter(v)} className={`flex-1 py-1.5 rounded-lg font-bold text-xs transition-all ${statusFilter===v ? (v==='Estimate'?'bg-violet-600 text-white':v==='Booked'?'bg-amber-500 text-white':v==='Billed'?'bg-indigo-600 text-white':'bg-slate-800 text-white') : 'bg-white text-slate-500 border border-slate-200 hover:border-slate-300'}`}>{l}</button>
+{[{v:'All',l:'All'},{v:'Estimate',l:'Quotes'},{v:'Booked',l:'Orders'},{v:'Billed',l:'Invoices'},{v:'CreditNote',l:'Returns'}].map(({v,l}) => (
+<button key={v} onClick={() => setStatusFilter(v)} className={`flex-1 py-1.5 rounded-lg font-bold text-xs transition-all ${statusFilter===v ? (v==='Estimate'?'bg-violet-600 text-white':v==='Booked'?'bg-amber-500 text-white':v==='Billed'?'bg-indigo-600 text-white':v==='CreditNote'?'bg-rose-600 text-white':'bg-slate-800 text-white') : 'bg-white text-slate-500 border border-slate-200 hover:border-slate-300'}`}>{l}</button>
 ))}
 </div>
 <div className="flex-1 overflow-y-auto space-y-3 pb-24 pr-1">
 {filtered.slice().reverse().map(o => (
 <div key={o.id} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden group hover:border-indigo-200">
-<div className={`absolute top-0 left-0 w-1.5 h-full ${o.status==='Estimate'?'bg-violet-400':o.status==='Billed'?(o.paymentStatus==='Paid'?'bg-emerald-500':'bg-amber-500'):'bg-slate-300'}`}></div>
+<div className={`absolute top-0 left-0 w-1.5 h-full ${o.status==='CreditNote'?'bg-rose-500':o.status==='Estimate'?'bg-violet-400':o.status==='Billed'?(o.paymentStatus==='Paid'?'bg-emerald-500':'bg-amber-500'):'bg-slate-300'}`}></div>
 <div className="flex justify-between border-b border-slate-100 pb-3 mb-3 pl-3">
-<div><h4 className="font-bold text-slate-800 text-sm">{o.customerName}</h4><p className="text-[11px] text-slate-500 font-medium mt-0.5">{o.id} \u2022 {formatDateDisp(o.date)} \u2022 <span className={`font-bold ${o.status==='Billed'?'text-indigo-600':o.status==='Estimate'?'text-violet-600':'text-amber-500'}`}>{o.status}</span></p></div>
-<div className="text-right"><p className="font-extrabold text-indigo-700 text-base">Rs. {o.total.toLocaleString()}</p><p className={`text-[9px] font-bold uppercase tracking-widest mt-1 ${o.status==='Billed'?'text-indigo-500':'text-slate-400'}`}>{o.status}</p></div>
+<div><h4 className="font-bold text-slate-800 text-sm">{o.customerName}</h4><p className="text-[11px] text-slate-500 font-medium mt-0.5">{o.id} \u2022 {formatDateDisp(o.date)} \u2022 <span className={`font-bold ${o.status==='Billed'?'text-indigo-600':o.status==='Estimate'?'text-violet-600':o.status==='CreditNote'?'text-rose-600':'text-amber-500'}`}>{o.status==='CreditNote'?'Credit Note':o.status}</span></p></div>
+<div className="text-right"><p className={`font-extrabold text-base ${o.status==='CreditNote'?'text-rose-600':'text-indigo-700'}`}>{o.status==='CreditNote'?'-':''} Rs. {o.total.toLocaleString()}</p><p className={`text-[9px] font-bold uppercase tracking-widest mt-1 ${o.status==='Billed'?'text-indigo-500':o.status==='CreditNote'?'text-rose-500':'text-slate-400'}`}>{o.status==='CreditNote'?'Credit Note':o.status}</p></div>
 </div>
 <div className="flex justify-between items-center pl-3">
 <div className="flex items-center gap-2"><span className={`text-[9px] px-2 py-0.5 rounded font-bold uppercase tracking-wider ${o.paymentStatus==='Paid'?'bg-emerald-100 text-emerald-700':o.paymentStatus==='Partial'?'bg-amber-100 text-amber-700':'bg-rose-100 text-rose-700'}`}>{o.paymentStatus}</span></div>
 <div className="flex gap-1.5">
 {o.status === 'Estimate' && isAdmin && <button onClick={async () => { await saveToFirebase('invoices', o.id, {...o, status: 'Booked'}); showToast('Converted to Draft Order'); }} title="Convert to Order" className="p-2 bg-amber-50 text-amber-600 hover:bg-amber-100 border border-amber-200 rounded-lg"><Save size={14}/></button>}
 {o.status === 'Estimate' && isAdmin && <button onClick={async () => { await saveToFirebase('invoices', o.id, {...o, status: 'Billed'}); showToast('Converted to Invoice'); }} title="Convert to Invoice" className="p-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-200 rounded-lg"><ReceiptText size={14}/></button>}
-{isAdmin && <button onClick={() => { setCurrentInvoice(o); setBillingView('form'); }} className="p-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 rounded-lg"><Edit size={16}/></button>}
+{o.status === 'Billed' && isAdmin && <button onClick={() => { setEditingCreditNote({customerId: o.customerId, id: o.id}); setShowCreditNoteModal(true); }} title="Issue Credit Note / Return" className="p-2 bg-rose-50 text-rose-500 hover:bg-rose-100 border border-rose-200 rounded-lg"><RotateCcw size={14}/></button>}
+{isAdmin && o.status !== 'CreditNote' && <button onClick={() => { setCurrentInvoice(o); setBillingView('form'); }} className="p-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 rounded-lg"><Edit size={16}/></button>}
 {isAdmin && <button onClick={async () => { if(window.confirm(`Delete ${o.id}?`)) await deleteFromFirebase('invoices', o.id); }} title="Delete" className="p-2 bg-rose-50 text-rose-500 hover:bg-rose-100 rounded-lg"><Trash2 size={16}/></button>}
-{o.status === 'Estimate' ? <button onClick={() => setPrintConfig({docType: 'estimate', format: 'a4', data: o})} title="View Estimate" className="p-2 bg-violet-50 text-violet-600 hover:bg-violet-100 rounded-lg"><FileText size={16}/></button> : <><button onClick={() => setPrintConfig({docType: 'dispatch', format: 'thermal', data: o})} title="Dispatch" className="p-2 bg-amber-50 text-amber-600 rounded-lg"><Truck size={16}/></button><button onClick={() => setPrintConfig({docType: 'invoice', format: 'thermal', data: o})} title="Print" className="p-2 bg-indigo-50 text-indigo-600 rounded-lg"><ReceiptText size={16}/></button></>}
+{o.status === 'Estimate' ? <button onClick={() => setPrintConfig({docType: 'estimate', format: 'a4', data: o})} title="View Estimate" className="p-2 bg-violet-50 text-violet-600 hover:bg-violet-100 rounded-lg"><FileText size={16}/></button> : o.status === 'CreditNote' ? <button onClick={() => setPrintConfig({docType: 'creditnote', format: 'a4', data: o})} title="Print Credit Note" className="p-2 bg-rose-50 text-rose-600 rounded-lg"><FileText size={16}/></button> : <><button onClick={() => setPrintConfig({docType: 'dispatch', format: 'thermal', data: o})} title="Dispatch" className="p-2 bg-amber-50 text-amber-600 rounded-lg"><Truck size={16}/></button><button onClick={() => setPrintConfig({docType: 'invoice', format: 'thermal', data: o})} title="Print" className="p-2 bg-indigo-50 text-indigo-600 rounded-lg"><ReceiptText size={16}/></button></>}
 </div>
 </div>
 </div>
@@ -768,6 +790,130 @@ Bal: Rs. {bal.toLocaleString()} {bal > 0 ? '(Dr)' : bal < 0 ? '(Cr)' : ''}
 </div>
 );
 })}
+</div>
+</div>
+);
+};
+
+// ─── Credit Note Modal ───
+const CreditNoteModal = () => {
+const { isAdmin, currentUser, products, customers, invoices, showToast, saveToFirebase, setShowCreditNoteModal, editingCreditNote, setEditingCreditNote, getCompanyName } = useContext(AppContext);
+const inputClass = "w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all shadow-sm text-slate-800 placeholder-slate-400";
+const [form, setForm] = useState({
+  customerId: editingCreditNote?.customerId || '',
+  originalInvoiceId: editingCreditNote?.id || '',
+  date: getLocalDateStr(),
+  reason: '',
+  items: [],
+});
+const [prodSearch, setProdSearch] = useState('');
+const grandTotal = form.items.reduce((s, i) => s + (i.price * i.quantity), 0);
+const handleAddItem = (p) => {
+  const existing = form.items.find(i => i.productId === p.id);
+  if (existing) { setForm({...form, items: form.items.map(i => i.productId === p.id ? {...i, quantity: i.quantity + 1} : i)}); }
+  else { setForm({...form, items: [...form.items, { productId: p.id, name: p.name, price: p.sellingPrice, costPrice: p.costPrice, company: getCompanyName(p.companyId), quantity: 1, unit: p.unit, unitsInBox: p.unitsInBox, isBonus: false }]}); }
+  setProdSearch('');
+};
+const save = async () => {
+  if (!form.customerId || form.items.length === 0) return showToast('Customer and at least one item required', 'error');
+  const total = grandTotal;
+  const cust = customers.find(c => c.id === Number(form.customerId));
+  const cn = {
+    id: `CN-${Math.floor(Math.random() * 100000)}`,
+    date: form.date,
+    customerId: Number(form.customerId),
+    customerName: cust?.name || '',
+    originalInvoiceId: form.originalInvoiceId || '',
+    items: form.items,
+    deliveryBilled: 0,
+    total,
+    reason: form.reason || '',
+    status: 'CreditNote',
+    salespersonId: currentUser.id,
+    salespersonName: currentUser.name,
+    customerDetails: cust ? { contactPerson: cust.contactPerson || '', phone: cust.phone || '', address1: cust.address1 || cust.address || '' } : {},
+  };
+  await saveToFirebase('invoices', cn.id, cn);
+  showToast('Credit Note Saved!');
+  setEditingCreditNote(null);
+  setShowCreditNoteModal(false);
+};
+return (
+<div className="h-full flex flex-col bg-slate-50 absolute inset-0 z-20 animate-slide-up">
+<div className="bg-white/80 backdrop-blur-md p-4 border-b border-slate-200 flex justify-between items-center sticky top-0 z-30 shadow-sm">
+<div>
+  <h2 className="text-lg font-extrabold text-slate-800 tracking-tight">Credit Note / Sales Return</h2>
+  <p className="text-[10px] font-bold text-rose-500 uppercase tracking-widest">CN-{form.date}</p>
+</div>
+<button onClick={() => { setEditingCreditNote(null); setShowCreditNoteModal(false); }} className="p-2 bg-slate-100 rounded-full text-slate-600 hover:bg-slate-200 transition-colors"><X size={20}/></button>
+</div>
+<div className="flex-1 overflow-y-auto p-4 space-y-5 pb-32">
+<div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+  <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5"><Users size={12}/> Customer</h3>
+  <select className={inputClass} value={form.customerId} onChange={e => setForm({...form, customerId: e.target.value})}>
+    <option value="">— Select Customer —</option>
+    {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+  </select>
+</div>
+<div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+  <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Return Details</h3>
+  <div className="grid grid-cols-2 gap-3 mb-3">
+    <div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Date</label><input type="date" className={inputClass} value={form.date} onChange={e => setForm({...form, date: e.target.value})} /></div>
+    <div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Orig. Invoice (optional)</label><input placeholder="INV-XXXX" className={inputClass} value={form.originalInvoiceId} onChange={e => setForm({...form, originalInvoiceId: e.target.value})} /></div>
+  </div>
+  <div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Reason for Return</label><input placeholder="e.g. Expired goods, Wrong item, Excess stock..." className={inputClass} value={form.reason} onChange={e => setForm({...form, reason: e.target.value})} /></div>
+</div>
+<div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+  <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5"><Package size={12}/> Returned Items</h3>
+  <div className="relative mb-4"><Search size={16} className="absolute left-3.5 top-3.5 text-slate-400"/><input placeholder="Search product to add..." className={`pl-10 ${inputClass}`} value={prodSearch} onChange={e => setProdSearch(e.target.value)} /></div>
+  {prodSearch && (
+    <div className="border border-rose-200 bg-rose-50/50 rounded-xl mb-4 max-h-48 overflow-y-auto p-2 space-y-1 shadow-inner">
+      {products.filter(p => p.name.toLowerCase().includes(prodSearch.toLowerCase())).map(p => (
+        <div key={p.id} className="p-2 bg-white rounded-lg shadow-sm border border-rose-100 flex justify-between items-center cursor-pointer hover:bg-rose-50 transition-colors" onClick={() => handleAddItem(p)}>
+          <span className="font-semibold text-sm text-slate-800">{p.name}</span>
+          <span className="text-rose-600 font-bold ml-2">Rs.{p.sellingPrice}</span>
+        </div>
+      ))}
+    </div>
+  )}
+  <div className="space-y-3">
+    {form.items.map(item => (
+      <div key={item.productId} className="bg-slate-50 p-3 rounded-xl border border-slate-200 shadow-sm">
+        <div className="flex justify-between items-start mb-2">
+          <p className="font-bold text-sm text-slate-800 leading-tight">{item.name}</p>
+          <button onClick={() => setForm({...form, items: form.items.filter(i => i.productId !== item.productId)})} className="text-slate-400 hover:text-rose-500"><X size={16}/></button>
+        </div>
+        <div className="flex items-center justify-between">
+          <div className="flex flex-col">
+            <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5 ml-1">Rate (Rs)</label>
+            <input type="number" className="w-24 p-1.5 text-sm font-extrabold text-rose-700 bg-white border border-rose-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-500 shadow-inner" value={item.price} onChange={e => setForm({...form, items: form.items.map(i => i.productId === item.productId ? {...i, price: Number(e.target.value)} : i)})} />
+          </div>
+          <div className="flex flex-col items-center">
+            <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Quantity</label>
+            <div className="flex items-center bg-white border border-slate-200 rounded-lg p-0.5 shadow-sm">
+              <button onClick={() => setForm({...form, items: form.items.map(i => i.productId === item.productId ? {...i, quantity: i.quantity - 1} : i).filter(i => i.quantity > 0)})} className="w-8 h-8 rounded-md bg-slate-50 text-slate-600 font-bold hover:bg-slate-100">-</button>
+              <input type="number" className="w-12 text-center text-sm font-bold bg-transparent outline-none appearance-none" value={item.quantity} onChange={e => setForm({...form, items: form.items.map(i => i.productId === item.productId ? {...i, quantity: Number(e.target.value)} : i)})} />
+              <button onClick={() => setForm({...form, items: form.items.map(i => i.productId === item.productId ? {...i, quantity: i.quantity + 1} : i)})} className="w-8 h-8 rounded-md bg-rose-50 text-rose-600 font-bold hover:bg-rose-100">+</button>
+            </div>
+          </div>
+          <div className="text-right">
+            <p className="text-[9px] text-slate-400 font-bold uppercase">Subtotal</p>
+            <p className="font-extrabold text-rose-700 text-sm">Rs.{(item.price * item.quantity).toLocaleString()}</p>
+          </div>
+        </div>
+      </div>
+    ))}
+    {form.items.length === 0 && <p className="text-center text-slate-400 text-sm py-4 font-medium">Search and add returned items above</p>}
+  </div>
+</div>
+<div className="bg-gradient-to-br from-rose-50 to-pink-50 p-6 rounded-2xl border border-rose-100 text-center shadow-sm">
+  <p className="text-rose-600 font-bold uppercase text-[10px] tracking-widest mb-1">Total Credit</p>
+  <p className="text-4xl font-black text-rose-800 tracking-tight">Rs. {grandTotal.toLocaleString()}</p>
+</div>
+</div>
+<div className="p-4 bg-white/80 backdrop-blur-md border-t border-slate-200 fixed bottom-0 w-full max-w-md flex gap-3 z-30">
+<button onClick={() => { setEditingCreditNote(null); setShowCreditNoteModal(false); }} className="flex-1 bg-white text-slate-700 border border-slate-300 py-3.5 rounded-xl font-bold shadow-sm flex justify-center items-center gap-2"><X size={18}/> Cancel</button>
+<button onClick={save} className="flex-[2] bg-rose-600 hover:bg-rose-700 text-white py-3.5 rounded-xl font-bold shadow-md flex justify-center items-center gap-2 active:scale-95 transition-all"><RotateCcw size={18}/> Save Credit Note</button>
 </div>
 </div>
 );
@@ -1274,6 +1420,30 @@ const reportEngine = useMemo(() => {
     o.items.forEach(item => { monthlyData[month].revenue += item.price * item.quantity; monthlyData[month].cost += (item.costPrice||0) * item.quantity; monthlyData[month].profit += (item.price - (item.costPrice||0)) * item.quantity; });
     monthlyData[month].orders += 1;
   });
+  // Credit Note impact — subtract returned values from all metrics (after monthlyData is built)
+  const creditNotes = invoices.filter(o => o.status === 'CreditNote' && checkCustomFilter(o.date) && (!filterCustomer || o.customerId === Number(filterCustomer)) && (!filterSalesperson || o.salespersonId === Number(filterSalesperson)));
+  creditNotes.forEach(cn => {
+    (cn.items || []).forEach(item => {
+      if (item.isBonus) return;
+      const rev = (item.price || 0) * (item.quantity || 0);
+      const cost = (item.costPrice || 0) * (item.quantity || 0);
+      const gp = rev - cost;
+      kpis.productRevenue -= rev; kpis.totalCOGS -= cost; kpis.grossMargin -= gp;
+      kpis.netProfit -= gp;
+      const pKey = item.name;
+      if (!byProduct[pKey]) byProduct[pKey] = { qty: 0, revenue: 0, cost: 0, profit: 0, company: item.company || '' };
+      byProduct[pKey].qty -= (item.quantity || 0); byProduct[pKey].revenue -= rev; byProduct[pKey].cost -= cost; byProduct[pKey].profit -= gp;
+      const cmpKey = item.company || 'Unknown';
+      if (!byCompany[cmpKey]) byCompany[cmpKey] = { qty: 0, revenue: 0, cost: 0, profit: 0 };
+      byCompany[cmpKey].revenue -= rev; byCompany[cmpKey].profit -= gp;
+    });
+    if (!byCustomer[cn.customerName]) byCustomer[cn.customerName] = { productRevenue: 0, cost: 0, profit: 0, orders: 0 };
+    byCustomer[cn.customerName].productRevenue -= cn.total; byCustomer[cn.customerName].profit -= cn.total;
+    const month = cn.date.slice(0, 7);
+    if (monthlyData[month]) { monthlyData[month].revenue -= cn.total; monthlyData[month].profit -= cn.total; }
+  });
+  kpis.creditNotesCount = creditNotes.length;
+  kpis.creditNotesTotal = creditNotes.reduce((s, cn) => s + cn.total, 0);
   // Payment collection rate for filtered period
   const totalBilledAmt = billedForPnL.reduce((s, o) => s + o.total, 0);
   const invoiceCollected = billedForPnL.reduce((s, o) => s + Number(o.receivedAmount||0), 0);
@@ -1304,7 +1474,14 @@ const handleExport = (format) => {
         if(view === 'Overview') return showToast("Cannot export Overview as CSV", "error");
         exportToCSV(exportData, `${title.replace(/ /g, '_')}_${dateFilter}.csv`);
     } else if (format === 'pdf') {
-        setPrintConfig({ docType: 'report', format: 'a5', data: { title, dateFilter, view, stats: reportEngine.kpis, rows: exportData } });
+        const appliedFilters = {
+          company: filterCompany ? (companies.find(c=>String(c.id)===filterCompany)?.name || filterCompany) : '',
+          customer: filterCustomer ? (customers.find(c=>String(c.id)===filterCustomer)?.name || filterCustomer) : '',
+          salesperson: filterSalesperson ? (appUsers.find(u=>String(u.id)===filterSalesperson)?.name || filterSalesperson) : '',
+          customStart: dateFilter === 'Custom' ? customStart : '',
+          customEnd: dateFilter === 'Custom' ? customEnd : '',
+        };
+        setPrintConfig({ docType: 'report', format: 'a5', data: { title, dateFilter, view, stats: reportEngine.kpis, rows: exportData, appliedFilters, generatedOn: getLocalDateStr() } });
     } else if (format === 'text') {
         const kpis = reportEngine.kpis;
         const margin = kpis.productRevenue > 0 ? ((kpis.grossMargin / kpis.productRevenue) * 100).toFixed(1) : 0;
@@ -1520,6 +1697,24 @@ return (
          <button key={v} onClick={() => setView(v)} className={`px-3 py-1.5 rounded-xl font-bold text-[11px] whitespace-nowrap shadow-sm transition-colors ${view === v ? 'bg-slate-800 text-white' : 'bg-white text-slate-600 border border-slate-200'}`}>{v}</button>
        ))}
     </div>
+
+    {/* Active filter chips */}
+    {(filterCompany || filterCustomer || filterSalesperson) && (
+      <div className="flex flex-wrap gap-1.5 mb-2 px-0.5 shrink-0">
+        {filterCompany && <span className="bg-indigo-100 text-indigo-700 text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1">
+          Co: {companies.find(c=>String(c.id)===filterCompany)?.name}
+          <button onClick={()=>setFilterCompany('')} className="ml-1 text-indigo-400 hover:text-indigo-700"><X size={10}/></button>
+        </span>}
+        {filterCustomer && <span className="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1">
+          Client: {customers.find(c=>String(c.id)===filterCustomer)?.name}
+          <button onClick={()=>setFilterCustomer('')} className="ml-1 text-emerald-400 hover:text-emerald-700"><X size={10}/></button>
+        </span>}
+        {filterSalesperson && <span className="bg-amber-100 text-amber-700 text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1">
+          SP: {appUsers.find(u=>String(u.id)===filterSalesperson)?.name}
+          <button onClick={()=>setFilterSalesperson('')} className="ml-1 text-amber-400 hover:text-amber-700"><X size={10}/></button>
+        </span>}
+      </div>
+    )}
 
     {/* Export bar */}
     <div className="flex justify-between items-center bg-indigo-50/50 border border-indigo-100 p-2 rounded-xl my-2 shrink-0">
@@ -2238,6 +2433,8 @@ const [editingUser, setEditingUser] = useState(null);
 const [printConfig, setPrintConfig] = useState(null);
 const [showSegmentsModal, setShowSegmentsModal] = useState(false);
 const [editingPayment, setEditingPayment] = useState(null);
+const [showCreditNoteModal, setShowCreditNoteModal] = useState(false);
+const [editingCreditNote, setEditingCreditNote] = useState(null);
 
 const isAdmin = currentUser?.role === 'admin';
 
@@ -2299,10 +2496,15 @@ if (!customer) return null;
 const openingBal = customer.openingBalance || 0;
 let entries = [];
 invoices.filter(o => o.customerId === customerId && o.status === 'Billed').forEach(inv => {
-entries.push({ id: inv.id, date: inv.date, ref: inv.id, desc: 'Sales Invoice', debit: inv.total, credit: 0, timestamp: new Date(inv.date).getTime() });
+const itemLines = (inv.items || []).map(i => ({ name: i.name, qty: i.quantity, price: i.isBonus ? 0 : (i.price || 0), subtotal: i.isBonus ? 0 : (i.price || 0) * (i.quantity || 0), isBonus: !!i.isBonus }));
+entries.push({ id: inv.id, date: inv.date, ref: inv.id, desc: 'Sales Invoice', debit: inv.total, credit: 0, lineItems: itemLines, deliveryBilled: inv.deliveryBilled || 0, timestamp: new Date(inv.date).getTime() });
 if (inv.receivedAmount > 0) {
 entries.push({ id: `${inv.id}-PAY`, date: inv.date, ref: inv.id, desc: 'Payment (On Invoice)', debit: 0, credit: Number(inv.receivedAmount), timestamp: new Date(inv.date).getTime() + 1 });
 }
+});
+invoices.filter(o => o.customerId === customerId && o.status === 'CreditNote').forEach(cn => {
+const cnLines = (cn.items || []).map(i => ({ name: i.name, qty: i.quantity, price: i.price || 0, subtotal: (i.price || 0) * (i.quantity || 0), isBonus: false }));
+entries.push({ id: cn.id, date: cn.date, ref: cn.originalInvoiceId ? `Ref: ${cn.originalInvoiceId}` : cn.id, desc: `Credit Note / Sales Return${cn.reason ? ` \u2014 ${cn.reason}` : ''}`, debit: 0, credit: cn.total, lineItems: cnLines, isCreditNote: true, timestamp: new Date(cn.date).getTime() + 3 });
 });
 payments.filter(p => p.customerId === customerId).forEach(pay => {
 entries.push({ id: pay.id, date: pay.date, ref: pay.id, desc: pay.note || 'Payment Received', debit: 0, credit: Number(pay.amount), timestamp: new Date(pay.date).getTime() + 2 });
@@ -2357,6 +2559,7 @@ useEffect(() => {
       else if (showProductModal) setShowProductModal(false);
       else if (showCustomerModal) setShowCustomerModal(false);
       else if (showPaymentModal) { setEditingPayment(null); setShowPaymentModal(false); }
+      else if (showCreditNoteModal) { setEditingCreditNote(null); setShowCreditNoteModal(false); }
       else if (showLedgerModal) setShowLedgerModal(false);
       else if (showUserModal) setShowUserModal(false);
       else if (showExpenseCatModal) setShowExpenseCatModal(false);
@@ -2366,7 +2569,7 @@ useEffect(() => {
   };
   window.addEventListener('keydown', handler);
   return () => window.removeEventListener('keydown', handler);
-}, [currentUser, printConfig, showProductModal, showCustomerModal, showPaymentModal, showLedgerModal, showUserModal, showExpenseCatModal, showSegmentsModal, billingView]);
+}, [currentUser, printConfig, showProductModal, showCustomerModal, showPaymentModal, showCreditNoteModal, showLedgerModal, showUserModal, showExpenseCatModal, showSegmentsModal, billingView]);
 
 // — Auth Screen —
 if (!currentUser) {
@@ -2417,6 +2620,7 @@ showUserModal, setShowUserModal, editingUser, setEditingUser,
 setPrintConfig, printConfig,
 showSegmentsModal, setShowSegmentsModal,
 editingPayment, setEditingPayment,
+showCreditNoteModal, setShowCreditNoteModal, editingCreditNote, setEditingCreditNote,
 };
 return (
 <AppContext.Provider value={ctx}>
@@ -2525,6 +2729,7 @@ return (
   {showCustomerModal && <CustomerModal />}
   {showLedgerModal && <CustomerLedgerModal />}
   {showPaymentModal && <PaymentModal />}
+  {showCreditNoteModal && <CreditNoteModal />}
   {showExpenseCatModal && <ExpenseCategoryModal />}
   {showUserModal && <UserModal />}
   {showSegmentsModal && <SegmentsModal />}

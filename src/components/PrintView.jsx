@@ -34,7 +34,7 @@ const getFileName = () => {
   const custName = safeStr(data?.customerName || data?.title || 'Doc');
   const ref = safeStr(data?.id || '');
   const dateStr = (data?.date || getLocalDateStr()).replace(/-/g, '');
-  const labels = { invoice: 'Invoice', dispatch: 'DispatchNote', receipt: 'Receipt', ledger: 'Ledger', report: 'Report', estimate: 'Estimate' };
+  const labels = { invoice: 'Invoice', dispatch: 'DispatchNote', receipt: 'Receipt', ledger: 'Ledger', report: 'Report', estimate: 'Estimate', creditnote: 'CreditNote' };
   const label = labels[docType] || 'Document';
   if (docType === 'ledger') {
     const start = (data?.dateRange?.start || '').replace(/-/g, '');
@@ -43,7 +43,9 @@ const getFileName = () => {
   }
   if (docType === 'report') {
     const viewStr = safeStr(data?.view || 'Overview');
-    const periodStr = safeStr(data?.dateFilter || 'All');
+    const periodStr = data?.dateFilter === 'Custom' && data?.appliedFilters?.customStart
+      ? `${(data.appliedFilters.customStart||'').replace(/-/g,'')}to${(data.appliedFilters.customEnd||'').replace(/-/g,'')}`
+      : safeStr(data?.dateFilter || 'All');
     return `${label}_${viewStr}_${periodStr}.pdf`;
   }
   return `${label}_${ref}_${custName}_${dateStr}.pdf`;
@@ -104,6 +106,22 @@ const generateShareText = () => {
     text += `*Estimated Total: Rs.${(estimateItemsTotal + (data.deliveryBilled || 0)).toLocaleString()}*\n\n`;
     text += `⚠ _Rates and availability can change anytime without prior notice._\n`;
     text += `This estimate is for reference only and does not constitute a final invoice.`;
+
+  } else if (docType === 'creditnote') {
+    text += `*CREDIT NOTE / SALES RETURN*\n`;
+    text += `${hr}\n`;
+    text += `Ref: ${data.id}\n`;
+    text += `Date: ${formatDateDisp(data.date)}\n`;
+    text += `Customer: *${data.customerName}*\n`;
+    if (data.originalInvoiceId) text += `Original Invoice: ${data.originalInvoiceId}\n`;
+    text += `\n*Items Returned:*\n`;
+    (data.items || []).forEach(i => {
+      text += `• ${i.name} ×${i.quantity} @ Rs.${i.price || 0} = Rs.${((i.price||0)*(i.quantity||0)).toLocaleString()}\n`;
+    });
+    text += `${hr}\n`;
+    text += `*Total Credit: Rs.${(data.total||0).toLocaleString()}*\n`;
+    if (data.reason) text += `Reason: ${data.reason}\n`;
+    text += `\nThis amount has been credited to your account.`;
 
   } else if (docType === 'dispatch') {
     text += `*DISPATCH NOTE #${data.id}*\n`;
@@ -365,6 +383,7 @@ const docLabel = {
   ledger: 'Account Statement',
   report: 'Analytics Report',
   estimate: 'Price Estimate / Quotation',
+  creditnote: 'Sales Return / Credit Note',
 }[docType] || 'Document';
 
 // Sizing helpers
@@ -568,16 +587,31 @@ return (
     {/* ── Report Content ── */}
     {docType === 'report' && data && (
       <div style={{ color: '#1e293b' }}>
-        <div className="keep-together" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: sz('10px','14px','16px'), borderBottom: '2px solid #1e293b', paddingBottom: '8px', flexWrap: 'wrap', gap: '6px' }}>
+        <div className="keep-together" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: sz('6px','10px','12px'), borderBottom: '2px solid #1e293b', paddingBottom: '8px', flexWrap: 'wrap', gap: '6px' }}>
           <div>
             <div style={{ fontSize: sz('14px','18px','22px'), fontWeight: 900, lineHeight: 1.2 }}>{data.title || 'Report'}</div>
-            <div style={{ fontSize: '9px', color: '#64748b', marginTop: '3px' }}>Generated {formatDateDisp(getLocalDateStr())}</div>
+            <div style={{ fontSize: '9px', color: '#64748b', marginTop: '3px' }}>Generated {formatDateDisp(data.generatedOn || getLocalDateStr())}</div>
           </div>
           <div style={{ textAlign: 'right', background: '#f1f5f9', padding: '6px 12px', borderRadius: '8px', flexShrink: 0 }}>
             <div style={{ fontSize: '7.5px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px' }}>Period</div>
             <div style={{ fontWeight: 800, color: '#1e293b', fontSize: '11px' }}>{data.dateFilter || 'All Time'}</div>
           </div>
         </div>
+
+        {/* Criteria box */}
+        {(data.appliedFilters?.company || data.appliedFilters?.customer || data.appliedFilters?.salesperson || data.appliedFilters?.customStart) && (
+          <div className="keep-together" style={{ marginBottom: sz('8px','12px','14px'), padding: sz('6px 8px','8px 12px','10px 14px'), background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '8px', fontSize: sz('7px','8px','9px') }}>
+            <div style={{ fontWeight: 800, color: '#0369a1', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '5px', fontSize: sz('6px','7px','7.5px') }}>
+              Filters Applied
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 12px', color: '#0c4a6e' }}>
+              {data.appliedFilters.company && <span><strong>Company:</strong> {data.appliedFilters.company}</span>}
+              {data.appliedFilters.customer && <span><strong>Customer:</strong> {data.appliedFilters.customer}</span>}
+              {data.appliedFilters.salesperson && <span><strong>Salesperson:</strong> {data.appliedFilters.salesperson}</span>}
+              {data.appliedFilters.customStart && <span><strong>From:</strong> {formatDateDisp(data.appliedFilters.customStart)} <strong>To:</strong> {formatDateDisp(data.appliedFilters.customEnd)}</span>}
+            </div>
+          </div>
+        )}
 
         {data.view === 'Overview' ? (
           <div className="keep-together" style={{ border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden' }}>
@@ -651,8 +685,8 @@ return (
       </div>
     )}
 
-    {/* ── Invoice / Dispatch Items Table ── */}
-    {(docType === 'invoice' || docType === 'dispatch' || docType === 'estimate') && (
+    {/* ── Invoice / Dispatch / Credit Note Items Table ── */}
+    {(docType === 'invoice' || docType === 'dispatch' || docType === 'estimate' || docType === 'creditnote') && (
       <>
         <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: sz('12px','16px','20px'), fontSize: sz('8.5px','10px','11px') }}>
           <thead>
@@ -802,6 +836,29 @@ return (
             </div>
           );
         })()}
+        {/* Credit Note Totals */}
+        {docType === 'creditnote' && data && (() => {
+          const cnSubtotal = safeItems.reduce((s, i) => s + (i?.isBonus ? 0 : (i?.price || 0) * (i?.quantity || 0)), 0);
+          return (
+            <div className="keep-together" style={{ float: 'right', width: isThermal ? '100%' : sz('','240px','280px'), borderTop: '2px solid #e11d48', paddingTop: sz('8px','10px','12px') }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: sz('12px','14px','16px'), color: '#e11d48' }}>
+                <span>Total Credit:</span>
+                <span>Rs. {cnSubtotal.toLocaleString()}</span>
+              </div>
+              {data.originalInvoiceId && (
+                <div style={{ marginTop: '8px', fontSize: sz('7px','8px','9px'), color: '#64748b' }}>
+                  <strong>Original Invoice:</strong> {data.originalInvoiceId}
+                </div>
+              )}
+              {data.reason && (
+                <div style={{ marginTop: '4px', fontSize: sz('7px','8px','9px'), color: '#64748b' }}>
+                  <strong>Reason:</strong> {data.reason}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
         <div style={{ clear: 'both' }}></div>
 
         {/* ── Invoice Notes ── */}
@@ -824,8 +881,20 @@ return (
           </div>
         )}
 
+        {/* ── Credit Note Acknowledgement ── */}
+        {docType === 'creditnote' && (
+          <div className="keep-together" style={{ marginTop: sz('12px','16px','20px'), border: '1.5px solid #e11d48', borderRadius: '8px', overflow: 'hidden', fontSize: sz('6.5px','7.5px','8.5px') }}>
+            <div style={{ background: '#e11d48', color: 'white', padding: sz('4px 8px','5px 12px','6px 14px'), fontWeight: 900, textAlign: 'center', letterSpacing: '0.5px', textTransform: 'uppercase', fontSize: sz('6.5px','7px','8px') }}>
+              Credit Note Acknowledgement
+            </div>
+            <div style={{ padding: sz('6px 8px','8px 12px','10px 14px'), background: '#fff1f2', color: '#881337', lineHeight: 1.7, fontWeight: 600, fontSize: sz('7px','8px','9px') }}>
+              This credit note reduces the customer's outstanding balance by the amount shown above. The returned goods have been accepted subject to inspection and verification.
+            </div>
+          </div>
+        )}
+
         {/* ── Return / Exchange Policy ── */}
-        {docType !== 'estimate' && <div className="keep-together" style={{ marginTop: sz('12px','16px','20px'), border: '1.5px solid #1e293b', borderRadius: '8px', overflow: 'hidden', fontSize: sz('6.5px','7.5px','8.5px') }}>
+        {docType !== 'estimate' && docType !== 'creditnote' && <div className="keep-together" style={{ marginTop: sz('12px','16px','20px'), border: '1.5px solid #1e293b', borderRadius: '8px', overflow: 'hidden', fontSize: sz('6.5px','7.5px','8.5px') }}>
           <div style={{ background: '#1e293b', color: 'white', padding: sz('4px 8px','5px 12px','6px 14px'), fontWeight: 900, textAlign: 'center', letterSpacing: '0.5px', textTransform: 'uppercase', fontSize: sz('6.5px','7px','8px') }}>
             "No" Return / Exchange Policy on Some Items
           </div>
@@ -922,6 +991,17 @@ return (
                 <td style={{ padding: sz('4px 2px','6px 5px','7px 6px'), wordBreak: 'break-word' }}>
                   <span style={{ fontWeight: 700, display: 'block', lineHeight: 1.3, color: '#1e293b' }}>{row.desc || '—'}</span>
                   <span style={{ fontSize: sz('6px','7px','7.5px'), color: '#94a3b8', fontWeight: 500, display: 'block', marginTop: '1px', wordBreak: 'break-all' }}>{row.ref || ''}</span>
+                  {(row.lineItems || []).length > 0 && (row.lineItems || []).map((li, idx) => (
+                    <div key={idx} style={{ fontSize: sz('6px','7px','7.5px'), color: '#475569', display: 'flex', justifyContent: 'space-between', marginTop: '2px', paddingLeft: '6px' }}>
+                      <span style={{ flex: 1 }}>{li.isBonus ? '🎁 ' : '• '}{li.name} ×{li.qty}{!li.isBonus && ` @ Rs.${(li.price||0).toLocaleString()}`}</span>
+                      <span style={{ fontWeight: 700, marginLeft: '8px' }}>{li.isBonus ? 'FREE' : `Rs.${(li.subtotal||0).toLocaleString()}`}</span>
+                    </div>
+                  ))}
+                  {(row.deliveryBilled || 0) > 0 && (
+                    <div style={{ fontSize: sz('6px','7px','7.5px'), color: '#94a3b8', display: 'flex', justifyContent: 'space-between', paddingLeft: '6px', marginTop: '1px' }}>
+                      <span>+ Delivery</span><span>Rs.{(row.deliveryBilled||0).toLocaleString()}</span>
+                    </div>
+                  )}
                 </td>
                 <td style={{ padding: sz('4px 2px','6px 5px','7px 6px'), textAlign: 'right', fontWeight: 800, color: '#4338ca' }}>
                   {(row.debit || 0) > 0 ? (row.debit || 0).toLocaleString() : '—'}
