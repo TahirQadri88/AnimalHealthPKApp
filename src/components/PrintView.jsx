@@ -183,6 +183,64 @@ const handlePrint = () => {
   setTimeout(() => { if (styleEl) styleEl.remove(); }, 1500);
 };
 
+// ── HTML Share / Download (replaces broken PDF) ───────────────────────────
+const handleShareHTML = async () => {
+  const element = document.getElementById('print-document');
+  if (!element) { showToast('Document not found', 'error'); return; }
+
+  // Clone and force correct paper width inline — Tailwind classes won't work outside app
+  const clone = element.cloneNode(true);
+  const paperW = isThermal ? '80mm' : isA5 ? '148mm' : '210mm';
+  const padding = isThermal ? '12px' : isA5 ? '20px' : '28px';
+  clone.style.cssText = [
+    `width:${paperW}`, `max-width:${paperW}`, `min-width:${paperW}`,
+    'margin:0 auto', `padding:${padding}`, 'background:white',
+    "font-family:'Inter',system-ui,sans-serif",
+    `font-size:${isThermal ? '10px' : isA5 ? '11px' : '12px'}`,
+    'line-height:1.5', 'box-sizing:border-box',
+  ].join(';');
+
+  const pageSize   = isThermal ? '80mm auto' : isA5 ? 'A5 portrait' : 'A4 portrait';
+  const pageMargin = isThermal ? '3mm' : '10mm';
+  const bodyPad    = isThermal ? '8px' : '20px';
+  const docTitle   = getFileName().replace(/\.[^.]+$/, '');
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>${docTitle}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+  <style>
+    *{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+    body{margin:0;padding:${bodyPad};background:#f1f5f9;font-family:'Inter',system-ui,sans-serif;display:flex;justify-content:center;}
+    @media print{body{padding:0;background:white;}@page{size:${pageSize};margin:${pageMargin};}}
+  </style>
+</head>
+<body>${clone.outerHTML}</body>
+</html>`;
+
+  const fileName = getFileName().replace(/\.[^.]+$/, '.html');
+  const blob = new Blob([html], { type: 'text/html' });
+  const file = new File([blob], fileName, { type: 'text/html' });
+
+  // iOS / Android: native share sheet → WhatsApp, Files, AirDrop, etc.
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file], title: docTitle }); return; }
+    catch (e) { if (e.name === 'AbortError') return; }
+  }
+
+  // Desktop / fallback: direct download
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = fileName;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+  showToast('Saved! Open the file in browser to view or print');
+};
+
 // ── PDF download ──────────────────────────────────────────────────────────
 const handlePDF = () => {
   const element = document.getElementById('print-document');
@@ -326,9 +384,9 @@ return (
       {/* Actions */}
       <div className="flex items-center gap-2">
         <button
-          onClick={handlePDF}
+          onClick={handleShareHTML}
           className="flex items-center gap-1.5 px-3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-bold text-xs transition-colors shadow"
-        ><FileDown size={14}/> Save PDF</button>
+        ><FileDown size={14}/> Save / Share</button>
 
         <button
           onClick={handlePrint}
