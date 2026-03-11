@@ -381,7 +381,7 @@ const [data, setData] = React.useState([]);
 useEffect(() => {
 const unsubscribe = onSnapshot(collection(db, collectionName), (snapshot) => {
 const items = [];
-snapshot.forEach((d) => items.push({ ...d.data(), id: d.id }));
+snapshot.forEach((d) => items.push(d.data()));
 setData(items.sort((a, b) => (a.id > b.id ? 1 : -1)));
 }, (error) => { console.error('Error fetching ' + collectionName + ':', error); });
 return () => unsubscribe();
@@ -1065,7 +1065,7 @@ return (
 
 // ─── Master Records View ───
 const MastersView = () => {
-const { products, customers, expenseCategories, getCompanyName, deleteFromFirebase, showToast, setEditingProduct, setShowProductModal, setEditingCustomer, setShowCustomerModal, setShowExpenseCatModal } = useContext(AppContext);
+const { products, customers, invoices, payments, expenseCategories, getCompanyName, deleteFromFirebase, showToast, setEditingProduct, setShowProductModal, setEditingCustomer, setShowCustomerModal, setShowExpenseCatModal } = useContext(AppContext);
 const [tab, setTab] = useState('products');
 const [search, setSearch] = useState('');
 const tabConfig = [
@@ -1124,7 +1124,15 @@ return (
           </div>
           <div className="flex gap-1.5 shrink-0">
             <button onClick={()=>{setEditingCustomer(c);setShowCustomerModal(true);}} className="p-2 bg-slate-50 text-slate-600 rounded-lg hover:bg-indigo-50 hover:text-indigo-600 transition-colors"><Edit size={14}/></button>
-            <button onClick={async()=>{if(window.confirm(`Permanently delete ${c.name}?`))await deleteFromFirebase('customers',c.id);}} className="p-2 bg-rose-50 text-rose-500 rounded-lg hover:bg-rose-100 transition-colors"><Trash2 size={14}/></button>
+            <button onClick={async()=>{
+const invCount = invoices.filter(o => o.customerId === c.id).length;
+const payCount = payments.filter(p => p.customerId === c.id).length;
+if (invCount > 0 || payCount > 0) {
+  showToast(`Cannot delete: ${c.name} has ${invCount} invoice(s) and ${payCount} payment(s). Remove those first.`, 'error');
+  return;
+}
+if(window.confirm(`Permanently delete ${c.name}?`)) await deleteFromFirebase('customers',c.id);
+}} className="p-2 bg-rose-50 text-rose-500 rounded-lg hover:bg-rose-100 transition-colors"><Trash2 size={14}/></button>
           </div>
         </div>
       ))}
