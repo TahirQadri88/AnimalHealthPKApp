@@ -254,7 +254,7 @@ return (
 };
 
 const CustomerLedgerModal = () => {
-const { selectedLedgerId, getCustomerLedger, generateReceiptData, setPrintConfig, setShowPaymentModal, setSelectedCustomerForPayment, setShowLedgerModal, deleteFromFirebase, saveToFirebase, invoices, isAdmin, setEditingPayment, payments, setShowCreditNoteModal, setEditingCreditNote } = useContext(AppContext);
+const { selectedLedgerId, getCustomerLedger, generateReceiptData, setPrintConfig, setShowPaymentModal, setSelectedCustomerForPayment, setShowLedgerModal, deleteFromFirebase, saveToFirebase, invoices, isAdmin, setEditingPayment, payments, setShowCreditNoteModal, setEditingCreditNote, showConfirm } = useContext(AppContext);
 const [startDate, setStartDate] = useState(() => { const d = new Date(); d.setMonth(d.getMonth() - 1); return getLocalDateStr(d); });
 const [endDate, setEndDate] = useState(getLocalDateStr());
 const fullLedger = getCustomerLedger(selectedLedgerId);
@@ -318,7 +318,7 @@ return (
 )}
 {isAdmin && row.credit > 0 && !row.isCreditNote && (
 <button title="Delete Payment" onClick={async () => {
-  if (!window.confirm('Delete this payment record?')) return;
+  if (!await showConfirm('Delete this payment record?')) return;
   if (row.id.startsWith('REC-')) {
     await deleteFromFirebase('payments', row.id);
   } else if (row.id.endsWith('-PAY')) {
@@ -345,7 +345,7 @@ return (
 };
 
 const ExpenseCategoryModal = () => {
-const { expenseCategories, saveToFirebase, deleteFromFirebase, showToast, setShowExpenseCatModal } = useContext(AppContext);
+const { expenseCategories, saveToFirebase, deleteFromFirebase, showToast, setShowExpenseCatModal, showConfirm } = useContext(AppContext);
 const [newCat, setNewCat] = useState('');
 const addCat = async () => {
 if(!newCat) return;
@@ -364,7 +364,7 @@ return (
 {expenseCategories.map(c => (
 <li key={c.id} className="flex justify-between items-center p-3 hover:bg-slate-50">
 <span className="font-semibold text-slate-700 text-sm flex items-center gap-2"><Tag size={14} className="text-slate-400"/> {c.name}</span>
-<button onClick={async () => { if(window.confirm(`Delete category "${c.name}"?`)) await deleteFromFirebase('expenseCategories', c.id); }} className="p-2 text-slate-400 hover:text-rose-500 transition-colors"><Trash2 size={16}/></button>
+<button onClick={async () => { if(await showConfirm(`Delete category "${c.name}"?`)) await deleteFromFirebase('expenseCategories', c.id); }} className="p-2 text-slate-400 hover:text-rose-500 transition-colors"><Trash2 size={16}/></button>
 </li>
 ))}
 </ul>
@@ -390,8 +390,25 @@ return data;
 }
 
 
+const ConfirmDialog = () => {
+const { confirmDialog, setConfirmDialog } = useContext(AppContext);
+if (!confirmDialog) return null;
+const handle = (val) => { setConfirmDialog(null); confirmDialog.resolve(val); };
+return (
+<div className="fixed inset-0 bg-slate-900/70 z-[200] flex items-center justify-center p-6" onClick={() => handle(false)}>
+  <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl" onClick={e => e.stopPropagation()}>
+    <p className="text-slate-800 font-semibold text-sm leading-relaxed whitespace-pre-line">{confirmDialog.message}</p>
+    <div className="flex gap-3 mt-5">
+      <button onClick={() => handle(false)} className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-sm transition-colors">Cancel</button>
+      <button onClick={() => handle(true)} className="flex-1 py-2.5 bg-rose-500 hover:bg-rose-600 text-white font-bold rounded-xl text-sm transition-colors">Confirm</button>
+    </div>
+  </div>
+</div>
+);
+};
+
 const SegmentsModal = () => {
-const { cities, areas, customerTypes, saveToFirebase, deleteFromFirebase, showToast, setShowSegmentsModal } = useContext(AppContext);
+const { cities, areas, customerTypes, saveToFirebase, deleteFromFirebase, showToast, setShowSegmentsModal, showConfirm } = useContext(AppContext);
 const [tab, setTab] = useState('cities');
 const [newVal, setNewVal] = useState('');
 const [editingId, setEditingId] = useState(null);
@@ -441,7 +458,7 @@ return (
 <>
 <span className="flex-1 font-semibold text-slate-700 text-sm">{item.name}</span>
 <button onClick={()=>{setEditingId(item.id);setEditVal(item.name);}} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"><Edit size={14}/></button>
-<button onClick={async()=>{if(window.confirm(`Delete "${item.name}"?`))await deleteFromFirebase(col,item.id);}} className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"><Trash2 size={14}/></button>
+<button onClick={async()=>{if(await showConfirm(`Delete "${item.name}"?`))await deleteFromFirebase(col,item.id);}} className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"><Trash2 size={14}/></button>
 </>
 )}
 </li>
@@ -455,7 +472,7 @@ return (
 
 // — Tabs —
 const DashboardTab = () => {
-const { isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig } = useContext(AppContext);
+const { isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig, showConfirm } = useContext(AppContext);
 const [dateFilter, setDateFilter] = useState('This Month');
 const filteredInvoices = invoices.filter(o => o.status === 'Billed' && checkDateFilter(o.date, dateFilter));
 const filteredExpenses = expenses.filter(e => checkDateFilter(e.date, dateFilter));
@@ -541,7 +558,7 @@ return (
 };
 
 const BillingTab = () => {
-const { isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig, setShowCreditNoteModal, setEditingCreditNote } = useContext(AppContext);
+const { isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig, setShowCreditNoteModal, setEditingCreditNote, showConfirm } = useContext(AppContext);
 const [search, setSearch] = useState('');
 const [dateFilter, setDateFilter] = useState('All Time');
 const [statusFilter, setStatusFilter] = useState('All');
@@ -691,7 +708,7 @@ return (
 <p className="text-emerald-600 font-bold uppercase text-[10px] tracking-widest mb-1">Grand Total</p>
 <p className="text-4xl font-black text-emerald-800 tracking-tight">Rs. {grandTotal.toLocaleString()}</p>
 </div>
-{isEdit && isAdmin && (<button onClick={async () => { if(window.confirm("Permanently delete?")) { await deleteFromFirebase('invoices', currentInvoice.id); setBillingView('list'); } }} className="w-full bg-white text-rose-600 font-bold p-4 rounded-xl flex justify-center items-center gap-2 border border-rose-200 hover:bg-rose-50 shadow-sm mt-4"><Trash2 size={18}/> Delete Invoice</button>)}
+{isEdit && isAdmin && (<button onClick={async () => { if(await showConfirm("Permanently delete?")) { await deleteFromFirebase('invoices', currentInvoice.id); setBillingView('list'); } }} className="w-full bg-white text-rose-600 font-bold p-4 rounded-xl flex justify-center items-center gap-2 border border-rose-200 hover:bg-rose-50 shadow-sm mt-4"><Trash2 size={18}/> Delete Invoice</button>)}
 </div>
 <div className="p-4 bg-white/80 backdrop-blur-md border-t border-slate-200 fixed bottom-0 w-full max-w-md z-30 space-y-2">
 <button onClick={() => saveInvoice('Estimate')} className="w-full bg-violet-600 hover:bg-violet-700 text-white py-2.5 rounded-xl font-bold shadow-sm flex justify-center items-center gap-2 active:scale-95 transition-all text-sm"><FileText size={16}/> Save as Estimate / Quotation</button>
@@ -731,7 +748,7 @@ return (
 {o.status === 'Estimate' && isAdmin && <button onClick={async () => { await saveToFirebase('invoices', o.id, {...o, status: 'Billed'}); showToast('Converted to Invoice'); }} title="Convert to Invoice" className="p-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-200 rounded-lg"><ReceiptText size={14}/></button>}
 {o.status === 'Billed' && isAdmin && <button onClick={() => { setEditingCreditNote({customerId: o.customerId, id: o.id}); setShowCreditNoteModal(true); }} title="Issue Credit Note / Return" className="p-2 bg-rose-50 text-rose-500 hover:bg-rose-100 border border-rose-200 rounded-lg"><RotateCcw size={14}/></button>}
 {isAdmin && o.status !== 'CreditNote' && <button onClick={() => { setCurrentInvoice(o); setBillingView('form'); }} className="p-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 rounded-lg"><Edit size={16}/></button>}
-{isAdmin && <button onClick={async () => { if(window.confirm(`Delete ${o.id}?`)) await deleteFromFirebase('invoices', o.id); }} title="Delete" className="p-2 bg-rose-50 text-rose-500 hover:bg-rose-100 rounded-lg"><Trash2 size={16}/></button>}
+{isAdmin && <button onClick={async () => { if(await showConfirm(`Delete ${o.id}?`)) await deleteFromFirebase('invoices', o.id); }} title="Delete" className="p-2 bg-rose-50 text-rose-500 hover:bg-rose-100 rounded-lg"><Trash2 size={16}/></button>}
 {o.status === 'Estimate' ? <button onClick={() => setPrintConfig({docType: 'estimate', format: 'a4', data: o})} title="View Estimate" className="p-2 bg-violet-50 text-violet-600 hover:bg-violet-100 rounded-lg"><FileText size={16}/></button> : o.status === 'CreditNote' ? <button onClick={() => setPrintConfig({docType: 'creditnote', format: 'a4', data: o})} title="Print Credit Note" className="p-2 bg-rose-50 text-rose-600 rounded-lg"><FileText size={16}/></button> : <><button onClick={() => setPrintConfig({docType: 'dispatch', format: 'thermal', data: o})} title="Dispatch" className="p-2 bg-amber-50 text-amber-600 rounded-lg"><Truck size={16}/></button><button onClick={() => setPrintConfig({docType: 'invoice', format: 'thermal', data: o})} title="Print" className="p-2 bg-indigo-50 text-indigo-600 rounded-lg"><ReceiptText size={16}/></button></>}
 </div>
 </div>
@@ -743,7 +760,7 @@ return (
 };
 
 const ProductsTab = () => {
-const { isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig } = useContext(AppContext);
+const { isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig, showConfirm } = useContext(AppContext);
 const [search, setSearch] = useState('');
 return (
 <div className="p-4 flex flex-col h-full">
@@ -756,7 +773,7 @@ return (
 <div key={p.id} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
 <div className="flex justify-between items-start mb-3">
 <div><h4 className="font-bold text-slate-800 text-base leading-tight">{p.name}</h4><p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mt-1">{getCompanyName(p.companyId)} • {p.unit} ({p.unitsInBox})</p></div>
-{isAdmin && (<div className="flex gap-1.5"><button onClick={() => { setEditingProduct(p); setShowProductModal(true); }} className="p-2 bg-slate-50 text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"><Edit size={16}/></button><button onClick={async () => { if(window.confirm(`Permanently delete ${p.name}?`)) await deleteFromFirebase('products', p.id); }} className="p-2 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-100 transition-colors"><Trash2 size={16}/></button></div>)}
+{isAdmin && (<div className="flex gap-1.5"><button onClick={() => { setEditingProduct(p); setShowProductModal(true); }} className="p-2 bg-slate-50 text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"><Edit size={16}/></button><button onClick={async () => { if(await showConfirm(`Permanently delete ${p.name}?`)) await deleteFromFirebase('products', p.id); }} className="p-2 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-100 transition-colors"><Trash2 size={16}/></button></div>)}
 </div>
 <div className="flex justify-between items-end border-t border-slate-100 pt-3 mt-1">
 <div className="flex flex-col"><span className="text-indigo-700 font-extrabold text-lg">Rs. {p.sellingPrice.toLocaleString()}</span>{isAdmin && <span className="text-slate-400 text-[9px] font-bold uppercase mt-0.5">Cost: Rs. {p.costPrice}</span>}</div>
@@ -770,7 +787,7 @@ return (
 };
 
 const CustomersTab = () => {
-const { isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig } = useContext(AppContext);
+const { isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig, showConfirm } = useContext(AppContext);
 const [search, setSearch] = useState('');
 return (
 <div className="p-4 flex flex-col h-full">
@@ -802,13 +819,13 @@ Bal: Rs. {bal.toLocaleString()} {bal > 0 ? '(Dr)' : bal < 0 ? '(Cr)' : ''}
   const relPayments = payments.filter(p => p.customerId === c.id);
   const hasRecords = relInvoices.length > 0 || relPayments.length > 0;
   if (hasRecords) {
-    if (!window.confirm(`${c.name} has ${relInvoices.length} invoice(s) and ${relPayments.length} payment(s).\n\nDelete this client AND all related records permanently?\n\nThis cannot be undone.`)) return;
+    if (!await showConfirm(`${c.name} has ${relInvoices.length} invoice(s) and ${relPayments.length} payment(s).\n\nDelete this client AND all related records permanently?\n\nThis cannot be undone.`)) return;
     await Promise.all([
       ...relInvoices.map(o => deleteFromFirebase('invoices', o.id)),
       ...relPayments.map(p => deleteFromFirebase('payments', p.id)),
     ]);
   } else {
-    if (!window.confirm(`Permanently delete ${c.name}?`)) return;
+    if (!await showConfirm(`Permanently delete ${c.name}?`)) return;
   }
   await deleteFromFirebase('customers', c.id);
   showToast(`${c.name} deleted`);
@@ -947,7 +964,7 @@ return (
 
 // ─── Payments / Receipts Tab ───
 const PaymentsTab = () => {
-const { isAdmin, customers, payments, invoices, deleteFromFirebase, saveToFirebase, showToast, setShowPaymentModal, setSelectedCustomerForPayment, setEditingPayment } = useContext(AppContext);
+const { isAdmin, customers, payments, invoices, deleteFromFirebase, saveToFirebase, showToast, setShowPaymentModal, setSelectedCustomerForPayment, setEditingPayment, showConfirm } = useContext(AppContext);
 const [search, setSearch] = useState('');
 const [dateFilter, setDateFilter] = useState('This Month');
 const [customerFilter, setCustomerFilter] = useState('');
@@ -1016,7 +1033,7 @@ return (
                 )}
                 {(p.type === 'receipt' || p.type === 'invoice') && (
                   <button onClick={async()=>{
-                    if(!window.confirm('Delete this payment record?')) return;
+                    if(!await showConfirm('Delete this payment record?')) return;
                     if(p.type === 'receipt'){
                       await deleteFromFirebase('payments', p.id);
                     } else {
@@ -1079,7 +1096,7 @@ return (
         <>
           <span className="flex-1 font-semibold text-slate-700 text-sm flex items-center gap-2"><Building2 size={14} className="text-slate-400"/> {c.name}</span>
           <button onClick={()=>{setEditingId(c.id);setEditVal(c.name);}} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"><Edit size={14}/></button>
-          <button onClick={async()=>{if(window.confirm(`Delete "${c.name}"?`))await deleteFromFirebase('companies',c.id);}} className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"><Trash2 size={14}/></button>
+          <button onClick={async()=>{if(await showConfirm(`Delete "${c.name}"?`))await deleteFromFirebase('companies',c.id);}} className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"><Trash2 size={14}/></button>
         </>
       )}
     </div>
@@ -1090,7 +1107,7 @@ return (
 
 // ─── Master Records View ───
 const MastersView = () => {
-const { products, customers, invoices, payments, expenseCategories, getCompanyName, deleteFromFirebase, showToast, setEditingProduct, setShowProductModal, setEditingCustomer, setShowCustomerModal, setShowExpenseCatModal } = useContext(AppContext);
+const { products, customers, invoices, payments, expenseCategories, getCompanyName, deleteFromFirebase, showToast, setEditingProduct, setShowProductModal, setEditingCustomer, setShowCustomerModal, setShowExpenseCatModal, showConfirm } = useContext(AppContext);
 const [tab, setTab] = useState('products');
 const [search, setSearch] = useState('');
 const tabConfig = [
@@ -1132,7 +1149,7 @@ return (
           </div>
           <div className="flex gap-1.5 shrink-0">
             <button onClick={()=>{setEditingProduct(p);setShowProductModal(true);}} className="p-2 bg-slate-50 text-slate-600 rounded-lg hover:bg-indigo-50 hover:text-indigo-600 transition-colors"><Edit size={14}/></button>
-            <button onClick={async()=>{if(window.confirm(`Delete ${p.name}?`))await deleteFromFirebase('products',p.id);}} className="p-2 bg-rose-50 text-rose-500 rounded-lg hover:bg-rose-100 transition-colors"><Trash2 size={14}/></button>
+            <button onClick={async()=>{if(await showConfirm(`Delete ${p.name}?`))await deleteFromFirebase('products',p.id);}} className="p-2 bg-rose-50 text-rose-500 rounded-lg hover:bg-rose-100 transition-colors"><Trash2 size={14}/></button>
           </div>
         </div>
       ))}
@@ -1154,13 +1171,13 @@ return (
   const relPayments = payments.filter(p => p.customerId === c.id);
   const hasRecords = relInvoices.length > 0 || relPayments.length > 0;
   if (hasRecords) {
-    if (!window.confirm(`${c.name} has ${relInvoices.length} invoice(s) and ${relPayments.length} payment(s).\n\nDelete this client AND all related records permanently?\n\nThis cannot be undone.`)) return;
+    if (!await showConfirm(`${c.name} has ${relInvoices.length} invoice(s) and ${relPayments.length} payment(s).\n\nDelete this client AND all related records permanently?\n\nThis cannot be undone.`)) return;
     await Promise.all([
       ...relInvoices.map(o => deleteFromFirebase('invoices', o.id)),
       ...relPayments.map(p => deleteFromFirebase('payments', p.id)),
     ]);
   } else {
-    if (!window.confirm(`Permanently delete ${c.name}?`)) return;
+    if (!await showConfirm(`Permanently delete ${c.name}?`)) return;
   }
   await deleteFromFirebase('customers', c.id);
   showToast(`${c.name} deleted`);
@@ -1178,7 +1195,7 @@ return (
       {expenseCategories.filter(c=>c.name.toLowerCase().includes(search.toLowerCase())).map(c=>(
         <div key={c.id} className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex justify-between items-center">
           <span className="font-semibold text-slate-700 text-sm flex items-center gap-2"><Tag size={14} className="text-slate-400"/> {c.name}</span>
-          <button onClick={async()=>{if(window.confirm(`Delete category "${c.name}"?`)) await deleteFromFirebase('expenseCategories',c.id);}} className="p-2 bg-rose-50 text-rose-500 rounded-lg hover:bg-rose-100 transition-colors"><Trash2 size={14}/></button>
+          <button onClick={async()=>{if(await showConfirm(`Delete category "${c.name}"?`)) await deleteFromFirebase('expenseCategories',c.id);}} className="p-2 bg-rose-50 text-rose-500 rounded-lg hover:bg-rose-100 transition-colors"><Trash2 size={14}/></button>
         </div>
       ))}
     </div>
@@ -1188,7 +1205,7 @@ return (
 };
 
 const AdminTab = () => {
-const { isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig } = useContext(AppContext);
+const { isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig, showConfirm } = useContext(AppContext);
 if(!isAdmin) return <div className="p-10 text-center font-bold text-slate-400 flex flex-col items-center mt-20"><Lock className="mb-4 text-slate-300" size={48}/> <p className="text-sm uppercase tracking-widest">Admin Access Required</p></div>;
 return (
 <div className="h-full flex flex-col">
@@ -1218,7 +1235,7 @@ return (
 };
 
 const AppSettingsView = () => {
-const { appSettings, saveToFirebase, showToast, appUsers, companies, products, customers, invoices, expenses, expenseCategories, payments, cities, areas, customerTypes } = useContext(AppContext);
+const { appSettings, saveToFirebase, showToast, showConfirm, appUsers, companies, products, customers, invoices, expenses, expenseCategories, payments, cities, areas, customerTypes } = useContext(AppContext);
 const [form, setForm] = useState({
   id: 'main',
   businessName: appSettings?.businessName || 'Khyber Traders',
@@ -1254,7 +1271,7 @@ const downloadBackup = () => {
 };
 const handleRestoreFile = async (e) => {
   const file = e.target.files[0]; if (!file) return;
-  if (!window.confirm('This will overwrite ALL existing data with the backup file. Are you sure?')) { e.target.value=''; return; }
+  if (!await showConfirm('This will overwrite ALL existing data with the backup file. Are you sure?')) { e.target.value=''; return; }
   setRestoring(true);
   try {
     const backup = JSON.parse(await file.text()); let count = 0;
@@ -1335,7 +1352,7 @@ return (
 };
 
 const UserManagementView = () => {
-const { isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig } = useContext(AppContext);
+const { isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig, showConfirm } = useContext(AppContext);
 const [userDateFilter, setUserDateFilter] = useState('This Month');
 return (
 <div className="h-full flex flex-col p-4 pb-24 overflow-y-auto">
@@ -1367,7 +1384,7 @@ return (
 </div>
 <div className="flex gap-1.5">
 <button onClick={() => { setEditingUser(u); setShowUserModal(true); }} className="p-2 bg-slate-50 text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"><Edit size={16}/></button>
-<button onClick={async () => { if(u.id === currentUser.id) return showToast("Cannot delete yourself","error"); if(window.confirm(`Permanently delete user ${u.name}?`)) await deleteFromFirebase('app_users', u.id); }} className="p-2 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-100 transition-colors"><Trash2 size={16}/></button>
+<button onClick={async () => { if(u.id === currentUser.id) return showToast("Cannot delete yourself","error"); if(await showConfirm(`Permanently delete user ${u.name}?`)) await deleteFromFirebase('app_users', u.id); }} className="p-2 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-100 transition-colors"><Trash2 size={16}/></button>
 </div>
 </div>
 <div className="grid grid-cols-3 gap-2 pt-3 border-t border-slate-100">
@@ -1394,7 +1411,7 @@ return (
 };
 
 const SegmentsAdminView = () => {
-const { cities, areas, customerTypes, customers, invoices, saveToFirebase, deleteFromFirebase, showToast, getCustomerBalance, setShowSegmentsModal } = useContext(AppContext);
+const { cities, areas, customerTypes, customers, invoices, saveToFirebase, deleteFromFirebase, showToast, getCustomerBalance, setShowSegmentsModal, showConfirm } = useContext(AppContext);
 const [tab, setTab] = useState('cities');
 const [newVal, setNewVal] = useState('');
 const [editingId, setEditingId] = useState(null);
@@ -1461,7 +1478,7 @@ return (
   {stats.orders > 0 && <p className="text-[10px] text-slate-400 mt-0.5">{stats.customers.size} clients · Rs.{stats.revenue.toLocaleString()} revenue</p>}
   </div>
   <button onClick={()=>{setEditingId(item.id);setEditVal(item.name);}} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg"><Edit size={14}/></button>
-  <button onClick={async()=>{if(window.confirm(`Delete "${item.name}"?`))await deleteFromFirebase(col,item.id);}} className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg"><Trash2 size={14}/></button>
+  <button onClick={async()=>{if(await showConfirm(`Delete "${item.name}"?`))await deleteFromFirebase(col,item.id);}} className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg"><Trash2 size={14}/></button>
   </div>
   )}
   </li>
@@ -1507,7 +1524,7 @@ const MultiPicker = ({ label, Icon, items, selected, onToggle, onClear }) => {
 };
 
 const AnalyticsView = () => {
-const { isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, cities, areas, customerTypes, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig } = useContext(AppContext);
+const { isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, cities, areas, customerTypes, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig, showConfirm } = useContext(AppContext);
 const [view, setView] = useState('Overview');
 const [dateFilter, setDateFilter] = useState('This Month');
 const [customStart, setCustomStart] = useState('');
@@ -2324,7 +2341,7 @@ return (
 };
 
 const ExpensesView = () => {
-const { isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig } = useContext(AppContext);
+const { isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig, showConfirm } = useContext(AppContext);
 const [date, setDate] = useState(getLocalDateStr());
 const [amount, setAmount] = useState('');
 const [category, setCategory] = useState(expenseCategories[0]?.name || '');
@@ -2386,7 +2403,7 @@ return (
 <p className="font-extrabold text-rose-600 text-base">Rs.{exp.amount.toLocaleString()}</p>
 <div className="flex gap-2 mt-1 justify-end">
 <button onClick={() => startEdit(exp)} className="text-[10px] text-indigo-500 hover:text-indigo-700 font-bold uppercase">Edit</button>
-<button onClick={async ()=>{ if(window.confirm("Delete expense?")) await deleteFromFirebase('expenses', exp.id) }} className="text-[10px] text-slate-400 hover:text-rose-500 font-bold uppercase">Del</button>
+<button onClick={async ()=>{ if(await showConfirm("Delete expense?")) await deleteFromFirebase('expenses', exp.id) }} className="text-[10px] text-slate-400 hover:text-rose-500 font-bold uppercase">Del</button>
 </div>
 </div>
 </div>
@@ -2402,7 +2419,7 @@ return (
 };
 
 const BulkOpsView = () => {
-const { isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig } = useContext(AppContext);
+const { isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig, showConfirm } = useContext(AppContext);
 const [bulkProducts, setBulkProducts] = useState([]);
 const [bulkSearch, setBulkSearch] = useState('');
 const [bulkEffectiveDate, setBulkEffectiveDate] = useState(getLocalDateStr());
@@ -2550,7 +2567,7 @@ return (
            <p className="text-xs font-bold text-rose-700 mb-2 flex items-center gap-1.5"><AlertCircle size={14}/> {dupes.length} Duplicate {dupes.length === 1 ? 'Company' : 'Companies'} Found</p>
            <p className="text-[10px] text-rose-600 mb-3">These were created by previous imports. Click to merge them and fix all product references.</p>
            <button onClick={async () => {
-             if(!window.confirm(`Merge ${dupes.length} duplicate compan${dupes.length > 1 ? 'ies' : 'y'}? This will re-assign all linked products and cannot be undone.`)) return;
+             if(!await showConfirm(`Merge ${dupes.length} duplicate compan${dupes.length > 1 ? 'ies' : 'y'}? This will re-assign all linked products and cannot be undone.`)) return;
              const canonical = {};
              companies.forEach(c => { const k = c.name.trim().toLowerCase(); if (!canonical[k]) canonical[k] = c.id; });
              let fixed = 0;
@@ -2690,6 +2707,8 @@ const [showSegmentsModal, setShowSegmentsModal] = useState(false);
 const [editingPayment, setEditingPayment] = useState(null);
 const [showCreditNoteModal, setShowCreditNoteModal] = useState(false);
 const [editingCreditNote, setEditingCreditNote] = useState(null);
+const [confirmDialog, setConfirmDialog] = useState(null);
+const showConfirm = (message) => new Promise(resolve => setConfirmDialog({ message, resolve }));
 
 const isAdmin = currentUser?.role === 'admin';
 
@@ -2863,7 +2882,7 @@ const TABS = [
 const ctx = {
 isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers,
 cities, areas, customerTypes,
-showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData,
+showToast, showConfirm, setConfirmDialog, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData,
 billingView, setBillingView, currentInvoice, setCurrentInvoice,
 activeTab, setActiveTab, adminView, setAdminView,
 editingProduct, setEditingProduct, showProductModal, setShowProductModal,
@@ -2990,6 +3009,7 @@ return (
   {showExpenseCatModal && <ExpenseCategoryModal />}
   {showUserModal && <UserModal />}
   {showSegmentsModal && <SegmentsModal />}
+  <ConfirmDialog />
 
   {toast && (
     <div className={`fixed top-6 right-6 lg:left-auto left-1/2 lg:-translate-x-0 -translate-x-1/2 px-5 py-3 rounded-2xl shadow-xl z-[100] font-semibold text-white flex items-center gap-2.5 text-sm transition-all animate-slide-up ${toast.type === 'error' ? 'bg-rose-600' : 'bg-slate-800'}`}>
