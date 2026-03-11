@@ -525,7 +525,7 @@ return (
 <div key={invoice.id} className="bg-white p-4 rounded-2xl border border-slate-200 flex justify-between items-center shadow-sm">
 <div>
 <p className="font-bold text-slate-800 text-sm">{invoice.customerName}</p>
-<p className="text-[11px] text-slate-500 font-medium mt-0.5">{invoice.id} \u2022 {formatDateDisp(invoice.date)} \u2022 <span className={`font-bold ${invoice.status === 'Billed' ? 'text-indigo-600' : 'text-amber-500'}`}>{invoice.status}</span></p>
+<p className="text-[11px] text-slate-500 font-medium mt-0.5">{invoice.id} • {formatDateDisp(invoice.date)} • <span className={`font-bold ${invoice.status === 'Billed' ? 'text-indigo-600' : 'text-amber-500'}`}>{invoice.status}</span></p>
 </div>
 <div className="text-right">
 <p className="font-extrabold text-slate-800 text-sm">Rs. {invoice.total.toLocaleString()}</p>
@@ -721,7 +721,7 @@ return (
 <div key={o.id} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden group hover:border-indigo-200">
 <div className={`absolute top-0 left-0 w-1.5 h-full ${o.status==='CreditNote'?'bg-rose-500':o.status==='Estimate'?'bg-violet-400':o.status==='Billed'?(o.paymentStatus==='Paid'?'bg-emerald-500':'bg-amber-500'):'bg-slate-300'}`}></div>
 <div className="flex justify-between border-b border-slate-100 pb-3 mb-3 pl-3">
-<div><h4 className="font-bold text-slate-800 text-sm">{o.customerName}</h4><p className="text-[11px] text-slate-500 font-medium mt-0.5">{o.id} \u2022 {formatDateDisp(o.date)} \u2022 <span className={`font-bold ${o.status==='Billed'?'text-indigo-600':o.status==='Estimate'?'text-violet-600':o.status==='CreditNote'?'text-rose-600':'text-amber-500'}`}>{o.status==='CreditNote'?'Credit Note':o.status}</span></p></div>
+<div><h4 className="font-bold text-slate-800 text-sm">{o.customerName}</h4><p className="text-[11px] text-slate-500 font-medium mt-0.5">{o.id} • {formatDateDisp(o.date)} • <span className={`font-bold ${o.status==='Billed'?'text-indigo-600':o.status==='Estimate'?'text-violet-600':o.status==='CreditNote'?'text-rose-600':'text-amber-500'}`}>{o.status==='CreditNote'?'Credit Note':o.status}</span></p></div>
 <div className="text-right"><p className={`font-extrabold text-base ${o.status==='CreditNote'?'text-rose-600':'text-indigo-700'}`}>{o.status==='CreditNote'?'-':''} Rs. {o.total.toLocaleString()}</p><p className={`text-[9px] font-bold uppercase tracking-widest mt-1 ${o.status==='Billed'?'text-indigo-500':o.status==='CreditNote'?'text-rose-500':'text-slate-400'}`}>{o.status==='CreditNote'?'Credit Note':o.status}</p></div>
 </div>
 <div className="flex justify-between items-center pl-3">
@@ -755,7 +755,7 @@ return (
 {products.filter(p => p.name.toLowerCase().includes(search.toLowerCase())).map(p => (
 <div key={p.id} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
 <div className="flex justify-between items-start mb-3">
-<div><h4 className="font-bold text-slate-800 text-base leading-tight">{p.name}</h4><p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mt-1">{getCompanyName(p.companyId)} \u2022 {p.unit} ({p.unitsInBox})</p></div>
+<div><h4 className="font-bold text-slate-800 text-base leading-tight">{p.name}</h4><p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mt-1">{getCompanyName(p.companyId)} • {p.unit} ({p.unitsInBox})</p></div>
 {isAdmin && (<div className="flex gap-1.5"><button onClick={() => { setEditingProduct(p); setShowProductModal(true); }} className="p-2 bg-slate-50 text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"><Edit size={16}/></button><button onClick={async () => { if(window.confirm(`Permanently delete ${p.name}?`)) await deleteFromFirebase('products', p.id); }} className="p-2 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-100 transition-colors"><Trash2 size={16}/></button></div>)}
 </div>
 <div className="flex justify-between items-end border-t border-slate-100 pt-3 mt-1">
@@ -931,7 +931,7 @@ return (
 
 // ─── Payments / Receipts Tab ───
 const PaymentsTab = () => {
-const { isAdmin, customers, payments, invoices, deleteFromFirebase, showToast, setShowPaymentModal, setSelectedCustomerForPayment, setEditingPayment } = useContext(AppContext);
+const { isAdmin, customers, payments, invoices, deleteFromFirebase, saveToFirebase, showToast, setShowPaymentModal, setSelectedCustomerForPayment, setEditingPayment } = useContext(AppContext);
 const [search, setSearch] = useState('');
 const [dateFilter, setDateFilter] = useState('This Month');
 const [customerFilter, setCustomerFilter] = useState('');
@@ -998,8 +998,17 @@ return (
                 {p.type === 'receipt' && (
                   <button onClick={() => { setEditingPayment(p.raw); setSelectedCustomerForPayment(p.customerId); setShowPaymentModal(true); }} className="p-1.5 bg-slate-50 hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 rounded-lg border border-slate-200 transition-colors"><Edit size={13}/></button>
                 )}
-                {p.type === 'receipt' && (
-                  <button onClick={async()=>{if(window.confirm('Delete this payment receipt?')){await deleteFromFirebase('payments',p.id);showToast('Payment deleted');}}} className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-500 rounded-lg border border-rose-100 transition-colors"><Trash2 size={13}/></button>
+                {(p.type === 'receipt' || p.type === 'invoice') && (
+                  <button onClick={async()=>{
+                    if(!window.confirm('Delete this payment record?')) return;
+                    if(p.type === 'receipt'){
+                      await deleteFromFirebase('payments', p.id);
+                    } else {
+                      const inv = invoices.find(i => i.id === p.raw.id);
+                      if(inv) await saveToFirebase('invoices', inv.id, {...inv, receivedAmount: 0, paymentStatus: 'Pending'});
+                    }
+                    showToast('Payment deleted');
+                  }} className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-500 rounded-lg border border-rose-100 transition-colors"><Trash2 size={13}/></button>
                 )}
               </div>
             )}
