@@ -136,10 +136,11 @@ const generateShareText = () => {
     text += `*${data.customerName}*\n`;
     if (data.customerDetails?.contactPerson || data.customerDetails?.phone)
       text += `${data.customerDetails?.contactPerson || ''} ${data.customerDetails?.phone ? '- ' + data.customerDetails.phone : ''}\n`;
-    if (data.customerDetails?.address1) text += `${data.customerDetails.address1}\n`;
-    if (data.customerDetails?.map1) text += `${data.customerDetails.map1}\n`;
-    if (data.customerDetails?.address2) text += `Alt: ${data.customerDetails.address2}\n`;
-    if (data.customerDetails?.map2) text += `${data.customerDetails.map2}\n`;
+    const _addrKey = data.deliveryAddressKey || 'address1';
+    const _addr = _addrKey === 'address2' ? data.customerDetails?.address2 : data.customerDetails?.address1;
+    const _map = _addrKey === 'address2' ? data.customerDetails?.map2 : data.customerDetails?.map1;
+    if (_addr) text += `${_addr}\n`;
+    if (_map) text += `${_map}\n`;
     text += `\n🚚 *${data.vehicle || 'N/A'}*`;
     if (data.vehicle === 'Intercity Transport') {
       text += `\nTransport: ${data.transportCompany || '-'} | Bilty: ${data.biltyNumber || '-'}`;
@@ -528,18 +529,15 @@ return (
                   {data.customerDetails.phone ? ` · ${data.customerDetails.phone}` : ''}
                 </div>
               )}
-              {data.customerDetails.address1 && (
-                <div style={{ marginTop: '3px' }}>{data.customerDetails.address1}</div>
-              )}
-              {data.customerDetails.map1 && (
-                <div style={{ fontSize: '7.5px', color: '#6366f1', marginTop: '2px', wordBreak: 'break-all' }}>Map: {data.customerDetails.map1}</div>
-              )}
-              {data.customerDetails.address2 && (
-                <div style={{ marginTop: '4px', color: '#64748b' }}>Alt: {data.customerDetails.address2}</div>
-              )}
-              {data.customerDetails.map2 && (
-                <div style={{ fontSize: '7.5px', color: '#6366f1', marginTop: '2px', wordBreak: 'break-all' }}>Map: {data.customerDetails.map2}</div>
-              )}
+              {(() => {
+                const useKey = data.deliveryAddressKey || 'address1';
+                const addr = useKey === 'address2' ? data.customerDetails.address2 : data.customerDetails.address1;
+                const mapLink = useKey === 'address2' ? data.customerDetails.map2 : data.customerDetails.map1;
+                return (<>
+                  {addr && <div style={{ marginTop: '3px' }}>{addr}</div>}
+                  {mapLink && <div style={{ fontSize: '7.5px', color: '#6366f1', marginTop: '2px', wordBreak: 'break-all' }}>Map: {mapLink}</div>}
+                </>);
+              })()}
             </div>
           )}
           {docType === 'ledger' && data.phone && (

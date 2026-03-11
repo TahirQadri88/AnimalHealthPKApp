@@ -17,6 +17,10 @@ import PrintView from './components/PrintView';
 
 const AppContext = createContext(null);
 
+const EXPENSE_GROUPS = ['Transportation', 'Salary', 'Utilities', 'Office', 'Other'];
+const EXPENSE_GROUP_COLORS = { Transportation: 'bg-indigo-50 text-indigo-600 border-indigo-100', Salary: 'bg-amber-50 text-amber-600 border-amber-100', Utilities: 'bg-teal-50 text-teal-600 border-teal-100', Office: 'bg-purple-50 text-purple-600 border-purple-100', Other: 'bg-slate-100 text-slate-500 border-slate-200' };
+const RIDER_VEHICLE_TYPES = ['Rider', 'Rickshaw', 'Suzuki'];
+
 // ─── TOP-LEVEL MODAL COMPONENTS (outside App to prevent focus-loss on re-render) ───
 
 const ModalWrapper = ({ title, children, onClose }) => {
@@ -348,10 +352,12 @@ return (
 const ExpenseCategoryModal = () => {
 const { expenseCategories, saveToFirebase, deleteFromFirebase, showToast, setShowExpenseCatModal, showConfirm } = useContext(AppContext);
 const [newCat, setNewCat] = useState('');
+const [newGroup, setNewGroup] = useState('Transportation');
+const inputCls = "w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:border-indigo-500 shadow-sm";
 const addCat = async () => {
 if(!newCat) return;
 if(expenseCategories.some(c => c.name.toLowerCase() === newCat.toLowerCase())) return showToast("Category exists", "error");
-const catObj = { id: Date.now(), name: newCat };
+const catObj = { id: Date.now(), name: newCat, group: newGroup };
 await saveToFirebase('expenseCategories', catObj.id, catObj);
 setNewCat('');
 showToast("Category Added");
@@ -359,15 +365,31 @@ showToast("Category Added");
 return (
 <ModalWrapper title="Manage Expense Labels" onClose={() => setShowExpenseCatModal(false)}>
 <div className="space-y-4 pb-10">
-<div className="flex gap-2"><input type="text" placeholder="New category name..." className="flex-1 p-3 bg-slate-50 border border-slate-200 rounded-xl font-semibold outline-none focus:border-indigo-500" value={newCat} onChange={e=>setNewCat(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();addCat();}}} /><button type="button" onClick={addCat} className="bg-indigo-600 text-white px-4 rounded-xl font-bold hover:bg-indigo-700 transition-colors">Add</button></div>
+<form onSubmit={e=>{e.preventDefault();addCat();}} className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-3">
+  <div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Category Name</label><input type="text" placeholder="e.g. Bike Ride, Petrol..." className={inputCls} value={newCat} onChange={e=>setNewCat(e.target.value)} /></div>
+  <div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Group / Type</label><select className={inputCls} value={newGroup} onChange={e=>setNewGroup(e.target.value)}>{EXPENSE_GROUPS.map(g=><option key={g} value={g}>{g}</option>)}</select></div>
+  <button type="submit" className="w-full bg-indigo-600 text-white font-bold py-2.5 rounded-xl hover:bg-indigo-700 transition-colors">Add Category</button>
+</form>
 <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+{expenseCategories.length === 0 && <p className="text-center py-6 text-sm text-slate-400">No categories yet.</p>}
 <ul className="divide-y divide-slate-100">
-{expenseCategories.map(c => (
-<li key={c.id} className="flex justify-between items-center p-3 hover:bg-slate-50">
-<span className="font-semibold text-slate-700 text-sm flex items-center gap-2"><Tag size={14} className="text-slate-400"/> {c.name}</span>
-<button onClick={async () => { if(await showConfirm(`Delete category "${c.name}"?`)) await deleteFromFirebase('expenseCategories', c.id); }} className="p-2 text-slate-400 hover:text-rose-500 transition-colors"><Trash2 size={16}/></button>
-</li>
-))}
+{EXPENSE_GROUPS.map(g => {
+  const cats = expenseCategories.filter(c => (c.group||'Other') === g);
+  if (cats.length === 0) return null;
+  return (
+    <li key={g}>
+      <div className={`px-3 py-1.5 text-[9px] font-black uppercase tracking-widest border-b border-slate-100 ${EXPENSE_GROUP_COLORS[g]}`}>{g}</div>
+      <ul>
+        {cats.map(c => (
+          <li key={c.id} className="flex justify-between items-center px-3 py-2.5 hover:bg-slate-50">
+            <span className="font-semibold text-slate-700 text-sm flex items-center gap-2"><Tag size={13} className="text-slate-400"/> {c.name}</span>
+            <button type="button" onClick={async () => { if(await showConfirm(`Delete category "${c.name}"?`)) await deleteFromFirebase('expenseCategories', c.id); }} className="p-2 text-slate-400 hover:text-rose-500 transition-colors"><Trash2 size={15}/></button>
+          </li>
+        ))}
+      </ul>
+    </li>
+  );
+})}
 </ul>
 </div>
 </div>
@@ -376,6 +398,78 @@ return (
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
+
+const RidersModal = () => {
+const { riders, saveToFirebase, deleteFromFirebase, showToast, setShowRidersModal, showConfirm } = useContext(AppContext);
+const inputCls = "w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:border-indigo-500 shadow-sm";
+const [form, setForm] = useState({ name: '', phone: '', vehicleType: 'Rider', vehicleNumber: '' });
+const [editingId, setEditingId] = useState(null);
+const [editForm, setEditForm] = useState({});
+const add = async () => {
+  if (!form.name || !form.vehicleType) return showToast("Name and vehicle type required", "error");
+  const obj = { id: Date.now(), name: form.name, phone: form.phone, vehicleType: form.vehicleType, vehicleNumber: form.vehicleNumber };
+  await saveToFirebase('riders', obj.id, obj);
+  setForm({ name: '', phone: '', vehicleType: 'Rider', vehicleNumber: '' });
+  showToast("Rider Added");
+};
+const saveEdit = async (rider) => {
+  if (!editForm.name) return showToast("Name required", "error");
+  await saveToFirebase('riders', rider.id, { ...rider, ...editForm });
+  setEditingId(null);
+  showToast("Rider Updated");
+};
+return (
+<ModalWrapper title="Manage Riders & Vehicles" onClose={() => setShowRidersModal(false)}>
+<div className="space-y-4 pb-10">
+<form onSubmit={e=>{e.preventDefault();add();}} className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-3">
+  <div className="grid grid-cols-2 gap-2">
+    <div className="col-span-2"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Name *</label><input className={inputCls} placeholder="e.g. Ali Raza" value={form.name} onChange={e=>setForm({...form,name:e.target.value})} /></div>
+    <div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Phone</label><input className={inputCls} placeholder="03XX..." value={form.phone} onChange={e=>setForm({...form,phone:e.target.value})} /></div>
+    <div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Vehicle No.</label><input className={inputCls} placeholder="e.g. ABC-123" value={form.vehicleNumber} onChange={e=>setForm({...form,vehicleNumber:e.target.value})} /></div>
+    <div className="col-span-2"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Vehicle Type *</label><select className={inputCls} value={form.vehicleType} onChange={e=>setForm({...form,vehicleType:e.target.value})}>{RIDER_VEHICLE_TYPES.map(t=><option key={t} value={t}>{t}</option>)}</select></div>
+  </div>
+  <button type="submit" className="w-full bg-indigo-600 text-white font-bold py-2.5 rounded-xl hover:bg-indigo-700 transition-colors">Add Rider / Vehicle</button>
+</form>
+<div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+  {riders.length === 0 && <p className="text-center py-6 text-sm text-slate-400">No riders registered yet.</p>}
+  <ul className="divide-y divide-slate-100">
+    {riders.map(rider => (
+      <li key={rider.id} className="p-3 hover:bg-slate-50">
+        {editingId === rider.id ? (
+          <div className="space-y-2">
+            <div className="grid grid-cols-2 gap-2">
+              <input autoFocus className="col-span-2 p-2 text-sm font-semibold border border-indigo-300 rounded-lg outline-none" value={editForm.name||''} onChange={e=>setEditForm({...editForm,name:e.target.value})} placeholder="Name" />
+              <input className="p-2 text-sm font-semibold border border-slate-200 rounded-lg outline-none" value={editForm.phone||''} onChange={e=>setEditForm({...editForm,phone:e.target.value})} placeholder="Phone" />
+              <input className="p-2 text-sm font-semibold border border-slate-200 rounded-lg outline-none" value={editForm.vehicleNumber||''} onChange={e=>setEditForm({...editForm,vehicleNumber:e.target.value})} placeholder="Vehicle No." />
+              <select className="col-span-2 p-2 text-sm font-semibold border border-slate-200 rounded-lg outline-none" value={editForm.vehicleType||'Rider'} onChange={e=>setEditForm({...editForm,vehicleType:e.target.value})}>{RIDER_VEHICLE_TYPES.map(t=><option key={t} value={t}>{t}</option>)}</select>
+            </div>
+            <div className="flex gap-2">
+              <button type="button" onClick={()=>saveEdit(rider)} className="text-xs font-bold text-indigo-600 px-3 py-1.5 bg-indigo-50 rounded-lg">Save</button>
+              <button type="button" onClick={()=>setEditingId(null)} className="text-xs font-bold text-slate-500 px-2 py-1.5 bg-slate-100 rounded-lg">Cancel</button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-slate-800 text-sm">{rider.name}</span>
+                <span className="text-[9px] font-black bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded border border-indigo-100">{rider.vehicleType}</span>
+              </div>
+              <p className="text-[11px] text-slate-500 mt-0.5">{rider.phone || '—'}{rider.vehicleNumber ? ` · ${rider.vehicleNumber}` : ''}</p>
+            </div>
+            <button type="button" onClick={()=>{setEditingId(rider.id);setEditForm({name:rider.name,phone:rider.phone,vehicleType:rider.vehicleType,vehicleNumber:rider.vehicleNumber});}} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg"><Edit size={14}/></button>
+            <button type="button" onClick={async()=>{if(await showConfirm(`Delete ${rider.name}?`))await deleteFromFirebase('riders',rider.id);}} className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg"><Trash2 size={14}/></button>
+          </div>
+        )}
+      </li>
+    ))}
+  </ul>
+</div>
+</div>
+</ModalWrapper>
+);
+};
+
 
 function useLiveCollection(collectionName) {
 const [data, setData] = React.useState([]);
@@ -564,13 +658,13 @@ return (
 };
 
 const BillingTab = () => {
-const { isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig, setShowCreditNoteModal, setEditingCreditNote, showConfirm } = useContext(AppContext);
+const { isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig, setShowCreditNoteModal, setEditingCreditNote, showConfirm, riders } = useContext(AppContext);
 const [search, setSearch] = useState('');
 const [dateFilter, setDateFilter] = useState('All Time');
 const [statusFilter, setStatusFilter] = useState('All');
 const [prodSearch, setProdSearch] = useState('');
 const startNewInvoice = () => {
-setCurrentInvoice({ id: null, customerId: '', customerName: '', customerDetails: {}, items: [], deliveryBilled: 0, transportExpense: 0, vehicle: VEHICLES[0], paymentStatus: 'Pending', receivedAmount: 0, transportCompany: '', biltyNumber: '', driverName: '', driverPhone: '', notes: '' });
+setCurrentInvoice({ id: null, customerId: '', customerName: '', customerDetails: {}, items: [], deliveryBilled: 0, transportExpense: 0, vehicle: VEHICLES[0], paymentStatus: 'Pending', receivedAmount: 0, transportCompany: '', biltyNumber: '', driverName: '', driverPhone: '', riderId: '', deliveryAddressKey: 'address1', notes: '' });
 setBillingView('form');
 };
 const saveInvoice = async (status) => {
@@ -618,7 +712,7 @@ const cid = Number(e.target.value);
 const cName = customers.find(c=>c.id === cid)?.name || '';
 const pastInvs = invoices.filter(inv => inv.customerId === cid).sort((a,b) => new Date(b.date) - new Date(a.date) || b.id.localeCompare(a.id));
 const lastInv = pastInvs[0];
-setCurrentInvoice({ ...currentInvoice, customerId: cid, customerName: cName, vehicle: lastInv ? (lastInv.vehicle || VEHICLES[0]) : VEHICLES[0], transportCompany: lastInv ? (lastInv.transportCompany || '') : '', biltyNumber: lastInv ? (lastInv.biltyNumber || '') : '', driverName: lastInv ? (lastInv.driverName || '') : '', driverPhone: lastInv ? (lastInv.driverPhone || '') : '', deliveryBilled: lastInv ? (lastInv.deliveryBilled || 0) : 0, transportExpense: lastInv ? (lastInv.transportExpense || 0) : 0 });
+setCurrentInvoice({ ...currentInvoice, customerId: cid, customerName: cName, vehicle: lastInv ? (lastInv.vehicle || VEHICLES[0]) : VEHICLES[0], transportCompany: lastInv ? (lastInv.transportCompany || '') : '', biltyNumber: lastInv ? (lastInv.biltyNumber || '') : '', driverName: lastInv ? (lastInv.driverName || '') : '', driverPhone: lastInv ? (lastInv.driverPhone || '') : '', riderId: lastInv ? (lastInv.riderId || '') : '', deliveryAddressKey: lastInv ? (lastInv.deliveryAddressKey || 'address1') : 'address1', deliveryBilled: lastInv ? (lastInv.deliveryBilled || 0) : 0, transportExpense: lastInv ? (lastInv.transportExpense || 0) : 0 });
 }}><option value="">– Select Client –</option>{customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
 <button onClick={() => { setEditingCustomer(null); setShowCustomerModal(true); }} className="p-3 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-xl font-black shrink-0 transition-colors"><Plus size={18}/></button>
 </div>
@@ -638,6 +732,23 @@ setCurrentInvoice({ ...currentInvoice, customerId: cid, customerName: cName, veh
   return null;
 })()}
 </div>
+{currentInvoice.customerId && (() => {
+  const cust = customers.find(c => c.id === currentInvoice.customerId);
+  if (!cust?.address2) return null;
+  return (
+    <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+      <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5"><MapPin size={12}/> Delivery Address</h3>
+      <div className="space-y-2">
+        {[{key:'address1',label:'Primary',address:cust.address1},{key:'address2',label:'Secondary',address:cust.address2}].map(opt=>(
+          <label key={opt.key} className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${currentInvoice.deliveryAddressKey===opt.key?'bg-indigo-50 border-indigo-300':'bg-slate-50 border-slate-200 hover:bg-slate-100'}`}>
+            <input type="radio" name="deliveryAddress" className="mt-0.5 accent-indigo-600" checked={currentInvoice.deliveryAddressKey===opt.key} onChange={()=>setCurrentInvoice({...currentInvoice,deliveryAddressKey:opt.key})} />
+            <div><span className="text-[10px] font-black uppercase tracking-wider text-slate-500">{opt.label}</span><p className="text-sm font-semibold text-slate-700 mt-0.5 leading-snug">{opt.address}</p></div>
+          </label>
+        ))}
+      </div>
+    </div>
+  );
+})()}
 <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
 <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5"><Package size={12}/> Products</h3>
 <div className="flex gap-2 items-center mb-4"><div className="relative flex-1"><Search size={16} className="absolute left-3.5 top-3.5 text-slate-400"/><input placeholder="Search to add..." className={`pl-10 ${inputClass}`} value={prodSearch} onChange={e=>setProdSearch(e.target.value)} /></div></div>
@@ -690,7 +801,16 @@ return (
 )}
 {['Rider', 'Rickshaw', 'Suzuki'].includes(currentInvoice.vehicle) && (
 <div className="grid grid-cols-2 gap-3 mb-3 bg-indigo-50/50 p-3 rounded-xl border border-indigo-100">
-<div className="col-span-2 sm:col-span-1"><label className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider ml-1 mb-1 block">Driver Name</label><input placeholder="Name" className={`${inputClass} !bg-white !border-indigo-200`} value={currentInvoice.driverName || ''} onChange={e => setCurrentInvoice({...currentInvoice, driverName: e.target.value})} /></div>
+{riders.filter(r => r.vehicleType === currentInvoice.vehicle).length > 0 && (
+  <div className="col-span-2">
+    <label className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider ml-1 mb-1 block">Pick from Registry</label>
+    <select className={`${inputClass} !bg-white !border-indigo-200`} value={currentInvoice.riderId || ''} onChange={e => { const r = riders.find(r => String(r.id) === e.target.value); if (r) setCurrentInvoice({...currentInvoice, riderId: r.id, driverName: r.name, driverPhone: r.phone || ''}); else setCurrentInvoice({...currentInvoice, riderId: '', driverName: '', driverPhone: ''}); }}>
+      <option value="">– Pick a Rider –</option>
+      {riders.filter(r => r.vehicleType === currentInvoice.vehicle).map(r => <option key={r.id} value={r.id}>{r.name}{r.vehicleNumber ? ` (${r.vehicleNumber})` : ''}</option>)}
+    </select>
+  </div>
+)}
+<div className="col-span-2 sm:col-span-1"><label className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider ml-1 mb-1 block">Driver Name</label><input placeholder="Name" className={`${inputClass} !bg-white !border-indigo-200`} value={currentInvoice.driverName || ''} onChange={e => setCurrentInvoice({...currentInvoice, driverName: e.target.value, riderId: ''})} /></div>
 <div className="col-span-2 sm:col-span-1"><label className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider ml-1 mb-1 block">Driver Phone</label><input placeholder="03XX..." className={`${inputClass} !bg-white !border-indigo-200`} value={currentInvoice.driverPhone || ''} onChange={e => setCurrentInvoice({...currentInvoice, driverPhone: e.target.value})} /></div>
 </div>
 )}
@@ -1210,6 +1330,78 @@ return (
 );
 };
 
+const RidersAdminView = () => {
+const { riders, saveToFirebase, deleteFromFirebase, showToast, showConfirm } = useContext(AppContext);
+const inputCls = "w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:border-indigo-500 shadow-sm";
+const [form, setForm] = useState({ name: '', phone: '', vehicleType: 'Rider', vehicleNumber: '' });
+const [editingId, setEditingId] = useState(null);
+const [editForm, setEditForm] = useState({});
+const add = async () => {
+  if (!form.name) return showToast("Name required", "error");
+  const obj = { id: Date.now(), name: form.name, phone: form.phone, vehicleType: form.vehicleType, vehicleNumber: form.vehicleNumber };
+  await saveToFirebase('riders', obj.id, obj);
+  setForm({ name: '', phone: '', vehicleType: 'Rider', vehicleNumber: '' });
+  showToast("Rider Added");
+};
+const saveEdit = async (rider) => {
+  if (!editForm.name) return showToast("Name required", "error");
+  await saveToFirebase('riders', rider.id, { ...rider, ...editForm });
+  setEditingId(null);
+  showToast("Rider Updated");
+};
+return (
+<div className="h-full flex flex-col p-4 pb-24 overflow-y-auto space-y-4">
+<form onSubmit={e=>{e.preventDefault();add();}} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+  <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest">Register New Rider / Vehicle</h3>
+  <div className="grid grid-cols-2 gap-3">
+    <div className="col-span-2"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Full Name *</label><input className={inputCls} placeholder="e.g. Ali Raza" value={form.name} onChange={e=>setForm({...form,name:e.target.value})} /></div>
+    <div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Phone</label><input className={inputCls} placeholder="03XX..." value={form.phone} onChange={e=>setForm({...form,phone:e.target.value})} /></div>
+    <div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Vehicle Number</label><input className={inputCls} placeholder="e.g. ABC-123" value={form.vehicleNumber} onChange={e=>setForm({...form,vehicleNumber:e.target.value})} /></div>
+    <div className="col-span-2"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Vehicle Type *</label><select className={inputCls} value={form.vehicleType} onChange={e=>setForm({...form,vehicleType:e.target.value})}>{RIDER_VEHICLE_TYPES.map(t=><option key={t} value={t}>{t}</option>)}</select></div>
+  </div>
+  <button type="submit" className="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl hover:bg-indigo-700 transition-colors">Add Rider / Vehicle</button>
+</form>
+<div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+  <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-2"><Truck size={14} className="text-indigo-500"/><span className="text-xs font-bold text-slate-600 uppercase tracking-widest">Registered Riders</span><span className="ml-auto text-xs font-black text-indigo-600">{riders.length}</span></div>
+  {riders.length === 0 && <p className="text-center py-8 text-sm text-slate-400 font-medium">No riders registered yet.</p>}
+  <ul className="divide-y divide-slate-100">
+    {riders.map(rider => (
+      <li key={rider.id} className="p-3 hover:bg-slate-50">
+        {editingId === rider.id ? (
+          <div className="space-y-2">
+            <div className="grid grid-cols-2 gap-2">
+              <input autoFocus className="col-span-2 p-2 text-sm font-semibold border border-indigo-300 rounded-lg outline-none" value={editForm.name||''} onChange={e=>setEditForm({...editForm,name:e.target.value})} placeholder="Name" onKeyDown={e=>{if(e.key==='Escape')setEditingId(null);}} />
+              <input className="p-2 text-sm font-semibold border border-slate-200 rounded-lg outline-none" value={editForm.phone||''} onChange={e=>setEditForm({...editForm,phone:e.target.value})} placeholder="Phone" />
+              <input className="p-2 text-sm font-semibold border border-slate-200 rounded-lg outline-none" value={editForm.vehicleNumber||''} onChange={e=>setEditForm({...editForm,vehicleNumber:e.target.value})} placeholder="Vehicle No." />
+              <select className="col-span-2 p-2 text-sm font-semibold border border-slate-200 rounded-lg outline-none" value={editForm.vehicleType||'Rider'} onChange={e=>setEditForm({...editForm,vehicleType:e.target.value})}>{RIDER_VEHICLE_TYPES.map(t=><option key={t} value={t}>{t}</option>)}</select>
+            </div>
+            <div className="flex gap-2">
+              <button type="button" onClick={()=>saveEdit(rider)} className="text-xs font-bold text-indigo-600 px-3 py-1.5 bg-indigo-50 rounded-lg hover:bg-indigo-100">Save</button>
+              <button type="button" onClick={()=>setEditingId(null)} className="text-xs font-bold text-slate-500 px-2 py-1.5 bg-slate-100 rounded-lg">Cancel</button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <div className="flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-bold text-slate-800 text-sm">{rider.name}</span>
+                <span className="text-[9px] font-black bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded border border-indigo-100">{rider.vehicleType}</span>
+                {rider.vehicleNumber && <span className="text-[9px] font-bold bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">{rider.vehicleNumber}</span>}
+              </div>
+              <p className="text-[11px] text-slate-500 mt-0.5">{rider.phone || 'No phone'}</p>
+            </div>
+            <button type="button" onClick={()=>{setEditingId(rider.id);setEditForm({name:rider.name,phone:rider.phone||'',vehicleType:rider.vehicleType,vehicleNumber:rider.vehicleNumber||''});}} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg"><Edit size={14}/></button>
+            <button type="button" onClick={async()=>{if(await showConfirm(`Delete ${rider.name}?`))await deleteFromFirebase('riders',rider.id);showToast(`${rider.name} deleted`);}} className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg"><Trash2 size={14}/></button>
+          </div>
+        )}
+      </li>
+    ))}
+  </ul>
+</div>
+</div>
+);
+};
+
 const AdminTab = () => {
 const { isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig, showConfirm } = useContext(AppContext);
 if(!isAdmin) return <div className="p-10 text-center font-bold text-slate-400 flex flex-col items-center mt-20"><Lock className="mb-4 text-slate-300" size={48}/> <p className="text-sm uppercase tracking-widest">Admin Access Required</p></div>;
@@ -1225,6 +1417,7 @@ return (
 <button onClick={()=>setAdminView('segments')} className={`flex-1 py-2 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 whitespace-nowrap ${adminView==='segments'?'bg-white text-purple-600 shadow-sm':'text-slate-500'}`}><Globe size={14}/> Segments</button>
 <button onClick={()=>setAdminView('users')} className={`flex-1 py-2 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 whitespace-nowrap ${adminView==='users'?'bg-white text-amber-600 shadow-sm':'text-slate-500'}`}><Users size={14}/> Users</button>
 <button onClick={()=>setAdminView('settings')} className={`flex-1 py-2 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 whitespace-nowrap ${adminView==='settings'?'bg-white text-slate-700 shadow-sm':'text-slate-500'}`}><Settings size={14}/> Settings</button>
+<button onClick={()=>setAdminView('riders')} className={`flex-1 py-2 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 whitespace-nowrap ${adminView==='riders'?'bg-white text-indigo-600 shadow-sm':'text-slate-500'}`}><Truck size={14}/> Riders</button>
 </div>
 </div>
 <div className="flex-1 overflow-hidden">
@@ -1235,6 +1428,7 @@ return (
 <div style={{display: adminView === 'segments' ? 'flex' : 'none', flexDirection: 'column', height: '100%'}}><SegmentsAdminView /></div>
 <div style={{display: adminView === 'users' ? 'flex' : 'none', flexDirection: 'column', height: '100%'}}><UserManagementView /></div>
 <div style={{display: adminView === 'settings' ? 'flex' : 'none', flexDirection: 'column', height: '100%'}}><AppSettingsView /></div>
+<div style={{display: adminView === 'riders' ? 'flex' : 'none', flexDirection: 'column', height: '100%'}}><RidersAdminView /></div>
 </div>
 </div>
 )
@@ -2373,6 +2567,7 @@ const [category, setCategory] = useState(expenseCategories[0]?.name || '');
 const [note, setNote] = useState('');
 const [editingExpense, setEditingExpense] = useState(null);
 const [expFilter, setExpFilter] = useState('This Month');
+const [groupFilter, setGroupFilter] = useState('All');
 const saveExpense = async () => {
 if(!amount || !category) return showToast("Amount & Category required", "error");
 if (editingExpense) {
@@ -2388,7 +2583,7 @@ setAmount(''); setNote(''); setDate(getLocalDateStr()); setCategory(expenseCateg
 };
 const startEdit = (exp) => { setEditingExpense(exp); setDate(exp.date); setAmount(String(exp.amount)); setCategory(exp.category); setNote(exp.note || ''); };
 const cancelEdit = () => { setEditingExpense(null); setAmount(''); setNote(''); setDate(getLocalDateStr()); setCategory(expenseCategories[0]?.name || ''); };
-const filteredExpenses = expenses.filter(e => checkDateFilter(e.date, expFilter)).slice().reverse();
+const filteredExpenses = expenses.filter(e => checkDateFilter(e.date, expFilter)).filter(e => { if (groupFilter === 'All') return true; const cat = expenseCategories.find(c => c.name === e.category); return (cat?.group || 'Other') === groupFilter; }).slice().reverse();
 const filteredTotal = filteredExpenses.reduce((s,e)=>s+Number(e.amount),0);
 return (
 <div className="h-full flex flex-col p-4 pb-24 overflow-y-auto">
@@ -2402,20 +2597,26 @@ return (
 </div>
 <div className="grid grid-cols-2 gap-3 mb-3">
 <div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Date</label><input type="date" className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-semibold outline-none" value={date} onChange={e=>setDate(e.target.value)}/></div>
-<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Category</label><select className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-semibold outline-none" value={category} onChange={e=>setCategory(e.target.value)}><option value="">– Select –</option>{expenseCategories.map(c=><option key={c.id} value={c.name}>{c.name}</option>)}</select></div>
+<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Category</label><select className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-semibold outline-none" value={category} onChange={e=>setCategory(e.target.value)}><option value="">– Select –</option>{EXPENSE_GROUPS.map(g => { const cats = expenseCategories.filter(c=>(c.group||'Other')===g); if(!cats.length) return null; return <optgroup key={g} label={g}>{cats.map(c=><option key={c.id} value={c.name}>{c.name}</option>)}</optgroup>; })}</select></div>
 </div>
 <div className="mb-3"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Amount</label><input type="number" placeholder="0.00" className="w-full p-3 bg-white border border-rose-200 text-rose-600 rounded-xl text-lg font-extrabold outline-none focus:border-rose-400" value={amount} onChange={e=>setAmount(e.target.value)}/></div>
 <div className="mb-4"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Short Note</label><input type="text" placeholder="e.g. Paid to Ali for DHA drop" className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-semibold outline-none" value={note} onChange={e=>setNote(e.target.value)}/></div>
 <button type="submit" className={`w-full font-bold py-3.5 rounded-xl shadow-md text-white ${editingExpense ? 'bg-amber-500 hover:bg-amber-600' : 'bg-rose-500 hover:bg-rose-600'}`}>{editingExpense ? 'Update Expense' : 'Record Expense'}</button>
 </form>
-<div className="flex justify-between items-center mb-3">
+<div className="flex items-center gap-2 mb-3 flex-wrap">
 <div className="flex items-center gap-1.5 bg-white px-2.5 py-1.5 rounded-lg border border-slate-200 shadow-sm">
 <Calendar size={13} className="text-rose-500"/>
 <select value={expFilter} onChange={e=>setExpFilter(e.target.value)} className="bg-transparent font-bold text-[11px] text-slate-700 outline-none cursor-pointer">
 <option>Today</option><option>This Week</option><option>This Month</option><option>This Year</option><option>All Time</option>
 </select>
 </div>
-<div className="text-right">
+<div className="flex items-center gap-1.5 bg-white px-2.5 py-1.5 rounded-lg border border-slate-200 shadow-sm">
+<Tag size={11} className="text-indigo-500"/>
+<select value={groupFilter} onChange={e=>setGroupFilter(e.target.value)} className="bg-transparent font-bold text-[11px] text-slate-700 outline-none cursor-pointer">
+<option value="All">All Groups</option>{EXPENSE_GROUPS.map(g=><option key={g} value={g}>{g}</option>)}
+</select>
+</div>
+<div className="ml-auto text-right">
 <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Total</p>
 <p className="font-extrabold text-rose-600 text-base">Rs.{filteredTotal.toLocaleString()}</p>
 </div>
@@ -2423,7 +2624,7 @@ return (
 <div className="space-y-2.5">
 {filteredExpenses.map(exp => (
 <div key={exp.id} className={`bg-white p-3.5 rounded-2xl border shadow-sm flex justify-between items-center ${editingExpense?.id === exp.id ? 'border-amber-300 ring-2 ring-amber-200' : 'border-slate-200'}`}>
-<div><p className="font-bold text-slate-800 text-sm flex items-center gap-1.5"><Tag size={12} className="text-slate-400"/> {exp.category}</p><p className="text-[11px] text-slate-500 font-medium mt-0.5">{formatDateDisp(exp.date)} {exp.note ? `- ${exp.note}` : ''}</p></div>
+<div>{(() => { const cat = expenseCategories.find(c=>c.name===exp.category); const grp = cat?.group||'Other'; return <p className="font-bold text-slate-800 text-sm flex items-center gap-1.5"><Tag size={12} className="text-slate-400"/> {exp.category} <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border ${EXPENSE_GROUP_COLORS[grp]}`}>{grp}</span></p>; })()}<p className="text-[11px] text-slate-500 font-medium mt-0.5">{formatDateDisp(exp.date)} {exp.note ? `- ${exp.note}` : ''}</p></div>
 <div className="text-right ml-3">
 <p className="font-extrabold text-rose-600 text-base">Rs.{exp.amount.toLocaleString()}</p>
 <div className="flex gap-2 mt-1 justify-end">
@@ -2711,6 +2912,7 @@ const cities = useLiveCollection('cities');
 const areas = useLiveCollection('areas');
 const customerTypes = useLiveCollection('customerTypes');
 const appSettingsRaw = useLiveCollection('appSettings');
+const riders = useLiveCollection('riders');
 const appSettings = appSettingsRaw.find(s => s.id === 'main') || { businessName: 'Khyber Traders', appName: 'AnimalHealth.PK', tagline: 'Wholesale Veterinary Pharmacy · Karachi', showBusinessNameOnDocs: true, showBusinessNameOnReports: true };
 
 // Complex UI State
@@ -2729,6 +2931,7 @@ const [showUserModal, setShowUserModal] = useState(false);
 const [editingUser, setEditingUser] = useState(null);
 const [printConfig, setPrintConfig] = useState(null);
 const [showSegmentsModal, setShowSegmentsModal] = useState(false);
+const [showRidersModal, setShowRidersModal] = useState(false);
 const [editingPayment, setEditingPayment] = useState(null);
 const [showCreditNoteModal, setShowCreditNoteModal] = useState(false);
 const [editingCreditNote, setEditingCreditNote] = useState(null);
@@ -2864,12 +3067,13 @@ useEffect(() => {
       else if (showUserModal) setShowUserModal(false);
       else if (showExpenseCatModal) setShowExpenseCatModal(false);
       else if (showSegmentsModal) setShowSegmentsModal(false);
+      else if (showRidersModal) setShowRidersModal(false);
       else if (billingView === 'form') setBillingView('list');
     }
   };
   window.addEventListener('keydown', handler);
   return () => window.removeEventListener('keydown', handler);
-}, [currentUser, printConfig, showProductModal, showCustomerModal, showPaymentModal, showCreditNoteModal, showLedgerModal, showUserModal, showExpenseCatModal, showSegmentsModal, billingView]);
+}, [currentUser, printConfig, showProductModal, showCustomerModal, showPaymentModal, showCreditNoteModal, showLedgerModal, showUserModal, showExpenseCatModal, showSegmentsModal, showRidersModal, billingView]);
 
 // — Auth Screen —
 if (!currentUser) {
@@ -2919,6 +3123,8 @@ showExpenseCatModal, setShowExpenseCatModal,
 showUserModal, setShowUserModal, editingUser, setEditingUser,
 setPrintConfig, printConfig,
 showSegmentsModal, setShowSegmentsModal,
+showRidersModal, setShowRidersModal,
+riders,
 editingPayment, setEditingPayment,
 showCreditNoteModal, setShowCreditNoteModal, editingCreditNote, setEditingCreditNote,
 appSettings,
@@ -2974,7 +3180,7 @@ return (
       <h2 className="text-base font-bold text-slate-800 capitalize">{TABS.find(t=>t.id===activeTab)?.label || ''}</h2>
       <div className="flex items-center gap-3">
         {activeTab === 'billing' && billingView === 'list' && (
-          <button onClick={() => { setCurrentInvoice({ id: null, customerId: '', customerName: '', customerDetails: {}, items: [], deliveryBilled: 0, transportExpense: 0, vehicle: VEHICLES[0], paymentStatus: 'Pending', receivedAmount: 0, transportCompany: '', biltyNumber: '', driverName: '', driverPhone: '', notes: '' }); setBillingView('form'); }} className="flex items-center gap-1.5 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700 transition-colors shadow-sm"><Plus size={16}/> New Invoice <kbd className="ml-1 text-[9px] bg-indigo-500 px-1.5 py-0.5 rounded font-mono">Alt+B</kbd></button>
+          <button onClick={() => { setCurrentInvoice({ id: null, customerId: '', customerName: '', customerDetails: {}, items: [], deliveryBilled: 0, transportExpense: 0, vehicle: VEHICLES[0], paymentStatus: 'Pending', receivedAmount: 0, transportCompany: '', biltyNumber: '', driverName: '', driverPhone: '', riderId: '', deliveryAddressKey: 'address1', notes: '' }); setBillingView('form'); }} className="flex items-center gap-1.5 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700 transition-colors shadow-sm"><Plus size={16}/> New Invoice <kbd className="ml-1 text-[9px] bg-indigo-500 px-1.5 py-0.5 rounded font-mono">Alt+B</kbd></button>
         )}
         {activeTab === 'customers' && (
           <button onClick={() => { setSelectedCustomerForPayment(null); setShowPaymentModal(true); }} className="flex items-center gap-1.5 bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-emerald-600 transition-colors shadow-sm"><Wallet size={16}/> Receive Payment</button>
@@ -3035,6 +3241,7 @@ return (
   {showExpenseCatModal && <ExpenseCategoryModal />}
   {showUserModal && <UserModal />}
   {showSegmentsModal && <SegmentsModal />}
+  {showRidersModal && <RidersModal />}
   <ConfirmDialog />
 
   {toast && (
