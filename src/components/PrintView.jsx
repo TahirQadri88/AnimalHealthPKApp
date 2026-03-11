@@ -173,9 +173,11 @@ const generateShareText = () => {
     if (data.phone) text += `${data.phone}\n`;
     text += `Period: ${formatDateDisp(data.dateRange?.start)} to ${formatDateDisp(data.dateRange?.end)}\n`;
     text += `${hr}\n`;
+    const periodClosingBal = (data.openingBal || 0) + (data.totalDebit || 0) - (data.totalCredit || 0);
+    text += `Opening Balance: Rs.${(data.openingBal || 0).toLocaleString()}\n`;
     text += `Total Debits: Rs.${(data.totalDebit || 0).toLocaleString()}\n`;
     text += `Total Credits: Rs.${(data.totalCredit || 0).toLocaleString()}\n`;
-    text += `*Closing Balance: Rs.${(data.closingBal || 0).toLocaleString()}*\n\n`;
+    text += `*Closing Balance: Rs.${periodClosingBal.toLocaleString()}*\n\n`;
     text += `Please arrange payment at your earliest convenience.`;
 
   } else if (docType === 'report') {
@@ -995,7 +997,7 @@ return (
           </div>
           <div style={{ textAlign: 'right', background: '#fff1f2', padding: sz('6px 10px','8px 12px','10px 14px'), borderRadius: '8px', border: '1px solid #fecdd3', flexShrink: 0 }}>
             <div style={{ fontSize: '7.5px', fontWeight: 800, textTransform: 'uppercase', color: '#e11d48', letterSpacing: '1px' }}>Closing Balance</div>
-            <div style={{ fontWeight: 900, color: '#be123c', fontSize: sz('13px','16px','20px') }}>Rs. {(data.closingBal || 0).toLocaleString()}</div>
+            <div style={{ fontWeight: 900, color: '#be123c', fontSize: sz('13px','16px','20px') }}>Rs. {((data.openingBal || 0) + (data.totalDebit || 0) - (data.totalCredit || 0)).toLocaleString()}</div>
           </div>
         </div>
 
