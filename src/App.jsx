@@ -1911,7 +1911,7 @@ const renderSegmentTable = (dataObj, label) => {
 const filterLabel = dateFilter === 'Custom' ? `${customStart||'...'} - ${customEnd}` : dateFilter;
 
 return (
-  <div className="h-full flex flex-col p-4 overflow-hidden">
+  <div className="h-full flex flex-col p-4">
     {/* Filter Bar */}
     <div className="flex flex-wrap gap-2 mb-3 shrink-0 pb-1">
        <div className="flex items-center gap-1.5 bg-white px-2.5 py-1.5 rounded-lg border border-slate-200 shadow-sm shrink-0">
