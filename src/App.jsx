@@ -1495,8 +1495,16 @@ const MultiPicker = ({ label, Icon, items, selected, onToggle, onClear }) => {
   const [open, setOpen] = useState(false);
   const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0 });
   const btnRef = useRef(null);
+  const dropdownRef = useRef(null);
   useEffect(() => {
-    const handler = (e) => { if (btnRef.current && !btnRef.current.contains(e.target)) setOpen(false); };
+    const handler = (e) => {
+      if (
+        btnRef.current && !btnRef.current.contains(e.target) &&
+        dropdownRef.current && !dropdownRef.current.contains(e.target)
+      ) {
+        setOpen(false);
+      }
+    };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
@@ -1508,6 +1516,7 @@ const MultiPicker = ({ label, Icon, items, selected, onToggle, onClear }) => {
     setOpen(o => !o);
   };
   const count = selected.size;
+  const allSelected = items.length > 0 && items.every(i => selected.has(String(i.id)));
   return (
     <div className="relative shrink-0">
       <button ref={btnRef} onClick={handleOpen}
@@ -1515,10 +1524,10 @@ const MultiPicker = ({ label, Icon, items, selected, onToggle, onClear }) => {
         {Icon && <Icon size={12}/>} {count > 0 ? `${label} (${count})` : label} <ChevronDown size={10}/>
       </button>
       {open && createPortal(
-        <div style={{ position: 'fixed', top: dropdownPos.top, left: dropdownPos.left, zIndex: 9999 }}
+        <div ref={dropdownRef} style={{ position: 'fixed', top: dropdownPos.top, left: dropdownPos.left, zIndex: 9999 }}
           className="bg-white border border-slate-200 rounded-xl shadow-xl min-w-[170px] max-h-[260px] overflow-y-auto p-1.5">
           <div className="flex justify-between px-2 py-1 text-[10px] text-slate-500 font-semibold border-b border-slate-100 mb-1">
-            <button onClick={() => { items.forEach(i => onToggle(i.id)); }} className="hover:text-indigo-600">Select All</button>
+            <button onClick={() => { if (allSelected) { onClear(); } else { items.forEach(i => { if (!selected.has(String(i.id))) onToggle(i.id); }); } }} className="hover:text-indigo-600">{allSelected ? 'Deselect All' : 'Select All'}</button>
             <button onClick={onClear} className="text-rose-500 hover:text-rose-700">Clear</button>
           </div>
           {items.map(item => (
