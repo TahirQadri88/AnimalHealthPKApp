@@ -88,17 +88,16 @@ const formatted = { ...form, companyId: Number(finalCompanyId), costPrice: newCo
 if (isEdit) {
 await saveToFirebase('products', form.id, formatted);
 if (costChanged) {
-invoices.forEach(async inv => {
-if (inv.date >= effectiveDate) {
-let updated = false;
-const updatedItems = inv.items.map(item => {
-if (item.productId === form.id) { updated = true; return { ...item, costPrice: newCost }; }
-return item;
-});
-if (updated) await saveToFirebase('invoices', inv.id, { ...inv, items: updatedItems });
+const affectedInvoices = invoices.filter(inv => inv.date >= effectiveDate);
+let costUpdCount = 0;
+for (const inv of affectedInvoices) {
+const updatedItems = inv.items.map(item => item.productId === form.id ? { ...item, costPrice: newCost } : item);
+if (updatedItems.some((item, i) => item.costPrice !== inv.items[i]?.costPrice)) {
+  await saveToFirebase('invoices', inv.id, { ...inv, items: updatedItems });
+  costUpdCount++;
 }
-});
-showToast(`Product Updated. Cost applied from ${effectiveDate}`);
+}
+showToast(`Product Updated. Cost applied to ${costUpdCount} invoice${costUpdCount !== 1 ? 's' : ''} from ${effectiveDate}`);
 } else { showToast("Product Updated"); }
 } else {
 const newId = Date.now();
@@ -173,6 +172,10 @@ return (
 <div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Contact Person</label><input placeholder="Name" className={inputClass} value={form.contactPerson || ''} onChange={e => setForm({...form, contactPerson: e.target.value})} /></div>
 <div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Phone Number</label><input placeholder="03XXXXXXXXX" className={inputClass} value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} /></div>
 </div>
+<div className="grid grid-cols-2 gap-3">
+<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Email (Optional)</label><input type="email" placeholder="clinic@example.com" className={inputClass} value={form.email || ''} onChange={e => setForm({...form, email: e.target.value})} /></div>
+<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Alt. Phone (Optional)</label><input placeholder="03XXXXXXXXX" className={inputClass} value={form.altPhone || ''} onChange={e => setForm({...form, altPhone: e.target.value})} /></div>
+</div>
 </div>
 <div className="space-y-3 bg-slate-100 p-3 rounded-xl border border-slate-200">
 <h3 className="text-xs font-bold text-slate-800 uppercase tracking-widest flex items-center gap-1"><MapPin size={14}/> Primary Location</h3>
@@ -230,7 +233,14 @@ const inputClass = "w-full p-3.5 bg-white border border-slate-200 rounded-xl tex
 return (
 <ModalWrapper title={isEdit ? "Edit Payment Receipt" : "Receive Payment"} onClose={handleClose}>
 <div className="space-y-4 pb-10">
-<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Select Client</label><select className={inputClass} value={form.customerId} onChange={e=>setForm({...form, customerId: e.target.value})} disabled={isEdit}><option value="">– Choose Client –</option>{customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
+<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Select Client</label><select className={inputClass} value={form.customerId} onChange={e=>setForm({...form, customerId: e.target.value})}
+  disabled={isEdit && customers.some(c => c.id === Number(form.customerId) || String(c.id) === String(form.customerId))}>
+  <option value="">– Choose Client –</option>
+  {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+</select>
+{isEdit && !customers.some(c => String(c.id) === String(form.customerId)) && (
+  <p className="text-[10px] text-amber-600 font-bold mt-1 flex items-center gap-1"><AlertCircle size={11}/> Original client was deleted — please re-assign to an existing client or delete this receipt.</p>
+)}</div>
 {form.customerId && (<div className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-center"><p className="text-[10px] uppercase font-bold text-slate-500 tracking-widest">Current Outstanding Balance</p><p className="text-xl font-black text-rose-600 mt-1">Rs. {getCustomerBalance(Number(form.customerId)).toLocaleString()}</p></div>)}
 <div className="grid grid-cols-2 gap-3">
 <div className="col-span-2"><label className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider ml-1 mb-1 block">Amount Received (Cr)</label><input type="number" placeholder="0.00" className={`${inputClass} !border-emerald-200 !text-emerald-700 !font-extrabold text-lg`} value={form.amount} onChange={e=>setForm({...form, amount: e.target.value})} /></div>
@@ -354,7 +364,7 @@ return (
 {expenseCategories.map(c => (
 <li key={c.id} className="flex justify-between items-center p-3 hover:bg-slate-50">
 <span className="font-semibold text-slate-700 text-sm flex items-center gap-2"><Tag size={14} className="text-slate-400"/> {c.name}</span>
-<button onClick={async () => await deleteFromFirebase('expenseCategories', c.id)} className="p-2 text-slate-400 hover:text-rose-500 transition-colors"><Trash2 size={16}/></button>
+<button onClick={async () => { if(window.confirm(`Delete category "${c.name}"?`)) await deleteFromFirebase('expenseCategories', c.id); }} className="p-2 text-slate-400 hover:text-rose-500 transition-colors"><Trash2 size={16}/></button>
 </li>
 ))}
 </ul>
@@ -1114,7 +1124,7 @@ return (
           </div>
           <div className="flex gap-1.5 shrink-0">
             <button onClick={()=>{setEditingCustomer(c);setShowCustomerModal(true);}} className="p-2 bg-slate-50 text-slate-600 rounded-lg hover:bg-indigo-50 hover:text-indigo-600 transition-colors"><Edit size={14}/></button>
-            <button onClick={async()=>{if(window.confirm(`Permanently delete ${c.name}?`))await deleteFromFirebase('customers',c.id);}} className="p-2 bg-rose-50 text-rosese-500 rounded-lg hover:bg-rose-100 transition-colors"><Trash2 size={14}/></button>
+            <button onClick={async()=>{if(window.confirm(`Permanently delete ${c.name}?`))await deleteFromFirebase('customers',c.id);}} className="p-2 bg-rose-50 text-rose-500 rounded-lg hover:bg-rose-100 transition-colors"><Trash2 size={14}/></button>
           </div>
         </div>
       ))}
@@ -1128,7 +1138,7 @@ return (
       {expenseCategories.filter(c=>c.name.toLowerCase().includes(search.toLowerCase())).map(c=>(
         <div key={c.id} className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex justify-between items-center">
           <span className="font-semibold text-slate-700 text-sm flex items-center gap-2"><Tag size={14} className="text-slate-400"/> {c.name}</span>
-          <button onClick={async()=>await deleteFromFirebase('expenseCategories',c.id)} className="p-2 bg-rose-50 text-rose-500 rounded-lg hover:bg-rose-100 transition-colors"><Trash2 size={14}/></button>
+          <button onClick={async()=>{if(window.confirm(`Delete category "${c.name}"?`)) await deleteFromFirebase('expenseCategories',c.id);}} className="p-2 bg-rose-50 text-rose-500 rounded-lg hover:bg-rose-100 transition-colors"><Trash2 size={14}/></button>
         </div>
       ))}
     </div>
@@ -2355,18 +2365,33 @@ const BulkOpsView = () => {
 const { isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig } = useContext(AppContext);
 const [bulkProducts, setBulkProducts] = useState([]);
 const [bulkSearch, setBulkSearch] = useState('');
+const [bulkEffectiveDate, setBulkEffectiveDate] = useState(getLocalDateStr());
 const [activeExportTab, setActiveExportTab] = useState('items');
 useEffect(() => { setBulkProducts(products); }, [products]);
 const handleBulkSave = async () => {
-let updatedCount = 0;
+let updatedCount = 0; let costUpdateCount = 0;
 for (const bp of bulkProducts) {
 const orig = products.find(p => p.id === bp.id);
 if (orig && (orig.costPrice !== bp.costPrice || orig.sellingPrice !== bp.sellingPrice || orig.available !== bp.available || orig.name !== bp.name || orig.unit !== bp.unit || orig.unitsInBox !== bp.unitsInBox)) {
-await saveToFirebase('products', bp.id, {...orig, ...bp});
-updatedCount++;
+  await saveToFirebase('products', bp.id, {...orig, ...bp});
+  updatedCount++;
+  // Apply updated cost price retroactively to invoices from effective date onwards
+  if (orig.costPrice !== bp.costPrice) {
+    const affected = invoices.filter(inv => inv.date >= bulkEffectiveDate);
+    for (const inv of affected) {
+      const updatedItems = inv.items.map(item => item.productId === bp.id ? { ...item, costPrice: bp.costPrice } : item);
+      if (updatedItems.some((item, i) => item.costPrice !== inv.items[i]?.costPrice)) {
+        await saveToFirebase('invoices', inv.id, { ...inv, items: updatedItems });
+        costUpdateCount++;
+      }
+    }
+  }
 }
 }
-showToast(`Updated ${updatedCount} items`);
+const msg = costUpdateCount > 0
+  ? `Updated ${updatedCount} products. Cost re-applied to ${costUpdateCount} invoice${costUpdateCount !== 1 ? 's' : ''} from ${bulkEffectiveDate}`
+  : `Updated ${updatedCount} items`;
+showToast(msg);
 };
 const downloadImportTemplate = () => {
 const templateData = [{ Name: "Sample Product A", Company: "Pharma Co", Unit: "Vial", BoxQty: 1, Cost: 100, Selling: 150 }, { Name: "Sample Product B", Company: "AgriMed", Unit: "Strip", BoxQty: 10, Cost: 500, Selling: 650 }];
@@ -2485,6 +2510,7 @@ return (
            <p className="text-xs font-bold text-rose-700 mb-2 flex items-center gap-1.5"><AlertCircle size={14}/> {dupes.length} Duplicate {dupes.length === 1 ? 'Company' : 'Companies'} Found</p>
            <p className="text-[10px] text-rose-600 mb-3">These were created by previous imports. Click to merge them and fix all product references.</p>
            <button onClick={async () => {
+             if(!window.confirm(`Merge ${dupes.length} duplicate compan${dupes.length > 1 ? 'ies' : 'y'}? This will re-assign all linked products and cannot be undone.`)) return;
              const canonical = {};
              companies.forEach(c => { const k = c.name.trim().toLowerCase(); if (!canonical[k]) canonical[k] = c.id; });
              let fixed = 0;
@@ -2529,12 +2555,21 @@ return (
 
      {/* Bulk Price Edit */}
      <div className="flex-none bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col overflow-hidden" style={{minHeight: '300px'}}>
-        <div className="p-3 border-b border-slate-200 flex justify-between items-center bg-slate-50 gap-2">
-           <div className="flex items-center gap-2 flex-1">
-             <h3 className="font-bold text-slate-800 text-sm flex items-center gap-1.5 shrink-0"><ArrowUpDown size={15}/> Quick Edit</h3>
-             <input value={bulkSearch} onChange={e=>setBulkSearch(e.target.value)} placeholder="Search..." className="flex-1 p-1.5 text-xs border border-slate-200 rounded-lg outline-none focus:border-indigo-400 font-semibold bg-white"/>
-           </div>
-           <button onClick={handleBulkSave} className="bg-emerald-500 text-white px-3 py-1.5 rounded-lg font-bold text-xs shadow-sm shrink-0">Save All</button>
+        <div className="p-3 border-b border-slate-200 flex flex-col gap-2 bg-slate-50">
+          <div className="flex justify-between items-center gap-2">
+            <div className="flex items-center gap-2 flex-1">
+              <h3 className="font-bold text-slate-800 text-sm flex items-center gap-1.5 shrink-0"><ArrowUpDown size={15}/> Quick Edit</h3>
+              <input value={bulkSearch} onChange={e=>setBulkSearch(e.target.value)} placeholder="Search..." className="flex-1 p-1.5 text-xs border border-slate-200 rounded-lg outline-none focus:border-indigo-400 font-semibold bg-white"/>
+            </div>
+            <button onClick={handleBulkSave} className="bg-emerald-500 text-white px-3 py-1.5 rounded-lg font-bold text-xs shadow-sm shrink-0">Save All</button>
+          </div>
+          <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5">
+            <AlertCircle size={12} className="text-amber-600 shrink-0"/>
+            <span className="text-[10px] font-bold text-amber-700 shrink-0">Cost Effective From:</span>
+            <input type="date" value={bulkEffectiveDate} onChange={e=>setBulkEffectiveDate(e.target.value)}
+              className="text-[10px] font-bold text-amber-900 bg-transparent outline-none border-0 cursor-pointer"/>
+            <span className="text-[9px] text-amber-600 hidden sm:block">— Cost price changes will update invoices from this date</span>
+          </div>
         </div>
         <div className="overflow-auto" style={{maxHeight: '400px'}}>
            <table className="w-full text-left text-xs whitespace-nowrap min-w-[760px]">
