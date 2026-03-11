@@ -573,7 +573,7 @@ const totalItems = currentInvoice.items.reduce((sum, i) => sum + (i.price * i.qu
 const grandTotal = totalItems + Number(currentInvoice.deliveryBilled);
 const activeCustomer = customers.find(c => c.id === currentInvoice.customerId);
 const finalInvoice = { ...currentInvoice, total: grandTotal, status: status, salespersonId: currentUser.id, salespersonName: currentUser.name, customerDetails: activeCustomer ? { contactPerson: activeCustomer.contactPerson || '', phone: activeCustomer.phone || '', address1: activeCustomer.address1 || activeCustomer.address || '', map1: activeCustomer.map1 || '', address2: activeCustomer.address2 || '', map2: activeCustomer.map2 || '' } : {} };
-if (!finalInvoice.id) { finalInvoice.id = `INV-${Math.floor(Math.random()*10000)}`; finalInvoice.date = getLocalDateStr(); }
+if (!finalInvoice.id) { finalInvoice.id = `INV-${Date.now()}`; finalInvoice.date = getLocalDateStr(); }
 await saveToFirebase('invoices', finalInvoice.id, finalInvoice);
 showToast(currentInvoice.id ? "Invoice Updated" : `Invoice ${status}`);
 setBillingView('list');
@@ -2803,6 +2803,7 @@ return ledger ? ledger.closingBal : 0;
 };
 
 const generateReceiptData = (ledger, rowId) => {
+if (!ledger) return null;
 const row = ledger.rows.find(r => r.id === rowId);
 if(!row) return null;
 const isInvoicePayment = row.id.endsWith('-PAY');
