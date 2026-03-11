@@ -34,7 +34,7 @@ const getDispatchQtyStr = (item) => {
   return `${qty} (${loose} Loose)`;
 };
 
-const safeStr = (s) => (s || '').replace(/[^a-zA-Z0-9_\-]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
+const safeStr = (s) => String(s ?? '').replace(/[^a-zA-Z0-9_\-]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
 
 const getFileName = () => {
   const custName = safeStr(data?.customerName || data?.title || 'Doc');

@@ -150,7 +150,7 @@ if(isEdit) {
 const updatedCustomer = {...form, openingBalance: Number(form.openingBalance)};
 if(updatedCustomer.address) delete updatedCustomer.address;
 await saveToFirebase('customers', form.id, updatedCustomer);
-if(form.name !== editingCustomer.name) { invoices.forEach(async o => { if (o.customerId === form.id) await saveToFirebase('invoices', o.id, {...o, customerName: form.name}); }); }
+if(form.name !== editingCustomer.name) { for (const o of invoices) { if (o.customerId === form.id) await saveToFirebase('invoices', o.id, {...o, customerName: form.name}); } }
 showToast("Customer Updated");
 } else {
 const newId = Date.now();
@@ -2480,14 +2480,14 @@ let compId;
 const compName = rowData.company || 'Unknown';
 const compNameLower = compName.toLowerCase();
 if (localCompanyMap[compNameLower]) { compId = localCompanyMap[compNameLower]; } else {
-compId = Date.now() + Math.random();
+compId = Date.now();
 await saveToFirebase('companies', compId, { id: compId, name: compName });
 localCompanyMap[compNameLower] = compId;
 }
 const existingProd = products.find(p => p.name.toLowerCase() === rowData.name.toLowerCase());
 const prodObj = { name: rowData.name, companyId: compId, unit: rowData.unit || 'Unit', unitsInBox: Number(rowData.boxqty) || 1, costPrice: Number(rowData.cost) || 0, sellingPrice: Number(rowData.selling) || 0, available: true };
 if (existingProd) { await saveToFirebase('products', existingProd.id, { ...existingProd, ...prodObj }); updatedCount++; }
-else { const newId = Date.now() + Math.random(); await saveToFirebase('products', newId, { ...prodObj, id: newId }); addedCount++; }
+else { const newId = Date.now(); await saveToFirebase('products', newId, { ...prodObj, id: newId }); addedCount++; }
 }
 showToast(`Done! ${addedCount} added, ${updatedCount} updated.`);
 };
@@ -2512,7 +2512,7 @@ if (!name) continue;
 const custObj = { name, contactPerson: get('contact'), phone: get('phone'), address1: get('address1'), map1: get('map1'), address2: get('address2'), map2: get('map2'), openingBalance: Number(get('openingbalance')) || 0 };
 const existing = customers.find(c => c.name.toLowerCase() === name.toLowerCase());
 if (existing) { await saveToFirebase('customers', existing.id, {...existing, ...custObj}); updatedCount++; }
-else { const newId = Date.now() + Math.random(); await saveToFirebase('customers', newId, {...custObj, id: newId}); addedCount++; }
+else { const newId = Date.now(); await saveToFirebase('customers', newId, {...custObj, id: newId}); addedCount++; }
 }
 showToast(`Done! ${addedCount} added, ${updatedCount} updated.`);
 };
