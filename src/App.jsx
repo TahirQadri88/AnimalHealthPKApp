@@ -395,13 +395,18 @@ const ConfirmDialog = () => {
 const { confirmDialog, setConfirmDialog } = useContext(AppContext);
 if (!confirmDialog) return null;
 const handle = (val) => { setConfirmDialog(null); confirmDialog.resolve(val); };
+useEffect(() => {
+  const onKey = (e) => { if (e.key === 'Escape') handle(false); };
+  window.addEventListener('keydown', onKey);
+  return () => window.removeEventListener('keydown', onKey);
+}, []);
 return (
 <div className="fixed inset-0 bg-slate-900/70 z-[200] flex items-center justify-center p-6" onClick={() => handle(false)}>
   <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl" onClick={e => e.stopPropagation()}>
     <p className="text-slate-800 font-semibold text-sm leading-relaxed whitespace-pre-line">{confirmDialog.message}</p>
     <div className="flex gap-3 mt-5">
-      <button onClick={() => handle(false)} className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-sm transition-colors">Cancel</button>
-      <button onClick={() => handle(true)} className="flex-1 py-2.5 bg-rose-500 hover:bg-rose-600 text-white font-bold rounded-xl text-sm transition-colors">Confirm</button>
+      <button type="button" onClick={() => handle(false)} className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-sm transition-colors">Cancel</button>
+      <button type="button" onClick={() => handle(true)} className="flex-1 py-2.5 bg-rose-500 hover:bg-rose-600 text-white font-bold rounded-xl text-sm transition-colors">Confirm</button>
     </div>
   </div>
 </div>
@@ -1291,7 +1296,7 @@ const Field = ({ label, value, onChange, placeholder }) => (
 const Toggle = ({ label, desc, checked, onChange }) => (
   <div className="flex items-start justify-between gap-4 py-3 border-b border-slate-100 last:border-0">
     <div><div className="text-sm font-bold text-slate-700">{label}</div>{desc && <div className="text-[11px] text-slate-400 mt-0.5">{desc}</div>}</div>
-    <button onClick={()=>onChange(!checked)} className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${checked?'bg-indigo-600':'bg-slate-300'}`}>
+    <button type="button" onClick={()=>onChange(!checked)} className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${checked?'bg-indigo-600':'bg-slate-300'}`}>
       <span className={`inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${checked?'translate-x-6':'translate-x-1'}`}/>
     </button>
   </div>
@@ -1299,7 +1304,7 @@ const Toggle = ({ label, desc, checked, onChange }) => (
 const totalRecords = invoices.length + customers.length + products.length + payments.length + expenses.length;
 return (
 <div className="flex-1 overflow-y-auto p-4 space-y-5">
-  <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
+  <form onSubmit={e => { e.preventDefault(); saveSettings(); }} className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
     <h3 className="font-black text-slate-800 text-base mb-1">Business Profile</h3>
     <p className="text-xs text-slate-400 mb-5">Used on invoices, receipts, and all generated documents.</p>
     <div className="space-y-4">
@@ -1318,10 +1323,10 @@ return (
       <Toggle label="Show on Reports" desc="Display business name on printed analytics reports"
         checked={form.showBusinessNameOnReports} onChange={v=>setForm(p=>({...p,showBusinessNameOnReports:v}))} />
     </div>
-    <button onClick={saveSettings} className="mt-5 w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-3 rounded-xl text-sm flex items-center justify-center gap-2">
+    <button type="submit" className="mt-5 w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-3 rounded-xl text-sm flex items-center justify-center gap-2">
       <Save size={15}/> Save Settings
     </button>
-  </div>
+  </form>
   <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
     <h3 className="font-black text-slate-800 text-base mb-1">Backup & Data Safety</h3>
     <p className="text-xs text-slate-400 mb-4">Download a full JSON backup of all your data. Store in Google Drive or another safe location. Recommended: weekly.</p>
@@ -1527,8 +1532,8 @@ const MultiPicker = ({ label, Icon, items, selected, onToggle, onClear }) => {
         <div ref={dropdownRef} style={{ position: 'fixed', top: dropdownPos.top, left: dropdownPos.left, zIndex: 9999 }}
           className="bg-white border border-slate-200 rounded-xl shadow-xl min-w-[170px] max-h-[260px] overflow-y-auto p-1.5">
           <div className="flex justify-between px-2 py-1 text-[10px] text-slate-500 font-semibold border-b border-slate-100 mb-1">
-            <button onClick={() => { if (allSelected) { onClear(); } else { items.forEach(i => { if (!selected.has(String(i.id))) onToggle(i.id); }); } }} className="hover:text-indigo-600">{allSelected ? 'Deselect All' : 'Select All'}</button>
-            <button onClick={onClear} className="text-rose-500 hover:text-rose-700">Clear</button>
+            <button type="button" onClick={() => { if (allSelected) { onClear(); } else { items.forEach(i => { if (!selected.has(String(i.id))) onToggle(i.id); }); } }} className="hover:text-indigo-600">{allSelected ? 'Deselect All' : 'Select All'}</button>
+            <button type="button" onClick={onClear} className="text-rose-500 hover:text-rose-700">Clear</button>
           </div>
           {items.map(item => (
             <label key={item.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-50 cursor-pointer text-[11px] font-medium text-slate-700">
@@ -2387,12 +2392,12 @@ const filteredExpenses = expenses.filter(e => checkDateFilter(e.date, expFilter)
 const filteredTotal = filteredExpenses.reduce((s,e)=>s+Number(e.amount),0);
 return (
 <div className="h-full flex flex-col p-4 pb-24 overflow-y-auto">
-<div className={`bg-white p-4 rounded-2xl border shadow-sm mb-4 ${editingExpense ? 'border-amber-300 bg-amber-50/30' : 'border-slate-200'}`}>
+<form onSubmit={e => { e.preventDefault(); saveExpense(); }} className={`bg-white p-4 rounded-2xl border shadow-sm mb-4 ${editingExpense ? 'border-amber-300 bg-amber-50/30' : 'border-slate-200'}`}>
 <div className="flex justify-between items-center mb-3">
 <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest">{editingExpense ? '– Edit Expense' : 'Record New Expense'}</h3>
 <div className="flex gap-2">
-{editingExpense && <button onClick={cancelEdit} className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded-md">Cancel</button>}
-<button onClick={() => setShowExpenseCatModal(true)} className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded-md uppercase tracking-wider">Manage Labels</button>
+{editingExpense && <button type="button" onClick={cancelEdit} className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded-md">Cancel</button>}
+<button type="button" onClick={() => setShowExpenseCatModal(true)} className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded-md uppercase tracking-wider">Manage Labels</button>
 </div>
 </div>
 <div className="grid grid-cols-2 gap-3 mb-3">
@@ -2401,8 +2406,8 @@ return (
 </div>
 <div className="mb-3"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Amount</label><input type="number" placeholder="0.00" className="w-full p-3 bg-white border border-rose-200 text-rose-600 rounded-xl text-lg font-extrabold outline-none focus:border-rose-400" value={amount} onChange={e=>setAmount(e.target.value)}/></div>
 <div className="mb-4"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Short Note</label><input type="text" placeholder="e.g. Paid to Ali for DHA drop" className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-semibold outline-none" value={note} onChange={e=>setNote(e.target.value)}/></div>
-<button onClick={saveExpense} className={`w-full font-bold py-3.5 rounded-xl shadow-md text-white ${editingExpense ? 'bg-amber-500 hover:bg-amber-600' : 'bg-rose-500 hover:bg-rose-600'}`}>{editingExpense ? 'Update Expense' : 'Record Expense'}</button>
-</div>
+<button type="submit" className={`w-full font-bold py-3.5 rounded-xl shadow-md text-white ${editingExpense ? 'bg-amber-500 hover:bg-amber-600' : 'bg-rose-500 hover:bg-rose-600'}`}>{editingExpense ? 'Update Expense' : 'Record Expense'}</button>
+</form>
 <div className="flex justify-between items-center mb-3">
 <div className="flex items-center gap-1.5 bg-white px-2.5 py-1.5 rounded-lg border border-slate-200 shadow-sm">
 <Calendar size={13} className="text-rose-500"/>
