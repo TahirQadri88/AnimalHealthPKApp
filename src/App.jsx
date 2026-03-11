@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef, createContext, useContext } from 'react';
+import { createPortal } from 'react-dom';
 import {
 LayoutDashboard, Package, ReceiptText, BarChart3, Settings,
 Plus, Search, Truck, CheckCircle2, AlertCircle, Users,
@@ -1492,21 +1493,30 @@ return (
 
 const MultiPicker = ({ label, Icon, items, selected, onToggle, onClear }) => {
   const [open, setOpen] = useState(false);
-  const ref = useRef(null);
+  const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0 });
+  const btnRef = useRef(null);
   useEffect(() => {
-    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    const handler = (e) => { if (btnRef.current && !btnRef.current.contains(e.target)) setOpen(false); };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
+  const handleOpen = () => {
+    if (btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect();
+      setDropdownPos({ top: rect.bottom + 4, left: rect.left });
+    }
+    setOpen(o => !o);
+  };
   const count = selected.size;
   return (
-    <div ref={ref} className="relative shrink-0">
-      <button onClick={() => setOpen(o => !o)}
+    <div className="relative shrink-0">
+      <button ref={btnRef} onClick={handleOpen}
         className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border shadow-sm font-bold text-[11px] transition-colors ${count > 0 ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-700 border-slate-200'}`}>
         {Icon && <Icon size={12}/>} {count > 0 ? `${label} (${count})` : label} <ChevronDown size={10}/>
       </button>
-      {open && (
-        <div className="absolute top-full left-0 mt-1 z-50 bg-white border border-slate-200 rounded-xl shadow-xl min-w-[170px] max-h-[260px] overflow-y-auto p-1.5">
+      {open && createPortal(
+        <div style={{ position: 'fixed', top: dropdownPos.top, left: dropdownPos.left, zIndex: 9999 }}
+          className="bg-white border border-slate-200 rounded-xl shadow-xl min-w-[170px] max-h-[260px] overflow-y-auto p-1.5">
           <div className="flex justify-between px-2 py-1 text-[10px] text-slate-500 font-semibold border-b border-slate-100 mb-1">
             <button onClick={() => { items.forEach(i => onToggle(i.id)); }} className="hover:text-indigo-600">Select All</button>
             <button onClick={onClear} className="text-rose-500 hover:text-rose-700">Clear</button>
@@ -1517,7 +1527,8 @@ const MultiPicker = ({ label, Icon, items, selected, onToggle, onClear }) => {
               {item.name}
             </label>
           ))}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
