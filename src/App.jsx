@@ -381,7 +381,7 @@ const [data, setData] = React.useState([]);
 useEffect(() => {
 const unsubscribe = onSnapshot(collection(db, collectionName), (snapshot) => {
 const items = [];
-snapshot.forEach((d) => items.push(d.data()));
+snapshot.forEach((d) => items.push({ ...d.data(), id: d.id }));
 setData(items.sort((a, b) => (a.id > b.id ? 1 : -1)));
 }, (error) => { console.error('Error fetching ' + collectionName + ':', error); });
 return () => unsubscribe();
