@@ -796,7 +796,23 @@ Bal: Rs. {bal.toLocaleString()} {bal > 0 ? '(Dr)' : bal < 0 ? '(Cr)' : ''}
 </span>
 </div>
 </div>
-{isAdmin && (<div className="flex flex-col gap-2 ml-3"><button onClick={(e) => { e.stopPropagation(); setEditingCustomer(c); setShowCustomerModal(true); }} className="p-2 bg-slate-50 text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"><Edit size={16}/></button><button onClick={async (e) => { e.stopPropagation(); if(window.confirm(`Permanently delete ${c.name}? All ledger records will be orphaned.`)) await deleteFromFirebase('customers', c.id); }} className="p-2 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-100 transition-colors"><Trash2 size={16}/></button></div>)}
+{isAdmin && (<div className="flex flex-col gap-2 ml-3"><button onClick={(e) => { e.stopPropagation(); setEditingCustomer(c); setShowCustomerModal(true); }} className="p-2 bg-slate-50 text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"><Edit size={16}/></button><button onClick={async (e) => {
+  e.stopPropagation();
+  const relInvoices = invoices.filter(o => o.customerId === c.id);
+  const relPayments = payments.filter(p => p.customerId === c.id);
+  const hasRecords = relInvoices.length > 0 || relPayments.length > 0;
+  if (hasRecords) {
+    if (!window.confirm(`${c.name} has ${relInvoices.length} invoice(s) and ${relPayments.length} payment(s).\n\nDelete this client AND all related records permanently?\n\nThis cannot be undone.`)) return;
+    await Promise.all([
+      ...relInvoices.map(o => deleteFromFirebase('invoices', o.id)),
+      ...relPayments.map(p => deleteFromFirebase('payments', p.id)),
+    ]);
+  } else {
+    if (!window.confirm(`Permanently delete ${c.name}?`)) return;
+  }
+  await deleteFromFirebase('customers', c.id);
+  showToast(`${c.name} deleted`);
+}} className="p-2 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-100 transition-colors"><Trash2 size={16}/></button></div>)}
 </div>
 );
 })}
@@ -1134,13 +1150,20 @@ return (
           <div className="flex gap-1.5 shrink-0">
             <button onClick={()=>{setEditingCustomer(c);setShowCustomerModal(true);}} className="p-2 bg-slate-50 text-slate-600 rounded-lg hover:bg-indigo-50 hover:text-indigo-600 transition-colors"><Edit size={14}/></button>
             <button onClick={async()=>{
-const invCount = invoices.filter(o => o.customerId === c.id).length;
-const payCount = payments.filter(p => p.customerId === c.id).length;
-if (invCount > 0 || payCount > 0) {
-  showToast(`Cannot delete: ${c.name} has ${invCount} invoice(s) and ${payCount} payment(s). Remove those first.`, 'error');
-  return;
-}
-if(window.confirm(`Permanently delete ${c.name}?`)) await deleteFromFirebase('customers',c.id);
+  const relInvoices = invoices.filter(o => o.customerId === c.id);
+  const relPayments = payments.filter(p => p.customerId === c.id);
+  const hasRecords = relInvoices.length > 0 || relPayments.length > 0;
+  if (hasRecords) {
+    if (!window.confirm(`${c.name} has ${relInvoices.length} invoice(s) and ${relPayments.length} payment(s).\n\nDelete this client AND all related records permanently?\n\nThis cannot be undone.`)) return;
+    await Promise.all([
+      ...relInvoices.map(o => deleteFromFirebase('invoices', o.id)),
+      ...relPayments.map(p => deleteFromFirebase('payments', p.id)),
+    ]);
+  } else {
+    if (!window.confirm(`Permanently delete ${c.name}?`)) return;
+  }
+  await deleteFromFirebase('customers', c.id);
+  showToast(`${c.name} deleted`);
 }} className="p-2 bg-rose-50 text-rose-500 rounded-lg hover:bg-rose-100 transition-colors"><Trash2 size={14}/></button>
           </div>
         </div>
