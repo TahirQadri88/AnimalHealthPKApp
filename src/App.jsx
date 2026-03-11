@@ -1913,7 +1913,7 @@ const filterLabel = dateFilter === 'Custom' ? `${customStart||'...'} - ${customE
 return (
   <div className="h-full flex flex-col p-4 overflow-hidden">
     {/* Filter Bar */}
-    <div className="flex gap-2 mb-3 overflow-x-auto scrollbar-hide shrink-0 pb-1">
+    <div className="flex flex-wrap gap-2 mb-3 shrink-0 pb-1">
        <div className="flex items-center gap-1.5 bg-white px-2.5 py-1.5 rounded-lg border border-slate-200 shadow-sm shrink-0">
          <Calendar size={13} className="text-indigo-500"/>
          <select value={dateFilter} onChange={e => setDateFilter(e.target.value)} className="bg-transparent font-bold text-[11px] text-slate-700 outline-none cursor-pointer">
