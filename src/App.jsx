@@ -2882,7 +2882,7 @@ const TABS = [
 const ctx = {
 isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers,
 cities, areas, customerTypes,
-showToast, showConfirm, setConfirmDialog, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData,
+showToast, showConfirm, confirmDialog, setConfirmDialog, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData,
 billingView, setBillingView, currentInvoice, setCurrentInvoice,
 activeTab, setActiveTab, adminView, setAdminView,
 editingProduct, setEditingProduct, showProductModal, setShowProductModal,
@@ -2958,7 +2958,7 @@ return (
     </header>
 
     <main className="flex-1 overflow-hidden h-full bg-slate-50 lg:bg-slate-100">
-      <div className="h-full lg:max-w-4xl lg:mx-auto lg:my-0 bg-slate-50 lg:shadow-sm overflow-hidden flex flex-col">
+      <div className="relative h-full lg:max-w-4xl lg:mx-auto lg:my-0 bg-slate-50 lg:shadow-sm overflow-hidden flex flex-col">
         {activeTab === 'dashboard' && <DashboardTab />}
         {activeTab === 'products' && <ProductsTab />}
         {activeTab === 'billing' && <BillingTab />}
