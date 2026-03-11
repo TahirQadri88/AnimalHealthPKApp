@@ -3,8 +3,14 @@ import { FileDown, Printer, Share2, X, MessageCircle } from 'lucide-react';
 import { formatDateDisp, getLocalDateStr, APP_NAME } from '../helpers';
 
 // Format: 'thermal' | 'a5' | 'a4'
-function PrintView({ printConfig, setPrintConfig, products, customers, getCustomerLedger, getCustomerBalance, showToast }) {
+function PrintView({ printConfig, setPrintConfig, products, customers, getCustomerLedger, getCustomerBalance, showToast, appSettings }) {
 const { docType, format, data } = printConfig;
+const biz = appSettings || {};
+const bizName = biz.businessName || 'Khyber Traders';
+const bizAppName = biz.appName || APP_NAME;
+const bizTagline = biz.tagline || 'Wholesale Veterinary Pharmacy · Karachi';
+const showOnDocs = biz.showBusinessNameOnDocs !== false;
+const showOnReports = biz.showBusinessNameOnReports !== false;
 const isThermal = format === 'thermal';
 const isA5 = format === 'a5';
 const printRef = useRef(null);
@@ -54,7 +60,7 @@ const getFileName = () => {
 // ── WhatsApp share text ────────────────────────────────────────────────────
 const generateShareText = () => {
   if (!data) return '';
-  let text = `*${APP_NAME}*\n`;
+  let text = `*${bizAppName}*\n`;
   const hr = '─'.repeat(28);
 
   if (docType === 'invoice') {
@@ -481,11 +487,11 @@ return (
     {/* ── Header ── */}
     <div className="keep-together" style={{ textAlign: 'center', marginBottom: sz('14px','20px','24px'), borderBottom: '2.5px solid #1e293b', paddingBottom: sz('10px','14px','18px') }}>
       <div style={{ fontSize: sz('18px','24px','30px'), fontWeight: 900, letterSpacing: '-0.5px', textTransform: 'uppercase', color: '#0f172a' }}>
-        {APP_NAME}
+        {showOnDocs ? bizName : bizAppName}
       </div>
-      <div style={{ fontSize: '8px', textTransform: 'uppercase', letterSpacing: '2.5px', fontWeight: 700, color: '#94a3b8', marginTop: '3px' }}>
-        Wholesale Veterinary Pharmacy
-      </div>
+      {bizTagline && showOnDocs && <div style={{ fontSize: '8px', textTransform: 'uppercase', letterSpacing: '2.5px', fontWeight: 700, color: '#94a3b8', marginTop: '3px' }}>
+        {bizTagline}
+      </div>}
       <div style={{
         marginTop: sz('8px','10px','12px'),
         display: 'inline-block',
@@ -599,15 +605,15 @@ return (
         </div>
 
         {/* Criteria box */}
-        {(data.appliedFilters?.company || data.appliedFilters?.customer || data.appliedFilters?.salesperson || data.appliedFilters?.customStart) && (
+        {(data.appliedFilters?.companies || data.appliedFilters?.company || data.appliedFilters?.customers || data.appliedFilters?.customer || data.appliedFilters?.salespersons || data.appliedFilters?.salesperson || data.appliedFilters?.customStart) && (
           <div className="keep-together" style={{ marginBottom: sz('8px','12px','14px'), padding: sz('6px 8px','8px 12px','10px 14px'), background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '8px', fontSize: sz('7px','8px','9px') }}>
             <div style={{ fontWeight: 800, color: '#0369a1', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '5px', fontSize: sz('6px','7px','7.5px') }}>
               Filters Applied
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 12px', color: '#0c4a6e' }}>
-              {data.appliedFilters.company && <span><strong>Company:</strong> {data.appliedFilters.company}</span>}
-              {data.appliedFilters.customer && <span><strong>Customer:</strong> {data.appliedFilters.customer}</span>}
-              {data.appliedFilters.salesperson && <span><strong>Salesperson:</strong> {data.appliedFilters.salesperson}</span>}
+              {(data.appliedFilters.companies || data.appliedFilters.company) && <span><strong>Brand:</strong> {data.appliedFilters.companies || data.appliedFilters.company}</span>}
+              {(data.appliedFilters.customers || data.appliedFilters.customer) && <span><strong>Client:</strong> {data.appliedFilters.customers || data.appliedFilters.customer}</span>}
+              {(data.appliedFilters.salespersons || data.appliedFilters.salesperson) && <span><strong>Staff:</strong> {data.appliedFilters.salespersons || data.appliedFilters.salesperson}</span>}
               {data.appliedFilters.customStart && <span><strong>From:</strong> {formatDateDisp(data.appliedFilters.customStart)} <strong>To:</strong> {formatDateDisp(data.appliedFilters.customEnd)}</span>}
             </div>
           </div>
@@ -663,23 +669,45 @@ return (
               </tr>
             </thead>
             <tbody>
-              {safeRows.map((r, i) => (
+              {safeRows.map((r, i) => {
+                const rName = r['Product Name'] || r['Brand Name'] || r['Customer Name'] || r['Staff Name'] || r.Name || '—';
+                const rBrand = r['Brand'] || r.Company || '';
+                const rQty = r['Qty Sold'] || r.Qty || 0;
+                const rRev = r['Revenue (Rs)'] || r.Revenue || 0;
+                const rGP = r['Gross Profit (Rs)'] || r['Outstanding (Rs)'] || r.GrossProfit || r.Amount || 0;
+                return (
                 <tr key={i} style={{ borderBottom: '1px solid #f1f5f9', background: i % 2 === 0 ? '#fff' : '#f8fafc', pageBreakInside: 'avoid', breakInside: 'avoid' }}>
                   <td style={{ padding: sz('4px','6px','7px'), fontWeight: 600, wordBreak: 'break-word', lineHeight: 1.3 }}>
-                    {r.Name || '—'}
-                    {r.Company ? <span style={{ fontSize: '7.5px', color: '#94a3b8', display: 'block' }}>{r.Company}</span> : null}
+                    {rName}
+                    {rBrand ? <span style={{ fontSize: '7.5px', color: '#94a3b8', display: 'block' }}>{rBrand}</span> : null}
                   </td>
-                  {data.view !== 'Receivables' && <td style={{ padding: sz('4px','6px','7px'), textAlign: 'center' }}>{(r.Qty || 0).toLocaleString()}</td>}
-                  {data.view !== 'Receivables' && <td style={{ padding: sz('4px','6px','7px'), textAlign: 'right' }}>Rs.{(r.Revenue || 0).toLocaleString()}</td>}
+                  {data.view !== 'Receivables' && <td style={{ padding: sz('4px','6px','7px'), textAlign: 'center' }}>{Number(rQty).toLocaleString()}</td>}
+                  {data.view !== 'Receivables' && <td style={{ padding: sz('4px','6px','7px'), textAlign: 'right' }}>Rs.{Number(rRev).toLocaleString()}</td>}
                   <td style={{ padding: sz('4px','6px','7px'), textAlign: 'right', fontWeight: 800, color: '#059669' }}>
-                    Rs.{(r.GrossProfit || r.Amount || 0).toLocaleString()}
+                    Rs.{Number(rGP).toLocaleString()}
                   </td>
                 </tr>
-              ))}
+                );
+              })}
               {safeRows.length === 0 && (
                 <tr><td colSpan={data.view === 'Receivables' ? 2 : 4} style={{ padding: '16px', textAlign: 'center', color: '#94a3b8' }}>No data</td></tr>
               )}
             </tbody>
+            {safeRows.length > 0 && (() => {
+              const totalQty = safeRows.reduce((s,r) => s + (Number(r['Qty Sold']||r.Qty)||0), 0);
+              const totalRev = safeRows.reduce((s,r) => s + (Number(r['Revenue (Rs)']||r.Revenue)||0), 0);
+              const totalGP = safeRows.reduce((s,r) => s + (Number(r['Gross Profit (Rs)']||r['Outstanding (Rs)']||r.GrossProfit||r.Amount)||0), 0);
+              return (
+                <tfoot>
+                  <tr style={{ background: '#1e293b', color: 'white', fontWeight: 900, fontSize: sz('8px','9px','10px') }}>
+                    <td style={{ padding: sz('4px 4px','6px 6px','7px 8px') }}>TOTAL ({safeRows.length})</td>
+                    {data.view !== 'Receivables' && <td style={{ padding: sz('4px','6px','7px'), textAlign: 'center' }}>{totalQty.toLocaleString()}</td>}
+                    {data.view !== 'Receivables' && <td style={{ padding: sz('4px','6px','7px'), textAlign: 'right' }}>Rs.{totalRev.toLocaleString()}</td>}
+                    <td style={{ padding: sz('4px','6px','7px'), textAlign: 'right' }}>Rs.{totalGP.toLocaleString()}</td>
+                  </tr>
+                </tfoot>
+              );
+            })()}
           </table>
         )}
       </div>
@@ -908,7 +936,7 @@ return (
               ))}
             </div>
             <div style={{ marginTop: sz('4px','6px','8px'), textAlign: 'center', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '1px', fontSize: sz('6px','7px','7.5px'), borderTop: '1px dashed #cbd5e1', paddingTop: sz('4px','5px','6px') }}>
-              Khyber Traders · Wholesale Veterinary Pharmacy · Karachi
+              {showOnDocs ? `${bizName} · ${bizTagline}` : bizAppName}
             </div>
           </div>
         </div>}

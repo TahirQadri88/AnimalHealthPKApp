@@ -1151,6 +1151,7 @@ return (
 <button onClick={()=>setAdminView('bulk')} className={`flex-1 py-2 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 whitespace-nowrap ${adminView==='bulk'?'bg-white text-emerald-600 shadow-sm':'text-slate-500'}`}><Upload size={14}/> Bulk Ops</button>
 <button onClick={()=>setAdminView('segments')} className={`flex-1 py-2 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 whitespace-nowrap ${adminView==='segments'?'bg-white text-purple-600 shadow-sm':'text-slate-500'}`}><Globe size={14}/> Segments</button>
 <button onClick={()=>setAdminView('users')} className={`flex-1 py-2 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 whitespace-nowrap ${adminView==='users'?'bg-white text-amber-600 shadow-sm':'text-slate-500'}`}><Users size={14}/> Users</button>
+<button onClick={()=>setAdminView('settings')} className={`flex-1 py-2 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 whitespace-nowrap ${adminView==='settings'?'bg-white text-slate-700 shadow-sm':'text-slate-500'}`}><Settings size={14}/> Settings</button>
 </div>
 </div>
 <div className="flex-1 overflow-hidden">
@@ -1160,9 +1161,127 @@ return (
 <div style={{display: adminView === 'bulk' ? 'flex' : 'none', flexDirection: 'column', height: '100%'}}><BulkOpsView /></div>
 <div style={{display: adminView === 'segments' ? 'flex' : 'none', flexDirection: 'column', height: '100%'}}><SegmentsAdminView /></div>
 <div style={{display: adminView === 'users' ? 'flex' : 'none', flexDirection: 'column', height: '100%'}}><UserManagementView /></div>
+<div style={{display: adminView === 'settings' ? 'flex' : 'none', flexDirection: 'column', height: '100%'}}><AppSettingsView /></div>
 </div>
 </div>
 )
+};
+
+const AppSettingsView = () => {
+const { appSettings, saveToFirebase, showToast, appUsers, companies, products, customers, invoices, expenses, expenseCategories, payments, cities, areas, customerTypes } = useContext(AppContext);
+const [form, setForm] = useState({
+  id: 'main',
+  businessName: appSettings?.businessName || 'Khyber Traders',
+  appName: appSettings?.appName || 'AnimalHealth.PK',
+  tagline: appSettings?.tagline || 'Wholesale Veterinary Pharmacy · Karachi',
+  phone: appSettings?.phone || '',
+  email: appSettings?.email || '',
+  address: appSettings?.address || '',
+  showBusinessNameOnDocs: appSettings?.showBusinessNameOnDocs !== false,
+  showBusinessNameOnReports: appSettings?.showBusinessNameOnReports !== false,
+});
+const [restoring, setRestoring] = useState(false);
+React.useEffect(() => {
+  if (appSettings?.id) setForm({
+    id: 'main',
+    businessName: appSettings.businessName || 'Khyber Traders',
+    appName: appSettings.appName || 'AnimalHealth.PK',
+    tagline: appSettings.tagline || 'Wholesale Veterinary Pharmacy · Karachi',
+    phone: appSettings.phone || '',
+    email: appSettings.email || '',
+    address: appSettings.address || '',
+    showBusinessNameOnDocs: appSettings.showBusinessNameOnDocs !== false,
+    showBusinessNameOnReports: appSettings.showBusinessNameOnReports !== false,
+  });
+}, [appSettings?.id, appSettings?.businessName]);
+const saveSettings = async () => { await saveToFirebase('appSettings', 'main', form); showToast('Settings saved!'); };
+const downloadBackup = () => {
+  const backup = { exportedAt: new Date().toISOString(), collections: { app_users: appUsers, companies, products, customers, invoices, expenses, expenseCategories, payments, cities, areas, customerTypes } };
+  const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob); const a = document.createElement('a');
+  a.href = url; a.download = `AnimalHealthPK_Backup_${new Date().toISOString().slice(0,10).replace(/-/g,'')}.json`;
+  a.click(); URL.revokeObjectURL(url); showToast('Backup downloaded!');
+};
+const handleRestoreFile = async (e) => {
+  const file = e.target.files[0]; if (!file) return;
+  if (!window.confirm('This will overwrite ALL existing data with the backup file. Are you sure?')) { e.target.value=''; return; }
+  setRestoring(true);
+  try {
+    const backup = JSON.parse(await file.text()); let count = 0;
+    for (const [col, docs] of Object.entries(backup.collections || {})) {
+      for (const d of (docs || [])) { await saveToFirebase(col, d.id, d); count++; }
+    }
+    showToast(`Restore complete! ${count} records written. Please refresh.`, 'success');
+  } catch { showToast('Restore failed — invalid backup file', 'error'); }
+  setRestoring(false); e.target.value = '';
+};
+const Field = ({ label, value, onChange, placeholder }) => (
+  <div><label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">{label}</label>
+  <input value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder}
+    className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" /></div>
+);
+const Toggle = ({ label, desc, checked, onChange }) => (
+  <div className="flex items-start justify-between gap-4 py-3 border-b border-slate-100 last:border-0">
+    <div><div className="text-sm font-bold text-slate-700">{label}</div>{desc && <div className="text-[11px] text-slate-400 mt-0.5">{desc}</div>}</div>
+    <button onClick={()=>onChange(!checked)} className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${checked?'bg-indigo-600':'bg-slate-300'}`}>
+      <span className={`inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${checked?'translate-x-6':'translate-x-1'}`}/>
+    </button>
+  </div>
+);
+const totalRecords = invoices.length + customers.length + products.length + payments.length + expenses.length;
+return (
+<div className="flex-1 overflow-y-auto p-4 space-y-5">
+  <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
+    <h3 className="font-black text-slate-800 text-base mb-1">Business Profile</h3>
+    <p className="text-xs text-slate-400 mb-5">Used on invoices, receipts, and all generated documents.</p>
+    <div className="space-y-4">
+      <Field label="Business / Company Name" value={form.businessName} onChange={v=>setForm(p=>({...p,businessName:v}))} placeholder="e.g. Khyber Traders" />
+      <Field label="App Name (shown on documents)" value={form.appName} onChange={v=>setForm(p=>({...p,appName:v}))} placeholder="e.g. AnimalHealth.PK" />
+      <Field label="Tagline" value={form.tagline} onChange={v=>setForm(p=>({...p,tagline:v}))} placeholder="e.g. Wholesale Veterinary Pharmacy · Karachi" />
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Phone" value={form.phone} onChange={v=>setForm(p=>({...p,phone:v}))} placeholder="+92 300 0000000" />
+        <Field label="Email" value={form.email} onChange={v=>setForm(p=>({...p,email:v}))} placeholder="info@example.com" />
+      </div>
+      <Field label="Address" value={form.address} onChange={v=>setForm(p=>({...p,address:v}))} placeholder="City, Country" />
+    </div>
+    <div className="mt-5 bg-slate-50 rounded-xl px-4 py-1 border border-slate-100">
+      <Toggle label="Show on Invoices & Documents" desc="Display business name in document headers and footers"
+        checked={form.showBusinessNameOnDocs} onChange={v=>setForm(p=>({...p,showBusinessNameOnDocs:v}))} />
+      <Toggle label="Show on Reports" desc="Display business name on printed analytics reports"
+        checked={form.showBusinessNameOnReports} onChange={v=>setForm(p=>({...p,showBusinessNameOnReports:v}))} />
+    </div>
+    <button onClick={saveSettings} className="mt-5 w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-3 rounded-xl text-sm flex items-center justify-center gap-2">
+      <Save size={15}/> Save Settings
+    </button>
+  </div>
+  <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
+    <h3 className="font-black text-slate-800 text-base mb-1">Backup & Data Safety</h3>
+    <p className="text-xs text-slate-400 mb-4">Download a full JSON backup of all your data. Store in Google Drive or another safe location. Recommended: weekly.</p>
+    <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="font-black text-amber-900 text-sm">Full Backup (JSON)</div>
+          <div className="text-[11px] text-amber-700 mt-1">{invoices.length} invoices · {customers.length} customers · {products.length} products · {payments.length} payments · {expenses.length} expenses <span className="font-bold">({totalRecords} total records)</span></div>
+        </div>
+        <button onClick={downloadBackup} className="bg-amber-500 hover:bg-amber-600 text-white font-bold px-4 py-2 rounded-lg text-xs flex items-center gap-1.5 shrink-0">
+          <Download size={13}/> Download
+        </button>
+      </div>
+    </div>
+    <div className="bg-rose-50 border border-rose-200 rounded-xl p-4">
+      <div className="font-black text-rose-900 text-sm mb-1">Restore from Backup ⚠</div>
+      <p className="text-[11px] text-rose-700 mb-3">Overwrites all existing data. Only use to recover from data loss.</p>
+      <label className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold cursor-pointer ${restoring?'bg-slate-200 text-slate-400':'bg-rose-600 hover:bg-rose-700 text-white'}`}>
+        <Upload size={13}/> {restoring?'Restoring…':'Choose Backup .json File'}
+        <input type="file" accept=".json" onChange={handleRestoreFile} disabled={restoring} className="hidden" />
+      </label>
+    </div>
+    <div className="mt-4 p-3 bg-slate-50 rounded-xl border border-slate-100 text-[11px] text-slate-500">
+      <strong className="text-slate-600">Also:</strong> Firebase Console → Firestore → Automated Backups for server-side backups (requires Blaze plan).
+    </div>
+  </div>
+</div>
+);
 };
 
 const UserManagementView = () => {
@@ -1304,15 +1423,50 @@ return (
 );
 };
 
+const MultiPicker = ({ label, Icon, items, selected, onToggle, onClear }) => {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+  const count = selected.size;
+  return (
+    <div ref={ref} className="relative shrink-0">
+      <button onClick={() => setOpen(o => !o)}
+        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border shadow-sm font-bold text-[11px] transition-colors ${count > 0 ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-700 border-slate-200'}`}>
+        {Icon && <Icon size={12}/>} {count > 0 ? `${label} (${count})` : label} <ChevronDown size={10}/>
+      </button>
+      {open && (
+        <div className="absolute top-full left-0 mt-1 z-50 bg-white border border-slate-200 rounded-xl shadow-xl min-w-[170px] max-h-[260px] overflow-y-auto p-1.5">
+          <div className="flex justify-between px-2 py-1 text-[10px] text-slate-500 font-semibold border-b border-slate-100 mb-1">
+            <button onClick={() => { items.forEach(i => onToggle(i.id)); }} className="hover:text-indigo-600">Select All</button>
+            <button onClick={onClear} className="text-rose-500 hover:text-rose-700">Clear</button>
+          </div>
+          {items.map(item => (
+            <label key={item.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-50 cursor-pointer text-[11px] font-medium text-slate-700">
+              <input type="checkbox" checked={selected.has(String(item.id))} onChange={() => onToggle(item.id)} className="accent-indigo-600 rounded" />
+              {item.name}
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const AnalyticsView = () => {
 const { isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, cities, areas, customerTypes, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig } = useContext(AppContext);
 const [view, setView] = useState('Overview');
 const [dateFilter, setDateFilter] = useState('This Month');
 const [customStart, setCustomStart] = useState('');
 const [customEnd, setCustomEnd] = useState(getLocalDateStr());
-const [filterCompany, setFilterCompany] = useState('');
-const [filterCustomer, setFilterCustomer] = useState('');
-const [filterSalesperson, setFilterSalesperson] = useState('');
+const [filterCompanies, setFilterCompanies] = useState(new Set());
+const [filterCustomers, setFilterCustomers] = useState(new Set());
+const [filterSalespersons, setFilterSalespersons] = useState(new Set());
+const toggleFilter = (setter, id) => setter(prev => { const next = new Set(prev); next.has(String(id)) ? next.delete(String(id)) : next.add(String(id)); return next; });
+const clearFilter = (setter) => setter(new Set());
 const [sortBy, setSortBy] = useState('profit');
 
 const checkCustomFilter = (dateStr) => {
@@ -1323,8 +1477,8 @@ const checkCustomFilter = (dateStr) => {
 
 const reportEngine = useMemo(() => {
   let billedForPnL = invoices.filter(o => o.status === 'Billed' && checkCustomFilter(o.date));
-  if(filterCustomer) billedForPnL = billedForPnL.filter(o => o.customerId === Number(filterCustomer));
-  if(filterSalesperson) billedForPnL = billedForPnL.filter(o => o.salespersonId === Number(filterSalesperson));
+  if(filterCustomers.size > 0) billedForPnL = billedForPnL.filter(o => filterCustomers.has(String(o.customerId)));
+  if(filterSalespersons.size > 0) billedForPnL = billedForPnL.filter(o => filterSalespersons.has(String(o.salespersonId)));
   const kpis = { productRevenue: 0, totalCOGS: 0, grossMargin: 0, deliveryBilled: 0, transportExpense: 0, totalReceivables: 0 };
   const byProduct = {}; const byCompany = {}; const byCustomer = {}; const receivablesList = [];
   const bySalesperson = {};
@@ -1344,7 +1498,7 @@ const reportEngine = useMemo(() => {
     let orderItemRevenue = 0; let orderItemCost = 0;
     o.items.forEach(item => {
       const itemCompanyId = products.find(p=>p.id===item.productId)?.companyId;
-      if(filterCompany && String(itemCompanyId) !== String(filterCompany)) return;
+      if(filterCompanies.size > 0 && !filterCompanies.has(String(itemCompanyId))) return;
       const itemRev = item.price * item.quantity;
       const itemCost = (item.costPrice || 0) * item.quantity;
       orderItemRevenue += itemRev; orderItemCost += itemCost;
@@ -1421,7 +1575,7 @@ const reportEngine = useMemo(() => {
     monthlyData[month].orders += 1;
   });
   // Credit Note impact — subtract returned values from all metrics (after monthlyData is built)
-  const creditNotes = invoices.filter(o => o.status === 'CreditNote' && checkCustomFilter(o.date) && (!filterCustomer || o.customerId === Number(filterCustomer)) && (!filterSalesperson || o.salespersonId === Number(filterSalesperson)));
+  const creditNotes = invoices.filter(o => o.status === 'CreditNote' && checkCustomFilter(o.date) && (filterCustomers.size === 0 || filterCustomers.has(String(o.customerId))) && (filterSalespersons.size === 0 || filterSalespersons.has(String(o.salespersonId))));
   creditNotes.forEach(cn => {
     (cn.items || []).forEach(item => {
       if (item.isBonus) return;
@@ -1456,15 +1610,35 @@ const reportEngine = useMemo(() => {
   let newCustCount = 0, repeatCustCount = 0;
   periodCustIds.forEach(id => { if (billedForPnL.some(o => o.customerId === id && o.date === custFirstOrderDate[id])) newCustCount++; else repeatCustCount++; });
   return { kpis, byProduct, byCompany, byCustomer, bySalesperson, byCity, byArea, byType, receivablesList: receivablesList.sort((a,b)=>b.amount-a.amount), trends, dailyBreakdown, byExpenseCategory, agingBuckets, monthlyData, collectionRate, newCustCount, repeatCustCount, totalBilledAmt };
-}, [invoices, expenses, payments, dateFilter, customStart, customEnd, filterCompany, filterCustomer, filterSalesperson, products, customers]);
+}, [invoices, expenses, payments, dateFilter, customStart, customEnd, ...[...filterCompanies], ...[...filterCustomers], ...[...filterSalespersons], products, customers]);
 
 const getSortedExportData = () => {
    if (view === 'Overview') return null;
-   if (view === 'Receivables') return reportEngine.receivablesList.map(r => ({ Name: r.name, Balance: r.amount, DaysSinceLastInvoice: r.daysSince || 0, LastInvoiceDate: r.lastInvDate || '' }));
-   if (view === 'By Salesperson') return Object.entries(reportEngine.bySalesperson).map(([key,val]) => ({ Name: key, Orders: val.orders, Revenue: val.revenue, GrossProfit: val.profit })).sort((a,b)=>b.Revenue-a.Revenue);
+   if (view === 'Receivables') return reportEngine.receivablesList.map(r => ({
+     'Customer Name': r.name, 'Outstanding (Rs)': r.amount,
+     'Days Since Last Invoice': r.daysSince || 0, 'Last Invoice Date': r.lastInvDate || ''
+   }));
+   if (view === 'By Salesperson') return Object.entries(reportEngine.bySalesperson)
+     .map(([key,val]) => ({ 'Staff Name': key, 'Orders': val.orders, 'Revenue (Rs)': val.revenue, 'Gross Profit (Rs)': val.profit,
+       'Margin %': val.revenue > 0 ? +((val.profit/val.revenue)*100).toFixed(1) : 0 }))
+     .sort((a,b)=>b['Revenue (Rs)']-a['Revenue (Rs)']);
    const dataObj = view === 'By Product' ? reportEngine.byProduct : view === 'By Company' ? reportEngine.byCompany : reportEngine.byCustomer;
    let arr = Object.entries(dataObj).map(([key, val]) => ({ key, ...val })).sort((a,b) => b[sortBy] - a[sortBy]);
-   return arr.map(r => ({ Name: r.key, Company: r.company || '', Qty: r.qty || 0, Revenue: r.revenue || r.productRevenue || 0, GrossProfit: r.profit || 0 }));
+   if (view === 'By Product') return arr.map(r => ({
+     'Product Name': r.key, 'Brand': r.company || '',
+     'Qty Sold': r.qty || 0, 'Revenue (Rs)': r.revenue || 0, 'Cost (Rs)': r.cost || 0,
+     'Gross Profit (Rs)': r.profit || 0, 'Margin %': (r.revenue||0) > 0 ? +((r.profit/r.revenue)*100).toFixed(1) : 0,
+   }));
+   if (view === 'By Company') return arr.map(r => ({
+     'Brand Name': r.key,
+     'Qty Sold': r.qty || 0, 'Revenue (Rs)': r.revenue || r.productRevenue || 0, 'Cost (Rs)': r.cost || 0,
+     'Gross Profit (Rs)': r.profit || 0, 'Margin %': (r.revenue||r.productRevenue||0) > 0 ? +((r.profit/(r.revenue||r.productRevenue))*100).toFixed(1) : 0,
+   }));
+   return arr.map(r => ({
+     'Customer Name': r.key,
+     'Orders': r.orders || 0, 'Revenue (Rs)': r.revenue || r.productRevenue || 0, 'Cost (Rs)': r.cost || 0,
+     'Gross Profit (Rs)': r.profit || 0,
+   }));
 };
 
 const handleExport = (format) => {
@@ -1472,12 +1646,24 @@ const handleExport = (format) => {
     const exportData = getSortedExportData();
     if (format === 'csv') {
         if(view === 'Overview') return showToast("Cannot export Overview as CSV", "error");
-        exportToCSV(exportData, `${title.replace(/ /g, '_')}_${dateFilter}.csv`);
+        const numericKeys = ['Revenue (Rs)', 'Gross Profit (Rs)', 'Cost (Rs)', 'Outstanding (Rs)', 'Qty Sold', 'Orders'];
+        const csvTotals = {};
+        numericKeys.forEach(k => { if (exportData.some(r => r[k] !== undefined)) csvTotals[k] = exportData.reduce((s,r)=>s+(Number(r[k])||0),0); });
+        const filterDesc = [
+          filterCompanies.size > 0 && `Brand: ${[...filterCompanies].map(id=>companies.find(c=>String(c.id)===id)?.name).filter(Boolean).join('+')}`,
+          filterCustomers.size > 0 && `Client: ${[...filterCustomers].map(id=>customers.find(c=>String(c.id)===id)?.name).filter(Boolean).join('+')}`,
+          filterSalespersons.size > 0 && `Staff: ${[...filterSalespersons].map(id=>appUsers.find(u=>String(u.id)===id)?.name).filter(Boolean).join('+')}`,
+        ].filter(Boolean).join(' | ');
+        exportToCSV(exportData, `${title.replace(/ /g,'_')}_${filterLabel.replace(/ /g,'_')}.csv`, {
+          title: `${APP_NAME} — ${title}`,
+          subtitle: `Period: ${filterLabel}${filterDesc ? ' | ' + filterDesc : ''} | Generated: ${getLocalDateStr()}`,
+          totals: csvTotals,
+        });
     } else if (format === 'pdf') {
         const appliedFilters = {
-          company: filterCompany ? (companies.find(c=>String(c.id)===filterCompany)?.name || filterCompany) : '',
-          customer: filterCustomer ? (customers.find(c=>String(c.id)===filterCustomer)?.name || filterCustomer) : '',
-          salesperson: filterSalesperson ? (appUsers.find(u=>String(u.id)===filterSalesperson)?.name || filterSalesperson) : '',
+          companies: filterCompanies.size > 0 ? [...filterCompanies].map(id=>companies.find(c=>String(c.id)===id)?.name).filter(Boolean).join(', ') : '',
+          customers: filterCustomers.size > 0 ? [...filterCustomers].map(id=>customers.find(c=>String(c.id)===id)?.name).filter(Boolean).join(', ') : '',
+          salespersons: filterSalespersons.size > 0 ? [...filterSalespersons].map(id=>appUsers.find(u=>String(u.id)===id)?.name).filter(Boolean).join(', ') : '',
           customStart: dateFilter === 'Custom' ? customStart : '',
           customEnd: dateFilter === 'Custom' ? customEnd : '',
         };
@@ -1501,17 +1687,21 @@ const handleExport = (format) => {
           if (reportEngine.trends.revenue !== null) text += `📈 Revenue trend: ${Number(reportEngine.trends.revenue) >= 0 ? '+' : ''}${reportEngine.trends.revenue}% vs prev period\n`;
         } else {
           exportData.forEach((r, i) => {
-            const gp = r.GrossProfit || r.Amount || 0;
-            const rev = r.Revenue || 0;
+            const name = r['Product Name'] || r['Brand Name'] || r['Customer Name'] || r['Staff Name'] || r.Name || '?';
+            const brand = r['Brand'] || r.Company || '';
+            const gp = r['Gross Profit (Rs)'] || r['Outstanding (Rs)'] || 0;
+            const rev = r['Revenue (Rs)'] || 0;
+            const qty = r['Qty Sold'] || r.Qty || 0;
+            const orders = r['Orders'] || 0;
             const gpMargin = rev > 0 ? ` (${((gp/rev)*100).toFixed(1)}%)` : '';
-            text += `${i+1}. *${r.Name}*${r.Company ? ` — ${r.Company}` : ''}\n`;
-            if (r.Qty) text += `   Qty: ${(r.Qty||0).toLocaleString()} | `;
-            if (r.Orders) text += `   Orders: ${r.Orders} | `;
-            text += `Rev: Rs.${rev.toLocaleString()} | GP: Rs.${gp.toLocaleString()}${gpMargin}\n`;
+            text += `${i+1}. *${name}*${brand ? ` — ${brand}` : ''}\n`;
+            if (qty) text += `   Qty: ${Number(qty).toLocaleString()} | `;
+            if (orders) text += `   Orders: ${orders} | `;
+            text += `Rev: Rs.${Number(rev).toLocaleString()} | GP: Rs.${Number(gp).toLocaleString()}${gpMargin}\n`;
           });
           if (exportData.length > 0) {
-            const totalRev = exportData.reduce((s,r)=>s+(r.Revenue||0),0);
-            const totalGP = exportData.reduce((s,r)=>s+(r.GrossProfit||0),0);
+            const totalRev = exportData.reduce((s,r)=>s+(r['Revenue (Rs)']||0),0);
+            const totalGP = exportData.reduce((s,r)=>s+(r['Gross Profit (Rs)']||r['Outstanding (Rs)']||0),0);
             text += `${'─'.repeat(30)}\nTotal Rev: Rs.${totalRev.toLocaleString()} | Total GP: Rs.${totalGP.toLocaleString()}\n`;
           }
         }
@@ -1663,24 +1853,12 @@ return (
            <option>Today</option><option>This Week</option><option>This Month</option><option>This Year</option><option>All Time</option><option>Custom</option>
          </select>
        </div>
-       <div className="flex items-center gap-1.5 bg-white px-2.5 py-1.5 rounded-lg border border-slate-200 shadow-sm shrink-0">
-         <Filter size={13} className="text-slate-400"/>
-         <select value={filterCompany} onChange={e => setFilterCompany(e.target.value)} className="bg-transparent font-bold text-[11px] text-slate-700 outline-none cursor-pointer max-w-[90px]">
-           <option value="">All Brands</option>{companies.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
-         </select>
-       </div>
-       <div className="flex items-center gap-1.5 bg-white px-2.5 py-1.5 rounded-lg border border-slate-200 shadow-sm shrink-0">
-         <Users size={13} className="text-slate-400"/>
-         <select value={filterCustomer} onChange={e => setFilterCustomer(e.target.value)} className="bg-transparent font-bold text-[11px] text-slate-700 outline-none cursor-pointer max-w-[90px]">
-           <option value="">All Clients</option>{customers.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
-         </select>
-       </div>
-       <div className="flex items-center gap-1.5 bg-white px-2.5 py-1.5 rounded-lg border border-slate-200 shadow-sm shrink-0">
-         <Award size={13} className="text-slate-400"/>
-         <select value={filterSalesperson} onChange={e => setFilterSalesperson(e.target.value)} className="bg-transparent font-bold text-[11px] text-slate-700 outline-none cursor-pointer max-w-[90px]">
-           <option value="">All Staff</option>{appUsers.map(u=><option key={u.id} value={u.id}>{u.name}</option>)}
-         </select>
-       </div>
+       <MultiPicker label="Brand" Icon={Filter} items={companies} selected={filterCompanies}
+         onToggle={id=>toggleFilter(setFilterCompanies,id)} onClear={()=>clearFilter(setFilterCompanies)} />
+       <MultiPicker label="Client" Icon={Users} items={customers} selected={filterCustomers}
+         onToggle={id=>toggleFilter(setFilterCustomers,id)} onClear={()=>clearFilter(setFilterCustomers)} />
+       <MultiPicker label="Staff" Icon={Award} items={appUsers} selected={filterSalespersons}
+         onToggle={id=>toggleFilter(setFilterSalespersons,id)} onClear={()=>clearFilter(setFilterSalespersons)} />
     </div>
 
     {/* Custom date inputs */}
@@ -1699,19 +1877,19 @@ return (
     </div>
 
     {/* Active filter chips */}
-    {(filterCompany || filterCustomer || filterSalesperson) && (
+    {(filterCompanies.size > 0 || filterCustomers.size > 0 || filterSalespersons.size > 0) && (
       <div className="flex flex-wrap gap-1.5 mb-2 px-0.5 shrink-0">
-        {filterCompany && <span className="bg-indigo-100 text-indigo-700 text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1">
-          Co: {companies.find(c=>String(c.id)===filterCompany)?.name}
-          <button onClick={()=>setFilterCompany('')} className="ml-1 text-indigo-400 hover:text-indigo-700"><X size={10}/></button>
+        {filterCompanies.size > 0 && <span className="bg-indigo-100 text-indigo-700 text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1">
+          Brand: {[...filterCompanies].slice(0,2).map(id=>companies.find(c=>String(c.id)===id)?.name).filter(Boolean).join(', ')}{filterCompanies.size > 2 && ` +${filterCompanies.size-2}`}
+          <button onClick={()=>clearFilter(setFilterCompanies)} className="ml-1 text-indigo-400 hover:text-indigo-700"><X size={10}/></button>
         </span>}
-        {filterCustomer && <span className="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1">
-          Client: {customers.find(c=>String(c.id)===filterCustomer)?.name}
-          <button onClick={()=>setFilterCustomer('')} className="ml-1 text-emerald-400 hover:text-emerald-700"><X size={10}/></button>
+        {filterCustomers.size > 0 && <span className="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1">
+          Client: {[...filterCustomers].slice(0,2).map(id=>customers.find(c=>String(c.id)===id)?.name).filter(Boolean).join(', ')}{filterCustomers.size > 2 && ` +${filterCustomers.size-2}`}
+          <button onClick={()=>clearFilter(setFilterCustomers)} className="ml-1 text-emerald-400 hover:text-emerald-700"><X size={10}/></button>
         </span>}
-        {filterSalesperson && <span className="bg-amber-100 text-amber-700 text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1">
-          SP: {appUsers.find(u=>String(u.id)===filterSalesperson)?.name}
-          <button onClick={()=>setFilterSalesperson('')} className="ml-1 text-amber-400 hover:text-amber-700"><X size={10}/></button>
+        {filterSalespersons.size > 0 && <span className="bg-amber-100 text-amber-700 text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1">
+          Staff: {[...filterSalespersons].slice(0,2).map(id=>appUsers.find(u=>String(u.id)===id)?.name).filter(Boolean).join(', ')}{filterSalespersons.size > 2 && ` +${filterSalespersons.size-2}`}
+          <button onClick={()=>clearFilter(setFilterSalespersons)} className="ml-1 text-amber-400 hover:text-amber-700"><X size={10}/></button>
         </span>}
       </div>
     )}
@@ -2415,6 +2593,8 @@ const payments = useLiveCollection('payments');
 const cities = useLiveCollection('cities');
 const areas = useLiveCollection('areas');
 const customerTypes = useLiveCollection('customerTypes');
+const appSettingsRaw = useLiveCollection('appSettings');
+const appSettings = appSettingsRaw.find(s => s.id === 'main') || { businessName: 'Khyber Traders', appName: 'AnimalHealth.PK', tagline: 'Wholesale Veterinary Pharmacy · Karachi', showBusinessNameOnDocs: true, showBusinessNameOnReports: true };
 
 // Complex UI State
 const [billingView, setBillingView] = useState('list');
@@ -2621,6 +2801,7 @@ setPrintConfig, printConfig,
 showSegmentsModal, setShowSegmentsModal,
 editingPayment, setEditingPayment,
 showCreditNoteModal, setShowCreditNoteModal, editingCreditNote, setEditingCreditNote,
+appSettings,
 };
 return (
 <AppContext.Provider value={ctx}>
@@ -2722,6 +2903,7 @@ return (
       getCustomerLedger={getCustomerLedger}
       getCustomerBalance={getCustomerBalance}
       showToast={showToast}
+      appSettings={appSettings}
     />
   )}
 
