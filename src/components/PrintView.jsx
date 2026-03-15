@@ -266,8 +266,8 @@ const buildHtmlDoc = () => {
     #nav-bar .print-btn{background:#059669;}
     #nav-bar .print-btn:hover{background:#047857;}
     #doc-wrap{padding:${bodyPad};}
-    @media print{#nav-bar{display:none!important;}#doc-wrap{padding:0;}body{background:white;}@page{size:${pageSize};margin:${pageMargin};}
-      #doc>*{width:100%!important;max-width:none!important;padding:0!important;}}
+    @media print{#nav-bar{display:none!important;}body{background:white;margin:0;}@page{size:${pageSize};margin:0;}
+      #doc-wrap{padding:${pageMargin};}#doc>*{width:100%!important;max-width:none!important;padding:0!important;}}
   </style>
 </head>
 <body>
@@ -594,7 +594,9 @@ return (
       </div>}
       <div style={{
         marginTop: sz('5px','7px','9px'),
-        display: 'inline-block',
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
         background: '#1e293b',
         color: 'white',
         padding: isThermal ? '2px 10px' : '3px 14px',
@@ -603,8 +605,7 @@ return (
         textTransform: 'uppercase',
         letterSpacing: '1.5px',
         fontSize: sz('7px','8px','9px'),
-        textAlign: 'center',
-        lineHeight: '1.2',
+        lineHeight: 1,
       }}>
         {docLabel}
       </div>
@@ -1046,7 +1047,7 @@ return (
             Rs. {(data.receivedAmount || 0).toLocaleString()}
           </div>
           {data.note && (
-            <div style={{ display: 'inline-block', marginTop: sz('8px','10px','12px'), padding: sz('3px 10px','4px 14px','6px 16px'), background: 'white', borderRadius: '999px', border: '1px solid #86efac', fontSize: sz('9px','10px','11px'), fontWeight: 600, color: '#15803d', wordBreak: 'break-word', textAlign: 'center', lineHeight: '1.2' }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginTop: sz('8px','10px','12px'), padding: sz('3px 10px','4px 14px','6px 16px'), background: 'white', borderRadius: '999px', border: '1px solid #86efac', fontSize: sz('9px','10px','11px'), fontWeight: 600, color: '#15803d', wordBreak: 'break-word', lineHeight: 1 }}>
               {data.note}
             </div>
           )}
@@ -1176,8 +1177,7 @@ return (
       margin-bottom: 40px;
     }
     @media print {
-      @page { margin: 8mm; size: auto; }
-      @page :first { margin-top: 8mm; }
+      @page { margin: 0; size: auto; }
       html, body { height: auto !important; overflow: visible !important; }
       #print-root { display: block !important; position: relative !important; overflow: visible !important; }
       .no-print { display: none !important; }
