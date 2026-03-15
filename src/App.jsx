@@ -637,6 +637,33 @@ byProduct[item.name].profit += (rev - cost);
 const arr = Object.entries(byProduct).map(([name, data]) => ({name, ...data}));
 return { topValue: [...arr].sort((a,b)=>b.revenue - a.revenue).slice(0,5), topQty: [...arr].sort((a,b)=>b.qty - a.qty).slice(0,5), topProfit: [...arr].sort((a,b)=>b.profit - a.profit).slice(0,5) };
 }, [filteredInvoices]);
+
+// Receivables: top customers with outstanding balance
+const topReceivables = useMemo(() => {
+  return customers
+    .map(c => ({ ...c, balance: getCustomerBalance(c.id) }))
+    .filter(c => c.balance > 0)
+    .sort((a, b) => b.balance - a.balance)
+    .slice(0, 5);
+}, [customers, invoices, payments]);
+
+// Recent activity: merge invoices + payments, sort by date desc, take 8
+const recentActivity = useMemo(() => {
+  const invEntries = invoices.filter(o => checkDateFilter(o.date, dateFilter)).map(o => ({
+    id: o.id, date: o.date, customerName: o.customerName, amount: o.total,
+    kind: o.status === 'Billed' ? 'invoice' : o.status === 'Estimate' ? 'estimate' : o.status === 'CreditNote' ? 'creditnote' : 'draft',
+    paymentStatus: o.paymentStatus, raw: o
+  }));
+  const payEntries = payments.filter(p => checkDateFilter(p.date, dateFilter)).map(p => ({
+    id: p.id, date: p.date,
+    customerName: customers.find(c => c.id === p.customerId)?.name || 'Unknown',
+    amount: Number(p.amount), kind: 'payment', note: p.note, raw: p
+  }));
+  return [...invEntries, ...payEntries]
+    .sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id))
+    .slice(0, 8);
+}, [invoices, payments, customers, dateFilter]);
+
 return (
 <div className="h-full overflow-y-auto">
 <div className="p-5 space-y-6 pb-24">
@@ -652,11 +679,43 @@ return (
 <p className="text-[10px] uppercase font-bold text-indigo-100 flex items-center gap-1.5 tracking-wider"><TrendingUp size={14}/> {dateFilter} Sales</p>
 <p className="text-xl sm:text-2xl font-black mt-2 tracking-tight">Rs. {revenue.toLocaleString()}</p>
 </div>
-<div className="bg-gradient-to-br from-rose-500 to-rose-600 text-white p-5 rounded-2xl shadow-lg shadow-rose-500/20">
-<p className="text-[10px] uppercase font-bold text-rose-100 flex items-center gap-1.5 tracking-wider"><DollarSign size={14}/> Receivables</p>
+<button onClick={() => { setSelectedLedgerId(null); setShowLedgerModal(false); setActiveTab('customers'); }} className="bg-gradient-to-br from-rose-500 to-rose-600 text-white p-5 rounded-2xl shadow-lg shadow-rose-500/20 text-left w-full">
+<p className="text-[10px] uppercase font-bold text-rose-100 flex items-center gap-1.5 tracking-wider">
+  <DollarSign size={14}/> Receivables
+  {topReceivables.length > 0 && <span className="ml-auto bg-white/30 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full">{topReceivables.length}</span>}
+</p>
 <p className="text-xl sm:text-2xl font-black mt-2 tracking-tight">Rs. {totalReceivables.toLocaleString()}</p>
+</button>
 </div>
+
+{/* Receivables Quick View */}
+{topReceivables.length > 0 && (
+<div className="bg-white border border-rose-100 rounded-2xl shadow-sm overflow-hidden">
+  <div className="flex justify-between items-center px-4 pt-4 pb-2">
+    <h3 className="text-[11px] font-bold text-rose-700 uppercase tracking-widest flex items-center gap-1.5">
+      <Bell size={13}/> Outstanding Balances
+      <span className="bg-rose-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full">{topReceivables.length}</span>
+    </h3>
+    <button onClick={() => setActiveTab('customers')} className="text-[10px] font-bold text-rose-600 flex items-center gap-0.5">View All <ChevronRight size={12}/></button>
+  </div>
+  <div className="divide-y divide-rose-50">
+    {topReceivables.map(c => (
+      <button key={c.id} onClick={() => { setSelectedLedgerId(c.id); setShowLedgerModal(true); }} className="w-full flex justify-between items-center px-4 py-3 hover:bg-rose-50 transition-colors text-left">
+        <div className="flex-1 min-w-0">
+          <p className="font-bold text-slate-800 text-sm truncate">{c.name}</p>
+          {c.phone && <p className="text-[10px] text-slate-400 mt-0.5">{c.phone}</p>}
+        </div>
+        <div className="text-right ml-3 shrink-0">
+          <p className={`font-extrabold text-sm ${c.balance >= 100000 ? 'text-rose-600' : c.balance >= 50000 ? 'text-amber-600' : 'text-slate-700'}`}>Rs. {c.balance.toLocaleString()}</p>
+          {c.balance >= 100000 && <span className="text-[9px] font-bold text-rose-500 uppercase tracking-wider">High</span>}
+        </div>
+        <ChevronRight size={14} className="text-slate-300 ml-2 shrink-0"/>
+      </button>
+    ))}
+  </div>
 </div>
+)}
+
 {isAdmin && (
 <button type="button" className="w-full bg-white border border-slate-200 p-5 rounded-2xl shadow-sm flex justify-between items-center hover:border-indigo-200 transition-colors text-left" onClick={() => {setActiveTab('admin'); setAdminView('expenses');}}>
 <div><p className="text-[10px] uppercase font-bold text-slate-500 flex items-center gap-1.5 tracking-wider"><TrendingDown size={14}/> Operational Expenses</p><p className="text-xl font-black text-slate-800 mt-1">Rs. {totalExpenses.toLocaleString()}</p></div>
@@ -675,24 +734,47 @@ return (
 </div>
 </div>
 )}
+
+{/* Recent Activity */}
 <div>
-<div className="flex justify-between items-end mb-4 mt-6">
-<h3 className="text-base font-bold text-slate-800">Recent Activity</h3>
+<div className="flex justify-between items-end mb-4 mt-2">
+<h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
+  Recent Activity
+  {recentActivity.length > 0 && <span className="bg-indigo-100 text-indigo-700 text-[10px] font-black px-2 py-0.5 rounded-full">{recentActivity.length}</span>}
+</h3>
 <button onClick={() => setActiveTab('billing')} className="text-xs font-bold text-indigo-600 flex items-center gap-0.5">View All <ChevronRight size={14}/></button>
 </div>
-<div className="space-y-3">
-{invoices.filter(o => checkDateFilter(o.date, dateFilter)).slice(-5).reverse().map(invoice => (
-<div key={invoice.id} className="bg-white p-4 rounded-2xl border border-slate-200 flex justify-between items-center shadow-sm">
-<div>
-<p className="font-bold text-slate-800 text-sm">{invoice.customerName}</p>
-<p className="text-[11px] text-slate-500 font-medium mt-0.5">{invoice.id} • {formatDateDisp(invoice.date)} • <span className={`font-bold ${invoice.status === 'Billed' ? 'text-indigo-600' : 'text-amber-500'}`}>{invoice.status}</span></p>
-</div>
-<div className="text-right">
-<p className="font-extrabold text-slate-800 text-sm">Rs. {invoice.total.toLocaleString()}</p>
-<span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded mt-1 inline-block ${invoice.paymentStatus==='Paid'?'bg-emerald-100 text-emerald-700':invoice.paymentStatus==='Partial'?'bg-amber-100 text-amber-700':'bg-rose-100 text-rose-700'}`}>{invoice.paymentStatus}</span>
-</div>
-</div>
-))}
+<div className="space-y-2.5">
+{recentActivity.map(entry => {
+  const kindConfig = {
+    invoice: { dot: 'bg-indigo-500', label: 'Invoice', labelCls: 'bg-indigo-100 text-indigo-700', amountCls: 'text-indigo-700' },
+    payment: { dot: 'bg-emerald-500', label: 'Payment', labelCls: 'bg-emerald-100 text-emerald-700', amountCls: 'text-emerald-600' },
+    estimate: { dot: 'bg-purple-400', label: 'Estimate', labelCls: 'bg-purple-100 text-purple-700', amountCls: 'text-slate-700' },
+    creditnote: { dot: 'bg-rose-400', label: 'Credit Note', labelCls: 'bg-rose-100 text-rose-600', amountCls: 'text-rose-600' },
+    draft: { dot: 'bg-amber-400', label: 'Draft', labelCls: 'bg-amber-100 text-amber-700', amountCls: 'text-slate-700' },
+  };
+  const cfg = kindConfig[entry.kind] || kindConfig.draft;
+  return (
+    <div key={entry.id} className="bg-white p-3.5 rounded-2xl border border-slate-200 flex gap-3 items-center shadow-sm">
+      <div className={`w-2 h-2 rounded-full shrink-0 ${cfg.dot}`}/>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <p className="font-bold text-slate-800 text-sm truncate">{entry.customerName}</p>
+          <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${cfg.labelCls}`}>{cfg.label}</span>
+        </div>
+        <p className="text-[10px] text-slate-400 font-medium mt-0.5">
+          {entry.id} &bull; {formatDateDisp(entry.date)}
+          {entry.kind === 'invoice' && entry.paymentStatus && (
+            <span className={`ml-1.5 font-bold ${entry.paymentStatus==='Paid'?'text-emerald-600':entry.paymentStatus==='Partial'?'text-amber-600':'text-rose-500'}`}>&bull; {entry.paymentStatus}</span>
+          )}
+          {entry.kind === 'payment' && entry.note && <span className="ml-1 italic">&bull; {entry.note}</span>}
+        </p>
+      </div>
+      <p className={`font-extrabold text-sm shrink-0 ${cfg.amountCls}`}>Rs. {entry.amount.toLocaleString()}</p>
+    </div>
+  );
+})}
+{recentActivity.length === 0 && <p className="text-center text-slate-400 text-sm py-8 font-medium">No activity for this period.</p>}
 </div>
 </div>
 </div>
@@ -1180,7 +1262,7 @@ return (
 
 // ─── Payments / Receipts Tab ───
 const PaymentsTab = () => {
-const { isAdmin, customers, payments, invoices, deleteFromFirebase, saveToFirebase, showToast, setShowPaymentModal, setSelectedCustomerForPayment, setEditingPayment, showConfirm } = useContext(AppContext);
+const { isAdmin, customers, payments, invoices, deleteFromFirebase, saveToFirebase, showToast, setShowPaymentModal, setSelectedCustomerForPayment, setEditingPayment, showConfirm, setPrintConfig, getCustomerLedger, generateReceiptData } = useContext(AppContext);
 const [search, setSearch] = useState('');
 const [dateFilter, setDateFilter] = useState('This Month');
 const [customerFilter, setCustomerFilter] = useState('');
@@ -1242,25 +1324,28 @@ return (
           </div>
           <div className="text-right ml-3 shrink-0">
             <p className="font-extrabold text-emerald-600 text-base">Rs. {p.amount.toLocaleString()}</p>
-            {isAdmin && (
-              <div className="flex gap-1 mt-1.5 justify-end">
-                {p.type === 'receipt' && (
-                  <button onClick={() => { setEditingPayment(p.raw); setSelectedCustomerForPayment(p.customerId); setShowPaymentModal(true); }} className="p-1.5 bg-slate-50 hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 rounded-lg border border-slate-200 transition-colors"><Edit size={13}/></button>
-                )}
-                {(p.type === 'receipt' || p.type === 'invoice') && (
-                  <button onClick={async()=>{
-                    if(!await showConfirm('Delete this payment record?')) return;
-                    if(p.type === 'receipt'){
-                      await deleteFromFirebase('payments', p.id);
-                    } else {
-                      const inv = invoices.find(i => i.id === p.raw.id);
-                      if(inv) await saveToFirebase('invoices', inv.id, {...inv, receivedAmount: 0, paymentStatus: 'Pending'});
-                    }
-                    showToast('Payment deleted');
-                  }} className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-500 rounded-lg border border-rose-100 transition-colors"><Trash2 size={13}/></button>
-                )}
-              </div>
-            )}
+            <div className="flex gap-1 mt-1.5 justify-end">
+              <button onClick={() => {
+                const ledger = getCustomerLedger(p.customerId);
+                const receiptData = generateReceiptData(ledger, p.id);
+                if (receiptData) setPrintConfig({ docType: 'receipt', format: 'thermal', data: receiptData });
+              }} title="Print Receipt" className="p-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 rounded-lg border border-emerald-100 transition-colors"><Printer size={13}/></button>
+              {isAdmin && p.type === 'receipt' && (
+                <button onClick={() => { setEditingPayment(p.raw); setSelectedCustomerForPayment(p.customerId); setShowPaymentModal(true); }} className="p-1.5 bg-slate-50 hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 rounded-lg border border-slate-200 transition-colors"><Edit size={13}/></button>
+              )}
+              {isAdmin && (p.type === 'receipt' || p.type === 'invoice') && (
+                <button onClick={async()=>{
+                  if(!await showConfirm('Delete this payment record?')) return;
+                  if(p.type === 'receipt'){
+                    await deleteFromFirebase('payments', p.id);
+                  } else {
+                    const inv = invoices.find(i => i.id === p.raw.id);
+                    if(inv) await saveToFirebase('invoices', inv.id, {...inv, receivedAmount: 0, paymentStatus: 'Pending'});
+                  }
+                  showToast('Payment deleted');
+                }} className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-500 rounded-lg border border-rose-100 transition-colors"><Trash2 size={13}/></button>
+              )}
+            </div>
           </div>
         </div>
       </div>

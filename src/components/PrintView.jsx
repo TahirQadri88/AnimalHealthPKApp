@@ -906,7 +906,7 @@ return (
         {/* Estimate Totals */}
         {docType === 'estimate' && data && (() => {
           const estimateSubtotal = safeItems.reduce((s, i) => s + (i?.isBonus ? 0 : (i?.price || 0) * (i?.quantity || 0)), 0);
-          const estimateGrandTotal = estimateSubtotal + (data.deliveryBilled || 0);
+          const estimateGrandTotal = estimateSubtotal + (Number(data.deliveryBilled) || 0);
           return (
             <div className="keep-together" style={{ marginLeft: 'auto', width: isThermal ? '100%' : sz('','240px','280px'), borderTop: '2px solid #7c3aed', paddingTop: sz('8px','10px','12px') }}>
               {[
