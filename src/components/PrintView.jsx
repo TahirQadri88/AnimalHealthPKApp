@@ -113,7 +113,6 @@ const generateShareText = () => {
     text += `Previous Bal: Rs.${prevBal.toLocaleString()}\n`;
     if (received > 0) text += `Paid: Rs.${received.toLocaleString()}\n`;
     text += `*Net Balance: Rs.${netBal.toLocaleString()}*\n`;
-    text += `Status: ${data.paymentStatus || 'Pending'}\n`;
 
   } else if (docType === 'estimate') {
     text += `*PRICE ESTIMATE / QUOTATION*\n`;
