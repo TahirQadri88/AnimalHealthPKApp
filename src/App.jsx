@@ -1418,7 +1418,7 @@ const tabConfig = [
   { id: 'categories', label: 'Exp. Labels' },
 ];
 return (
-<div className="h-full flex flex-col p-4 pb-6 overflow-y-auto space-y-4">
+<div className="flex-1 overflow-y-auto p-4 pb-6 space-y-4">
   <div className="flex bg-slate-100 p-1 rounded-xl gap-1 overflow-x-auto scrollbar-hide">
     {tabConfig.map(t=>(
       <button key={t.id} onClick={()=>{setTab(t.id);setSearch('');}} className={`flex-1 py-2 px-2 rounded-lg font-bold text-xs whitespace-nowrap transition-colors ${tab===t.id?'bg-white text-teal-700 shadow-sm':'text-slate-500'}`}>{t.label}</button>
@@ -1525,7 +1525,7 @@ const saveEdit = async (rider) => {
   showToast("Rider Updated");
 };
 return (
-<div className="h-full flex flex-col p-4 pb-24 overflow-y-auto space-y-4">
+<div className="flex-1 overflow-y-auto p-4 pb-24 space-y-4">
 <form onSubmit={e=>{e.preventDefault();add();}} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
   <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest">Register New Rider / Vehicle</h3>
   <div className="grid grid-cols-2 gap-3">
@@ -1730,7 +1730,7 @@ const UserManagementView = () => {
 const { isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig, showConfirm } = useContext(AppContext);
 const [userDateFilter, setUserDateFilter] = useState('This Month');
 return (
-<div className="h-full flex flex-col p-4 pb-24 overflow-y-auto">
+<div className="flex-1 overflow-y-auto p-4 pb-24">
 <div className="flex justify-between items-center mb-4">
 <div>
 <h3 className="text-xs font-bold text-slate-800 uppercase tracking-widest">Team Management</h3>
@@ -1820,7 +1820,7 @@ invoices.filter(o => o.status === 'Billed').forEach(o => {
   segStats[seg].customers.add(o.customerName);
 });
 return (
-<div className="h-full flex flex-col p-4 pb-24 overflow-y-auto space-y-4">
+<div className="flex-1 overflow-y-auto p-4 pb-24 space-y-4">
 <div className="flex justify-between items-center">
 <h3 className="text-xs font-bold text-slate-800 uppercase tracking-widest">Customer Segments</h3>
 </div>
@@ -2797,7 +2797,7 @@ const cancelEdit = () => { setEditingExpense(null); setAmount(''); setNote(''); 
 const filteredExpenses = expenses.filter(e => checkDateFilter(e.date, expFilter)).filter(e => { if (groupFilter === 'All') return true; const cat = expenseCategories.find(c => c.name === e.category); return (cat?.group || 'Other') === groupFilter; }).slice().reverse();
 const filteredTotal = filteredExpenses.reduce((s,e)=>s+Number(e.amount),0);
 return (
-<div className="h-full flex flex-col p-4 pb-24 overflow-y-auto">
+<div className="flex-1 overflow-y-auto p-4 pb-24">
 <form onSubmit={e => { e.preventDefault(); saveExpense(); }} className={`bg-white p-4 rounded-2xl border shadow-sm mb-4 ${editingExpense ? 'border-amber-300 bg-amber-50/30' : 'border-slate-200'}`}>
 <div className="flex justify-between items-center mb-3">
 <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest">{editingExpense ? '– Edit Expense' : 'Record New Expense'}</h3>
@@ -2975,7 +2975,7 @@ showToast('Master data exported!');
 };
 const visibleProducts = bulkProducts.filter(p => !bulkSearch || p.name.toLowerCase().includes(bulkSearch.toLowerCase()));
 return (
-<div className="h-full flex flex-col p-4 pb-24 overflow-y-auto">
+<div className="flex-1 overflow-y-auto p-4 pb-24">
 {/* Export Section */}
 <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm mb-4">
 <h3 className="text-xs font-bold text-slate-800 uppercase tracking-widest mb-3 flex items-center gap-1.5"><Download size={14} className="text-indigo-600"/> Export Master Data</h3>
