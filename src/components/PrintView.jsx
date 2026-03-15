@@ -1,5 +1,5 @@
-import React, { useRef } from 'react';
-import { FileDown, Printer, Share2, X, MessageCircle } from 'lucide-react';
+import React, { useRef, useEffect } from 'react';
+import { FileDown, Printer, Share2, X, MessageCircle, Image } from 'lucide-react';
 import { formatDateDisp, getLocalDateStr, APP_NAME } from '../helpers';
 
 // Format: 'thermal' | 'a5' | 'a4'
@@ -14,6 +14,13 @@ const showOnReports = biz.showBusinessNameOnReports !== false;
 const isThermal = format === 'thermal';
 const isA5 = format === 'a5';
 const printRef = useRef(null);
+
+// Keyboard: Escape closes the print view
+useEffect(() => {
+  const onKey = (e) => { if (e.key === 'Escape') setPrintConfig(null); };
+  window.addEventListener('keydown', onKey);
+  return () => window.removeEventListener('keydown', onKey);
+}, []);
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 const getDispatchQtyStr = (item) => {
@@ -369,6 +376,64 @@ const handlePDF = () => {
   }, 300);
 };
 
+// ── Image (PNG) Share — uses html2canvas, no pdf library needed ───────────
+const handleImageShare = async () => {
+  const element = document.getElementById('print-document');
+  if (!element) { showToast('Document not found', 'error'); return; }
+  showToast('Generating image…');
+
+  // Load html2canvas dynamically
+  if (!window.html2canvas) {
+    await new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+      s.onload = resolve; s.onerror = reject;
+      document.head.appendChild(s);
+    }).catch(() => { showToast('Image library failed to load', 'error'); });
+    if (!window.html2canvas) return;
+  }
+
+  try {
+    const targetW = isThermal ? 302 : isA5 ? 559 : 794;
+    const clone = element.cloneNode(true);
+    Object.assign(clone.style, {
+      position: 'fixed', left: '-9999px', top: '0',
+      width: targetW + 'px', maxWidth: targetW + 'px', minWidth: targetW + 'px',
+      margin: '0', boxShadow: 'none', zIndex: '-1', background: 'white',
+    });
+    document.body.appendChild(clone);
+
+    const canvas = await window.html2canvas(clone, {
+      scale: 2, useCORS: true, logging: false,
+      width: targetW, windowWidth: targetW, backgroundColor: '#ffffff',
+    });
+    if (document.body.contains(clone)) document.body.removeChild(clone);
+
+    const imgFileName = getFileName().replace(/\.pdf$/, '.jpg');
+    canvas.toBlob(async (blob) => {
+      if (!blob) { showToast('Image generation failed', 'error'); return; }
+      const file = new File([blob], imgFileName, { type: 'image/jpeg' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        navigator.share({ files: [file], title: imgFileName.replace(/\.jpg$/, '') })
+          .catch(e => { if (e.name !== 'AbortError') downloadImageFallback(blob, imgFileName); });
+      } else {
+        downloadImageFallback(blob, imgFileName);
+      }
+    }, 'image/jpeg', 0.93);
+  } catch (e) {
+    showToast('Image failed — use Print instead', 'error');
+  }
+};
+
+const downloadImageFallback = (blob, fileName) => {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = fileName;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+  showToast('Image saved! Share via gallery or WhatsApp');
+};
+
 // ── Layout helpers ────────────────────────────────────────────────────────
 const safeItems = data?.items || [];
 const safeRows  = data?.rows  || [];
@@ -427,19 +492,19 @@ return (
         {showThermal && (
           <button
             onClick={() => setPrintConfig({ ...printConfig, format: 'thermal' })}
-            className={`px-3 py-1.5 rounded-lg font-bold text-xs transition-all ${isThermal ? 'bg-white text-slate-900 shadow' : 'text-slate-400 hover:text-white'}`}
-          >📠 Thermal</button>
+            className={`px-3 py-1.5 rounded-lg font-bold text-xs transition-all focus:outline-none focus:ring-2 focus:ring-white/50 ${isThermal ? 'bg-white text-slate-900 shadow' : 'text-slate-400 hover:text-white'}`}
+          >Thermal</button>
         )}
         {showA5 && (
           <button
             onClick={() => setPrintConfig({ ...printConfig, format: 'a5' })}
-            className={`px-3 py-1.5 rounded-lg font-bold text-xs transition-all ${isA5 ? 'bg-white text-slate-900 shadow' : 'text-slate-400 hover:text-white'}`}
+            className={`px-3 py-1.5 rounded-lg font-bold text-xs transition-all focus:outline-none focus:ring-2 focus:ring-white/50 ${isA5 ? 'bg-white text-slate-900 shadow' : 'text-slate-400 hover:text-white'}`}
           >A5</button>
         )}
         {showA4 && (
           <button
             onClick={() => setPrintConfig({ ...printConfig, format: 'a4' })}
-            className={`px-3 py-1.5 rounded-lg font-bold text-xs transition-all ${!isThermal && !isA5 ? 'bg-white text-slate-900 shadow' : 'text-slate-400 hover:text-white'}`}
+            className={`px-3 py-1.5 rounded-lg font-bold text-xs transition-all focus:outline-none focus:ring-2 focus:ring-white/50 ${!isThermal && !isA5 ? 'bg-white text-slate-900 shadow' : 'text-slate-400 hover:text-white'}`}
           >A4</button>
         )}
       </div>
@@ -451,24 +516,30 @@ return (
       <div className="flex items-center gap-2">
         <button
           onClick={handleShareHTML}
-          className="flex items-center gap-1.5 px-3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-bold text-xs transition-colors shadow"
+          className="flex items-center gap-1.5 px-3 py-2 bg-indigo-600 hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-400 text-white rounded-lg font-bold text-xs transition-colors shadow"
         ><FileDown size={14}/> Save / Share</button>
 
         <button
           onClick={handlePrint}
-          className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold text-xs transition-colors shadow"
+          className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-400 text-white rounded-lg font-bold text-xs transition-colors shadow"
         ><Printer size={14}/> Print</button>
+
+        <button
+          onClick={handleImageShare}
+          className="flex items-center gap-1.5 px-3 py-2 bg-teal-600 hover:bg-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-400 text-white rounded-lg font-bold text-xs transition-colors shadow"
+          title="Share as Image (PNG/JPG) — works with WhatsApp"
+        ><Image size={14}/> Image</button>
 
         <a
           href={`https://wa.me/?text=${generateShareText()}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center gap-1.5 px-3 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg font-bold text-xs transition-colors shadow"
+          className="flex items-center gap-1.5 px-3 py-2 bg-green-600 hover:bg-green-500 focus:outline-none focus:ring-2 focus:ring-green-400 text-white rounded-lg font-bold text-xs transition-colors shadow"
         ><MessageCircle size={14}/> WhatsApp</a>
 
         <button
           onClick={() => setPrintConfig(null)}
-          className="flex items-center gap-1.5 px-3 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-lg font-bold text-xs transition-colors shadow"
+          className="flex items-center gap-1.5 px-3 py-2 bg-rose-600 hover:bg-rose-500 focus:outline-none focus:ring-2 focus:ring-rose-400 text-white rounded-lg font-bold text-xs transition-colors shadow"
         ><X size={14}/> Close</button>
       </div>
     </div>
@@ -488,24 +559,24 @@ return (
   >
 
     {/* ── Header ── */}
-    <div className="keep-together" style={{ textAlign: 'center', marginBottom: sz('14px','20px','24px'), borderBottom: '2.5px solid #1e293b', paddingBottom: sz('10px','14px','18px') }}>
-      <div style={{ fontSize: sz('18px','24px','30px'), fontWeight: 900, letterSpacing: '-0.5px', textTransform: 'uppercase', color: '#0f172a' }}>
+    <div className="keep-together" style={{ textAlign: 'center', marginBottom: sz('10px','14px','18px'), borderBottom: '2px solid #1e293b', paddingBottom: sz('8px','10px','14px') }}>
+      <div style={{ fontSize: sz('14px','18px','22px'), fontWeight: 900, letterSpacing: '-0.5px', textTransform: 'uppercase', color: '#0f172a', lineHeight: 1.2 }}>
         {showOnDocs ? bizName : bizAppName}
       </div>
-      {bizTagline && showOnDocs && <div style={{ fontSize: '8px', textTransform: 'uppercase', letterSpacing: '2.5px', fontWeight: 700, color: '#94a3b8', marginTop: '3px' }}>
+      {bizTagline && showOnDocs && <div style={{ fontSize: sz('7px','7.5px','8px'), textTransform: 'uppercase', letterSpacing: '2px', fontWeight: 700, color: '#94a3b8', marginTop: '2px' }}>
         {bizTagline}
       </div>}
       <div style={{
-        marginTop: sz('8px','10px','12px'),
+        marginTop: sz('5px','7px','9px'),
         display: 'inline-block',
         background: '#1e293b',
         color: 'white',
-        padding: isThermal ? '3px 12px' : '5px 18px',
+        padding: isThermal ? '2px 10px' : '3px 14px',
         borderRadius: '999px',
         fontWeight: 800,
         textTransform: 'uppercase',
-        letterSpacing: '2px',
-        fontSize: sz('8px','9px','10px'),
+        letterSpacing: '1.5px',
+        fontSize: sz('7px','8px','9px'),
       }}>
         {docLabel}
       </div>
@@ -513,17 +584,17 @@ return (
 
     {/* ── Customer / Doc Meta ── */}
     {docType !== 'report' && data && (
-      <div className="keep-together" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: sz('12px','16px','20px'), gap: '12px' }}>
+      <div className="keep-together" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: sz('10px','12px','16px'), gap: '8px' }}>
         {/* Left: customer */}
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: '7.5px', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '1.5px', color: '#94a3b8', marginBottom: '4px' }}>
+          <div style={{ fontSize: '7px', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '1.2px', color: '#94a3b8', marginBottom: '3px' }}>
             {docType === 'ledger' ? 'Account Holder' : 'Customer'}
           </div>
-          <div style={{ fontSize: sz('14px','18px','22px'), fontWeight: 900, lineHeight: 1.2, wordBreak: 'break-word', color: '#0f172a' }}>
+          <div style={{ fontSize: sz('12px','15px','18px'), fontWeight: 900, lineHeight: 1.2, wordBreak: 'break-word', color: '#0f172a' }}>
             {data.customerName || 'Unknown'}
           </div>
           {docType === 'dispatch' && data.customerDetails && (
-            <div style={{ marginTop: '8px', fontSize: '8.5px', color: '#334155', background: '#f8fafc', padding: '8px 10px', borderRadius: '8px', border: '1px solid #e2e8f0', lineHeight: 1.7 }}>
+            <div style={{ marginTop: '6px', fontSize: sz('7.5px','8.5px','9px'), color: '#334155', background: '#f8fafc', padding: '6px 8px', borderRadius: '6px', border: '1px solid #e2e8f0', lineHeight: 1.6 }}>
               {(data.customerDetails.contactPerson || data.customerDetails.phone) && (
                 <div><strong>{data.customerDetails.contactPerson || 'N/A'}</strong>
                   {data.customerDetails.phone ? ` · ${data.customerDetails.phone}` : ''}
@@ -534,34 +605,34 @@ return (
                 const addr = useKey === 'address2' ? data.customerDetails.address2 : data.customerDetails.address1;
                 const mapLink = useKey === 'address2' ? data.customerDetails.map2 : data.customerDetails.map1;
                 return (<>
-                  {addr && <div style={{ marginTop: '3px' }}>{addr}</div>}
-                  {mapLink && <div style={{ fontSize: '7.5px', color: '#6366f1', marginTop: '2px', wordBreak: 'break-all' }}>Map: {mapLink}</div>}
+                  {addr && <div style={{ marginTop: '2px' }}>{addr}</div>}
+                  {mapLink && <div style={{ fontSize: '7px', color: '#6366f1', marginTop: '2px', wordBreak: 'break-all' }}>Map: {mapLink}</div>}
                 </>);
               })()}
             </div>
           )}
           {docType === 'ledger' && data.phone && (
-            <div style={{ fontSize: '10px', color: '#64748b', marginTop: '3px' }}>{data.phone}</div>
+            <div style={{ fontSize: '9px', color: '#64748b', marginTop: '2px' }}>{data.phone}</div>
           )}
         </div>
 
         {/* Right: ref + date */}
-        <div style={{ textAlign: 'right', flexShrink: 0, paddingLeft: '8px' }}>
+        <div style={{ textAlign: 'right', flexShrink: 0, paddingLeft: '6px', minWidth: 0 }}>
           {docType !== 'ledger' && (
             <>
-              <div style={{ fontSize: '7.5px', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '1.5px', color: '#94a3b8', marginBottom: '4px' }}>Reference</div>
-              <div style={{ fontWeight: 800, fontSize: sz('11px','13px','14px'), color: '#1e293b', wordBreak: 'break-all', maxWidth: isThermal ? '72px' : '140px' }}>{data.id || '—'}</div>
-              <div style={{ color: '#64748b', fontSize: '10px', marginTop: '2px' }}>{formatDateDisp(data.date)}</div>
+              <div style={{ fontSize: '7px', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '1px', color: '#94a3b8', marginBottom: '2px' }}>Ref #</div>
+              <div style={{ fontWeight: 800, fontSize: sz('9px','11px','12px'), color: '#1e293b', wordBreak: 'break-all', maxWidth: isThermal ? '68px' : '130px', fontFamily: 'monospace' }}>{data.id || '—'}</div>
+              <div style={{ color: '#64748b', fontSize: sz('8px','9px','10px'), marginTop: '2px', fontWeight: 600 }}>{formatDateDisp(data.date)}</div>
               {docType === 'invoice' && data.salespersonName && (
-                <div style={{ fontSize: '9px', color: '#94a3b8', marginTop: '4px' }}>by {data.salespersonName}</div>
+                <div style={{ fontSize: sz('7px','8px','9px'), color: '#94a3b8', marginTop: '2px' }}>by {data.salespersonName}</div>
               )}
             </>
           )}
           {docType === 'ledger' && (
             <>
-              <div style={{ fontSize: '7.5px', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '1.5px', color: '#94a3b8', marginBottom: '4px' }}>Printed</div>
-              <div style={{ fontWeight: 700, fontSize: '10px' }}>{formatDateDisp(getLocalDateStr())}</div>
-              <div style={{ fontSize: '9px', color: '#64748b', marginTop: '4px' }}>
+              <div style={{ fontSize: '7px', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '1px', color: '#94a3b8', marginBottom: '2px' }}>Printed</div>
+              <div style={{ fontWeight: 700, fontSize: sz('8px','9px','10px') }}>{formatDateDisp(getLocalDateStr())}</div>
+              <div style={{ fontSize: sz('7.5px','8px','9px'), color: '#64748b', marginTop: '2px', fontWeight: 600 }}>
                 {formatDateDisp(data.dateRange?.start)} – {formatDateDisp(data.dateRange?.end)}
               </div>
             </>
@@ -814,7 +885,7 @@ return (
                 (data.deliveryBilled || 0) > 0 && { label: 'Delivery', val: `Rs. ${Number(data.deliveryBilled).toLocaleString()}`, muted: true },
                 { label: 'Estimated Total', val: `Rs. ${estimateGrandTotal.toLocaleString()}`, bold: true, large: true, divider: true },
               ].filter(Boolean).map((row, i) => (
-                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: sz('3px','4px','5px'), borderTop: row.divider ? '1px solid #e2e8f0' : 'none', paddingTop: row.divider ? sz('5px','6px','8px') : 0, marginTop: row.divider ? sz('4px','5px','6px') : 0, fontWeight: row.bold ? 800 : 500, fontSize: row.large ? sz('12px','14px','16px') : sz('8px','9px','10px') }}>
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: sz('3px','4px','5px'), borderTop: row.divider ? '1px solid #e2e8f0' : 'none', paddingTop: row.divider ? sz('4px','5px','7px') : 0, marginTop: row.divider ? sz('3px','4px','5px') : 0, fontWeight: row.bold ? 800 : 500, fontSize: row.large ? sz('10px','12px','13px') : sz('8px','9px','10px'), fontVariantNumeric: 'tabular-nums' }}>
                   <span style={{ color: row.muted ? '#94a3b8' : '#475569' }}>{row.label}:</span>
                   <span style={{ color: row.bold ? '#7c3aed' : '#1e293b' }}>{row.val}</span>
                 </div>
@@ -839,12 +910,12 @@ return (
                 { label: 'Subtotal', val: `Rs. ${(prevBalance + (data.total || 0)).toLocaleString()}`, bold: true },
                 received > 0 && { label: 'Payment Received', val: `− Rs. ${received.toLocaleString()}`, color: '#059669' },
               ].filter(Boolean).map((row, i) => row && (
-                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: sz('3px','4px','5px'), borderTop: row.divider || row.top ? '1px solid #e2e8f0' : 'none', paddingTop: row.divider || row.top ? sz('5px','6px','8px') : 0, marginTop: row.divider || row.top ? sz('4px','5px','6px') : 0, fontWeight: row.bold ? 800 : 500, fontSize: row.large ? sz('12px','14px','16px') : sz('8px','9px','10px') }}>
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: sz('3px','4px','5px'), borderTop: row.divider || row.top ? '1px solid #e2e8f0' : 'none', paddingTop: row.divider || row.top ? sz('4px','5px','7px') : 0, marginTop: row.divider || row.top ? sz('3px','4px','5px') : 0, fontWeight: row.bold ? 800 : 500, fontSize: row.large ? sz('10px','12px','13px') : sz('8px','9px','10px') }}>
                   <span style={{ color: row.muted ? '#94a3b8' : '#475569' }}>{row.label}:</span>
-                  <span style={{ color: row.color || '#1e293b' }}>{row.val}</span>
+                  <span style={{ color: row.color || '#1e293b', fontVariantNumeric: 'tabular-nums' }}>{row.val}</span>
                 </div>
               ))}
-              <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '2.5px solid #1e293b', marginTop: sz('5px','6px','8px'), paddingTop: sz('6px','8px','10px'), fontWeight: 900, fontSize: sz('13px','16px','20px'), color: '#1e293b' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '2px solid #1e293b', marginTop: sz('4px','5px','6px'), paddingTop: sz('5px','6px','8px'), fontWeight: 900, fontSize: sz('11px','13px','15px'), color: '#1e293b', fontVariantNumeric: 'tabular-nums' }}>
                 <span>Net Balance:</span>
                 <span>Rs. {netBalance.toLocaleString()}</span>
               </div>
@@ -950,7 +1021,7 @@ return (
           <div style={{ fontSize: sz('7.5px','8.5px','9px'), fontWeight: 700, color: '#15803d', textTransform: 'uppercase', letterSpacing: '2px' }}>
             Amount Received
           </div>
-          <div style={{ fontSize: sz('32px','44px','56px'), fontWeight: 900, color: '#059669', marginTop: sz('6px','8px','10px'), lineHeight: 1 }}>
+          <div style={{ fontSize: sz('24px','32px','40px'), fontWeight: 900, color: '#059669', marginTop: sz('4px','6px','8px'), lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
             Rs. {(data.receivedAmount || 0).toLocaleString()}
           </div>
           {data.note && (
@@ -968,7 +1039,7 @@ return (
               <span>{r.label}:</span><span>{r.val}</span>
             </div>
           ))}
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 900, fontSize: sz('14px','18px','22px'), color: '#1e293b', borderTop: '1px solid #e2e8f0', paddingTop: sz('8px','10px','12px'), marginTop: sz('4px','6px','8px') }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 900, fontSize: sz('11px','14px','16px'), color: '#1e293b', borderTop: '1px solid #e2e8f0', paddingTop: sz('6px','8px','10px'), marginTop: sz('4px','5px','6px'), fontVariantNumeric: 'tabular-nums' }}>
             <span>Remaining Balance:</span>
             <span>Rs. {(data.newBalance || 0).toLocaleString()}</span>
           </div>
@@ -977,88 +1048,87 @@ return (
     )}
 
     {/* ── Ledger Content ── */}
-    {docType === 'ledger' && data && (
+    {docType === 'ledger' && data && (() => {
+      const isSimple = (data.ledgerMode || 'simple') === 'simple';
+      const closingBal = (data.openingBal || 0) + (data.totalDebit || 0) - (data.totalCredit || 0);
+      return (
       <>
-        {/* Summary bar */}
-        <div className="keep-together" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: sz('10px','14px','16px'), background: '#f8fafc', borderRadius: '10px', padding: sz('8px 10px','10px 14px','12px 16px'), border: '1px solid #e2e8f0', flexWrap: 'wrap', gap: '8px' }}>
-          <div>
-            <div style={{ fontSize: '7.5px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', color: '#94a3b8' }}>Opening Balance</div>
-            <div style={{ fontSize: sz('12px','14px','16px'), fontWeight: 800, color: '#1e293b' }}>Rs. {(data.openingBal || 0).toLocaleString()}</div>
-          </div>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: '7.5px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', color: '#94a3b8' }}>Total Debit</div>
-            <div style={{ fontSize: sz('12px','14px','16px'), fontWeight: 800, color: '#4338ca' }}>Rs. {(data.totalDebit || 0).toLocaleString()}</div>
-          </div>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: '7.5px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', color: '#94a3b8' }}>Total Credit</div>
-            <div style={{ fontSize: sz('12px','14px','16px'), fontWeight: 800, color: '#059669' }}>Rs. {(data.totalCredit || 0).toLocaleString()}</div>
-          </div>
-          <div style={{ textAlign: 'right', background: '#fff1f2', padding: sz('6px 10px','8px 12px','10px 14px'), borderRadius: '8px', border: '1px solid #fecdd3', flexShrink: 0 }}>
-            <div style={{ fontSize: '7.5px', fontWeight: 800, textTransform: 'uppercase', color: '#e11d48', letterSpacing: '1px' }}>Closing Balance</div>
-            <div style={{ fontWeight: 900, color: '#be123c', fontSize: sz('13px','16px','20px') }}>Rs. {((data.openingBal || 0) + (data.totalDebit || 0) - (data.totalCredit || 0)).toLocaleString()}</div>
-          </div>
+        {/* Compact summary bar — 4 figures inline, smaller for thermal */}
+        <div className="keep-together" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: sz('4px','6px','8px'), marginBottom: sz('8px','10px','12px') }}>
+          {[
+            { label: 'Opening', val: data.openingBal || 0, color: '#475569', bg: '#f8fafc', border: '#e2e8f0' },
+            { label: 'Debit (Dr)', val: data.totalDebit || 0, color: '#4338ca', bg: '#eef2ff', border: '#c7d2fe' },
+            { label: 'Credit (Cr)', val: data.totalCredit || 0, color: '#059669', bg: '#f0fdf4', border: '#bbf7d0' },
+            { label: 'Balance', val: closingBal, color: closingBal > 0 ? '#be123c' : '#065f46', bg: closingBal > 0 ? '#fff1f2' : '#f0fdf4', border: closingBal > 0 ? '#fecdd3' : '#bbf7d0' },
+          ].map((item, i) => (
+            <div key={i} style={{ background: item.bg, border: `1px solid ${item.border}`, borderRadius: sz('6px','7px','8px'), padding: sz('4px 4px','5px 6px','6px 8px'), textAlign: 'center', overflow: 'hidden' }}>
+              <div style={{ fontSize: sz('5.5px','6.5px','7px'), fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', color: '#94a3b8', marginBottom: '2px', whiteSpace: 'nowrap' }}>{item.label}</div>
+              <div style={{ fontSize: sz('8px','10px','11px'), fontWeight: 900, color: item.color, fontVariantNumeric: 'tabular-nums', wordBreak: 'break-all', lineHeight: 1.2 }}>Rs.{item.val.toLocaleString()}</div>
+            </div>
+          ))}
         </div>
 
         {/* Ledger table */}
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: sz('7.5px','9px','10px'), tableLayout: 'fixed' }}>
           <thead>
             <tr style={{ background: '#1e293b', color: 'white' }}>
-              <th style={{ padding: sz('4px 2px','7px 5px','8px 6px'), textAlign: 'left', fontWeight: 800, textTransform: 'uppercase', fontSize: sz('6.5px','7.5px','8px'), letterSpacing: '0.5px', width: isThermal ? '20%' : '13%' }}>Date</th>
-              <th style={{ padding: sz('4px 2px','7px 5px','8px 6px'), textAlign: 'left', fontWeight: 800, textTransform: 'uppercase', fontSize: sz('6.5px','7.5px','8px'), letterSpacing: '0.5px' }}>Particulars</th>
-              <th style={{ padding: sz('4px 2px','7px 5px','8px 6px'), textAlign: 'right', fontWeight: 800, textTransform: 'uppercase', fontSize: sz('6.5px','7.5px','8px'), letterSpacing: '0.5px', width: isThermal ? '17%' : '15%' }}>{isThermal ? 'Dr' : 'Debit (Dr)'}</th>
-              <th style={{ padding: sz('4px 2px','7px 5px','8px 6px'), textAlign: 'right', fontWeight: 800, textTransform: 'uppercase', fontSize: sz('6.5px','7.5px','8px'), letterSpacing: '0.5px', width: isThermal ? '17%' : '15%' }}>{isThermal ? 'Cr' : 'Credit (Cr)'}</th>
-              <th style={{ padding: sz('4px 2px','7px 5px','8px 6px'), textAlign: 'right', fontWeight: 800, textTransform: 'uppercase', fontSize: sz('6.5px','7.5px','8px'), letterSpacing: '0.5px', width: isThermal ? '19%' : '17%' }}>Balance</th>
+              <th style={{ padding: sz('4px 2px','6px 4px','7px 6px'), textAlign: 'left', fontWeight: 800, textTransform: 'uppercase', fontSize: sz('6px','7px','7.5px'), letterSpacing: '0.5px', width: isThermal ? '22%' : '13%' }}>Date</th>
+              <th style={{ padding: sz('4px 2px','6px 4px','7px 6px'), textAlign: 'left', fontWeight: 800, textTransform: 'uppercase', fontSize: sz('6px','7px','7.5px'), letterSpacing: '0.5px' }}>Particulars</th>
+              <th style={{ padding: sz('4px 2px','6px 4px','7px 6px'), textAlign: 'right', fontWeight: 800, textTransform: 'uppercase', fontSize: sz('6px','7px','7.5px'), letterSpacing: '0.5px', width: isThermal ? '18%' : '15%' }}>Dr</th>
+              <th style={{ padding: sz('4px 2px','6px 4px','7px 6px'), textAlign: 'right', fontWeight: 800, textTransform: 'uppercase', fontSize: sz('6px','7px','7.5px'), letterSpacing: '0.5px', width: isThermal ? '18%' : '15%' }}>Cr</th>
+              <th style={{ padding: sz('4px 2px','6px 4px','7px 6px'), textAlign: 'right', fontWeight: 800, textTransform: 'uppercase', fontSize: sz('6px','7px','7.5px'), letterSpacing: '0.5px', width: isThermal ? '19%' : '17%' }}>Bal</th>
             </tr>
           </thead>
           <tbody>
             {safeRows.map((row, i) => (
               <tr key={row.id || i} style={{ borderBottom: '1px solid #f1f5f9', background: i % 2 === 0 ? '#fff' : '#f8fafc', pageBreakInside: 'avoid', breakInside: 'avoid' }}>
-                <td style={{ padding: sz('4px 2px','6px 5px','7px 6px'), color: '#64748b', whiteSpace: 'nowrap', fontSize: sz('7px','8.5px','9px') }}>
+                <td style={{ padding: sz('3px 2px','5px 4px','6px 6px'), color: '#64748b', whiteSpace: 'nowrap', fontSize: sz('6.5px','8px','9px') }}>
                   {formatDateDisp(row.date)}
                 </td>
-                <td style={{ padding: sz('4px 2px','6px 5px','7px 6px'), wordBreak: 'break-word' }}>
-                  <span style={{ fontWeight: 700, display: 'block', lineHeight: 1.3, color: '#1e293b' }}>{row.desc || '—'}</span>
-                  <span style={{ fontSize: sz('6px','7px','7.5px'), color: '#94a3b8', fontWeight: 500, display: 'block', marginTop: '1px', wordBreak: 'break-all' }}>{row.ref || ''}</span>
-                  {(row.lineItems || []).length > 0 && (row.lineItems || []).map((li, idx) => (
+                <td style={{ padding: sz('3px 2px','5px 4px','6px 6px'), wordBreak: 'break-word' }}>
+                  <span style={{ fontWeight: 700, display: 'block', lineHeight: 1.3, color: row.isCreditNote ? '#be123c' : '#1e293b', fontSize: sz('7px','8.5px','9.5px') }}>{row.desc || '—'}</span>
+                  {!isSimple && <span style={{ fontSize: sz('6px','7px','7.5px'), color: '#94a3b8', fontWeight: 500, display: 'block', marginTop: '1px', wordBreak: 'break-all' }}>{row.ref || ''}</span>}
+                  {!isSimple && (row.lineItems || []).length > 0 && (row.lineItems || []).map((li, idx) => (
                     <div key={idx} style={{ fontSize: sz('6px','7px','7.5px'), color: '#475569', display: 'flex', justifyContent: 'space-between', marginTop: '2px', paddingLeft: '6px' }}>
                       <span style={{ flex: 1 }}>{li.isBonus ? '🎁 ' : '• '}{li.name} ×{li.qty}{!li.isBonus && ` @ Rs.${(li.price||0).toLocaleString()}`}</span>
-                      <span style={{ fontWeight: 700, marginLeft: '8px' }}>{li.isBonus ? 'FREE' : `Rs.${(li.subtotal||0).toLocaleString()}`}</span>
+                      <span style={{ fontWeight: 700, marginLeft: '6px', flexShrink: 0 }}>{li.isBonus ? 'FREE' : `Rs.${(li.subtotal||0).toLocaleString()}`}</span>
                     </div>
                   ))}
-                  {(row.deliveryBilled || 0) > 0 && (
+                  {!isSimple && (row.deliveryBilled || 0) > 0 && (
                     <div style={{ fontSize: sz('6px','7px','7.5px'), color: '#94a3b8', display: 'flex', justifyContent: 'space-between', paddingLeft: '6px', marginTop: '1px' }}>
                       <span>+ Delivery</span><span>Rs.{(row.deliveryBilled||0).toLocaleString()}</span>
                     </div>
                   )}
                 </td>
-                <td style={{ padding: sz('4px 2px','6px 5px','7px 6px'), textAlign: 'right', fontWeight: 800, color: '#4338ca' }}>
+                <td style={{ padding: sz('3px 2px','5px 4px','6px 6px'), textAlign: 'right', fontWeight: 800, color: '#4338ca', fontVariantNumeric: 'tabular-nums', fontSize: sz('7px','8.5px','9.5px') }}>
                   {(row.debit || 0) > 0 ? (row.debit || 0).toLocaleString() : '—'}
                 </td>
-                <td style={{ padding: sz('4px 2px','6px 5px','7px 6px'), textAlign: 'right', fontWeight: 800, color: '#059669' }}>
+                <td style={{ padding: sz('3px 2px','5px 4px','6px 6px'), textAlign: 'right', fontWeight: 800, color: '#059669', fontVariantNumeric: 'tabular-nums', fontSize: sz('7px','8.5px','9.5px') }}>
                   {(row.credit || 0) > 0 ? (row.credit || 0).toLocaleString() : '—'}
                 </td>
-                <td style={{ padding: sz('4px 2px','6px 5px','7px 6px'), textAlign: 'right', fontWeight: 900, color: (row.balance || 0) > 0 ? '#be123c' : '#065f46' }}>
+                <td style={{ padding: sz('3px 2px','5px 4px','6px 6px'), textAlign: 'right', fontWeight: 900, color: (row.balance || 0) > 0 ? '#be123c' : '#065f46', fontVariantNumeric: 'tabular-nums', fontSize: sz('7px','8.5px','9.5px') }}>
                   {(row.balance || 0).toLocaleString()}
                 </td>
               </tr>
             ))}
             {safeRows.length === 0 && (
-              <tr><td colSpan={5} style={{ padding: '16px', textAlign: 'center', color: '#94a3b8' }}>No transactions in this period</td></tr>
+              <tr><td colSpan={5} style={{ padding: '12px', textAlign: 'center', color: '#94a3b8' }}>No transactions in this period</td></tr>
             )}
           </tbody>
           <tfoot>
-            <tr style={{ background: '#f1f5f9', borderTop: '2px solid #1e293b' }}>
-              <td colSpan={2} style={{ padding: sz('5px 2px','8px 5px','10px 6px'), textAlign: 'right', fontWeight: 800, textTransform: 'uppercase', fontSize: sz('7px','7.5px','8px'), letterSpacing: '0.5px', color: '#475569' }}>
-                Period Totals:
+            <tr style={{ background: '#1e293b', color: 'white' }}>
+              <td colSpan={2} style={{ padding: sz('4px 2px','6px 4px','7px 6px'), textAlign: 'right', fontWeight: 700, textTransform: 'uppercase', fontSize: sz('6px','7px','7.5px'), letterSpacing: '0.5px' }}>
+                Totals:
               </td>
-              <td style={{ padding: sz('5px 2px','8px 5px','10px 6px'), textAlign: 'right', fontWeight: 900, color: '#4338ca' }}>{(data.totalDebit || 0).toLocaleString()}</td>
-              <td style={{ padding: sz('5px 2px','8px 5px','10px 6px'), textAlign: 'right', fontWeight: 900, color: '#059669' }}>{(data.totalCredit || 0).toLocaleString()}</td>
-              <td></td>
+              <td style={{ padding: sz('4px 2px','6px 4px','7px 6px'), textAlign: 'right', fontWeight: 900, fontVariantNumeric: 'tabular-nums', fontSize: sz('7px','8.5px','9.5px') }}>{(data.totalDebit || 0).toLocaleString()}</td>
+              <td style={{ padding: sz('4px 2px','6px 4px','7px 6px'), textAlign: 'right', fontWeight: 900, fontVariantNumeric: 'tabular-nums', fontSize: sz('7px','8.5px','9.5px') }}>{(data.totalCredit || 0).toLocaleString()}</td>
+              <td style={{ padding: sz('4px 2px','6px 4px','7px 6px'), textAlign: 'right', fontWeight: 900, fontVariantNumeric: 'tabular-nums', fontSize: sz('7px','8.5px','9.5px') }}>{closingBal.toLocaleString()}</td>
             </tr>
           </tfoot>
         </table>
       </>
-    )}
+      );
+    })()}
 
     {/* ── Footer ── */}
     <div style={{
@@ -1085,10 +1155,10 @@ return (
       margin-bottom: 40px;
     }
     @media print {
-      @page { margin: 8mm; }
+      @page { margin: 8mm; size: auto; }
       @page :first { margin-top: 8mm; }
       html, body { height: auto !important; overflow: visible !important; }
-      #print-root { display: block !important; position: relative !important; }
+      #print-root { display: block !important; position: relative !important; overflow: visible !important; }
       .no-print { display: none !important; }
       #print-document {
         box-shadow: none !important;
@@ -1099,13 +1169,19 @@ return (
         padding: 6mm !important;
         font-size: 10pt !important;
         position: relative !important;
+        page-break-after: auto !important;
       }
+      /* Keep header/summary blocks together; tables flow across pages */
       .keep-together { page-break-inside: avoid !important; break-inside: avoid !important; }
-      table { page-break-inside: auto !important; width: 100% !important; }
+      /* Tables spanning multiple pages: header repeats, footer on last page only */
+      table { page-break-inside: auto !important; width: 100% !important; border-collapse: collapse !important; }
       thead { display: table-header-group !important; }
       tfoot { display: table-footer-group !important; }
       tbody tr { page-break-inside: avoid !important; break-inside: avoid !important; }
+      /* Ensure every td/th has its background colour on print */
       * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
+      /* Tabular numbers stay aligned across pages */
+      .tabular-nums { font-variant-numeric: tabular-nums !important; }
     }
   `}</style>
 </div>
