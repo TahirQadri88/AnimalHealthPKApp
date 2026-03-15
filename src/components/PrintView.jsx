@@ -64,6 +64,19 @@ const getFileName = () => {
   return `${label}_${ref}_${custName}_${dateStr}.pdf`;
 };
 
+// ── Short caption for native share sheet ─────────────────────────────────
+const getShareCaption = () => {
+  if (!data) return getFileName().replace(/\.[^.]+$/, '');
+  if (docType === 'invoice') return `Invoice #${data.id} for ${data.customerName} — Rs. ${(data.total || 0).toLocaleString()} | ${formatDateDisp(data.date)}`;
+  if (docType === 'estimate') return `Price Estimate ${data.id} for ${data.customerName} | ${formatDateDisp(data.date)}`;
+  if (docType === 'dispatch') return `Dispatch Note #${data.id} for ${data.customerName} | ${formatDateDisp(data.date)}`;
+  if (docType === 'receipt') return `Payment Receipt ${data.id} — Rs. ${(data.receivedAmount || 0).toLocaleString()} received from ${data.customerName}`;
+  if (docType === 'creditnote') return `Credit Note ${data.id} for ${data.customerName} — Rs. ${(data.total || 0).toLocaleString()}`;
+  if (docType === 'ledger') return `Account Statement: ${data.customerName} | ${formatDateDisp(data.dateRange?.start)} – ${formatDateDisp(data.dateRange?.end)}`;
+  if (docType === 'report') return `${data.title || 'Analytics Report'} | Period: ${data.dateFilter || ''}`;
+  return getFileName().replace(/\.[^.]+$/, '');
+};
+
 // ── WhatsApp share text ────────────────────────────────────────────────────
 const generateShareText = () => {
   if (!data) return '';
@@ -246,12 +259,26 @@ const buildHtmlDoc = () => {
   <title>${docTitle}</title>
   <style>
     *{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
-    body{margin:0;padding:${bodyPad};background:#f1f5f9;font-family:system-ui,-apple-system,sans-serif;}
-    @media print{body{padding:0;background:white;}@page{size:${pageSize};margin:${pageMargin};}
+    body{margin:0;padding:0;background:#f1f5f9;font-family:system-ui,-apple-system,sans-serif;}
+    #nav-bar{position:sticky;top:0;z-index:100;background:#1e293b;display:flex;align-items:center;justify-content:space-between;padding:10px 16px;gap:12px;box-shadow:0 2px 8px rgba(0,0,0,0.3);}
+    #nav-bar .nav-title{color:#94a3b8;font-size:12px;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    #nav-bar .nav-btn{background:#334155;border:none;color:white;font-size:12px;font-weight:700;padding:8px 16px;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap;text-decoration:none;}
+    #nav-bar .nav-btn:hover{background:#475569;}
+    #nav-bar .print-btn{background:#059669;}
+    #nav-bar .print-btn:hover{background:#047857;}
+    #doc-wrap{padding:${bodyPad};}
+    @media print{#nav-bar{display:none!important;}#doc-wrap{padding:0;}body{background:white;}@page{size:${pageSize};margin:${pageMargin};}
       #doc>*{width:100%!important;max-width:none!important;padding:0!important;}}
   </style>
 </head>
-<body><div id="doc">${clone.outerHTML}</div></body>
+<body>
+<div id="nav-bar">
+  <button class="nav-btn" onclick="window.close()" title="Close">&#8592; Close</button>
+  <span class="nav-title">${docTitle}</span>
+  <button class="nav-btn print-btn" onclick="window.print()" title="Print">&#128438; Print</button>
+</div>
+<div id="doc-wrap"><div id="doc">${clone.outerHTML}</div></div>
+</body>
 </html>`;
   return { html, docTitle };
 };
@@ -293,7 +320,7 @@ const handleShareHTML = () => {
   if (navigator.canShare) {
     const file = new File([blob], fileName, { type: 'text/html' });
     if (navigator.canShare({ files: [file] })) {
-      navigator.share({ files: [file], title: docTitle })
+      navigator.share({ files: [file], title: docTitle, text: getShareCaption() })
         .catch(e => { if (e.name !== 'AbortError') downloadFallback(); });
       return;
     }
@@ -414,7 +441,7 @@ const handleImageShare = async () => {
       if (!blob) { showToast('Image generation failed', 'error'); return; }
       const file = new File([blob], imgFileName, { type: 'image/jpeg' });
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        navigator.share({ files: [file], title: imgFileName.replace(/\.jpg$/, '') })
+        navigator.share({ files: [file], title: imgFileName.replace(/\.jpg$/, ''), text: getShareCaption() })
           .catch(e => { if (e.name !== 'AbortError') downloadImageFallback(blob, imgFileName); });
       } else {
         downloadImageFallback(blob, imgFileName);
@@ -879,7 +906,7 @@ return (
           const estimateSubtotal = safeItems.reduce((s, i) => s + (i?.isBonus ? 0 : (i?.price || 0) * (i?.quantity || 0)), 0);
           const estimateGrandTotal = estimateSubtotal + (data.deliveryBilled || 0);
           return (
-            <div className="keep-together" style={{ float: 'right', width: isThermal ? '100%' : sz('','240px','280px'), borderTop: '2px solid #7c3aed', paddingTop: sz('8px','10px','12px') }}>
+            <div className="keep-together" style={{ marginLeft: 'auto', width: isThermal ? '100%' : sz('','240px','280px'), borderTop: '2px solid #7c3aed', paddingTop: sz('8px','10px','12px') }}>
               {[
                 { label: 'Items Subtotal', val: `Rs. ${estimateSubtotal.toLocaleString()}` },
                 (data.deliveryBilled || 0) > 0 && { label: 'Delivery', val: `Rs. ${Number(data.deliveryBilled).toLocaleString()}`, muted: true },
@@ -901,7 +928,7 @@ return (
           const itemsSubtotal = (data.total || 0) - (data.deliveryBilled || 0);
 
           return (
-            <div className="keep-together" style={{ float: 'right', width: isThermal ? '100%' : sz('','240px','280px'), borderTop: '2px solid #1e293b', paddingTop: sz('8px','10px','12px') }}>
+            <div className="keep-together" style={{ marginLeft: 'auto', width: isThermal ? '100%' : sz('','240px','280px'), borderTop: '2px solid #1e293b', paddingTop: sz('8px','10px','12px') }}>
               {[
                 { label: 'Items Subtotal', val: `Rs. ${itemsSubtotal.toLocaleString()}` },
                 (data.deliveryBilled || 0) > 0 && { label: `Delivery (${data.vehicle || ''})`, val: `Rs. ${Number(data.deliveryBilled).toLocaleString()}`, muted: true },
@@ -939,7 +966,7 @@ return (
         {docType === 'creditnote' && data && (() => {
           const cnSubtotal = safeItems.reduce((s, i) => s + (i?.isBonus ? 0 : (i?.price || 0) * (i?.quantity || 0)), 0);
           return (
-            <div className="keep-together" style={{ float: 'right', width: isThermal ? '100%' : sz('','240px','280px'), borderTop: '2px solid #e11d48', paddingTop: sz('8px','10px','12px') }}>
+            <div className="keep-together" style={{ marginLeft: 'auto', width: isThermal ? '100%' : sz('','240px','280px'), borderTop: '2px solid #e11d48', paddingTop: sz('8px','10px','12px') }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: sz('12px','14px','16px'), color: '#e11d48' }}>
                 <span>Total Credit:</span>
                 <span>Rs. {cnSubtotal.toLocaleString()}</span>

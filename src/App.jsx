@@ -309,16 +309,33 @@ return (
 <span className="block text-[9px] text-slate-400 mt-0.5">{row.ref}</span>
 {row.isCreditNote && <span className="text-[9px] bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded font-bold uppercase mt-1 inline-block">Credit Note</span>}
 {ledgerMode === 'detailed' && (row.lineItems || []).length > 0 && (
-  <div className="mt-1.5 space-y-0.5 border-t border-slate-100 pt-1.5">
-    {row.lineItems.map((li, idx) => (
-      <div key={idx} className="text-[10px] text-slate-600 font-medium flex justify-between gap-2">
-        <span className="flex-1 truncate">{li.isBonus ? '🎁 ' : '• '}{li.name} ×{li.qty}{!li.isBonus && <span className="text-slate-400"> @ Rs.{li.price.toLocaleString()}</span>}</span>
-        <span className="font-bold text-slate-700 shrink-0">{li.isBonus ? 'FREE' : `Rs.${li.subtotal.toLocaleString()}`}</span>
-      </div>
-    ))}
-    {(row.deliveryBilled || 0) > 0 && (
-      <div className="text-[10px] text-slate-500 flex justify-between"><span>+ Delivery</span><span>Rs.{row.deliveryBilled.toLocaleString()}</span></div>
-    )}
+  <div className="mt-2 border-t border-slate-100 pt-2">
+    <table className="w-full text-[9.5px]" style={{borderCollapse:'collapse'}}>
+      <thead>
+        <tr className="text-slate-400 border-b border-slate-100">
+          <th className="text-left font-bold pb-1 pr-2">Product</th>
+          <th className="text-center font-bold pb-1 px-1 whitespace-nowrap">Qty</th>
+          <th className="text-right font-bold pb-1 px-1 whitespace-nowrap">Rate</th>
+          <th className="text-right font-bold pb-1 pl-1 whitespace-nowrap">Subtotal</th>
+        </tr>
+      </thead>
+      <tbody>
+        {row.lineItems.map((li, idx) => (
+          <tr key={idx} className={idx % 2 === 0 ? '' : 'bg-slate-50/50'}>
+            <td className="py-0.5 pr-2 font-semibold text-slate-700 leading-tight">{li.isBonus && <span className="mr-0.5">🎁</span>}{li.name}</td>
+            <td className="py-0.5 px-1 text-center text-slate-500 tabular-nums">{li.qty}</td>
+            <td className="py-0.5 px-1 text-right text-slate-500 tabular-nums">{li.isBonus ? '—' : `Rs.${(li.price||0).toLocaleString()}`}</td>
+            <td className="py-0.5 pl-1 text-right font-bold text-slate-700 tabular-nums">{li.isBonus ? <span className="text-emerald-600 font-bold text-[9px]">FREE</span> : `Rs.${(li.subtotal||0).toLocaleString()}`}</td>
+          </tr>
+        ))}
+        {(row.deliveryBilled || 0) > 0 && (
+          <tr className="border-t border-slate-100">
+            <td colSpan={3} className="pt-1 pr-2 text-slate-400 font-semibold">+ Delivery Charge</td>
+            <td className="pt-1 pl-1 text-right font-bold text-slate-600 tabular-nums">Rs.{row.deliveryBilled.toLocaleString()}</td>
+          </tr>
+        )}
+      </tbody>
+    </table>
   </div>
 )}
 </td>
@@ -684,13 +701,19 @@ setBillingView('form');
 };
 const saveInvoice = async (status) => {
 if(!currentInvoice.customerId || currentInvoice.items.length === 0) return showToast("Customer and items are required", "error");
-const totalItems = currentInvoice.items.reduce((sum, i) => sum + (i.price * i.quantity), 0);
-const grandTotal = totalItems + Number(currentInvoice.deliveryBilled);
+const totalItems = currentInvoice.items.reduce((sum, i) => sum + (i.isBonus ? 0 : i.price * i.quantity), 0);
+const grandTotal = totalItems + Number(currentInvoice.deliveryBilled || 0);
 const activeCustomer = customers.find(c => c.id === currentInvoice.customerId);
 const finalInvoice = { ...currentInvoice, total: grandTotal, status: status, salespersonId: currentUser.id, salespersonName: currentUser.name, customerDetails: activeCustomer ? { contactPerson: activeCustomer.contactPerson || '', phone: activeCustomer.phone || '', address1: activeCustomer.address1 || activeCustomer.address || '', map1: activeCustomer.map1 || '', address2: activeCustomer.address2 || '', map2: activeCustomer.map2 || '' } : {} };
-if (!finalInvoice.id) { finalInvoice.id = `INV-${Date.now()}`; finalInvoice.date = getLocalDateStr(); }
+if (!finalInvoice.id) {
+  const prefix = status === 'Estimate' ? 'EST' : status === 'Booked' ? 'ORD' : 'INV';
+  finalInvoice.id = `${prefix}-${Date.now()}`;
+  finalInvoice.date = getLocalDateStr();
+}
 await saveToFirebase('invoices', finalInvoice.id, finalInvoice);
-showToast(currentInvoice.id ? "Invoice Updated" : `Invoice ${status}`);
+const statusLabels = { Estimate: 'Estimate', Booked: 'Draft Order', Billed: 'Invoice' };
+const label = statusLabels[status] || status;
+showToast(currentInvoice.id ? `${label} Updated` : `${label} Saved`);
 setBillingView('list');
 };
 const inputClass = "w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-sm text-slate-800 placeholder-slate-400";
@@ -711,11 +734,16 @@ setProdSearch('');
 };
 if (billingView === 'form') {
 const isEdit = !!currentInvoice.id;
-const grandTotal = currentInvoice.items.reduce((s,i)=>s+(i.price*i.quantity),0) + Number(currentInvoice.deliveryBilled);
+const editingStatus = currentInvoice.status || '';
+const grandTotal = currentInvoice.items.reduce((s,i)=>s+(i.isBonus?0:i.price*i.quantity),0) + Number(currentInvoice.deliveryBilled||0);
+const formTypeLabel = isEdit
+  ? (editingStatus === 'Estimate' ? 'Edit Estimate' : editingStatus === 'Booked' ? 'Edit Draft Order' : editingStatus === 'CreditNote' ? 'Credit Note' : `Edit Invoice`)
+  : (statusFilter === 'Estimate' ? 'New Estimate / Quotation' : statusFilter === 'Booked' ? 'New Draft Order' : 'New Invoice');
+const canSaveAsEstimate = !isEdit || editingStatus === 'Estimate' || editingStatus === 'Booked';
 return (
 <div className="h-full flex flex-col bg-slate-50 absolute inset-0 z-20 animate-slide-up">
 <div className="bg-white/80 backdrop-blur-md p-4 border-b border-slate-200 flex justify-between items-center sticky top-0 z-30 shadow-sm">
-<div><h2 className="text-lg font-extrabold text-slate-800 tracking-tight">{isEdit ? `Edit ${currentInvoice.id}` : 'New Invoice'}</h2><p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{formatDateDisp(currentInvoice.date || getLocalDateStr())}</p></div>
+<div><h2 className="text-lg font-extrabold text-slate-800 tracking-tight">{isEdit ? `${formTypeLabel} — ${currentInvoice.id}` : formTypeLabel}</h2><p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{formatDateDisp(currentInvoice.date || getLocalDateStr())}</p></div>
 <button onClick={() => setBillingView('list')} className="p-2 bg-slate-100 rounded-full text-slate-600 hover:bg-slate-200 transition-colors"><X size={20}/></button>
 </div>
 <div className="flex-1 overflow-y-auto p-4 space-y-5 pb-4">
@@ -849,13 +877,13 @@ return (
 <p className="text-emerald-600 font-bold uppercase text-[10px] tracking-widest mb-1">Grand Total</p>
 <p className="text-4xl font-black text-emerald-800 tracking-tight">Rs. {grandTotal.toLocaleString()}</p>
 </div>
-{isEdit && isAdmin && (<button onClick={async () => { if(await showConfirm("Permanently delete?")) { await deleteFromFirebase('invoices', currentInvoice.id); setBillingView('list'); } }} className="w-full bg-white text-rose-600 font-bold p-4 rounded-xl flex justify-center items-center gap-2 border border-rose-200 hover:bg-rose-50 shadow-sm mt-4"><Trash2 size={18}/> Delete Invoice</button>)}
+{isEdit && isAdmin && (<button onClick={async () => { if(await showConfirm("Permanently delete?")) { await deleteFromFirebase('invoices', currentInvoice.id); setBillingView('list'); } }} className="w-full bg-white text-rose-600 font-bold p-4 rounded-xl flex justify-center items-center gap-2 border border-rose-200 hover:bg-rose-50 shadow-sm mt-4"><Trash2 size={18}/> Delete {editingStatus === 'Estimate' ? 'Estimate' : editingStatus === 'Booked' ? 'Draft Order' : 'Invoice'}</button>)}
 </div>
 <div className="p-4 bg-white/80 backdrop-blur-md border-t border-slate-200 shrink-0 space-y-2">
-<button onClick={() => saveInvoice('Estimate')} className="w-full bg-violet-600 hover:bg-violet-700 text-white py-2.5 rounded-xl font-bold shadow-sm flex justify-center items-center gap-2 active:scale-95 transition-all text-sm"><FileText size={16}/> Save as Estimate / Quotation</button>
+{canSaveAsEstimate && <button onClick={() => saveInvoice('Estimate')} className="w-full bg-violet-600 hover:bg-violet-700 text-white py-2.5 rounded-xl font-bold shadow-sm flex justify-center items-center gap-2 active:scale-95 transition-all text-sm"><FileText size={16}/> Save as Estimate / Quotation</button>}
 <div className="flex gap-3">
-<button onClick={() => saveInvoice('Booked')} className="flex-1 bg-white text-slate-700 border border-slate-300 py-3.5 rounded-xl font-bold shadow-sm flex justify-center items-center gap-2 active:scale-95 transition-all hover:bg-slate-50"><Save size={18}/> Draft</button>
-<button onClick={() => saveInvoice('Billed')} className="flex-[2] bg-indigo-600 hover:bg-indigo-700 text-white py-3.5 rounded-xl font-bold shadow-md flex justify-center items-center gap-2 active:scale-95 transition-all"><ReceiptText size={18}/> Issue Bill</button>
+{canSaveAsEstimate && <button onClick={() => saveInvoice('Booked')} className="flex-1 bg-white text-slate-700 border border-slate-300 py-3.5 rounded-xl font-bold shadow-sm flex justify-center items-center gap-2 active:scale-95 transition-all hover:bg-slate-50"><Save size={18}/> Draft Order</button>}
+<button onClick={() => saveInvoice('Billed')} className={`${canSaveAsEstimate ? 'flex-[2]' : 'flex-1'} bg-indigo-600 hover:bg-indigo-700 text-white py-3.5 rounded-xl font-bold shadow-md flex justify-center items-center gap-2 active:scale-95 transition-all`}><ReceiptText size={18}/> {isEdit && editingStatus === 'Billed' ? 'Update Invoice' : 'Issue Invoice'}</button>
 </div>
 </div>
 </div>
@@ -879,18 +907,18 @@ return (
 <div key={o.id} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden group hover:border-indigo-200">
 <div className={`absolute top-0 left-0 w-1.5 h-full ${o.status==='CreditNote'?'bg-rose-500':o.status==='Estimate'?'bg-violet-400':o.status==='Billed'?(o.paymentStatus==='Paid'?'bg-emerald-500':'bg-amber-500'):'bg-slate-300'}`}></div>
 <div className="flex justify-between border-b border-slate-100 pb-3 mb-3 pl-3">
-<div><h4 className="font-bold text-slate-800 text-sm">{o.customerName}</h4><p className="text-[11px] text-slate-500 font-medium mt-0.5">{o.id} • {formatDateDisp(o.date)} • <span className={`font-bold ${o.status==='Billed'?'text-indigo-600':o.status==='Estimate'?'text-violet-600':o.status==='CreditNote'?'text-rose-600':'text-amber-500'}`}>{o.status==='CreditNote'?'Credit Note':o.status}</span></p></div>
-<div className="text-right"><p className={`font-extrabold text-base ${o.status==='CreditNote'?'text-rose-600':'text-indigo-700'}`}>{o.status==='CreditNote'?'-':''} Rs. {o.total.toLocaleString()}</p><p className={`text-[9px] font-bold uppercase tracking-widest mt-1 ${o.status==='Billed'?'text-indigo-500':o.status==='CreditNote'?'text-rose-500':'text-slate-400'}`}>{o.status==='CreditNote'?'Credit Note':o.status}</p></div>
+<div><h4 className="font-bold text-slate-800 text-sm">{o.customerName}</h4><p className="text-[11px] text-slate-500 font-medium mt-0.5">{o.id} • {formatDateDisp(o.date)} • <span className={`font-bold ${o.status==='Billed'?'text-indigo-600':o.status==='Estimate'?'text-violet-600':o.status==='CreditNote'?'text-rose-600':'text-amber-500'}`}>{o.status==='CreditNote'?'Credit Note':o.status==='Booked'?'Draft Order':o.status}</span></p></div>
+<div className="text-right"><p className={`font-extrabold text-base ${o.status==='CreditNote'?'text-rose-600':'text-indigo-700'}`}>{o.status==='CreditNote'?'-':''} Rs. {o.total.toLocaleString()}</p><p className={`text-[9px] font-bold uppercase tracking-widest mt-1 ${o.status==='Billed'?'text-indigo-500':o.status==='CreditNote'?'text-rose-500':'text-slate-400'}`}>{o.status==='CreditNote'?'Credit Note':o.status==='Booked'?'Draft Order':o.status}</p></div>
 </div>
 <div className="flex justify-between items-center pl-3">
 <div className="flex items-center gap-2"><span className={`text-[9px] px-2 py-0.5 rounded font-bold uppercase tracking-wider ${o.paymentStatus==='Paid'?'bg-emerald-100 text-emerald-700':o.paymentStatus==='Partial'?'bg-amber-100 text-amber-700':'bg-rose-100 text-rose-700'}`}>{o.paymentStatus}</span></div>
 <div className="flex gap-1.5">
-{o.status === 'Estimate' && isAdmin && <button onClick={async () => { await saveToFirebase('invoices', o.id, {...o, status: 'Booked'}); showToast('Converted to Draft Order'); }} title="Convert to Order" className="p-2 bg-amber-50 text-amber-600 hover:bg-amber-100 border border-amber-200 rounded-lg"><Save size={14}/></button>}
-{o.status === 'Estimate' && isAdmin && <button onClick={async () => { await saveToFirebase('invoices', o.id, {...o, status: 'Billed'}); showToast('Converted to Invoice'); }} title="Convert to Invoice" className="p-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-200 rounded-lg"><ReceiptText size={14}/></button>}
+{o.status === 'Estimate' && isAdmin && <button onClick={async () => { await saveToFirebase('invoices', o.id, {...o, status: 'Booked'}); showToast('Converted to Draft Order'); }} title="Convert to Draft Order" className="p-2 bg-amber-50 text-amber-600 hover:bg-amber-100 border border-amber-200 rounded-lg"><Save size={14}/></button>}
+{(o.status === 'Estimate' || o.status === 'Booked') && isAdmin && <button onClick={async () => { await saveToFirebase('invoices', o.id, {...o, status: 'Billed'}); showToast('Converted to Invoice'); }} title="Issue as Invoice" className="p-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-200 rounded-lg"><ReceiptText size={14}/></button>}
 {o.status === 'Billed' && isAdmin && <button onClick={() => { setEditingCreditNote({customerId: o.customerId, id: o.id}); setShowCreditNoteModal(true); }} title="Issue Credit Note / Return" className="p-2 bg-rose-50 text-rose-500 hover:bg-rose-100 border border-rose-200 rounded-lg"><RotateCcw size={14}/></button>}
 {isAdmin && o.status !== 'CreditNote' && <button onClick={() => { setCurrentInvoice(o); setBillingView('form'); }} className="p-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 rounded-lg"><Edit size={16}/></button>}
 {isAdmin && <button onClick={async () => { if(await showConfirm(`Delete ${o.id}?`)) await deleteFromFirebase('invoices', o.id); }} title="Delete" className="p-2 bg-rose-50 text-rose-500 hover:bg-rose-100 rounded-lg"><Trash2 size={16}/></button>}
-{o.status === 'Estimate' ? <button onClick={() => setPrintConfig({docType: 'estimate', format: 'a4', data: o})} title="View Estimate" className="p-2 bg-violet-50 text-violet-600 hover:bg-violet-100 rounded-lg"><FileText size={16}/></button> : o.status === 'CreditNote' ? <button onClick={() => setPrintConfig({docType: 'creditnote', format: 'a4', data: o})} title="Print Credit Note" className="p-2 bg-rose-50 text-rose-600 rounded-lg"><FileText size={16}/></button> : <><button onClick={() => setPrintConfig({docType: 'dispatch', format: 'thermal', data: o})} title="Dispatch" className="p-2 bg-amber-50 text-amber-600 rounded-lg"><Truck size={16}/></button><button onClick={() => setPrintConfig({docType: 'invoice', format: 'thermal', data: o})} title="Print" className="p-2 bg-indigo-50 text-indigo-600 rounded-lg"><ReceiptText size={16}/></button></>}
+{o.status === 'Estimate' ? <button onClick={() => setPrintConfig({docType: 'estimate', format: 'a4', data: o})} title="View Estimate" className="p-2 bg-violet-50 text-violet-600 hover:bg-violet-100 rounded-lg"><FileText size={16}/></button> : o.status === 'Booked' ? <><button onClick={() => setPrintConfig({docType: 'dispatch', format: 'thermal', data: o})} title="Dispatch Note" className="p-2 bg-amber-50 text-amber-600 rounded-lg"><Truck size={16}/></button><button onClick={() => setPrintConfig({docType: 'estimate', format: 'a4', data: o})} title="View Order" className="p-2 bg-slate-50 text-slate-600 rounded-lg"><FileText size={16}/></button></> : o.status === 'CreditNote' ? <button onClick={() => setPrintConfig({docType: 'creditnote', format: 'a4', data: o})} title="Print Credit Note" className="p-2 bg-rose-50 text-rose-600 rounded-lg"><FileText size={16}/></button> : <><button onClick={() => setPrintConfig({docType: 'dispatch', format: 'thermal', data: o})} title="Dispatch" className="p-2 bg-amber-50 text-amber-600 rounded-lg"><Truck size={16}/></button><button onClick={() => setPrintConfig({docType: 'invoice', format: 'thermal', data: o})} title="Print" className="p-2 bg-indigo-50 text-indigo-600 rounded-lg"><ReceiptText size={16}/></button></>}
 </div>
 </div>
 </div>
@@ -928,8 +956,14 @@ return (
 };
 
 const CustomersTab = () => {
-const { isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig, showConfirm } = useContext(AppContext);
+const { isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, cities, areas, customerTypes, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig, showConfirm } = useContext(AppContext);
 const [search, setSearch] = useState('');
+const [filterCity, setFilterCity] = useState('');
+const [filterArea, setFilterArea] = useState('');
+const [filterType, setFilterType] = useState('');
+const [filterBalance, setFilterBalance] = useState('All');
+const activeFilters = filterCity || filterArea || filterType || filterBalance !== 'All';
+const clearFilters = () => { setFilterCity(''); setFilterArea(''); setFilterType(''); setFilterBalance('All'); };
 return (
 <div className="p-4 flex flex-col h-full">
 <div className="flex justify-between items-center mb-4">
@@ -939,9 +973,38 @@ return (
 {isAdmin && <button onClick={() => { setEditingCustomer(null); setShowCustomerModal(true); }} className="bg-indigo-600 text-white p-2 rounded-xl shadow-md"><Plus size={18}/></button>}
 </div>
 </div>
-<div className="relative mb-4"><Search className="absolute left-3.5 top-3.5 text-slate-400" size={18} /><input placeholder="Search Clients..." className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl font-semibold outline-none shadow-sm text-sm" value={search} onChange={e => setSearch(e.target.value)} /></div>
+<div className="relative mb-2"><Search className="absolute left-3.5 top-3.5 text-slate-400" size={18} /><input placeholder="Search Clients..." className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl font-semibold outline-none shadow-sm text-sm" value={search} onChange={e => setSearch(e.target.value)} /></div>
+<div className="flex gap-2 mb-3 overflow-x-auto pb-1 scrollbar-hide shrink-0">
+  <select value={filterCity} onChange={e=>setFilterCity(e.target.value)} className="bg-white border border-slate-200 px-2.5 py-1.5 rounded-lg font-bold text-[11px] text-slate-700 outline-none shrink-0">
+    <option value="">All Cities</option>
+    {cities.map(c=><option key={c.id} value={c.name}>{c.name}</option>)}
+  </select>
+  <select value={filterArea} onChange={e=>setFilterArea(e.target.value)} className="bg-white border border-slate-200 px-2.5 py-1.5 rounded-lg font-bold text-[11px] text-slate-700 outline-none shrink-0">
+    <option value="">All Areas</option>
+    {areas.map(a=><option key={a.id} value={a.name}>{a.name}</option>)}
+  </select>
+  <select value={filterType} onChange={e=>setFilterType(e.target.value)} className="bg-white border border-slate-200 px-2.5 py-1.5 rounded-lg font-bold text-[11px] text-slate-700 outline-none shrink-0">
+    <option value="">All Types</option>
+    {customerTypes.map(t=><option key={t.id} value={t.name}>{t.name}</option>)}
+  </select>
+  <select value={filterBalance} onChange={e=>setFilterBalance(e.target.value)} className="bg-white border border-slate-200 px-2.5 py-1.5 rounded-lg font-bold text-[11px] text-slate-700 outline-none shrink-0">
+    <option value="All">All Balances</option>
+    <option value="Outstanding">Outstanding (Dr)</option>
+    <option value="Advance">Advance (Cr)</option>
+    <option value="Clear">Cleared</option>
+  </select>
+  {activeFilters && <button onClick={clearFilters} className="shrink-0 text-[10px] font-bold text-rose-500 bg-rose-50 border border-rose-100 px-2.5 py-1.5 rounded-lg flex items-center gap-1 hover:bg-rose-100 transition-colors"><X size={10}/> Clear</button>}
+</div>
 <div className="flex-1 overflow-y-auto space-y-3 pb-24 pr-1">
-{customers.filter(c => c.name.toLowerCase().includes(search.toLowerCase())).map(c => {
+{customers.filter(c => {
+const bal = getCustomerBalance(c.id);
+const nameMatch = c.name.toLowerCase().includes(search.toLowerCase()) || (c.contactPerson||'').toLowerCase().includes(search.toLowerCase()) || (c.phone||'').includes(search);
+const cityMatch = !filterCity || (c.city||'') === filterCity;
+const areaMatch = !filterArea || (c.area||'') === filterArea;
+const typeMatch = !filterType || (c.customerType||'') === filterType;
+const balMatch = filterBalance === 'All' || (filterBalance === 'Outstanding' && bal > 0) || (filterBalance === 'Advance' && bal < 0) || (filterBalance === 'Clear' && bal === 0);
+return nameMatch && cityMatch && areaMatch && typeMatch && balMatch;
+}).map(c => {
 const bal = getCustomerBalance(c.id);
 return (
 <div key={c.id} className="bg-white p-4 rounded-2xl border border-slate-200 flex justify-between items-center shadow-sm hover:border-indigo-200 transition-colors">
@@ -1707,6 +1770,7 @@ return (
 
 const MultiPicker = ({ label, Icon, items, selected, onToggle, onClear }) => {
   const [open, setOpen] = useState(false);
+  const [pickerSearch, setPickerSearch] = useState('');
   const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0 });
   const btnRef = useRef(null);
   const dropdownRef = useRef(null);
@@ -1717,6 +1781,7 @@ const MultiPicker = ({ label, Icon, items, selected, onToggle, onClear }) => {
         dropdownRef.current && !dropdownRef.current.contains(e.target)
       ) {
         setOpen(false);
+        setPickerSearch('');
       }
     };
     document.addEventListener('mousedown', handler);
@@ -1728,8 +1793,10 @@ const MultiPicker = ({ label, Icon, items, selected, onToggle, onClear }) => {
       setDropdownPos({ top: rect.bottom + 4, left: rect.left });
     }
     setOpen(o => !o);
+    if (open) setPickerSearch('');
   };
   const count = selected.size;
+  const filteredItems = pickerSearch ? items.filter(i => i.name.toLowerCase().includes(pickerSearch.toLowerCase())) : items;
   const allSelected = items.length > 0 && items.every(i => selected.has(String(i.id)));
   return (
     <div className="relative shrink-0">
@@ -1739,17 +1806,26 @@ const MultiPicker = ({ label, Icon, items, selected, onToggle, onClear }) => {
       </button>
       {open && createPortal(
         <div ref={dropdownRef} style={{ position: 'fixed', top: dropdownPos.top, left: dropdownPos.left, zIndex: 9999 }}
-          className="bg-white border border-slate-200 rounded-xl shadow-xl min-w-[170px] max-h-[260px] overflow-y-auto p-1.5">
+          className="bg-white border border-slate-200 rounded-xl shadow-xl min-w-[190px] max-h-[300px] flex flex-col p-1.5">
+          {items.length > 6 && (
+            <div className="px-1 pb-1.5 border-b border-slate-100 mb-1">
+              <input autoFocus type="text" placeholder={`Search ${label}...`} value={pickerSearch} onChange={e => setPickerSearch(e.target.value)}
+                className="w-full px-2.5 py-1.5 text-[11px] font-medium border border-slate-200 rounded-lg outline-none focus:border-indigo-400 bg-slate-50" />
+            </div>
+          )}
           <div className="flex justify-between px-2 py-1 text-[10px] text-slate-500 font-semibold border-b border-slate-100 mb-1">
             <button type="button" onClick={() => { if (allSelected) { onClear(); } else { items.forEach(i => { if (!selected.has(String(i.id))) onToggle(i.id); }); } }} className="hover:text-indigo-600">{allSelected ? 'Deselect All' : 'Select All'}</button>
             <button type="button" onClick={onClear} className="text-rose-500 hover:text-rose-700">Clear</button>
           </div>
-          {items.map(item => (
-            <label key={item.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-50 cursor-pointer text-[11px] font-medium text-slate-700">
-              <input type="checkbox" checked={selected.has(String(item.id))} onChange={() => onToggle(item.id)} className="accent-indigo-600 rounded" />
-              {item.name}
-            </label>
-          ))}
+          <div className="overflow-y-auto flex-1">
+            {filteredItems.map(item => (
+              <label key={item.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-50 cursor-pointer text-[11px] font-medium text-slate-700">
+                <input type="checkbox" checked={selected.has(String(item.id))} onChange={() => onToggle(item.id)} className="accent-indigo-600 rounded" />
+                {item.name}
+              </label>
+            ))}
+            {filteredItems.length === 0 && <p className="text-center py-3 text-[10px] text-slate-400">No results</p>}
+          </div>
         </div>,
         document.body
       )}
@@ -1968,7 +2044,7 @@ const handleExport = (format) => {
           customStart: dateFilter === 'Custom' ? customStart : '',
           customEnd: dateFilter === 'Custom' ? customEnd : '',
         };
-        setPrintConfig({ docType: 'report', format: 'a5', data: { title, dateFilter, view, stats: reportEngine.kpis, rows: exportData, appliedFilters, generatedOn: getLocalDateStr() } });
+        setPrintConfig({ docType: 'report', format: 'a5', data: { title, dateFilter: filterLabel, view, stats: reportEngine.kpis, rows: exportData, appliedFilters, generatedOn: getLocalDateStr() } });
     } else if (format === 'text') {
         const kpis = reportEngine.kpis;
         const margin = kpis.productRevenue > 0 ? ((kpis.grossMargin / kpis.productRevenue) * 100).toFixed(1) : 0;
@@ -2142,7 +2218,29 @@ const renderSegmentTable = (dataObj, label) => {
   );
 };
 
-const filterLabel = dateFilter === 'Custom' ? `${customStart||'...'} - ${customEnd}` : dateFilter;
+const filterLabel = (() => {
+  const nowPKT = getPKTDate();
+  if (dateFilter === 'Custom') return `${customStart||'...'} to ${customEnd}`;
+  if (dateFilter === 'Today') {
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return `Today, ${nowPKT.getDate()} ${months[nowPKT.getMonth()]} ${nowPKT.getFullYear()}`;
+  }
+  if (dateFilter === 'This Week') {
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const today = new Date(nowPKT.getFullYear(), nowPKT.getMonth(), nowPKT.getDate());
+    const startOfWeek = new Date(today); startOfWeek.setDate(today.getDate() - today.getDay());
+    const endOfWeek = new Date(startOfWeek); endOfWeek.setDate(startOfWeek.getDate() + 6);
+    const sameMonth = startOfWeek.getMonth() === endOfWeek.getMonth();
+    if (sameMonth) return `${months[startOfWeek.getMonth()]} ${startOfWeek.getDate()}–${endOfWeek.getDate()}, ${endOfWeek.getFullYear()}`;
+    return `${startOfWeek.getDate()} ${months[startOfWeek.getMonth()]} – ${endOfWeek.getDate()} ${months[endOfWeek.getMonth()]} ${endOfWeek.getFullYear()}`;
+  }
+  if (dateFilter === 'This Month') {
+    const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    return `${months[nowPKT.getMonth()]} ${nowPKT.getFullYear()}`;
+  }
+  if (dateFilter === 'This Year') return `Year ${nowPKT.getFullYear()}`;
+  return dateFilter;
+})();
 
 return (
   <div className="h-full flex flex-col p-4">
