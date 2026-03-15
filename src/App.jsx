@@ -1657,19 +1657,8 @@ const handleRestoreFile = async (e) => {
   } catch { showToast('Restore failed — invalid backup file', 'error'); }
   setRestoring(false); e.target.value = '';
 };
-const Field = ({ label, value, onChange, placeholder }) => (
-  <div><label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">{label}</label>
-  <input value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder}
-    className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" /></div>
-);
-const Toggle = ({ label, desc, checked, onChange }) => (
-  <div className="flex items-start justify-between gap-4 py-3 border-b border-slate-100 last:border-0">
-    <div><div className="text-sm font-bold text-slate-700">{label}</div>{desc && <div className="text-[11px] text-slate-400 mt-0.5">{desc}</div>}</div>
-    <button type="button" onClick={()=>onChange(!checked)} className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${checked?'bg-indigo-600':'bg-slate-300'}`}>
-      <span className={`inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${checked?'translate-x-6':'translate-x-1'}`}/>
-    </button>
-  </div>
-);
+const inputCls = "w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100";
+const labelCls = "block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5";
 const totalRecords = invoices.length + customers.length + products.length + payments.length + expenses.length;
 return (
 <div className="flex-1 overflow-y-auto p-4 space-y-5">
@@ -1677,20 +1666,24 @@ return (
     <h3 className="font-black text-slate-800 text-base mb-1">Business Profile</h3>
     <p className="text-xs text-slate-400 mb-5">Used on invoices, receipts, and all generated documents.</p>
     <div className="space-y-4">
-      <Field label="Business / Company Name" value={form.businessName} onChange={v=>setForm(p=>({...p,businessName:v}))} placeholder="e.g. Khyber Traders" />
-      <Field label="App Name (shown on documents)" value={form.appName} onChange={v=>setForm(p=>({...p,appName:v}))} placeholder="e.g. AnimalHealth.PK" />
-      <Field label="Tagline" value={form.tagline} onChange={v=>setForm(p=>({...p,tagline:v}))} placeholder="e.g. Wholesale Veterinary Pharmacy · Karachi" />
+      <div><label className={labelCls}>Business / Company Name</label><input className={inputCls} value={form.businessName} onChange={e=>setForm(p=>({...p,businessName:e.target.value}))} placeholder="e.g. Khyber Traders" /></div>
+      <div><label className={labelCls}>App Name (shown on documents)</label><input className={inputCls} value={form.appName} onChange={e=>setForm(p=>({...p,appName:e.target.value}))} placeholder="e.g. AnimalHealth.PK" /></div>
+      <div><label className={labelCls}>Tagline</label><input className={inputCls} value={form.tagline} onChange={e=>setForm(p=>({...p,tagline:e.target.value}))} placeholder="e.g. Wholesale Veterinary Pharmacy · Karachi" /></div>
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Phone" value={form.phone} onChange={v=>setForm(p=>({...p,phone:v}))} placeholder="+92 300 0000000" />
-        <Field label="Email" value={form.email} onChange={v=>setForm(p=>({...p,email:v}))} placeholder="info@example.com" />
+        <div><label className={labelCls}>Phone</label><input className={inputCls} value={form.phone} onChange={e=>setForm(p=>({...p,phone:e.target.value}))} placeholder="+92 300 0000000" /></div>
+        <div><label className={labelCls}>Email</label><input className={inputCls} value={form.email} onChange={e=>setForm(p=>({...p,email:e.target.value}))} placeholder="info@example.com" /></div>
       </div>
-      <Field label="Address" value={form.address} onChange={v=>setForm(p=>({...p,address:v}))} placeholder="City, Country" />
+      <div><label className={labelCls}>Address</label><input className={inputCls} value={form.address} onChange={e=>setForm(p=>({...p,address:e.target.value}))} placeholder="City, Country" /></div>
     </div>
     <div className="mt-5 bg-slate-50 rounded-xl px-4 py-1 border border-slate-100">
-      <Toggle label="Show on Invoices & Documents" desc="Display business name in document headers and footers"
-        checked={form.showBusinessNameOnDocs} onChange={v=>setForm(p=>({...p,showBusinessNameOnDocs:v}))} />
-      <Toggle label="Show on Reports" desc="Display business name on printed analytics reports"
-        checked={form.showBusinessNameOnReports} onChange={v=>setForm(p=>({...p,showBusinessNameOnReports:v}))} />
+      <div className="flex items-start justify-between gap-4 py-3 border-b border-slate-100">
+        <div><div className="text-sm font-bold text-slate-700">Show on Invoices &amp; Documents</div><div className="text-[11px] text-slate-400 mt-0.5">Display business name in document headers and footers</div></div>
+        <button type="button" onClick={()=>setForm(p=>({...p,showBusinessNameOnDocs:!p.showBusinessNameOnDocs}))} className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${form.showBusinessNameOnDocs?'bg-indigo-600':'bg-slate-300'}`}><span className={`inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${form.showBusinessNameOnDocs?'translate-x-6':'translate-x-1'}`}/></button>
+      </div>
+      <div className="flex items-start justify-between gap-4 py-3">
+        <div><div className="text-sm font-bold text-slate-700">Show on Reports</div><div className="text-[11px] text-slate-400 mt-0.5">Display business name on printed analytics reports</div></div>
+        <button type="button" onClick={()=>setForm(p=>({...p,showBusinessNameOnReports:!p.showBusinessNameOnReports}))} className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${form.showBusinessNameOnReports?'bg-indigo-600':'bg-slate-300'}`}><span className={`inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${form.showBusinessNameOnReports?'translate-x-6':'translate-x-1'}`}/></button>
+      </div>
     </div>
     <button type="submit" className="mt-5 w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-3 rounded-xl text-sm flex items-center justify-center gap-2">
       <Save size={15}/> Save Settings
