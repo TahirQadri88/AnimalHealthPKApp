@@ -604,6 +604,8 @@ return (
         textTransform: 'uppercase',
         letterSpacing: '1.5px',
         fontSize: sz('7px','8px','9px'),
+        textAlign: 'center',
+        lineHeight: '1.2',
       }}>
         {docLabel}
       </div>
@@ -946,13 +948,6 @@ return (
                 <span>Net Balance:</span>
                 <span>Rs. {netBalance.toLocaleString()}</span>
               </div>
-              {data.paymentStatus && (
-                <div style={{ textAlign: 'right', marginTop: '6px' }}>
-                  <span style={{ display: 'inline-block', padding: '2px 10px', borderRadius: '999px', fontSize: sz('7px','8px','9px'), fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px', background: data.paymentStatus === 'Paid' ? '#d1fae5' : data.paymentStatus === 'Partial' ? '#fef9c3' : '#fee2e2', color: data.paymentStatus === 'Paid' ? '#065f46' : data.paymentStatus === 'Partial' ? '#78350f' : '#991b1b', border: `1px solid ${data.paymentStatus === 'Paid' ? '#a7f3d0' : data.paymentStatus === 'Partial' ? '#fde68a' : '#fecaca'}` }}>
-                    {data.paymentStatus}
-                  </span>
-                </div>
-              )}
               {totalSavings > 0 && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: sz('6px','8px','10px'), padding: sz('5px 8px','6px 10px','8px 12px'), background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: '8px', fontWeight: 800, fontSize: sz('8px','9px','10px'), color: '#065f46' }}>
                   <span>Bonus Savings:</span>
@@ -1052,7 +1047,7 @@ return (
             Rs. {(data.receivedAmount || 0).toLocaleString()}
           </div>
           {data.note && (
-            <div style={{ display: 'inline-block', marginTop: sz('8px','10px','12px'), padding: sz('3px 10px','4px 14px','6px 16px'), background: 'white', borderRadius: '999px', border: '1px solid #86efac', fontSize: sz('9px','10px','11px'), fontWeight: 600, color: '#15803d', wordBreak: 'break-word' }}>
+            <div style={{ display: 'inline-block', marginTop: sz('8px','10px','12px'), padding: sz('3px 10px','4px 14px','6px 16px'), background: 'white', borderRadius: '999px', border: '1px solid #86efac', fontSize: sz('9px','10px','11px'), fontWeight: 600, color: '#15803d', wordBreak: 'break-word', textAlign: 'center', lineHeight: '1.2' }}>
               {data.note}
             </div>
           )}

@@ -17,6 +17,17 @@ import PrintView from './components/PrintView';
 
 const AppContext = createContext(null);
 
+const getNextSeqNum = (items, prefix) => {
+  const LEGACY_THRESHOLD = 10000000;
+  const nums = items.map(item => {
+    const s = String(item.id || '');
+    if (!s.startsWith(prefix + '-')) return 0;
+    const n = parseInt(s.slice(prefix.length + 1), 10);
+    return !isNaN(n) && n < LEGACY_THRESHOLD ? n : 0;
+  });
+  return Math.max(0, ...nums) + 1;
+};
+
 const EXPENSE_GROUPS = ['Transportation', 'Salary', 'Utilities', 'Office', 'Other'];
 const EXPENSE_GROUP_COLORS = { Transportation: 'bg-indigo-50 text-indigo-600 border-indigo-100', Salary: 'bg-amber-50 text-amber-600 border-amber-100', Utilities: 'bg-teal-50 text-teal-600 border-teal-100', Office: 'bg-purple-50 text-purple-600 border-purple-100', Other: 'bg-slate-100 text-slate-500 border-slate-200' };
 const RIDER_VEHICLE_TYPES = ['Rider', 'Rickshaw', 'Suzuki'];
@@ -213,7 +224,7 @@ return (
 };
 
 const PaymentModal = () => {
-const { selectedCustomerForPayment, customers, getCustomerBalance, saveToFirebase, showToast, setShowPaymentModal, editingPayment, setEditingPayment } = useContext(AppContext);
+const { selectedCustomerForPayment, customers, payments, getCustomerBalance, saveToFirebase, showToast, setShowPaymentModal, editingPayment, setEditingPayment } = useContext(AppContext);
 const isEdit = !!editingPayment;
 const [form, setForm] = useState(
   isEdit
@@ -228,7 +239,7 @@ if (isEdit) {
   await saveToFirebase('payments', updated.id, updated);
   showToast("Payment Receipt Updated!");
 } else {
-  const newPayment = { id: `REC-${Math.floor(Math.random()*100000)}`, customerId: Number(form.customerId), amount: Number(form.amount), date: form.date, note: form.note };
+  const newPayment = { id: `REC-${String(getNextSeqNum(payments, 'REC')).padStart(4, '0')}`, customerId: Number(form.customerId), amount: Number(form.amount), date: form.date, note: form.note };
   await saveToFirebase('payments', newPayment.id, newPayment);
   showToast("Payment Received & Ledger Updated!");
 }
@@ -707,7 +718,8 @@ const activeCustomer = customers.find(c => c.id === currentInvoice.customerId);
 const finalInvoice = { ...currentInvoice, total: grandTotal, status: status, salespersonId: currentUser.id, salespersonName: currentUser.name, customerDetails: activeCustomer ? { contactPerson: activeCustomer.contactPerson || '', phone: activeCustomer.phone || '', address1: activeCustomer.address1 || activeCustomer.address || '', map1: activeCustomer.map1 || '', address2: activeCustomer.address2 || '', map2: activeCustomer.map2 || '' } : {} };
 if (!finalInvoice.id) {
   const prefix = status === 'Estimate' ? 'EST' : status === 'Booked' ? 'ORD' : 'INV';
-  finalInvoice.id = `${prefix}-${Date.now()}`;
+  const nextNum = getNextSeqNum(invoices, prefix);
+  finalInvoice.id = `${prefix}-${String(nextNum).padStart(4, '0')}`;
   finalInvoice.date = getLocalDateStr();
 }
 await saveToFirebase('invoices', finalInvoice.id, finalInvoice);
