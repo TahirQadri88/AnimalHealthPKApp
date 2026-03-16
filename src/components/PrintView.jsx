@@ -594,9 +594,9 @@ return (
 
     {/* ── Header ── */}
     <div className="keep-together" style={{ textAlign: 'center', marginBottom: sz('10px','14px','18px'), borderBottom: '2px solid #1e293b', paddingBottom: sz('8px','10px','14px') }}>
-      <div style={{ fontSize: sz('14px','18px','22px'), fontWeight: 900, letterSpacing: '-0.5px', textTransform: 'uppercase', color: '#0f172a', lineHeight: 1.2 }}>
-        {showOnDocs ? bizName : bizAppName}
-      </div>
+      {showOnDocs && <div style={{ fontSize: sz('14px','18px','22px'), fontWeight: 900, letterSpacing: '-0.5px', textTransform: 'uppercase', color: '#0f172a', lineHeight: 1.2 }}>
+        {bizName}
+      </div>}
       {bizTagline && showOnDocs && <div style={{ fontSize: sz('7px','7.5px','8px'), textTransform: 'uppercase', letterSpacing: '2px', fontWeight: 700, color: '#94a3b8', marginTop: '2px' }}>
         {bizTagline}
       </div>}
@@ -1037,7 +1037,7 @@ return (
               ))}
             </div>
             <div style={{ marginTop: sz('4px','6px','8px'), textAlign: 'center', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '1px', fontSize: sz('6px','7px','7.5px'), borderTop: '1px dashed #cbd5e1', paddingTop: sz('4px','5px','6px') }}>
-              {showOnDocs ? `${bizName} · ${bizTagline}` : bizAppName}
+              {showOnDocs ? `${bizName}${bizTagline ? ` · ${bizTagline}` : ''}` : ''}
             </div>
           </div>
         </div>}
