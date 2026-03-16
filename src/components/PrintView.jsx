@@ -258,7 +258,8 @@ const buildHtmlDoc = () => {
     'line-height:1.5', 'box-sizing:border-box',
   ].join(';');
   const pageSize   = isThermal ? '80mm auto' : isA5 ? 'A5 portrait' : 'A4 portrait';
-  const pageMargin = isThermal ? '3mm' : '10mm';
+  // Thermal: 5mm top/bottom, 4mm left/right — covers the printer's 2–3mm hardware non-printable edge
+  const pageMargin = isThermal ? '5mm 4mm' : '10mm';
   const bodyPad    = isThermal ? '8px' : '16px';
   const docTitle   = getFileName().replace(/\.[^.]+$/, '');
   const html = `<!DOCTYPE html>
@@ -352,7 +353,8 @@ const handleThermalPrint = async () => {
   Object.assign(clone.style, {
     position: 'fixed', left: '-9999px', top: '0',
     width: targetW + 'px', maxWidth: targetW + 'px', minWidth: targetW + 'px',
-    margin: '0', padding: '8px', boxShadow: 'none', zIndex: '-1', background: 'white',
+    // 10px (≈2.6mm) side padding inside the canvas keeps text away from the image edge
+    margin: '0', padding: '8px 10px', boxShadow: 'none', zIndex: '-1', background: 'white',
   });
   document.body.appendChild(clone);
 
@@ -368,7 +370,7 @@ const handleThermalPrint = async () => {
     const newWin = window.open('', '_blank');
     if (!newWin) { showToast('Allow popups to enable printing', 'error'); return; }
     newWin.document.write(`<!DOCTYPE html><html><head>
-<style>*{margin:0;padding:0;box-sizing:border-box;}@page{size:80mm auto;margin:0;}@media print{body{margin:0;background:white;}}img{width:80mm;max-width:80mm;display:block;}</style>
+<style>*{margin:0;padding:0;box-sizing:border-box;}@page{size:80mm auto;margin:5mm 4mm;}@media print{body{margin:0;background:white;}}img{width:100%;max-width:100%;display:block;}</style>
 </head><body><img src="${imgDataUrl}"><script>window.onload=function(){window.focus();window.print();}<\/script></body></html>`);
     newWin.document.close();
   } catch (e) {
