@@ -289,6 +289,7 @@ const handleThermalPrint = async () => {
   const element = document.getElementById('print-document');
   if (!element) { showToast('Document not found', 'error'); return; }
   showToast('Preparing thermal print…');
+  const docTitle = getFileName().replace(/\.[^.]+$/, '');
 
   // Load html-to-image — uses browser-native SVG foreignObject rendering
   if (!window.htmlToImage) {
@@ -305,9 +306,11 @@ const handleThermalPrint = async () => {
     showToast('Falling back to standard print…');
     const result = buildHtmlDoc();
     if (!result) return;
+    const { html, docTitle: fbTitle } = result;
     const newWin = window.open('', '_blank');
     if (!newWin) { showToast('Allow popups to enable printing', 'error'); return; }
-    newWin.document.open(); newWin.document.write(result.html); newWin.document.close();
+    newWin.document.open(); newWin.document.write(html); newWin.document.close();
+    newWin.document.title = fbTitle;
     newWin.onload = () => { newWin.focus(); newWin.print(); };
     setTimeout(() => { try { newWin.focus(); newWin.print(); } catch (e) {} }, 900);
     return;
@@ -355,9 +358,11 @@ const handleThermalPrint = async () => {
     const newWin = window.open('', '_blank');
     if (!newWin) { showToast('Allow popups to enable printing', 'error'); return; }
     newWin.document.write(`<!DOCTYPE html><html><head>
-<style>*{margin:0;padding:0;box-sizing:border-box;}@page{size:80mm auto;margin:5mm 4mm;}@media print{body{margin:0;background:white;}}img{width:100%;max-width:100%;display:block;}</style>
+<title>${docTitle}</title>
+<style>*{margin:0;padding:0;box-sizing:border-box;}@page{size:80mm auto;margin:0;}@media print{body{margin:0;background:white;}}img{width:100%;max-width:100%;display:block;}</style>
 </head><body><img src="${imgDataUrl}"><script>window.onload=function(){window.focus();window.print();}<\/script></body></html>`);
     newWin.document.close();
+    newWin.document.title = docTitle;
   } catch (e) {
     if (document.body.contains(clone)) document.body.removeChild(clone);
     showToast('Print failed — try PDF instead', 'error');
@@ -371,18 +376,17 @@ const handlePrint = () => {
 
   const result = buildHtmlDoc();
   if (!result) { showToast('Document not found', 'error'); return; }
-  const { html } = result;
-  // Blob URL: window URL is blob:https://…/uuid, not the app URL.
-  // iOS uses <title> as the PDF filename; app URL never appears anywhere.
-  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-  const blobUrl = URL.createObjectURL(blob);
-  const newWin = window.open(blobUrl, '_blank');
+  const { html, docTitle } = result;
+  // about:blank window: no URL in address bar, @page{margin:0} removes header/footer space.
+  // Explicit document.title ensures iOS uses the invoice/receipt ID as the PDF filename.
+  const newWin = window.open('', '_blank');
   if (!newWin) { showToast('Allow popups to enable printing', 'error'); return; }
+  newWin.document.open();
+  newWin.document.write(html);
+  newWin.document.close();
+  newWin.document.title = docTitle;
   // onload fires after content is rendered; fallback setTimeout for slower devices
-  newWin.onload = () => {
-    newWin.focus(); newWin.print();
-    setTimeout(() => URL.revokeObjectURL(blobUrl), 2000);
-  };
+  newWin.onload = () => { newWin.focus(); newWin.print(); };
   setTimeout(() => { try { newWin.focus(); newWin.print(); } catch (e) {} }, 900);
 };
 
