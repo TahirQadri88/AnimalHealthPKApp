@@ -292,18 +292,18 @@ const handleThermalPrint = async () => {
   if (!element) { showToast('Document not found', 'error'); return; }
   showToast('Preparing thermal print…');
 
-  // Load html2canvas if not already loaded
-  if (!window.html2canvas) {
+  // Load html-to-image — uses browser-native SVG foreignObject rendering
+  if (!window.htmlToImage) {
     await new Promise((resolve, reject) => {
       const s = document.createElement('script');
-      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+      s.src = 'https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.js';
       s.onload = resolve; s.onerror = reject;
       document.head.appendChild(s);
     }).catch(() => null);
   }
 
-  // If html2canvas still unavailable, fall back to regular HTML print
-  if (!window.html2canvas) {
+  // If library unavailable, fall back to regular HTML print
+  if (!window.htmlToImage) {
     showToast('Falling back to standard print…');
     const result = buildHtmlDoc();
     if (!result) return;
@@ -316,7 +316,6 @@ const handleThermalPrint = async () => {
   }
 
   const targetW = 302; // 80 mm at 96 dpi
-  const SCALE   = 4;   // Render at 4× → ~384 effective dpi → dark crisp output
 
   // Clone and apply high-contrast colours (gray text → black, preserve white-on-dark)
   const clone = element.cloneNode(true);
@@ -343,22 +342,18 @@ const handleThermalPrint = async () => {
   Object.assign(clone.style, {
     position: 'absolute', left: '-9999px', top: '0',
     width: targetW + 'px', maxWidth: targetW + 'px', minWidth: targetW + 'px',
-    // 10px (≈2.6mm) side padding inside the canvas keeps text away from the image edge
     margin: '0', padding: '8px 10px', boxShadow: 'none', zIndex: '-1', background: 'white',
   });
   document.body.appendChild(clone);
-  const elH = clone.scrollHeight;
+  await new Promise(r => setTimeout(r, 200));
 
   try {
-    const canvas = await window.html2canvas(clone, {
-      scale: SCALE, useCORS: true, logging: false, letterRendering: true,
-      width: targetW, windowWidth: targetW,
-      height: elH, windowHeight: elH,
-      backgroundColor: '#ffffff', scrollX: 0, scrollY: 0,
+    const imgDataUrl = await window.htmlToImage.toPng(clone, {
+      pixelRatio: 4,           // 4× = ~384 DPI for crisp thermal output
+      backgroundColor: '#ffffff',
     });
     if (document.body.contains(clone)) document.body.removeChild(clone);
 
-    const imgDataUrl = canvas.toDataURL('image/png');
     const newWin = window.open('', '_blank');
     if (!newWin) { showToast('Allow popups to enable printing', 'error'); return; }
     newWin.document.write(`<!DOCTYPE html><html><head>
@@ -508,15 +503,16 @@ const handleImageShare = async () => {
   if (!element) { showToast('Document not found', 'error'); return; }
   showToast('Generating image…');
 
-  // Load html2canvas dynamically
-  if (!window.html2canvas) {
+  // Load html-to-image — uses browser-native SVG foreignObject rendering,
+  // not a JS CSS reimplementation, so all CSS properties work correctly.
+  if (!window.htmlToImage) {
     await new Promise((resolve, reject) => {
       const s = document.createElement('script');
-      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+      s.src = 'https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.js';
       s.onload = resolve; s.onerror = reject;
       document.head.appendChild(s);
     }).catch(() => { showToast('Image library failed to load', 'error'); });
-    if (!window.html2canvas) return;
+    if (!window.htmlToImage) return;
   }
 
   try {
@@ -528,29 +524,24 @@ const handleImageShare = async () => {
       margin: '0', boxShadow: 'none', zIndex: '-1', background: 'white',
     });
     document.body.appendChild(clone);
-    const elH = clone.scrollHeight;
+    await new Promise(r => setTimeout(r, 200));
 
-    await new Promise(r => setTimeout(r, 150));
-
-    const canvas = await window.html2canvas(clone, {
-      scale: 2, useCORS: true, logging: false, letterRendering: true,
-      width: targetW, windowWidth: targetW,
-      height: elH, windowHeight: elH,
-      backgroundColor: '#ffffff', scrollX: 0, scrollY: 0,
+    const dataUrl = await window.htmlToImage.toJpeg(clone, {
+      quality: 0.95,
+      pixelRatio: 2,
+      backgroundColor: '#ffffff',
     });
     if (document.body.contains(clone)) document.body.removeChild(clone);
 
+    const blob = await (await fetch(dataUrl)).blob();
     const imgFileName = getFileName().replace(/\.pdf$/, '.jpg');
-    canvas.toBlob(async (blob) => {
-      if (!blob) { showToast('Image generation failed', 'error'); return; }
-      const file = new File([blob], imgFileName, { type: 'image/jpeg' });
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        navigator.share({ files: [file], title: imgFileName.replace(/\.jpg$/, ''), text: getShareCaption() })
-          .catch(e => { if (e.name !== 'AbortError') downloadImageFallback(blob, imgFileName); });
-      } else {
-        downloadImageFallback(blob, imgFileName);
-      }
-    }, 'image/jpeg', 0.93);
+    const file = new File([blob], imgFileName, { type: 'image/jpeg' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      navigator.share({ files: [file], title: imgFileName.replace(/\.jpg$/, ''), text: getShareCaption() })
+        .catch(e => { if (e.name !== 'AbortError') downloadImageFallback(blob, imgFileName); });
+    } else {
+      downloadImageFallback(blob, imgFileName);
+    }
   } catch (e) {
     showToast('Image failed — use Print instead', 'error');
   }
