@@ -4,7 +4,7 @@ import {
 LayoutDashboard, Package, ReceiptText, BarChart3, Settings,
 Plus, Search, Truck, CheckCircle2, AlertCircle, Users,
 Share2, Printer, Trash2, Edit, X, Lock, DollarSign,
-TrendingUp, Receipt, FileSpreadsheet, Calendar, Save, ChevronRight,
+TrendingUp, Receipt, FileSpreadsheet, Calendar, Save, ChevronRight, ChevronLeft,
 Wallet, Download, Upload, TrendingDown, Filter, ArrowUpDown, Award, CreditCard,
 FileDown, BookOpen, ShoppingCart, Tag, Building2, BarChart2, PieChart, Activity,
 Percent, Hash, Zap, Archive, RefreshCw, Eye, EyeOff, ChevronDown, ChevronUp,
@@ -50,6 +50,36 @@ return (
 <div className="flex-1 overflow-y-auto p-5 bg-slate-50/50">{children}</div>
 </div>
 </div>
+);
+};
+
+// ─── Scrollable Tab Bar with Arrow Navigation ───
+const ScrollableTabBar = ({ children, className = '', bgClass = '' }) => {
+const ref = useRef(null);
+const [showLeft, setShowLeft] = useState(false);
+const [showRight, setShowRight] = useState(false);
+const check = () => {
+  const el = ref.current;
+  if (!el) return;
+  setShowLeft(el.scrollLeft > 2);
+  setShowRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 2);
+};
+useEffect(() => {
+  check();
+  const el = ref.current;
+  if (el) el.addEventListener('scroll', check);
+  const ro = new ResizeObserver(check);
+  if (el) ro.observe(el);
+  return () => { el?.removeEventListener('scroll', check); ro.disconnect(); };
+}, [children]);
+const scroll = (d) => ref.current?.scrollBy({ left: d * 100, behavior: 'smooth' });
+const btnBase = `shrink-0 p-1 rounded-lg border border-slate-300 text-slate-500 hover:text-slate-800 transition-all ${bgClass || 'bg-white'}`;
+return (
+  <div className={`flex items-center gap-1 ${className}`}>
+    <button onClick={() => scroll(-1)} className={`${btnBase} ${showLeft ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}><ChevronLeft size={14}/></button>
+    <div ref={ref} className="flex flex-1 gap-1 overflow-x-auto scrollbar-hide" onScroll={check}>{children}</div>
+    <button onClick={() => scroll(1)} className={`${btnBase} ${showRight ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}><ChevronRight size={14}/></button>
+  </div>
 );
 };
 
@@ -617,6 +647,7 @@ return (
 const DashboardTab = () => {
 const { isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, analyticsView, setAnalyticsView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig, showConfirm } = useContext(AppContext);
 const [dateFilter, setDateFilter] = useState('This Month');
+const [activitySearch, setActivitySearch] = useState('');
 const filteredInvoices = invoices.filter(o => o.status === 'Billed' && checkDateFilter(o.date, dateFilter));
 const filteredExpenses = expenses.filter(e => checkDateFilter(e.date, dateFilter));
 const revenue = filteredInvoices.reduce((sum, o) => sum + o.total, 0);
@@ -737,15 +768,16 @@ return (
 
 {/* Recent Activity */}
 <div>
-<div className="flex justify-between items-end mb-4 mt-2">
+<div className="flex justify-between items-end mb-3 mt-2">
 <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
   Recent Activity
   {recentActivity.length > 0 && <span className="bg-indigo-100 text-indigo-700 text-[10px] font-black px-2 py-0.5 rounded-full">{recentActivity.length}</span>}
 </h3>
 <button onClick={() => setActiveTab('billing')} className="text-xs font-bold text-indigo-600 flex items-center gap-0.5">View All <ChevronRight size={14}/></button>
 </div>
+<div className="relative mb-3"><Search className="absolute left-3.5 top-3 text-slate-400" size={15}/><input placeholder="Search activity..." className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl font-semibold outline-none shadow-sm text-sm" value={activitySearch} onChange={e => setActivitySearch(e.target.value)} /></div>
 <div className="space-y-2.5">
-{recentActivity.map(entry => {
+{recentActivity.filter(entry => !activitySearch || entry.customerName.toLowerCase().includes(activitySearch.toLowerCase()) || entry.id.toLowerCase().includes(activitySearch.toLowerCase())).map(entry => {
   const kindConfig = {
     invoice: { dot: 'bg-indigo-500', label: 'Invoice', labelCls: 'bg-indigo-100 text-indigo-700', amountCls: 'text-indigo-700' },
     payment: { dot: 'bg-emerald-500', label: 'Payment', labelCls: 'bg-emerald-100 text-emerald-700', amountCls: 'text-emerald-600' },
@@ -774,7 +806,7 @@ return (
     </div>
   );
 })}
-{recentActivity.length === 0 && <p className="text-center text-slate-400 text-sm py-8 font-medium">No activity for this period.</p>}
+{recentActivity.filter(e => !activitySearch || e.customerName.toLowerCase().includes(activitySearch.toLowerCase()) || e.id.toLowerCase().includes(activitySearch.toLowerCase())).length === 0 && <p className="text-center text-slate-400 text-sm py-8 font-medium">{activitySearch ? 'No matching activity.' : 'No activity for this period.'}</p>}
 </div>
 </div>
 </div>
@@ -1068,7 +1100,7 @@ return (
 </div>
 </div>
 <div className="relative mb-2"><Search className="absolute left-3.5 top-3.5 text-slate-400" size={18} /><input placeholder="Search Clients..." className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl font-semibold outline-none shadow-sm text-sm" value={search} onChange={e => setSearch(e.target.value)} /></div>
-<div className="flex gap-2 mb-3 overflow-x-auto pb-1 scrollbar-hide shrink-0">
+<ScrollableTabBar className="mb-3 shrink-0">
   <select value={filterCity} onChange={e=>setFilterCity(e.target.value)} className="bg-white border border-slate-200 px-2.5 py-1.5 rounded-lg font-bold text-[11px] text-slate-700 outline-none shrink-0">
     <option value="">All Cities</option>
     {cities.map(c=><option key={c.id} value={c.name}>{c.name}</option>)}
@@ -1088,7 +1120,7 @@ return (
     <option value="Clear">Cleared</option>
   </select>
   {activeFilters && <button onClick={clearFilters} className="shrink-0 text-[10px] font-bold text-rose-500 bg-rose-50 border border-rose-100 px-2.5 py-1.5 rounded-lg flex items-center gap-1 hover:bg-rose-100 transition-colors"><X size={10}/> Clear</button>}
-</div>
+</ScrollableTabBar>
 <div className="flex-1 overflow-y-auto space-y-3 pb-24 pr-1">
 {customers.filter(c => {
 const bal = getCustomerBalance(c.id);
@@ -1419,10 +1451,12 @@ const tabConfig = [
 ];
 return (
 <div className="flex-1 overflow-y-auto p-4 pb-6 space-y-4">
-  <div className="flex bg-slate-100 p-1 rounded-xl gap-1 overflow-x-auto scrollbar-hide">
+  <div className="bg-slate-100 p-1 rounded-xl">
+  <ScrollableTabBar bgClass="bg-slate-100">
     {tabConfig.map(t=>(
-      <button key={t.id} onClick={()=>{setTab(t.id);setSearch('');}} className={`flex-1 py-2 px-2 rounded-lg font-bold text-xs whitespace-nowrap transition-colors ${tab===t.id?'bg-white text-teal-700 shadow-sm':'text-slate-500'}`}>{t.label}</button>
+      <button key={t.id} onClick={()=>{setTab(t.id);setSearch('');}} className={`py-2 px-3 rounded-lg font-bold text-xs whitespace-nowrap transition-colors ${tab===t.id?'bg-white text-teal-700 shadow-sm':'text-slate-500'}`}>{t.label}</button>
     ))}
+  </ScrollableTabBar>
   </div>
   <div className="flex gap-2">
     <div className="relative flex-1"><Search className="absolute left-3 top-3 text-slate-400" size={14}/><input placeholder="Search..." className="w-full pl-9 pr-3 py-2.5 bg-white border border-slate-200 rounded-xl font-semibold outline-none text-sm shadow-sm focus:border-indigo-400" value={search} onChange={e=>setSearch(e.target.value)} /></div>
@@ -1511,6 +1545,7 @@ const inputCls = "w-full p-3 bg-white border border-slate-200 rounded-xl text-sm
 const [form, setForm] = useState({ name: '', phone: '', vehicleType: 'Rider', vehicleNumber: '' });
 const [editingId, setEditingId] = useState(null);
 const [editForm, setEditForm] = useState({});
+const [riderSearch, setRiderSearch] = useState('');
 const add = async () => {
   if (!form.name) return showToast("Name required", "error");
   const obj = { id: Date.now(), name: form.name, phone: form.phone, vehicleType: form.vehicleType, vehicleNumber: form.vehicleNumber };
@@ -1538,9 +1573,10 @@ return (
 </form>
 <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
   <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-2"><Truck size={14} className="text-indigo-500"/><span className="text-xs font-bold text-slate-600 uppercase tracking-widest">Registered Riders</span><span className="ml-auto text-xs font-black text-indigo-600">{riders.length}</span></div>
+  <div className="px-3 pt-3 pb-2"><div className="relative"><Search className="absolute left-3 top-2.5 text-slate-400" size={14}/><input placeholder="Search riders..." className="w-full pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg font-semibold outline-none text-sm focus:border-indigo-400" value={riderSearch} onChange={e=>setRiderSearch(e.target.value)} /></div></div>
   {riders.length === 0 && <p className="text-center py-8 text-sm text-slate-400 font-medium">No riders registered yet.</p>}
   <ul className="divide-y divide-slate-100">
-    {riders.map(rider => (
+    {riders.filter(r => !riderSearch || r.name.toLowerCase().includes(riderSearch.toLowerCase()) || (r.phone||'').includes(riderSearch) || (r.vehicleNumber||'').toLowerCase().includes(riderSearch.toLowerCase())).map(rider => (
       <li key={rider.id} className="p-3 hover:bg-slate-50">
         {editingId === rider.id ? (
           <div className="space-y-2">
@@ -1584,15 +1620,17 @@ return (
 <div className="h-full flex flex-col">
 <div className="px-4 pt-4 pb-2">
 <h2 className="text-2xl font-extrabold text-slate-800 tracking-tight mb-4">Admin Hub</h2>
-<div className="flex bg-slate-200 p-1 rounded-xl overflow-x-auto scrollbar-hide">
-<button onClick={()=>setAdminView('analytics')} className={`flex-1 py-2 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 whitespace-nowrap ${adminView==='analytics'?'bg-white text-indigo-700 shadow-sm':'text-slate-500'}`}><BarChart3 size={14}/> Analytics</button>
-<button onClick={()=>setAdminView('expenses')} className={`flex-1 py-2 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 whitespace-nowrap ${adminView==='expenses'?'bg-white text-rose-600 shadow-sm':'text-slate-500'}`}><Wallet size={14}/> Expenses</button>
-<button onClick={()=>setAdminView('masters')} className={`flex-1 py-2 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 whitespace-nowrap ${adminView==='masters'?'bg-white text-teal-600 shadow-sm':'text-slate-500'}`}><Archive size={14}/> Masters</button>
-<button onClick={()=>setAdminView('bulk')} className={`flex-1 py-2 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 whitespace-nowrap ${adminView==='bulk'?'bg-white text-emerald-600 shadow-sm':'text-slate-500'}`}><Upload size={14}/> Bulk Ops</button>
-<button onClick={()=>setAdminView('segments')} className={`flex-1 py-2 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 whitespace-nowrap ${adminView==='segments'?'bg-white text-purple-600 shadow-sm':'text-slate-500'}`}><Globe size={14}/> Segments</button>
-<button onClick={()=>setAdminView('users')} className={`flex-1 py-2 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 whitespace-nowrap ${adminView==='users'?'bg-white text-amber-600 shadow-sm':'text-slate-500'}`}><Users size={14}/> Users</button>
-<button onClick={()=>setAdminView('settings')} className={`flex-1 py-2 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 whitespace-nowrap ${adminView==='settings'?'bg-white text-slate-700 shadow-sm':'text-slate-500'}`}><Settings size={14}/> Settings</button>
-<button onClick={()=>setAdminView('riders')} className={`flex-1 py-2 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 whitespace-nowrap ${adminView==='riders'?'bg-white text-indigo-600 shadow-sm':'text-slate-500'}`}><Truck size={14}/> Riders</button>
+<div className="bg-slate-200 p-1 rounded-xl">
+<ScrollableTabBar bgClass="bg-slate-200">
+<button onClick={()=>setAdminView('analytics')} className={`py-2 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 whitespace-nowrap ${adminView==='analytics'?'bg-white text-indigo-700 shadow-sm':'text-slate-500'}`}><BarChart3 size={14}/> Analytics</button>
+<button onClick={()=>setAdminView('expenses')} className={`py-2 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 whitespace-nowrap ${adminView==='expenses'?'bg-white text-rose-600 shadow-sm':'text-slate-500'}`}><Wallet size={14}/> Expenses</button>
+<button onClick={()=>setAdminView('masters')} className={`py-2 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 whitespace-nowrap ${adminView==='masters'?'bg-white text-teal-600 shadow-sm':'text-slate-500'}`}><Archive size={14}/> Masters</button>
+<button onClick={()=>setAdminView('bulk')} className={`py-2 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 whitespace-nowrap ${adminView==='bulk'?'bg-white text-emerald-600 shadow-sm':'text-slate-500'}`}><Upload size={14}/> Bulk Ops</button>
+<button onClick={()=>setAdminView('segments')} className={`py-2 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 whitespace-nowrap ${adminView==='segments'?'bg-white text-purple-600 shadow-sm':'text-slate-500'}`}><Globe size={14}/> Segments</button>
+<button onClick={()=>setAdminView('users')} className={`py-2 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 whitespace-nowrap ${adminView==='users'?'bg-white text-amber-600 shadow-sm':'text-slate-500'}`}><Users size={14}/> Users</button>
+<button onClick={()=>setAdminView('settings')} className={`py-2 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 whitespace-nowrap ${adminView==='settings'?'bg-white text-slate-700 shadow-sm':'text-slate-500'}`}><Settings size={14}/> Settings</button>
+<button onClick={()=>setAdminView('riders')} className={`py-2 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 whitespace-nowrap ${adminView==='riders'?'bg-white text-indigo-600 shadow-sm':'text-slate-500'}`}><Truck size={14}/> Riders</button>
+</ScrollableTabBar>
 </div>
 </div>
 <div className="flex-1 overflow-hidden">
@@ -1722,6 +1760,7 @@ return (
 const UserManagementView = () => {
 const { isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig, showConfirm } = useContext(AppContext);
 const [userDateFilter, setUserDateFilter] = useState('This Month');
+const [userSearch, setUserSearch] = useState('');
 return (
 <div className="flex-1 overflow-y-auto p-4 pb-24">
 <div className="flex justify-between items-center mb-4">
@@ -1731,6 +1770,7 @@ return (
 </div>
 <button onClick={() => { setEditingUser(null); setShowUserModal(true); }} className="bg-indigo-600 text-white px-3 py-2 rounded-lg text-xs font-bold shadow-sm flex items-center gap-1 hover:bg-indigo-700 transition-colors"><Plus size={14}/> Add User</button>
 </div>
+<div className="relative mb-3"><Search className="absolute left-3 top-2.5 text-slate-400" size={14}/><input placeholder="Search users..." className="w-full pl-8 pr-3 py-2 bg-white border border-slate-200 rounded-xl font-semibold outline-none text-sm shadow-sm focus:border-indigo-400" value={userSearch} onChange={e=>setUserSearch(e.target.value)} /></div>
 <div className="flex items-center gap-1.5 bg-white px-2.5 py-1.5 rounded-lg border border-slate-200 shadow-sm mb-4 w-fit">
 <Calendar size={13} className="text-indigo-500"/>
 <select value={userDateFilter} onChange={e=>setUserDateFilter(e.target.value)} className="bg-transparent font-bold text-[11px] text-slate-700 outline-none cursor-pointer">
@@ -1738,7 +1778,7 @@ return (
 </select>
 </div>
 <div className="space-y-3">
-{appUsers.map(u => {
+{appUsers.filter(u => !userSearch || u.name.toLowerCase().includes(userSearch.toLowerCase()) || u.role.toLowerCase().includes(userSearch.toLowerCase())).map(u => {
 const userInvoices = invoices.filter(inv => inv.salespersonId === u.id && inv.status === 'Billed' && checkDateFilter(inv.date, userDateFilter));
 const totalSales = userInvoices.reduce((sum, inv) => sum + inv.total, 0);
 const totalProfit = userInvoices.reduce((sum, inv) => sum + inv.items.reduce((s, item) => s + ((item.price - item.costPrice) * item.quantity), 0), 0);
@@ -1784,6 +1824,7 @@ const [tab, setTab] = useState('cities');
 const [newVal, setNewVal] = useState('');
 const [editingId, setEditingId] = useState(null);
 const [editVal, setEditVal] = useState('');
+const [segSearch, setSegSearch] = useState('');
 const colMap = { cities: cities, areas: areas, customerTypes: customerTypes };
 const fireMap = { cities: 'cities', areas: 'areas', customerTypes: 'customerTypes' };
 const labelMap = { cities: 'City', areas: 'Area', customerTypes: 'Type' };
@@ -1817,19 +1858,22 @@ return (
 <div className="flex justify-between items-center">
 <h3 className="text-xs font-bold text-slate-800 uppercase tracking-widest">Customer Segments</h3>
 </div>
-<div className="flex bg-slate-200 p-1 rounded-xl gap-1">
+<div className="bg-slate-200 p-1 rounded-xl">
+<ScrollableTabBar bgClass="bg-slate-200">
 {['cities','areas','customerTypes'].map(t => (
-<button key={t} onClick={() => { setTab(t); setNewVal(''); setEditingId(null); }} className={`flex-1 py-2 px-2 rounded-lg font-bold text-xs transition-colors ${tab===t?'bg-white text-purple-700 shadow-sm':'text-slate-500'}`}>{labelMap[t]}s</button>
+<button key={t} onClick={() => { setTab(t); setNewVal(''); setEditingId(null); setSegSearch(''); }} className={`py-2 px-3 rounded-lg font-bold text-xs whitespace-nowrap transition-colors ${tab===t?'bg-white text-purple-700 shadow-sm':'text-slate-500'}`}>{labelMap[t]}s</button>
 ))}
+</ScrollableTabBar>
 </div>
 <div className="flex gap-2">
 <input type="text" placeholder={`New ${labelMap[tab]}...`} className="flex-1 p-3 bg-white border border-slate-200 rounded-xl font-semibold outline-none focus:border-indigo-500 text-sm" value={newVal} onChange={e=>setNewVal(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')add();}} />
 <button onClick={add} className="bg-indigo-600 text-white px-4 rounded-xl font-bold hover:bg-indigo-700 transition-colors">Add</button>
 </div>
+<div className="relative"><Search className="absolute left-3 top-2.5 text-slate-400" size={14}/><input placeholder={`Search ${labelMap[tab]}s...`} className="w-full pl-8 pr-3 py-2 bg-white border border-slate-200 rounded-xl font-semibold outline-none text-sm focus:border-indigo-400" value={segSearch} onChange={e=>setSegSearch(e.target.value)} /></div>
 <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
 {list.length === 0 && <p className="text-center py-6 text-sm text-slate-400">No {labelMap[tab]}s yet.</p>}
 <ul className="divide-y divide-slate-100">
-{list.map(item => {
+{list.filter(item => !segSearch || item.name.toLowerCase().includes(segSearch.toLowerCase())).map(item => {
   const stats = segStats[item.name] || { orders: 0, revenue: 0, customers: new Set() };
   return (
   <li key={item.id} className="p-3 hover:bg-slate-50">
@@ -2360,11 +2404,11 @@ return (
     )}
 
     {/* View Tabs */}
-    <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide shrink-0">
+    <ScrollableTabBar className="pb-2 shrink-0">
        {['Overview','Insights','Monthly Trend','By Product','By Company','By Customer','By City','By Area','By Type','By Salesperson','Receivables'].map(v => (
          <button key={v} onClick={() => setView(v)} className={`px-3 py-1.5 rounded-xl font-bold text-[11px] whitespace-nowrap shadow-sm transition-colors ${view === v ? 'bg-slate-800 text-white' : 'bg-white text-slate-600 border border-slate-200'}`}>{v}</button>
        ))}
-    </div>
+    </ScrollableTabBar>
 
     {/* Active filter chips */}
     {(filterCompanies.size > 0 || filterCustomers.size > 0 || filterSalespersons.size > 0) && (
@@ -2772,6 +2816,7 @@ const [note, setNote] = useState('');
 const [editingExpense, setEditingExpense] = useState(null);
 const [expFilter, setExpFilter] = useState('This Month');
 const [groupFilter, setGroupFilter] = useState('All');
+const [expSearch, setExpSearch] = useState('');
 const saveExpense = async () => {
 if(!amount || !category) return showToast("Amount & Category required", "error");
 if (editingExpense) {
@@ -2787,7 +2832,7 @@ setAmount(''); setNote(''); setDate(getLocalDateStr()); setCategory(expenseCateg
 };
 const startEdit = (exp) => { setEditingExpense(exp); setDate(exp.date); setAmount(String(exp.amount)); setCategory(exp.category); setNote(exp.note || ''); };
 const cancelEdit = () => { setEditingExpense(null); setAmount(''); setNote(''); setDate(getLocalDateStr()); setCategory(expenseCategories[0]?.name || ''); };
-const filteredExpenses = expenses.filter(e => checkDateFilter(e.date, expFilter)).filter(e => { if (groupFilter === 'All') return true; const cat = expenseCategories.find(c => c.name === e.category); return (cat?.group || 'Other') === groupFilter; }).slice().reverse();
+const filteredExpenses = expenses.filter(e => checkDateFilter(e.date, expFilter)).filter(e => { if (groupFilter === 'All') return true; const cat = expenseCategories.find(c => c.name === e.category); return (cat?.group || 'Other') === groupFilter; }).filter(e => !expSearch || e.category.toLowerCase().includes(expSearch.toLowerCase()) || (e.note||'').toLowerCase().includes(expSearch.toLowerCase())).slice().reverse();
 const filteredTotal = filteredExpenses.reduce((s,e)=>s+Number(e.amount),0);
 return (
 <div className="flex-1 overflow-y-auto p-4 pb-24">
@@ -2807,6 +2852,7 @@ return (
 <div className="mb-4"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Short Note</label><input type="text" placeholder="e.g. Paid to Ali for DHA drop" className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-semibold outline-none" value={note} onChange={e=>setNote(e.target.value)}/></div>
 <button type="submit" className={`w-full font-bold py-3.5 rounded-xl shadow-md text-white ${editingExpense ? 'bg-amber-500 hover:bg-amber-600' : 'bg-rose-500 hover:bg-rose-600'}`}>{editingExpense ? 'Update Expense' : 'Record Expense'}</button>
 </form>
+<div className="relative mb-2"><Search className="absolute left-3 top-2.5 text-slate-400" size={14}/><input placeholder="Search by category or note..." className="w-full pl-8 pr-3 py-2 bg-white border border-slate-200 rounded-xl font-semibold outline-none text-sm shadow-sm focus:border-rose-400" value={expSearch} onChange={e=>setExpSearch(e.target.value)} /></div>
 <div className="flex items-center gap-2 mb-3 flex-wrap">
 <div className="flex items-center gap-1.5 bg-white px-2.5 py-1.5 rounded-lg border border-slate-200 shadow-sm">
 <Calendar size={13} className="text-rose-500"/>
