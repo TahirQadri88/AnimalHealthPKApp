@@ -271,8 +271,8 @@ const buildHtmlDoc = () => {
   <style>
     *{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
     body{margin:0;padding:${bodyPad};background:white;font-family:system-ui,-apple-system,sans-serif;}
-    @page{size:${pageSize};margin:${pageMargin};}
-    @media print{body{padding:0;background:white;}#doc>*{width:100%!important;max-width:none!important;}}
+    @page{size:${pageSize};margin:0;}
+    @media print{body{padding:${pageMargin};background:white;}#doc>*{width:100%!important;max-width:none!important;}}
     ${isThermal ? `@media print{#doc *{color:black!important;}[data-dk],[data-dk] *{color:white!important;}}` : ''}
   </style>
 </head>
@@ -372,13 +372,17 @@ const handlePrint = () => {
   const result = buildHtmlDoc();
   if (!result) { showToast('Document not found', 'error'); return; }
   const { html } = result;
-  const newWin = window.open('', '_blank');
+  // Blob URL: window URL is blob:https://…/uuid, not the app URL.
+  // iOS uses <title> as the PDF filename; app URL never appears anywhere.
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+  const blobUrl = URL.createObjectURL(blob);
+  const newWin = window.open(blobUrl, '_blank');
   if (!newWin) { showToast('Allow popups to enable printing', 'error'); return; }
-  newWin.document.open();
-  newWin.document.write(html);
-  newWin.document.close();
   // onload fires after content is rendered; fallback setTimeout for slower devices
-  newWin.onload = () => { newWin.focus(); newWin.print(); };
+  newWin.onload = () => {
+    newWin.focus(); newWin.print();
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 2000);
+  };
   setTimeout(() => { try { newWin.focus(); newWin.print(); } catch (e) {} }, 900);
 };
 
