@@ -603,7 +603,7 @@ return (
       <div style={{
         marginTop: sz('5px','7px','9px'),
         display: 'inline-block',
-        lineHeight: sz('7px','8px','9px'),
+        lineHeight: 1.4,
         padding: isThermal ? '4px 10px' : '5px 14px',
         background: '#1e293b',
         color: 'white',
@@ -1053,7 +1053,7 @@ return (
             Rs. {(data.receivedAmount || 0).toLocaleString()}
           </div>
           {data.note && (
-            <div style={{ display: 'inline-block', lineHeight: sz('9px','10px','11px'), marginTop: sz('8px','10px','12px'), padding: sz('5px 10px','6px 14px','8px 16px'), background: 'white', borderRadius: '999px', border: '1px solid #86efac', fontSize: sz('9px','10px','11px'), fontWeight: 600, color: '#15803d', wordBreak: 'break-word' }}>
+            <div style={{ display: 'inline-block', lineHeight: 1.4, marginTop: sz('8px','10px','12px'), padding: sz('5px 10px','6px 14px','8px 16px'), background: 'white', borderRadius: '999px', border: '1px solid #86efac', fontSize: sz('9px','10px','11px'), fontWeight: 600, color: '#15803d', wordBreak: 'break-word' }}>
               {data.note}
             </div>
           )}
