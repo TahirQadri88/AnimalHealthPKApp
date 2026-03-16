@@ -340,7 +340,7 @@ const handleThermalPrint = async () => {
   });
 
   Object.assign(clone.style, {
-    position: 'absolute', left: '-9999px', top: '0',
+    position: 'fixed', top: '0', left: '0',
     width: targetW + 'px', maxWidth: targetW + 'px', minWidth: targetW + 'px',
     margin: '0', padding: '8px 10px', boxShadow: 'none', zIndex: '-1', background: 'white',
   });
@@ -516,22 +516,19 @@ const handleImageShare = async () => {
   }
 
   try {
-    const targetW = isThermal ? 302 : isA5 ? 559 : 794;
-    const clone = element.cloneNode(true);
-    Object.assign(clone.style, {
-      position: 'absolute', left: '-9999px', top: '0',
-      width: targetW + 'px', maxWidth: targetW + 'px', minWidth: targetW + 'px',
-      margin: '0', boxShadow: 'none', zIndex: '-1', background: 'white',
-    });
-    document.body.appendChild(clone);
-    await new Promise(r => setTimeout(r, 200));
+    // Capture the live element directly — it is already rendered in the DOM
+    // at the correct format width. html-to-image requires the element to be
+    // within the viewport; cloning off-screen (left:-9999px) produces blank output.
+    const printRoot = document.getElementById('print-root');
+    if (printRoot) printRoot.scrollTop = 0;
+    await new Promise(r => setTimeout(r, 150));
 
-    const dataUrl = await window.htmlToImage.toJpeg(clone, {
+    const dataUrl = await window.htmlToImage.toJpeg(element, {
       quality: 0.95,
       pixelRatio: 2,
       backgroundColor: '#ffffff',
+      height: element.scrollHeight,
     });
-    if (document.body.contains(clone)) document.body.removeChild(clone);
 
     const blob = await (await fetch(dataUrl)).blob();
     const imgFileName = getFileName().replace(/\.pdf$/, '.jpg');
