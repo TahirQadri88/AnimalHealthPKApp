@@ -1160,7 +1160,7 @@ const save = async () => {
   const total = grandTotal;
   const cust = customers.find(c => c.id === Number(form.customerId));
   const cn = {
-    id: `CN-${Math.floor(Math.random() * 100000)}`,
+    id: `CN-${String(getNextSeqNum(invoices, 'CN')).padStart(4, '0')}`,
     date: form.date,
     customerId: Number(form.customerId),
     customerName: cust?.name || '',
