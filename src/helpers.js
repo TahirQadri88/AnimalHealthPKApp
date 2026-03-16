@@ -44,12 +44,26 @@ const checkDateFilter = (dateStr, filter) => {
   return true;
 };
 
-const exportToCSV = (data, filename) => {
+const exportToCSV = (data, filename, options = {}) => {
   if(!data || !data.length) return;
+  const { title, subtitle, totals } = options;
   const q = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-  const headers = Object.keys(data[0]).map(q).join(',');
-  const rows = data.map(obj => Object.values(obj).map(q).join(',')).join('\n');
-  const blob = new Blob([headers + '\n' + rows], { type: 'text/csv' });
+  const lines = [];
+  // Optional header rows (title + subtitle)
+  if (title) { lines.push(q(title)); lines.push(q(subtitle || '')); lines.push(''); }
+  // Column headers
+  lines.push(Object.keys(data[0]).map(q).join(','));
+  // Data rows
+  data.forEach(obj => lines.push(Object.values(obj).map(q).join(',')));
+  // Optional totals row
+  if (totals && Object.keys(totals).length) {
+    lines.push('');
+    lines.push(Object.keys(data[0]).map((k, i) =>
+      i === 0 ? q('TOTAL') : totals[k] !== undefined ? q(totals[k]) : q('')
+    ).join(','));
+  }
+  // BOM prefix ensures correct encoding in Excel
+  const blob = new Blob(['\uFEFF' + lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
   const url = window.URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url; a.download = filename; a.click();

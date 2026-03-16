@@ -14,4 +14,4 @@ function useLiveCollection(collectionName) {
   return data;
 }
 
-export default useFirestoreCollection;
+export default useLiveCollection;
