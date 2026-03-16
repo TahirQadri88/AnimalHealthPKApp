@@ -67,11 +67,11 @@ const getFileName = () => {
 // ── Short caption for native share sheet ─────────────────────────────────
 const getShareCaption = () => {
   if (!data) return getFileName().replace(/\.[^.]+$/, '');
-  if (docType === 'invoice') return `Invoice #${data.id} for ${data.customerName} — Rs. ${(data.total || 0).toLocaleString()} | ${formatDateDisp(data.date)}`;
+  if (docType === 'invoice') return `Invoice #${data.id} for ${data.customerName} — Rs. ${(data.total || 0).toLocaleString('en-US')} | ${formatDateDisp(data.date)}`;
   if (docType === 'estimate') return `Price Estimate ${data.id} for ${data.customerName} | ${formatDateDisp(data.date)}`;
   if (docType === 'dispatch') return `Dispatch Note #${data.id} for ${data.customerName} | ${formatDateDisp(data.date)}`;
-  if (docType === 'receipt') return `Payment Receipt ${data.id} — Rs. ${(data.receivedAmount || 0).toLocaleString()} received from ${data.customerName}`;
-  if (docType === 'creditnote') return `Credit Note ${data.id} for ${data.customerName} — Rs. ${(data.total || 0).toLocaleString()}`;
+  if (docType === 'receipt') return `Payment Receipt ${data.id} — Rs. ${(data.receivedAmount || 0).toLocaleString('en-US')} received from ${data.customerName}`;
+  if (docType === 'creditnote') return `Credit Note ${data.id} for ${data.customerName} — Rs. ${(data.total || 0).toLocaleString('en-US')}`;
   if (docType === 'ledger') return `Account Statement: ${data.customerName} | ${formatDateDisp(data.dateRange?.start)} – ${formatDateDisp(data.dateRange?.end)}`;
   if (docType === 'report') return `${data.title || 'Analytics Report'} | Period: ${data.dateFilter || ''}`;
   return getFileName().replace(/\.[^.]+$/, '');
@@ -102,17 +102,17 @@ const generateShareText = () => {
     text += `Customer: *${data.customerName}*\n\n`;
     text += `*Items:*\n`;
     (data.items || []).forEach(i => {
-      const lineTotal = i.isBonus ? 'FREE' : `Rs.${((i.price || 0) * (i.quantity || 0)).toLocaleString()}`;
+      const lineTotal = i.isBonus ? 'FREE' : `Rs.${((i.price || 0) * (i.quantity || 0)).toLocaleString('en-US')}`;
       text += `• ${i.name}${i.isBonus ? ' 🎁' : ''} x${i.quantity} = ${lineTotal}\n`;
       if (i.isBonus) savings += (i.originalPrice || 0) * (i.quantity || 0);
     });
-    if ((data.deliveryBilled || 0) > 0) text += `🚚 Delivery: Rs.${Number(data.deliveryBilled).toLocaleString()}\n`;
+    if ((data.deliveryBilled || 0) > 0) text += `🚚 Delivery: Rs.${Number(data.deliveryBilled).toLocaleString('en-US')}\n`;
     text += `${hr}\n`;
-    text += `*Current Bill: Rs.${(data.total || 0).toLocaleString()}*\n`;
-    if (savings > 0) text += `🎁 Savings: Rs.${savings.toLocaleString()}\n`;
-    text += `Previous Bal: Rs.${prevBal.toLocaleString()}\n`;
-    if (received > 0) text += `Paid: Rs.${received.toLocaleString()}\n`;
-    text += `*Net Balance: Rs.${netBal.toLocaleString()}*\n`;
+    text += `*Current Bill: Rs.${(data.total || 0).toLocaleString('en-US')}*\n`;
+    if (savings > 0) text += `🎁 Savings: Rs.${savings.toLocaleString('en-US')}\n`;
+    text += `Previous Bal: Rs.${prevBal.toLocaleString('en-US')}\n`;
+    if (received > 0) text += `Paid: Rs.${received.toLocaleString('en-US')}\n`;
+    text += `*Net Balance: Rs.${netBal.toLocaleString('en-US')}*\n`;
 
   } else if (docType === 'estimate') {
     text += `*PRICE ESTIMATE / QUOTATION*\n`;
@@ -123,12 +123,12 @@ const generateShareText = () => {
     text += `*Items:*\n`;
     const estimateItemsTotal = (data.items || []).reduce((s, i) => s + (i?.isBonus ? 0 : (i?.price || 0) * (i?.quantity || 0)), 0);
     (data.items || []).forEach(i => {
-      const lineTotal = i.isBonus ? 'FREE' : `Rs.${((i.price || 0) * (i.quantity || 0)).toLocaleString()}`;
+      const lineTotal = i.isBonus ? 'FREE' : `Rs.${((i.price || 0) * (i.quantity || 0)).toLocaleString('en-US')}`;
       text += `• ${i.name}${i.isBonus ? ' 🎁' : ''} x${i.quantity} @ Rs.${i.price || 0} = ${lineTotal}\n`;
     });
-    if ((data.deliveryBilled || 0) > 0) text += `🚚 Delivery: Rs.${Number(data.deliveryBilled).toLocaleString()}\n`;
+    if ((data.deliveryBilled || 0) > 0) text += `🚚 Delivery: Rs.${Number(data.deliveryBilled).toLocaleString('en-US')}\n`;
     text += `${hr}\n`;
-    text += `*Estimated Total: Rs.${(estimateItemsTotal + (data.deliveryBilled || 0)).toLocaleString()}*\n\n`;
+    text += `*Estimated Total: Rs.${(estimateItemsTotal + (data.deliveryBilled || 0)).toLocaleString('en-US')}*\n\n`;
     text += `⚠ _Rates and availability can change anytime without prior notice._\n`;
     text += `This estimate is for reference only and does not constitute a final invoice.`;
 
@@ -141,10 +141,10 @@ const generateShareText = () => {
     if (data.originalInvoiceId) text += `Original Invoice: ${data.originalInvoiceId}\n`;
     text += `\n*Items Returned:*\n`;
     (data.items || []).forEach(i => {
-      text += `• ${i.name} ×${i.quantity} @ Rs.${i.price || 0} = Rs.${((i.price||0)*(i.quantity||0)).toLocaleString()}\n`;
+      text += `• ${i.name} ×${i.quantity} @ Rs.${i.price || 0} = Rs.${((i.price||0)*(i.quantity||0)).toLocaleString('en-US')}\n`;
     });
     text += `${hr}\n`;
-    text += `*Total Credit: Rs.${(data.total||0).toLocaleString()}*\n`;
+    text += `*Total Credit: Rs.${(data.total||0).toLocaleString('en-US')}*\n`;
     if (data.reason) text += `Reason: ${data.reason}\n`;
     text += `\nThis amount has been credited to your account.`;
 
@@ -180,10 +180,10 @@ const generateShareText = () => {
     text += `Date: ${formatDateDisp(data.date)}\n`;
     text += `Customer: *${data.customerName}*\n`;
     text += `${hr}\n`;
-    text += `*Amount Received: Rs.${(data.receivedAmount || 0).toLocaleString()}*\n`;
+    text += `*Amount Received: Rs.${(data.receivedAmount || 0).toLocaleString('en-US')}*\n`;
     if (data.note) text += `📝 Mode: ${data.note}\n`;
-    text += `Previous Bal: Rs.${(data.prevBalance || 0).toLocaleString()}\n`;
-    text += `*Remaining Bal: Rs.${(data.newBalance || 0).toLocaleString()}*\n\n`;
+    text += `Previous Bal: Rs.${(data.prevBalance || 0).toLocaleString('en-US')}\n`;
+    text += `*Remaining Bal: Rs.${(data.newBalance || 0).toLocaleString('en-US')}*\n\n`;
     text += `Thank you for your business! 🙏`;
 
   } else if (docType === 'ledger') {
@@ -194,10 +194,10 @@ const generateShareText = () => {
     text += `Period: ${formatDateDisp(data.dateRange?.start)} to ${formatDateDisp(data.dateRange?.end)}\n`;
     text += `${hr}\n`;
     const periodClosingBal = (data.openingBal || 0) + (data.totalDebit || 0) - (data.totalCredit || 0);
-    text += `Opening Balance: Rs.${(data.openingBal || 0).toLocaleString()}\n`;
-    text += `Total Debits: Rs.${(data.totalDebit || 0).toLocaleString()}\n`;
-    text += `Total Credits: Rs.${(data.totalCredit || 0).toLocaleString()}\n`;
-    text += `*Closing Balance: Rs.${periodClosingBal.toLocaleString()}*\n\n`;
+    text += `Opening Balance: Rs.${(data.openingBal || 0).toLocaleString('en-US')}\n`;
+    text += `Total Debits: Rs.${(data.totalDebit || 0).toLocaleString('en-US')}\n`;
+    text += `Total Credits: Rs.${(data.totalCredit || 0).toLocaleString('en-US')}\n`;
+    text += `*Closing Balance: Rs.${periodClosingBal.toLocaleString('en-US')}*\n\n`;
     text += `Please arrange payment at your earliest convenience.`;
 
   } else if (docType === 'report') {
@@ -207,20 +207,20 @@ const generateShareText = () => {
     if (data.view === 'Overview') {
       const s = data.stats || {};
       text += `*Financial Summary:*\n`;
-      text += `📦 Product Sales: Rs.${(s.productRevenue || 0).toLocaleString()}\n`;
-      text += `💸 Total COGS: Rs.${(s.totalCOGS || 0).toLocaleString()}\n`;
-      text += `📊 Gross Margin: Rs.${(s.grossMargin || 0).toLocaleString()}\n`;
-      text += `🚚 Delivery Billed: Rs.${(s.deliveryBilled || 0).toLocaleString()}\n`;
-      text += `🚗 Transport Exp: Rs.${(s.transportExpense || 0).toLocaleString()}\n`;
-      text += `🏢 Operational Exp: Rs.${(s.totalExpenses || 0).toLocaleString()}\n`;
+      text += `📦 Product Sales: Rs.${(s.productRevenue || 0).toLocaleString('en-US')}\n`;
+      text += `💸 Total COGS: Rs.${(s.totalCOGS || 0).toLocaleString('en-US')}\n`;
+      text += `📊 Gross Margin: Rs.${(s.grossMargin || 0).toLocaleString('en-US')}\n`;
+      text += `🚚 Delivery Billed: Rs.${(s.deliveryBilled || 0).toLocaleString('en-US')}\n`;
+      text += `🚗 Transport Exp: Rs.${(s.transportExpense || 0).toLocaleString('en-US')}\n`;
+      text += `🏢 Operational Exp: Rs.${(s.totalExpenses || 0).toLocaleString('en-US')}\n`;
       text += `${hr}\n`;
-      text += `*Net Profit: Rs.${(s.netProfit || 0).toLocaleString()}*`;
+      text += `*Net Profit: Rs.${(s.netProfit || 0).toLocaleString('en-US')}*`;
     } else {
       text += `*${data.view}:*\n`;
       (data.rows || []).slice(0, 10).forEach((r, i) => {
         text += `${i + 1}. *${r.Name || ''}*${r.Company ? ` (${r.Company})` : ''}\n`;
-        if (r.Qty !== undefined) text += `   Qty: ${(r.Qty || 0).toLocaleString()} | Rev: Rs.${(r.Revenue || 0).toLocaleString()} | GP: Rs.${(r.GrossProfit || 0).toLocaleString()}\n`;
-        else text += `   Balance: Rs.${(r.Amount || 0).toLocaleString()}\n`;
+        if (r.Qty !== undefined) text += `   Qty: ${(r.Qty || 0).toLocaleString('en-US')} | Rev: Rs.${(r.Revenue || 0).toLocaleString('en-US')} | GP: Rs.${(r.GrossProfit || 0).toLocaleString('en-US')}\n`;
+        else text += `   Balance: Rs.${(r.Amount || 0).toLocaleString('en-US')}\n`;
       });
       if ((data.rows || []).length > 10) text += `... and ${data.rows.length - 10} more`;
     }
@@ -709,17 +709,16 @@ return (
       </div>}
       <div style={{
         marginTop: sz('5px','7px','9px'),
-        display: 'inline-block',
-        lineHeight: '1.2',
-        padding: isThermal ? '4px 10px' : '5px 14px',
-        background: '#1e293b',
-        color: 'white',
-        borderRadius: '999px',
+        borderTop: '2px solid #1e293b',
+        borderBottom: '2px solid #1e293b',
+        padding: isThermal ? '3px 0' : '5px 0',
         fontWeight: 800,
         textTransform: 'uppercase',
-        letterSpacing: '1.5px',
+        letterSpacing: '2px',
         fontSize: sz('7px','8px','9px'),
         textAlign: 'center',
+        color: '#1e293b',
+        lineHeight: 1.4,
       }}>
         {docLabel}
       </div>
@@ -858,14 +857,14 @@ return (
                 }}>
                   <span style={{ color: '#475569' }}>{row.label}:</span>
                   <span style={{ color: row.color || '#1e293b' }}>
-                    {row.neg ? '− ' : ''}Rs. {Math.abs(row.val).toLocaleString()}
+                    {row.neg ? '− ' : ''}Rs. {Math.abs(row.val).toLocaleString('en-US')}
                   </span>
                 </div>
               ))}
               <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '2.5px solid #1e293b', marginTop: sz('8px','10px','12px'), paddingTop: sz('8px','10px','12px'), fontWeight: 900, fontSize: sz('14px','18px','22px') }}>
                 <span>Net Profit:</span>
                 <span style={{ color: (data.stats?.netProfit || 0) >= 0 ? '#059669' : '#dc2626' }}>
-                  Rs. {(data.stats?.netProfit || 0).toLocaleString()}
+                  Rs. {(data.stats?.netProfit || 0).toLocaleString('en-US')}
                 </span>
               </div>
             </div>
@@ -895,10 +894,10 @@ return (
                     {rName}
                     {rBrand ? <span style={{ fontSize: '7.5px', color: '#94a3b8', display: 'block' }}>{rBrand}</span> : null}
                   </td>
-                  {data.view !== 'Receivables' && <td style={{ padding: sz('4px','6px','7px'), textAlign: 'center' }}>{Number(rQty).toLocaleString()}</td>}
-                  {data.view !== 'Receivables' && <td style={{ padding: sz('4px','6px','7px'), textAlign: 'right' }}>Rs.{Number(rRev).toLocaleString()}</td>}
+                  {data.view !== 'Receivables' && <td style={{ padding: sz('4px','6px','7px'), textAlign: 'center' }}>{Number(rQty).toLocaleString('en-US')}</td>}
+                  {data.view !== 'Receivables' && <td style={{ padding: sz('4px','6px','7px'), textAlign: 'right' }}>Rs.{Number(rRev).toLocaleString('en-US')}</td>}
                   <td style={{ padding: sz('4px','6px','7px'), textAlign: 'right', fontWeight: 800, color: '#059669' }}>
-                    Rs.{Number(rGP).toLocaleString()}
+                    Rs.{Number(rGP).toLocaleString('en-US')}
                   </td>
                 </tr>
                 );
@@ -915,9 +914,9 @@ return (
                 <tfoot>
                   <tr style={{ background: '#1e293b', color: 'white', fontWeight: 900, fontSize: sz('8px','9px','10px') }}>
                     <td style={{ padding: sz('4px 4px','6px 6px','7px 8px') }}>TOTAL ({safeRows.length})</td>
-                    {data.view !== 'Receivables' && <td style={{ padding: sz('4px','6px','7px'), textAlign: 'center' }}>{totalQty.toLocaleString()}</td>}
-                    {data.view !== 'Receivables' && <td style={{ padding: sz('4px','6px','7px'), textAlign: 'right' }}>Rs.{totalRev.toLocaleString()}</td>}
-                    <td style={{ padding: sz('4px','6px','7px'), textAlign: 'right' }}>Rs.{totalGP.toLocaleString()}</td>
+                    {data.view !== 'Receivables' && <td style={{ padding: sz('4px','6px','7px'), textAlign: 'center' }}>{totalQty.toLocaleString('en-US')}</td>}
+                    {data.view !== 'Receivables' && <td style={{ padding: sz('4px','6px','7px'), textAlign: 'right' }}>Rs.{totalRev.toLocaleString('en-US')}</td>}
+                    <td style={{ padding: sz('4px','6px','7px'), textAlign: 'right' }}>Rs.{totalGP.toLocaleString('en-US')}</td>
                   </tr>
                 </tfoot>
               );
@@ -971,10 +970,10 @@ return (
                       <span style={{ color: '#059669', fontWeight: 800, fontSize: sz('7px','8px','9px'), textTransform: 'uppercase' }}>Free</span>
                     ) : (
                       <>
-                        <span>Rs.{(item?.price || 0).toLocaleString()}</span>
+                        <span>Rs.{(item?.price || 0).toLocaleString('en-US')}</span>
                         {isThermal && (
                           <span style={{ display: 'block', fontWeight: 800, marginTop: '2px', paddingTop: '1px', borderTop: '1px dotted #e2e8f0', fontSize: '9px', color: '#1e293b' }}>
-                            = {((item?.price || 0) * (item?.quantity || 0)).toLocaleString()}
+                            = {((item?.price || 0) * (item?.quantity || 0)).toLocaleString('en-US')}
                           </span>
                         )}
                       </>
@@ -990,7 +989,7 @@ return (
                   <td style={{ padding: sz('','7px 4px 7px 0','8px 0 8px 4px'), textAlign: 'right', fontWeight: 800, color: '#1e293b' }}>
                     {item?.isBonus
                       ? <span style={{ color: '#059669' }}>Rs. 0</span>
-                      : `Rs. ${((item?.price || 0) * (item?.quantity || 0)).toLocaleString()}`}
+                      : `Rs. ${((item?.price || 0) * (item?.quantity || 0)).toLocaleString('en-US')}`}
                   </td>
                 )}
               </tr>
@@ -1024,9 +1023,9 @@ return (
           return (
             <div className="keep-together" style={{ marginLeft: 'auto', width: isThermal ? '100%' : sz('','240px','280px'), borderTop: '2px solid #7c3aed', paddingTop: sz('8px','10px','12px') }}>
               {[
-                { label: 'Items Subtotal', val: `Rs. ${estimateSubtotal.toLocaleString()}` },
-                (data.deliveryBilled || 0) > 0 && { label: 'Delivery', val: `Rs. ${Number(data.deliveryBilled).toLocaleString()}`, muted: true },
-                { label: 'Estimated Total', val: `Rs. ${estimateGrandTotal.toLocaleString()}`, bold: true, large: true, divider: true },
+                { label: 'Items Subtotal', val: `Rs. ${estimateSubtotal.toLocaleString('en-US')}` },
+                (data.deliveryBilled || 0) > 0 && { label: 'Delivery', val: `Rs. ${Number(data.deliveryBilled).toLocaleString('en-US')}`, muted: true },
+                { label: 'Estimated Total', val: `Rs. ${estimateGrandTotal.toLocaleString('en-US')}`, bold: true, large: true, divider: true },
               ].filter(Boolean).map((row, i) => (
                 <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: sz('3px','4px','5px'), borderTop: row.divider ? '1px solid #e2e8f0' : 'none', paddingTop: row.divider ? sz('4px','5px','7px') : 0, marginTop: row.divider ? sz('3px','4px','5px') : 0, fontWeight: row.bold ? 800 : 500, fontSize: row.large ? sz('10px','12px','13px') : sz('8px','9px','10px'), fontVariantNumeric: 'tabular-nums' }}>
                   <span style={{ color: row.muted ? '#94a3b8' : '#475569' }}>{row.label}:</span>
@@ -1046,12 +1045,12 @@ return (
           return (
             <div className="keep-together" style={{ marginLeft: 'auto', width: isThermal ? '100%' : sz('','240px','280px'), borderTop: '2px solid #1e293b', paddingTop: sz('8px','10px','12px') }}>
               {[
-                { label: 'Items Subtotal', val: `Rs. ${itemsSubtotal.toLocaleString()}` },
-                (data.deliveryBilled || 0) > 0 && { label: `Delivery (${data.vehicle || ''})`, val: `Rs. ${Number(data.deliveryBilled).toLocaleString()}`, muted: true },
-                { label: 'Current Bill', val: `Rs. ${(data.total || 0).toLocaleString()}`, bold: true, large: true, divider: true },
-                { label: 'Previous Balance', val: `Rs. ${prevBalance.toLocaleString()}`, top: true },
-                { label: 'Subtotal', val: `Rs. ${(prevBalance + (data.total || 0)).toLocaleString()}`, bold: true },
-                received > 0 && { label: 'Payment Received', val: `− Rs. ${received.toLocaleString()}`, color: '#059669' },
+                { label: 'Items Subtotal', val: `Rs. ${itemsSubtotal.toLocaleString('en-US')}` },
+                (data.deliveryBilled || 0) > 0 && { label: `Delivery (${data.vehicle || ''})`, val: `Rs. ${Number(data.deliveryBilled).toLocaleString('en-US')}`, muted: true },
+                { label: 'Current Bill', val: `Rs. ${(data.total || 0).toLocaleString('en-US')}`, bold: true, large: true, divider: true },
+                { label: 'Previous Balance', val: `Rs. ${prevBalance.toLocaleString('en-US')}`, top: true },
+                { label: 'Subtotal', val: `Rs. ${(prevBalance + (data.total || 0)).toLocaleString('en-US')}`, bold: true },
+                received > 0 && { label: 'Payment Received', val: `− Rs. ${received.toLocaleString('en-US')}`, color: '#059669' },
               ].filter(Boolean).map((row, i) => row && (
                 <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: sz('3px','4px','5px'), borderTop: row.divider || row.top ? '1px solid #e2e8f0' : 'none', paddingTop: row.divider || row.top ? sz('4px','5px','7px') : 0, marginTop: row.divider || row.top ? sz('3px','4px','5px') : 0, fontWeight: row.bold ? 800 : 500, fontSize: row.large ? sz('10px','12px','13px') : sz('8px','9px','10px') }}>
                   <span style={{ color: row.muted ? '#94a3b8' : '#475569' }}>{row.label}:</span>
@@ -1060,12 +1059,12 @@ return (
               ))}
               <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '2px solid #1e293b', marginTop: sz('4px','5px','6px'), paddingTop: sz('5px','6px','8px'), fontWeight: 900, fontSize: sz('11px','13px','15px'), color: '#1e293b', fontVariantNumeric: 'tabular-nums' }}>
                 <span>Net Balance:</span>
-                <span>Rs. {netBalance.toLocaleString()}</span>
+                <span>Rs. {netBalance.toLocaleString('en-US')}</span>
               </div>
               {totalSavings > 0 && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: sz('6px','8px','10px'), padding: sz('5px 8px','6px 10px','8px 12px'), background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: '8px', fontWeight: 800, fontSize: sz('8px','9px','10px'), color: '#065f46' }}>
                   <span>Bonus Savings:</span>
-                  <span>Rs. {totalSavings.toLocaleString()}</span>
+                  <span>Rs. {totalSavings.toLocaleString('en-US')}</span>
                 </div>
               )}
             </div>
@@ -1078,7 +1077,7 @@ return (
             <div className="keep-together" style={{ marginLeft: 'auto', width: isThermal ? '100%' : sz('','240px','280px'), borderTop: '2px solid #e11d48', paddingTop: sz('8px','10px','12px') }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: sz('12px','14px','16px'), color: '#e11d48' }}>
                 <span>Total Credit:</span>
-                <span>Rs. {cnSubtotal.toLocaleString()}</span>
+                <span>Rs. {cnSubtotal.toLocaleString('en-US')}</span>
               </div>
               {data.originalInvoiceId && (
                 <div style={{ marginTop: '8px', fontSize: sz('7px','8px','9px'), color: '#64748b' }}>
@@ -1106,11 +1105,11 @@ return (
 
         {/* ── Estimate Disclaimer ── */}
         {docType === 'estimate' && (
-          <div className="keep-together" style={{ marginTop: sz('12px','16px','20px'), border: '1.5px solid #7c3aed', borderRadius: '8px', overflow: 'hidden', fontSize: sz('6.5px','7.5px','8.5px') }}>
-            <div style={{ background: '#7c3aed', color: 'white', padding: sz('4px 8px','5px 12px','6px 14px'), fontWeight: 900, textAlign: 'center', letterSpacing: '0.5px', textTransform: 'uppercase', fontSize: sz('6.5px','7px','8px') }}>
+          <div className="keep-together" style={{ marginTop: sz('12px','16px','20px'), border: '1.5px solid #7c3aed', borderRadius: '8px', fontSize: sz('6.5px','7.5px','8.5px') }}>
+            <div style={{ background: '#7c3aed', color: 'white', padding: sz('4px 8px','5px 12px','6px 14px'), fontWeight: 900, textAlign: 'center', letterSpacing: '0.5px', textTransform: 'uppercase', fontSize: sz('6.5px','7px','8px'), borderRadius: '6px 6px 0 0' }}>
               Important Notice — Rates &amp; Availability
             </div>
-            <div style={{ padding: sz('6px 8px','8px 12px','10px 14px'), background: '#faf5ff', color: '#4c1d95', lineHeight: 1.7, fontWeight: 600, fontSize: sz('7px','8px','9px') }}>
+            <div style={{ padding: sz('6px 8px','8px 12px','10px 14px'), background: '#faf5ff', color: '#4c1d95', lineHeight: 1.7, fontWeight: 600, fontSize: sz('7px','8px','9px'), borderRadius: '0 0 6px 6px' }}>
               ⚠ Rates and availability can change anytime without prior notice. This estimate is for reference purposes only and does <strong>not</strong> constitute a final invoice. Final pricing will be confirmed at the time of order.
             </div>
           </div>
@@ -1118,22 +1117,22 @@ return (
 
         {/* ── Credit Note Acknowledgement ── */}
         {docType === 'creditnote' && (
-          <div className="keep-together" style={{ marginTop: sz('12px','16px','20px'), border: '1.5px solid #e11d48', borderRadius: '8px', overflow: 'hidden', fontSize: sz('6.5px','7.5px','8.5px') }}>
-            <div style={{ background: '#e11d48', color: 'white', padding: sz('4px 8px','5px 12px','6px 14px'), fontWeight: 900, textAlign: 'center', letterSpacing: '0.5px', textTransform: 'uppercase', fontSize: sz('6.5px','7px','8px') }}>
+          <div className="keep-together" style={{ marginTop: sz('12px','16px','20px'), border: '1.5px solid #e11d48', borderRadius: '8px', fontSize: sz('6.5px','7.5px','8.5px') }}>
+            <div style={{ background: '#e11d48', color: 'white', padding: sz('4px 8px','5px 12px','6px 14px'), fontWeight: 900, textAlign: 'center', letterSpacing: '0.5px', textTransform: 'uppercase', fontSize: sz('6.5px','7px','8px'), borderRadius: '6px 6px 0 0' }}>
               Credit Note Acknowledgement
             </div>
-            <div style={{ padding: sz('6px 8px','8px 12px','10px 14px'), background: '#fff1f2', color: '#881337', lineHeight: 1.7, fontWeight: 600, fontSize: sz('7px','8px','9px') }}>
+            <div style={{ padding: sz('6px 8px','8px 12px','10px 14px'), background: '#fff1f2', color: '#881337', lineHeight: 1.7, fontWeight: 600, fontSize: sz('7px','8px','9px'), borderRadius: '0 0 6px 6px' }}>
               This credit note reduces the customer's outstanding balance by the amount shown above. The returned goods have been accepted subject to inspection and verification.
             </div>
           </div>
         )}
 
         {/* ── Return / Exchange Policy ── */}
-        {docType !== 'estimate' && docType !== 'creditnote' && <div className="keep-together" style={{ marginTop: sz('12px','16px','20px'), border: '1.5px solid #1e293b', borderRadius: '8px', overflow: 'hidden', fontSize: sz('6.5px','7.5px','8.5px') }}>
-          <div style={{ background: '#1e293b', color: 'white', padding: sz('4px 8px','5px 12px','6px 14px'), fontWeight: 900, textAlign: 'center', letterSpacing: '0.5px', textTransform: 'uppercase', fontSize: sz('6.5px','7px','8px') }}>
+        {docType !== 'estimate' && docType !== 'creditnote' && <div className="keep-together" style={{ marginTop: sz('12px','16px','20px'), border: '1.5px solid #1e293b', borderRadius: '8px', fontSize: sz('6.5px','7.5px','8.5px') }}>
+          <div style={{ background: '#1e293b', color: 'white', padding: sz('4px 8px','5px 12px','6px 14px'), fontWeight: 900, textAlign: 'center', letterSpacing: '0.5px', textTransform: 'uppercase', fontSize: sz('6.5px','7px','8px'), borderRadius: '6px 6px 0 0' }}>
             "No" Return / Exchange Policy on Some Items
           </div>
-          <div style={{ padding: sz('6px 8px','8px 12px','10px 14px'), background: '#f8fafc' }}>
+          <div style={{ padding: sz('6px 8px','8px 12px','10px 14px'), background: '#f8fafc', borderRadius: '0 0 6px 6px' }}>
             <div style={{ color: '#334155', lineHeight: 1.7, marginBottom: sz('4px','5px','6px') }}>
               To ensure <strong>"Reliable, Authentic &amp; Storage Maintained"</strong> Vet. Medical Supplies, there is a <strong>No Return / No Exchange</strong> policy for the following items:
             </div>
@@ -1157,19 +1156,19 @@ return (
           <div style={{ fontSize: sz('7.5px','8.5px','9px'), fontWeight: 700, color: '#15803d', textTransform: 'uppercase', letterSpacing: '2px' }}>
             Amount Received
           </div>
-          <div style={{ fontSize: sz('24px','32px','40px'), fontWeight: 900, color: '#059669', marginTop: sz('4px','6px','8px'), lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
-            Rs. {(data.receivedAmount || 0).toLocaleString()}
+          <div style={{ fontSize: sz('24px','32px','40px'), fontWeight: 900, color: '#059669', marginTop: sz('4px','6px','8px'), lineHeight: 1.3, fontVariantNumeric: 'tabular-nums' }}>
+            Rs. {(data.receivedAmount || 0).toLocaleString('en-US')}
           </div>
           {data.note && (
-            <div style={{ display: 'inline-block', lineHeight: '1.2', marginTop: sz('8px','10px','12px'), padding: sz('5px 10px','6px 14px','8px 16px'), background: 'white', borderRadius: '999px', border: '1px solid #86efac', fontSize: sz('9px','10px','11px'), fontWeight: 600, color: '#15803d', wordBreak: 'break-word', textAlign: 'center' }}>
+            <div style={{ marginTop: sz('6px','8px','10px'), fontSize: sz('9px','10px','11px'), fontWeight: 700, color: '#15803d', lineHeight: 1.4 }}>
               {data.note}
             </div>
           )}
         </div>
         <div style={{ borderTop: '2px solid #1e293b', paddingTop: sz('10px','14px','16px') }}>
           {[
-            { label: 'Previous Balance', val: `Rs. ${(data.prevBalance || 0).toLocaleString()}`, color: '#64748b' },
-            { label: 'Amount Credited', val: `− Rs. ${(data.receivedAmount || 0).toLocaleString()}`, color: '#059669' },
+            { label: 'Previous Balance', val: `Rs. ${(data.prevBalance || 0).toLocaleString('en-US')}`, color: '#64748b' },
+            { label: 'Amount Credited', val: `− Rs. ${(data.receivedAmount || 0).toLocaleString('en-US')}`, color: '#059669' },
           ].map((r, i) => (
             <div key={i} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: sz('5px','7px','8px'), fontWeight: 600, fontSize: sz('10px','11px','12px'), color: r.color }}>
               <span>{r.label}:</span><span>{r.val}</span>
@@ -1177,7 +1176,7 @@ return (
           ))}
           <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 900, fontSize: sz('11px','14px','16px'), color: '#1e293b', borderTop: '1px solid #e2e8f0', paddingTop: sz('6px','8px','10px'), marginTop: sz('4px','5px','6px'), fontVariantNumeric: 'tabular-nums' }}>
             <span>Remaining Balance:</span>
-            <span>Rs. {(data.newBalance || 0).toLocaleString()}</span>
+            <span>Rs. {(data.newBalance || 0).toLocaleString('en-US')}</span>
           </div>
         </div>
       </div>
@@ -1197,9 +1196,9 @@ return (
             { label: 'Credit (Cr)', val: data.totalCredit || 0, color: '#059669', bg: '#f0fdf4', border: '#bbf7d0' },
             { label: 'Balance', val: closingBal, color: closingBal > 0 ? '#be123c' : '#065f46', bg: closingBal > 0 ? '#fff1f2' : '#f0fdf4', border: closingBal > 0 ? '#fecdd3' : '#bbf7d0' },
           ].map((item, i) => (
-            <div key={i} style={{ background: item.bg, border: `1px solid ${item.border}`, borderRadius: sz('6px','7px','8px'), padding: sz('4px 4px','5px 6px','6px 8px'), textAlign: 'center', overflow: 'hidden' }}>
+            <div key={i} style={{ background: item.bg, border: `1px solid ${item.border}`, borderRadius: sz('6px','7px','8px'), padding: sz('4px 4px','5px 6px','6px 8px'), textAlign: 'center' }}>
               <div style={{ fontSize: sz('5.5px','6.5px','7px'), fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', color: '#94a3b8', marginBottom: '2px', whiteSpace: 'nowrap' }}>{item.label}</div>
-              <div style={{ fontSize: sz('8px','10px','11px'), fontWeight: 900, color: item.color, fontVariantNumeric: 'tabular-nums', lineHeight: 1.2, ...(isThermal ? { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } : { wordBreak: 'break-all' }) }}>Rs.{item.val.toLocaleString()}</div>
+              <div style={{ fontSize: sz('8px','10px','11px'), fontWeight: 900, color: item.color, fontVariantNumeric: 'tabular-nums', lineHeight: 1.2, wordBreak: 'break-all' }}>Rs.{item.val.toLocaleString('en-US')}</div>
             </div>
           ))}
         </div>
@@ -1226,24 +1225,24 @@ return (
                   {!isSimple && <span style={{ fontSize: sz('6px','7px','7.5px'), color: '#94a3b8', fontWeight: 500, display: 'block', marginTop: '1px', wordBreak: 'break-all' }}>{row.ref || ''}</span>}
                   {!isSimple && (row.lineItems || []).length > 0 && (row.lineItems || []).map((li, idx) => (
                     <div key={idx} style={{ fontSize: sz('6px','7px','7.5px'), color: '#475569', display: 'flex', justifyContent: 'space-between', marginTop: '2px', paddingLeft: '6px' }}>
-                      <span style={{ flex: 1 }}>{li.isBonus ? '🎁 ' : '• '}{li.name} ×{li.qty}{!li.isBonus && ` @ Rs.${(li.price||0).toLocaleString()}`}</span>
-                      <span style={{ fontWeight: 700, marginLeft: '6px', flexShrink: 0 }}>{li.isBonus ? 'FREE' : `Rs.${(li.subtotal||0).toLocaleString()}`}</span>
+                      <span style={{ flex: 1 }}>{li.isBonus ? '🎁 ' : '• '}{li.name} ×{li.qty}{!li.isBonus && ` @ Rs.${(li.price||0).toLocaleString('en-US')}`}</span>
+                      <span style={{ fontWeight: 700, marginLeft: '6px', flexShrink: 0 }}>{li.isBonus ? 'FREE' : `Rs.${(li.subtotal||0).toLocaleString('en-US')}`}</span>
                     </div>
                   ))}
                   {!isSimple && (row.deliveryBilled || 0) > 0 && (
                     <div style={{ fontSize: sz('6px','7px','7.5px'), color: '#94a3b8', display: 'flex', justifyContent: 'space-between', paddingLeft: '6px', marginTop: '1px' }}>
-                      <span>+ Delivery</span><span>Rs.{(row.deliveryBilled||0).toLocaleString()}</span>
+                      <span>+ Delivery</span><span>Rs.{(row.deliveryBilled||0).toLocaleString('en-US')}</span>
                     </div>
                   )}
                 </td>
                 <td style={{ padding: sz('3px 2px','5px 4px','6px 6px'), textAlign: 'right', fontWeight: 800, color: '#4338ca', fontVariantNumeric: 'tabular-nums', fontSize: sz('7px','8.5px','9.5px') }}>
-                  {(row.debit || 0) > 0 ? (row.debit || 0).toLocaleString() : '—'}
+                  {(row.debit || 0) > 0 ? (row.debit || 0).toLocaleString('en-US') : '—'}
                 </td>
                 <td style={{ padding: sz('3px 2px','5px 4px','6px 6px'), textAlign: 'right', fontWeight: 800, color: '#059669', fontVariantNumeric: 'tabular-nums', fontSize: sz('7px','8.5px','9.5px') }}>
-                  {(row.credit || 0) > 0 ? (row.credit || 0).toLocaleString() : '—'}
+                  {(row.credit || 0) > 0 ? (row.credit || 0).toLocaleString('en-US') : '—'}
                 </td>
                 <td style={{ padding: sz('3px 2px','5px 4px','6px 6px'), textAlign: 'right', fontWeight: 900, color: (row.balance || 0) > 0 ? '#be123c' : '#065f46', fontVariantNumeric: 'tabular-nums', fontSize: sz('7px','8.5px','9.5px') }}>
-                  {(row.balance || 0).toLocaleString()}
+                  {(row.balance || 0).toLocaleString('en-US')}
                 </td>
               </tr>
             ))}
@@ -1256,9 +1255,9 @@ return (
               <td colSpan={2} style={{ padding: sz('4px 2px','6px 4px','7px 6px'), textAlign: 'right', fontWeight: 700, textTransform: 'uppercase', fontSize: sz('6px','7px','7.5px'), letterSpacing: '0.5px' }}>
                 Totals:
               </td>
-              <td style={{ padding: sz('4px 2px','6px 4px','7px 6px'), textAlign: 'right', fontWeight: 900, fontVariantNumeric: 'tabular-nums', fontSize: sz('7px','8.5px','9.5px') }}>{(data.totalDebit || 0).toLocaleString()}</td>
-              <td style={{ padding: sz('4px 2px','6px 4px','7px 6px'), textAlign: 'right', fontWeight: 900, fontVariantNumeric: 'tabular-nums', fontSize: sz('7px','8.5px','9.5px') }}>{(data.totalCredit || 0).toLocaleString()}</td>
-              <td style={{ padding: sz('4px 2px','6px 4px','7px 6px'), textAlign: 'right', fontWeight: 900, fontVariantNumeric: 'tabular-nums', fontSize: sz('7px','8.5px','9.5px') }}>{closingBal.toLocaleString()}</td>
+              <td style={{ padding: sz('4px 2px','6px 4px','7px 6px'), textAlign: 'right', fontWeight: 900, fontVariantNumeric: 'tabular-nums', fontSize: sz('7px','8.5px','9.5px') }}>{(data.totalDebit || 0).toLocaleString('en-US')}</td>
+              <td style={{ padding: sz('4px 2px','6px 4px','7px 6px'), textAlign: 'right', fontWeight: 900, fontVariantNumeric: 'tabular-nums', fontSize: sz('7px','8.5px','9.5px') }}>{(data.totalCredit || 0).toLocaleString('en-US')}</td>
+              <td style={{ padding: sz('4px 2px','6px 4px','7px 6px'), textAlign: 'right', fontWeight: 900, fontVariantNumeric: 'tabular-nums', fontSize: sz('7px','8.5px','9.5px') }}>{closingBal.toLocaleString('en-US')}</td>
             </tr>
           </tfoot>
         </table>
