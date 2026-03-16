@@ -605,13 +605,13 @@ return (
         display: 'inline-block',
         background: '#1e293b',
         color: 'white',
-        padding: isThermal ? '2px 10px' : '3px 14px',
+        padding: isThermal ? '4px 10px' : '5px 14px',
         borderRadius: '999px',
         fontWeight: 800,
         textTransform: 'uppercase',
         letterSpacing: '1.5px',
         fontSize: sz('7px','8px','9px'),
-        lineHeight: 1.4,
+        lineHeight: 1,
         verticalAlign: 'middle',
       }}>
         {docLabel}
@@ -1054,7 +1054,7 @@ return (
             Rs. {(data.receivedAmount || 0).toLocaleString()}
           </div>
           {data.note && (
-            <div style={{ display: 'inline-block', marginTop: sz('8px','10px','12px'), padding: sz('3px 10px','4px 14px','6px 16px'), background: 'white', borderRadius: '999px', border: '1px solid #86efac', fontSize: sz('9px','10px','11px'), fontWeight: 600, color: '#15803d', wordBreak: 'break-word', lineHeight: 1.4, verticalAlign: 'middle' }}>
+            <div style={{ display: 'inline-block', marginTop: sz('8px','10px','12px'), padding: sz('5px 10px','6px 14px','8px 16px'), background: 'white', borderRadius: '999px', border: '1px solid #86efac', fontSize: sz('9px','10px','11px'), fontWeight: 600, color: '#15803d', wordBreak: 'break-word', lineHeight: 1, verticalAlign: 'middle' }}>
               {data.note}
             </div>
           )}
