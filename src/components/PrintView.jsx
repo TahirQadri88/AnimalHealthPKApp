@@ -351,17 +351,19 @@ const handleThermalPrint = async () => {
   });
 
   Object.assign(clone.style, {
-    position: 'fixed', left: '-9999px', top: '0',
+    position: 'absolute', left: '-9999px', top: '0',
     width: targetW + 'px', maxWidth: targetW + 'px', minWidth: targetW + 'px',
     // 10px (≈2.6mm) side padding inside the canvas keeps text away from the image edge
     margin: '0', padding: '8px 10px', boxShadow: 'none', zIndex: '-1', background: 'white',
   });
   document.body.appendChild(clone);
+  const elH = clone.scrollHeight;
 
   try {
     const canvas = await window.html2canvas(clone, {
-      scale: SCALE, useCORS: true, logging: false,
+      scale: SCALE, useCORS: true, logging: false, letterRendering: true,
       width: targetW, windowWidth: targetW,
+      height: elH, windowHeight: elH,
       backgroundColor: '#ffffff', scrollX: 0, scrollY: 0,
     });
     if (document.body.contains(clone)) document.body.removeChild(clone);
@@ -531,15 +533,20 @@ const handleImageShare = async () => {
     const targetW = isThermal ? 302 : isA5 ? 559 : 794;
     const clone = element.cloneNode(true);
     Object.assign(clone.style, {
-      position: 'fixed', left: '-9999px', top: '0',
+      position: 'absolute', left: '-9999px', top: '0',
       width: targetW + 'px', maxWidth: targetW + 'px', minWidth: targetW + 'px',
       margin: '0', boxShadow: 'none', zIndex: '-1', background: 'white',
     });
     document.body.appendChild(clone);
+    const elH = clone.scrollHeight;
+
+    await new Promise(r => setTimeout(r, 150));
 
     const canvas = await window.html2canvas(clone, {
-      scale: 2, useCORS: true, logging: false,
-      width: targetW, windowWidth: targetW, backgroundColor: '#ffffff',
+      scale: 2, useCORS: true, logging: false, letterRendering: true,
+      width: targetW, windowWidth: targetW,
+      height: elH, windowHeight: elH,
+      backgroundColor: '#ffffff', scrollX: 0, scrollY: 0,
     });
     if (document.body.contains(clone)) document.body.removeChild(clone);
 
