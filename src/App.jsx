@@ -1635,7 +1635,7 @@ React.useEffect(() => {
     showBusinessNameOnDocs: appSettings.showBusinessNameOnDocs !== false,
     showBusinessNameOnReports: appSettings.showBusinessNameOnReports !== false,
   });
-}, [appSettings?.id, appSettings?.businessName]);
+}, [appSettings?.id, appSettings?.businessName, appSettings?.showBusinessNameOnDocs, appSettings?.showBusinessNameOnReports]);
 const saveSettings = async () => { await saveToFirebase('appSettings', 'main', form); showToast('Settings saved!'); };
 const downloadBackup = () => {
   const backup = { exportedAt: new Date().toISOString(), collections: { app_users: appUsers, companies, products, customers, invoices, expenses, expenseCategories, payments, cities, areas, customerTypes } };
@@ -3186,6 +3186,12 @@ console.error("Firebase Write Error:", e);
 showToast("Network Error - Could not save", "error");
 }
 };
+
+React.useEffect(() => {
+  if (appSettings?.id === 'main' && appSettings.showBusinessNameOnDocs === undefined) {
+    saveToFirebase('appSettings', 'main', { ...appSettings, showBusinessNameOnDocs: true, showBusinessNameOnReports: true });
+  }
+}, [appSettings?.id, appSettings?.showBusinessNameOnDocs]);
 
 const deleteFromFirebase = async (collectionName, id) => {
 try {

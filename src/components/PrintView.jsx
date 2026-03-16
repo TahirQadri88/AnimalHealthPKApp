@@ -1172,7 +1172,7 @@ return (
       paddingTop: sz('10px','12px','14px'),
       borderTop: '1px dashed #e2e8f0',
     }}>
-      Software Generated · {APP_NAME} · {formatDateDisp(getLocalDateStr())}
+      Software Generated{showOnDocs ? ` · ${bizName}` : ''} · {formatDateDisp(getLocalDateStr())}
     </div>
   </div>
 
