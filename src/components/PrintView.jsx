@@ -603,9 +603,8 @@ return (
       <div style={{
         marginTop: sz('5px','7px','9px'),
         display: 'inline-block',
-        height: sz('15px','18px','19px'),
-        lineHeight: sz('15px','18px','19px'),
-        padding: isThermal ? '0 10px' : '0 14px',
+        lineHeight: sz('7px','8px','9px'),
+        padding: isThermal ? '4px 10px' : '5px 14px',
         background: '#1e293b',
         color: 'white',
         borderRadius: '999px',
@@ -613,7 +612,6 @@ return (
         textTransform: 'uppercase',
         letterSpacing: '1.5px',
         fontSize: sz('7px','8px','9px'),
-        verticalAlign: 'middle',
       }}>
         {docLabel}
       </div>
@@ -1055,7 +1053,7 @@ return (
             Rs. {(data.receivedAmount || 0).toLocaleString()}
           </div>
           {data.note && (
-            <div style={{ display: 'inline-block', height: sz('19px','22px','27px'), lineHeight: sz('19px','22px','27px'), marginTop: sz('8px','10px','12px'), padding: sz('0 10px','0 14px','0 16px'), background: 'white', borderRadius: '999px', border: '1px solid #86efac', fontSize: sz('9px','10px','11px'), fontWeight: 600, color: '#15803d', wordBreak: 'break-word', verticalAlign: 'middle' }}>
+            <div style={{ display: 'inline-block', lineHeight: sz('9px','10px','11px'), marginTop: sz('8px','10px','12px'), padding: sz('5px 10px','6px 14px','8px 16px'), background: 'white', borderRadius: '999px', border: '1px solid #86efac', fontSize: sz('9px','10px','11px'), fontWeight: 600, color: '#15803d', wordBreak: 'break-word' }}>
               {data.note}
             </div>
           )}
