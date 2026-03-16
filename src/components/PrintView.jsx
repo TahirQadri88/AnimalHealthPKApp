@@ -235,6 +235,17 @@ const buildHtmlDoc = () => {
   if (!element) return null;
   const clone = element.cloneNode(true);
   clone.removeAttribute('class');
+
+  // THERMAL: mark dark-background elements so CSS can restore white text
+  if (isThermal) {
+    const parseRgb = s => { const m = (s || '').match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/); return m ? [+m[1], +m[2], +m[3]] : null; };
+    const lum = ([r, g, b]) => (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    clone.querySelectorAll('*').forEach(el => {
+      const bg = el.style.background || el.style.backgroundColor;
+      const rgb = parseRgb(bg);
+      if (rgb && lum(rgb) < 0.45) el.setAttribute('data-dk', '1');
+    });
+  }
   const paperW  = isThermal ? '80mm' : isA5 ? '148mm' : '210mm';
   const padding = isThermal ? '12px' : isA5 ? '20px' : '28px';
   const widthCss = isThermal
@@ -268,6 +279,7 @@ const buildHtmlDoc = () => {
     #doc-wrap{padding:${bodyPad};}
     @media print{#nav-bar{display:none!important;}body{background:white;margin:0;}@page{size:${pageSize};margin:0;}
       #doc-wrap{padding:${pageMargin};}#doc>*{width:100%!important;max-width:none!important;padding:0!important;}}
+    ${isThermal ? `@media print{#doc *{color:black!important;}[data-dk],[data-dk] *{color:white!important;}}` : ''}
   </style>
 </head>
 <body>
@@ -282,8 +294,94 @@ const buildHtmlDoc = () => {
   return { html, docTitle };
 };
 
+// ── Thermal print: html2canvas 4× scale → image → print window ───────────
+// This gives dark, crisp output on thermal printers regardless of browser DPI.
+const handleThermalPrint = async () => {
+  const element = document.getElementById('print-document');
+  if (!element) { showToast('Document not found', 'error'); return; }
+  showToast('Preparing thermal print…');
+
+  // Load html2canvas if not already loaded
+  if (!window.html2canvas) {
+    await new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+      s.onload = resolve; s.onerror = reject;
+      document.head.appendChild(s);
+    }).catch(() => null);
+  }
+
+  // If html2canvas still unavailable, fall back to regular HTML print
+  if (!window.html2canvas) {
+    showToast('Falling back to standard print…');
+    const result = buildHtmlDoc();
+    if (!result) return;
+    const newWin = window.open('', '_blank');
+    if (!newWin) { showToast('Allow popups to enable printing', 'error'); return; }
+    newWin.document.open(); newWin.document.write(result.html); newWin.document.close();
+    newWin.onload = () => { newWin.focus(); newWin.print(); };
+    setTimeout(() => { try { newWin.focus(); newWin.print(); } catch (e) {} }, 900);
+    return;
+  }
+
+  const targetW = 302; // 80 mm at 96 dpi
+  const SCALE   = 4;   // Render at 4× → ~384 effective dpi → dark crisp output
+
+  // Clone and apply high-contrast colours (gray text → black, preserve white-on-dark)
+  const clone = element.cloneNode(true);
+  const parseRgb = s => { const m = (s || '').match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/); return m ? [+m[1], +m[2], +m[3]] : null; };
+  const lum = ([r, g, b]) => (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  clone.querySelectorAll('*').forEach(el => {
+    const bgRgb = parseRgb(el.style.background || el.style.backgroundColor);
+    const bgLum = bgRgb ? lum(bgRgb) : 1;
+    const fgRgb = parseRgb(el.style.color);
+    if (fgRgb) {
+      const fgL = lum(fgRgb);
+      // Light bg + gray/muted text → force black
+      if (bgLum >= 0.5 && fgL > 0.15 && fgL < 0.95) el.style.color = '#000000';
+      // Dark bg + dark text → restore white
+      if (bgLum < 0.4 && fgL < 0.7) el.style.color = '#ffffff';
+    }
+    // Lighten near-invisible borders slightly so they print
+    if (el.style.borderColor) {
+      const bcRgb = parseRgb(el.style.borderColor);
+      if (bcRgb && lum(bcRgb) > 0.85) el.style.borderColor = '#aaaaaa';
+    }
+  });
+
+  Object.assign(clone.style, {
+    position: 'fixed', left: '-9999px', top: '0',
+    width: targetW + 'px', maxWidth: targetW + 'px', minWidth: targetW + 'px',
+    margin: '0', padding: '8px', boxShadow: 'none', zIndex: '-1', background: 'white',
+  });
+  document.body.appendChild(clone);
+
+  try {
+    const canvas = await window.html2canvas(clone, {
+      scale: SCALE, useCORS: true, logging: false,
+      width: targetW, windowWidth: targetW,
+      backgroundColor: '#ffffff', scrollX: 0, scrollY: 0,
+    });
+    if (document.body.contains(clone)) document.body.removeChild(clone);
+
+    const imgDataUrl = canvas.toDataURL('image/png');
+    const newWin = window.open('', '_blank');
+    if (!newWin) { showToast('Allow popups to enable printing', 'error'); return; }
+    newWin.document.write(`<!DOCTYPE html><html><head>
+<style>*{margin:0;padding:0;box-sizing:border-box;}@page{size:80mm auto;margin:0;}@media print{body{margin:0;background:white;}}img{width:80mm;max-width:80mm;display:block;}</style>
+</head><body><img src="${imgDataUrl}"><script>window.onload=function(){window.focus();window.print();}<\/script></body></html>`);
+    newWin.document.close();
+  } catch (e) {
+    if (document.body.contains(clone)) document.body.removeChild(clone);
+    showToast('Print failed — try PDF instead', 'error');
+  }
+};
+
 // ── Print — opens clean new window and auto-triggers print dialog ─────────
 const handlePrint = () => {
+  // Thermal: render via html2canvas at 4× scale for dark, crisp output
+  if (isThermal) { handleThermalPrint(); return; }
+
   const result = buildHtmlDoc();
   if (!result) { showToast('Document not found', 'error'); return; }
   const { html } = result;
@@ -603,7 +701,7 @@ return (
       <div style={{
         marginTop: sz('5px','7px','9px'),
         display: 'inline-block',
-        lineHeight: 1.4,
+        lineHeight: '1.2',
         padding: isThermal ? '4px 10px' : '5px 14px',
         background: '#1e293b',
         color: 'white',
@@ -612,6 +710,7 @@ return (
         textTransform: 'uppercase',
         letterSpacing: '1.5px',
         fontSize: sz('7px','8px','9px'),
+        textAlign: 'center',
       }}>
         {docLabel}
       </div>
@@ -656,7 +755,7 @@ return (
           {docType !== 'ledger' && (
             <>
               <div style={{ fontSize: '7px', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '1px', color: '#94a3b8', marginBottom: '2px' }}>Ref #</div>
-              <div style={{ fontWeight: 800, fontSize: sz('9px','11px','12px'), color: '#1e293b', wordBreak: 'break-all', maxWidth: isThermal ? '90px' : '160px', lineHeight: 1.2, fontFamily: 'monospace' }}>{data.id || '—'}</div>
+              <div style={{ fontWeight: 800, fontSize: sz('9px','11px','12px'), color: '#1e293b', maxWidth: isThermal ? '95px' : '160px', lineHeight: 1.2, fontFamily: 'monospace', ...(isThermal ? { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } : { wordBreak: 'break-all' }) }}>{data.id || '—'}</div>
               <div style={{ color: '#64748b', fontSize: sz('8px','9px','10px'), marginTop: '2px', fontWeight: 600 }}>{formatDateDisp(data.date)}</div>
               {docType === 'invoice' && data.salespersonName && (
                 <div style={{ fontSize: sz('7px','8px','9px'), color: '#94a3b8', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: isThermal ? '90px' : '160px' }}>by {data.salespersonName}</div>
@@ -1053,7 +1152,7 @@ return (
             Rs. {(data.receivedAmount || 0).toLocaleString()}
           </div>
           {data.note && (
-            <div style={{ display: 'inline-block', lineHeight: 1.4, marginTop: sz('8px','10px','12px'), padding: sz('5px 10px','6px 14px','8px 16px'), background: 'white', borderRadius: '999px', border: '1px solid #86efac', fontSize: sz('9px','10px','11px'), fontWeight: 600, color: '#15803d', wordBreak: 'break-word' }}>
+            <div style={{ display: 'inline-block', lineHeight: '1.2', marginTop: sz('8px','10px','12px'), padding: sz('5px 10px','6px 14px','8px 16px'), background: 'white', borderRadius: '999px', border: '1px solid #86efac', fontSize: sz('9px','10px','11px'), fontWeight: 600, color: '#15803d', wordBreak: 'break-word', textAlign: 'center' }}>
               {data.note}
             </div>
           )}
