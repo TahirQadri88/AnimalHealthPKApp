@@ -270,16 +270,14 @@ const buildHtmlDoc = () => {
   <title>${docTitle}</title>
   <style>
     *{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
-    body{margin:0;padding:0;background:#f1f5f9;font-family:system-ui,-apple-system,sans-serif;}
-    @page{size:${pageSize};margin:0;}
-    #doc-wrap{padding:${bodyPad};}
-    @media print{body{background:white;margin:0;}
-      #doc-wrap{padding:${pageMargin};}#doc>*{width:100%!important;max-width:none!important;padding:0!important;}}
+    body{margin:0;padding:${bodyPad};background:white;font-family:system-ui,-apple-system,sans-serif;}
+    @page{size:${pageSize};margin:${pageMargin};}
+    @media print{body{padding:0;background:white;}#doc>*{width:100%!important;max-width:none!important;}}
     ${isThermal ? `@media print{#doc *{color:black!important;}[data-dk],[data-dk] *{color:white!important;}}` : ''}
   </style>
 </head>
 <body>
-<div id="doc-wrap"><div id="doc">${clone.outerHTML}</div></div>
+<div id="doc">${clone.outerHTML}</div>
 </body>
 </html>`;
   return { html, docTitle };
@@ -515,20 +513,27 @@ const handleImageShare = async () => {
     if (!window.htmlToImage) return;
   }
 
-  try {
-    // Capture the live element directly — it is already rendered in the DOM
-    // at the correct format width. html-to-image requires the element to be
-    // within the viewport; cloning off-screen (left:-9999px) produces blank output.
-    const printRoot = document.getElementById('print-root');
-    if (printRoot) printRoot.scrollTop = 0;
-    await new Promise(r => setTimeout(r, 150));
+  // Clone the element and position it within the viewport at z-index:-1.
+  // html-to-image uses SVG foreignObject and cannot render elements at left:-9999px;
+  // position:fixed at top:0 left:0 keeps it in-viewport while hidden behind the app UI.
+  const targetW = isThermal ? 302 : isA5 ? 559 : 794;
+  const clone = element.cloneNode(true);
+  Object.assign(clone.style, {
+    position: 'fixed', top: '0', left: '0',
+    width: targetW + 'px', maxWidth: targetW + 'px', minWidth: targetW + 'px',
+    margin: '0', boxShadow: 'none', zIndex: '-1', background: 'white', overflow: 'visible',
+  });
+  document.body.appendChild(clone);
+  await new Promise(r => setTimeout(r, 200));
 
-    const dataUrl = await window.htmlToImage.toJpeg(element, {
+  try {
+    const dataUrl = await window.htmlToImage.toJpeg(clone, {
       quality: 0.95,
       pixelRatio: 2,
       backgroundColor: '#ffffff',
-      height: element.scrollHeight,
+      height: clone.scrollHeight,
     });
+    if (document.body.contains(clone)) document.body.removeChild(clone);
 
     const blob = await (await fetch(dataUrl)).blob();
     const imgFileName = getFileName().replace(/\.pdf$/, '.jpg');
@@ -540,6 +545,7 @@ const handleImageShare = async () => {
       downloadImageFallback(blob, imgFileName);
     }
   } catch (e) {
+    if (document.body.contains(clone)) document.body.removeChild(clone);
     showToast('Image failed — use Print instead', 'error');
   }
 };
