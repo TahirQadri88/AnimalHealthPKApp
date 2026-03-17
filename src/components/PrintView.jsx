@@ -332,6 +332,7 @@ const handleThermalPrint = async () => {
     position: 'fixed', top: '0', left: '0',
     width: targetW + 'px', maxWidth: targetW + 'px', minWidth: targetW + 'px',
     margin: '0', padding: '8px 10px', boxShadow: 'none', zIndex: '-1', background: 'white',
+    overflow: 'visible',
   });
   document.body.appendChild(clone);
   await new Promise(r => setTimeout(r, 200));
@@ -352,18 +353,42 @@ const handleThermalPrint = async () => {
     if (bcRgb && lum(bcRgb) > 0.85) el.style.borderColor = '#aaaaaa';
   });
 
+  // Binary threshold: convert captured PNG to pure B&W.
+  // Thermal printers need solid black pixels — anti-aliased gray edges from SVG→Canvas
+  // rendering print as faint gray dots. luma < 180 → black, ≥ 180 → white.
+  const applyThermalThreshold = dataUrl => new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement('canvas');
+      c.width = img.width; c.height = img.height;
+      const ctx = c.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      const id = ctx.getImageData(0, 0, c.width, c.height);
+      const d = id.data;
+      for (let i = 0; i < d.length; i += 4) {
+        const luma = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+        const v = luma < 180 ? 0 : 255;
+        d[i] = d[i + 1] = d[i + 2] = v;
+      }
+      ctx.putImageData(id, 0, 0);
+      resolve(c.toDataURL('image/png'));
+    };
+    img.src = dataUrl;
+  });
+
   try {
-    const imgDataUrl = await window.htmlToImage.toPng(clone, {
+    const rawDataUrl = await window.htmlToImage.toPng(clone, {
       pixelRatio: 4,           // 4× = ~384 DPI for crisp thermal output
       backgroundColor: '#ffffff',
     });
     if (document.body.contains(clone)) document.body.removeChild(clone);
+    const imgDataUrl = await applyThermalThreshold(rawDataUrl);
 
     const newWin = window.open('', '_blank');
     if (!newWin) { showToast('Allow popups to enable printing', 'error'); return; }
     newWin.document.write(`<!DOCTYPE html><html><head>
 <title>${docTitle}</title>
-<style>*{margin:0;padding:0;box-sizing:border-box;}html,body{width:80mm;max-width:80mm;overflow:hidden;}@page{size:80mm auto;margin:0;}@media print{body{margin:0;background:white;}}img{width:80mm;max-width:80mm;display:block;}</style>
+<style>*{margin:0;padding:0;box-sizing:border-box;}html,body{width:80mm;max-width:80mm;}@page{size:80mm auto;margin:0;}@media print{body{margin:0;background:white;}}img{width:80mm;max-width:80mm;display:block;}</style>
 </head><body><img src="${imgDataUrl}"><script>window.onload=function(){window.focus();window.print();}<\/script></body></html>`);
     newWin.document.close();
     newWin.document.title = docTitle;
