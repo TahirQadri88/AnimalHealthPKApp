@@ -396,7 +396,7 @@ const handleThermalPrint = async () => {
 
   try {
     const rawDataUrl = await window.htmlToImage.toPng(clone, {
-      pixelRatio: 4,           // 4× = ~384 DPI for crisp thermal output
+      pixelRatio: 6,           // 6× = ~575 DPI — finer threshold jagging
       backgroundColor: '#ffffff',
     });
     if (document.body.contains(clone)) document.body.removeChild(clone);
@@ -406,7 +406,7 @@ const handleThermalPrint = async () => {
     if (!newWin) { showToast('Allow popups to enable printing', 'error'); return; }
     newWin.document.write(`<!DOCTYPE html><html><head>
 <title>${docTitle}</title>
-<style>*{margin:0;padding:0;box-sizing:border-box;}html,body{width:80mm;max-width:80mm;}@page{size:80mm auto;margin:0;}@media print{body{margin:0;background:white;}}img{width:80mm;max-width:80mm;display:block;}</style>
+<style>*{margin:0;padding:0;box-sizing:border-box;}html,body{width:80mm;max-width:80mm;}@page{size:80mm auto;margin:0;}@media print{body{margin:0;background:white;}}img{width:100%;display:block;}</style>
 </head><body><img src="${imgDataUrl}"><script>window.onload=function(){window.focus();window.print();}<\/script></body></html>`);
     newWin.document.close();
     newWin.document.title = docTitle;
