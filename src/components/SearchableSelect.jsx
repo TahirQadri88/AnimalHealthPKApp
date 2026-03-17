@@ -2,24 +2,6 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { createPortal } from 'react-dom';
 import { ChevronDown } from 'lucide-react';
 
-/**
- * SearchableSelect — drop-in replacement for native <select> for large dynamic lists.
- *
- * Props:
- *   value        - current value (string or number)
- *   onChange(e)  - called with { target: { value } }, same API as native <select>
- *   options      - flat:   [{ value, label }]
- *                  grouped: [{ group: 'Name', options: [{ value, label }] }]
- *   placeholder  - text shown when nothing is selected (default '– Select –')
- *   className    - applied to the trigger button (pass your inputClass here)
- *   disabled     - bool
- *
- * Keyboard support:
- *   Enter / Space / ArrowDown  — open
- *   ArrowUp / ArrowDown        — navigate items
- *   Enter                      — select highlighted item
- *   Escape / Tab               — close without selecting
- */
 const SearchableSelect = ({
   value,
   onChange,
@@ -30,17 +12,18 @@ const SearchableSelect = ({
 }) => {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
-  const [hi, setHi] = useState(-1); // highlighted index in filtered list
+  const [hi, setHi] = useState(-1);
   const [pos, setPos] = useState({ top: 0, left: 0, width: 200 });
 
   const triggerRef = useRef(null);
   const inputRef = useRef(null);
   const listRef = useRef(null);
-  const dropdownRef = useRef(null);
+  // Timestamp of last backdrop-close — used to prevent the backdrop pointerdown
+  // from causing the trigger's onClick to immediately re-open the dropdown.
+  const lastCloseTs = useRef(0);
 
   const isGrouped = options.length > 0 && options[0]?.group !== undefined;
 
-  // Flat list used for search + keyboard navigation
   const flatItems = useMemo(() =>
     options.flatMap(o => o.group ? o.options.map(i => ({ ...i, _group: o.group })) : [o]),
     [options]
@@ -58,6 +41,11 @@ const SearchableSelect = ({
     [flatItems, value]
   );
 
+  const closeMenu = useCallback(() => {
+    lastCloseTs.current = Date.now();
+    setOpen(false); setSearch(''); setHi(-1);
+  }, []);
+
   const emit = useCallback((v) => {
     onChange({ target: { value: v } });
     setOpen(false); setSearch(''); setHi(-1);
@@ -67,9 +55,8 @@ const SearchableSelect = ({
     if (disabled) return;
     const rect = triggerRef.current?.getBoundingClientRect();
     if (!rect) return;
-    // Flip upward if not enough space below
     const spaceBelow = window.innerHeight - rect.bottom;
-    const dropH = Math.min(filtered.length * 36 + 60, 260); // rough estimate
+    const dropH = Math.min(filtered.length * 36 + 60, 260);
     const top = spaceBelow < dropH && rect.top > dropH
       ? rect.top - dropH - 4
       : rect.bottom + 4;
@@ -77,27 +64,11 @@ const SearchableSelect = ({
     setOpen(true);
   }, [disabled, filtered.length]);
 
-  // Close on outside click (desktop) or outside tap (mobile)
-  useEffect(() => {
-    if (!open) return;
-    const isOutside = (target) =>
-      !triggerRef.current?.contains(target) &&
-      !dropdownRef.current?.contains(target);
-    // mousedown covers desktop clicks
-    const onMouseDown = (e) => { if (isOutside(e.target)) { setOpen(false); setSearch(''); setHi(-1); } };
-    // touchstart covers mobile taps — fires before mousedown/click, reliable on all mobile browsers.
-    // We do NOT use a scroll listener because on mobile the soft keyboard appearing fires scroll
-    // events that would close the dropdown immediately after it opens.
-    const onTouchStart = (e) => {
-      if (isOutside(e.touches[0]?.target)) { setOpen(false); setSearch(''); setHi(-1); }
-    };
-    document.addEventListener('mousedown', onMouseDown);
-    document.addEventListener('touchstart', onTouchStart, { passive: true });
-    return () => {
-      document.removeEventListener('mousedown', onMouseDown);
-      document.removeEventListener('touchstart', onTouchStart);
-    };
-  }, [open]);
+  // Trigger click — ignore if we just closed via backdrop (prevents immediate re-open)
+  const handleTriggerClick = useCallback(() => {
+    if (Date.now() - lastCloseTs.current < 300) return;
+    openMenu();
+  }, [openMenu]);
 
   // Auto-focus search input when opened
   useEffect(() => { if (open) inputRef.current?.focus(); }, [open]);
@@ -120,7 +91,7 @@ const SearchableSelect = ({
       case 'Escape':
         e.preventDefault();
         e.stopPropagation(); // prevent Escape from also closing the parent modal
-        setOpen(false); setSearch(''); setHi(-1);
+        closeMenu();
         triggerRef.current?.querySelector('button')?.focus();
         break;
       case 'ArrowDown':
@@ -137,7 +108,7 @@ const SearchableSelect = ({
         else if (hi === -1 && filtered.length === 1) emit(filtered[0].value);
         break;
       case 'Tab':
-        setOpen(false); setSearch(''); setHi(-1);
+        closeMenu();
         break;
       default:
         break;
@@ -159,7 +130,7 @@ const SearchableSelect = ({
       <button
         type="button"
         disabled={disabled}
-        onClick={openMenu}
+        onClick={handleTriggerClick}
         onKeyDown={handleKeyDown}
         className={`${className} flex items-center justify-between gap-1 text-left ${disabled ? 'opacity-60 pointer-events-none' : ''}`}
         aria-haspopup="listbox"
@@ -175,85 +146,95 @@ const SearchableSelect = ({
         />
       </button>
 
-      {/* Dropdown portal — position:fixed escapes overflow:hidden ancestors (modals) */}
       {open && createPortal(
-        <div
-          ref={dropdownRef}
-          style={{ position: 'fixed', top: pos.top, left: pos.left, width: pos.width, zIndex: 9999 }}
-          className="bg-white rounded-xl border border-slate-200 shadow-2xl overflow-hidden"
-          onMouseDown={e => e.preventDefault()} // keep focus in search input
-        >
-          {/* Search input */}
-          <div className="p-2 border-b border-slate-100">
-            <input
-              ref={inputRef}
-              value={search}
-              onChange={e => { setSearch(e.target.value); setHi(0); }}
-              onKeyDown={handleKeyDown}
-              placeholder="Search…"
-              className="w-full px-2.5 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 font-medium placeholder-slate-400"
-            />
-          </div>
+        <>
+          {/*
+           * Invisible full-screen backdrop — sits behind the dropdown (z-9998).
+           * Any tap/click that lands outside the dropdown hits this first.
+           * onPointerDown fires on first contact (works for both mouse and touch,
+           * no timing races with document listeners or scroll events).
+           */}
+          <div
+            style={{ position: 'fixed', inset: 0, zIndex: 9998 }}
+            onPointerDown={closeMenu}
+          />
 
-          {/* Options list */}
-          <div ref={listRef} className="overflow-y-auto max-h-52">
-            {/* Clear / placeholder option */}
-            <button
-              type="button"
-              onClick={() => emit('')}
-              className="w-full text-left px-3 py-2 text-[11px] text-slate-400 hover:bg-slate-50 font-medium border-b border-slate-100"
-            >
-              {placeholder}
-            </button>
+          {/* Dropdown — above backdrop (z-9999) so its taps never reach the backdrop */}
+          <div
+            style={{ position: 'fixed', top: pos.top, left: pos.left, width: pos.width, zIndex: 9999 }}
+            className="bg-white rounded-xl border border-slate-200 shadow-2xl overflow-hidden"
+            onMouseDown={e => e.preventDefault()} // keep focus in search input on desktop
+          >
+            {/* Search input */}
+            <div className="p-2 border-b border-slate-100">
+              <input
+                ref={inputRef}
+                value={search}
+                onChange={e => { setSearch(e.target.value); setHi(0); }}
+                onKeyDown={handleKeyDown}
+                placeholder="Search…"
+                className="w-full px-2.5 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 font-medium placeholder-slate-400"
+              />
+            </div>
 
-            {filtered.length === 0 && (
-              <div className="px-3 py-4 text-center text-sm text-slate-400 font-medium">
-                No results for &ldquo;{search}&rdquo;
-              </div>
-            )}
-
-            {/* When searching or flat list: render flat */}
-            {(search || !isGrouped) && filtered.map((item, idx) => (
+            {/* Options list */}
+            <div ref={listRef} className="overflow-y-auto max-h-52">
+              {/* Clear / placeholder option */}
               <button
                 type="button"
-                key={String(item.value)}
-                data-si={idx}
-                onClick={() => emit(item.value)}
-                className={itemClass(item.value, idx)}
+                onClick={() => emit('')}
+                className="w-full text-left px-3 py-2 text-[11px] text-slate-400 hover:bg-slate-50 font-medium border-b border-slate-100"
               >
-                {item.label}
-                {search && item._group && (
-                  <span className="ml-1.5 text-[10px] font-normal text-slate-400">
-                    · {item._group}
-                  </span>
-                )}
+                {placeholder}
               </button>
-            ))}
 
-            {/* When not searching and grouped: render with group headers */}
-            {!search && isGrouped && options.map(grp => (
-              <div key={grp.group}>
-                <div className="px-3 pt-2 pb-0.5 text-[9px] font-black uppercase tracking-widest text-slate-400 bg-slate-50/80">
-                  {grp.group}
+              {filtered.length === 0 && (
+                <div className="px-3 py-4 text-center text-sm text-slate-400 font-medium">
+                  No results for &ldquo;{search}&rdquo;
                 </div>
-                {grp.options.map(item => (
-                  <button
-                    type="button"
-                    key={String(item.value)}
-                    onClick={() => emit(item.value)}
-                    className={`w-full text-left px-4 py-1.5 text-sm font-semibold transition-colors ${
-                      String(item.value) === String(value)
-                        ? 'bg-indigo-50 text-indigo-700'
-                        : 'text-slate-700 hover:bg-slate-50'
-                    }`}
-                  >
-                    {item.label}
-                  </button>
-                ))}
-              </div>
-            ))}
+              )}
+
+              {(search || !isGrouped) && filtered.map((item, idx) => (
+                <button
+                  type="button"
+                  key={String(item.value)}
+                  data-si={idx}
+                  onClick={() => emit(item.value)}
+                  className={itemClass(item.value, idx)}
+                >
+                  {item.label}
+                  {search && item._group && (
+                    <span className="ml-1.5 text-[10px] font-normal text-slate-400">
+                      · {item._group}
+                    </span>
+                  )}
+                </button>
+              ))}
+
+              {!search && isGrouped && options.map(grp => (
+                <div key={grp.group}>
+                  <div className="px-3 pt-2 pb-0.5 text-[9px] font-black uppercase tracking-widest text-slate-400 bg-slate-50/80">
+                    {grp.group}
+                  </div>
+                  {grp.options.map(item => (
+                    <button
+                      type="button"
+                      key={String(item.value)}
+                      onClick={() => emit(item.value)}
+                      className={`w-full text-left px-4 py-1.5 text-sm font-semibold transition-colors ${
+                        String(item.value) === String(value)
+                          ? 'bg-indigo-50 text-indigo-700'
+                          : 'text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              ))}
+            </div>
           </div>
-        </div>,
+        </>,
         document.body
       )}
     </div>
