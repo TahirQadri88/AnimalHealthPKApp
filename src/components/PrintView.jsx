@@ -359,35 +359,38 @@ const handleThermalPrint = async () => {
   // Step 3: threshold at midpoint 128 → pure black or pure white, alpha forced opaque.
   // This correctly handles cases where html-to-image renders text as light gray instead of
   // black — contrast stretch makes the relative difference visible before thresholding.
-  const applyThermalThreshold = dataUrl => new Promise(resolve => {
+  const applyThermalThreshold = dataUrl => new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => {
-      const c = document.createElement('canvas');
-      c.width = img.width; c.height = img.height;
-      const ctx = c.getContext('2d');
-      ctx.drawImage(img, 0, 0);
-      const id = ctx.getImageData(0, 0, c.width, c.height);
-      const d = id.data;
-      // Pass 1: find luminance range (skip fully transparent pixels)
-      let minL = 255, maxL = 0;
-      for (let i = 0; i < d.length; i += 4) {
-        if (d[i + 3] < 10) continue;
-        const luma = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
-        if (luma < minL) minL = luma;
-        if (luma > maxL) maxL = luma;
-      }
-      const range = maxL - minL;
-      // Pass 2: stretch contrast then threshold at midpoint
-      for (let i = 0; i < d.length; i += 4) {
-        const luma = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
-        const stretched = range > 10 ? ((luma - minL) / range) * 255 : luma;
-        const v = stretched < 128 ? 0 : 255;
-        d[i] = d[i + 1] = d[i + 2] = v;
-        d[i + 3] = 255; // force fully opaque
-      }
-      ctx.putImageData(id, 0, 0);
-      resolve(c.toDataURL('image/png'));
+      try {
+        const c = document.createElement('canvas');
+        c.width = img.width; c.height = img.height;
+        const ctx = c.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        const id = ctx.getImageData(0, 0, c.width, c.height);
+        const d = id.data;
+        // Pass 1: find luminance range (skip fully transparent pixels)
+        let minL = 255, maxL = 0;
+        for (let i = 0; i < d.length; i += 4) {
+          if (d[i + 3] < 10) continue;
+          const luma = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+          if (luma < minL) minL = luma;
+          if (luma > maxL) maxL = luma;
+        }
+        const range = maxL - minL;
+        // Pass 2: stretch contrast then threshold at midpoint
+        for (let i = 0; i < d.length; i += 4) {
+          const luma = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+          const stretched = range > 10 ? ((luma - minL) / range) * 255 : luma;
+          const v = stretched < 128 ? 0 : 255;
+          d[i] = d[i + 1] = d[i + 2] = v;
+          d[i + 3] = 255; // force fully opaque
+        }
+        ctx.putImageData(id, 0, 0);
+        resolve(c.toDataURL('image/png'));
+      } catch (err) { reject(err); }
     };
+    img.onerror = reject;
     img.src = dataUrl;
   });
 
@@ -397,7 +400,7 @@ const handleThermalPrint = async () => {
       backgroundColor: '#ffffff',
     });
     if (document.body.contains(clone)) document.body.removeChild(clone);
-    const imgDataUrl = await applyThermalThreshold(rawDataUrl);
+    const imgDataUrl = await applyThermalThreshold(rawDataUrl).catch(() => rawDataUrl);
 
     const newWin = window.open('', '_blank');
     if (!newWin) { showToast('Allow popups to enable printing', 'error'); return; }
