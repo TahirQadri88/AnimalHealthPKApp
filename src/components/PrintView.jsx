@@ -353,9 +353,12 @@ const handleThermalPrint = async () => {
     if (bcRgb && lum(bcRgb) > 0.85) el.style.borderColor = '#aaaaaa';
   });
 
-  // Binary threshold: convert captured PNG to pure B&W.
-  // Thermal printers need solid black pixels — anti-aliased gray edges from SVG→Canvas
-  // rendering print as faint gray dots. luma < 180 → black, ≥ 180 → white.
+  // Auto-levels + binary threshold → pure B&W for crisp thermal output.
+  // Step 1: find actual luminance range in the captured image (min/max).
+  // Step 2: stretch that range to 0–255 (so even a globally-light capture is fully utilized).
+  // Step 3: threshold at midpoint 128 → pure black or pure white, alpha forced opaque.
+  // This correctly handles cases where html-to-image renders text as light gray instead of
+  // black — contrast stretch makes the relative difference visible before thresholding.
   const applyThermalThreshold = dataUrl => new Promise(resolve => {
     const img = new Image();
     img.onload = () => {
@@ -365,10 +368,22 @@ const handleThermalPrint = async () => {
       ctx.drawImage(img, 0, 0);
       const id = ctx.getImageData(0, 0, c.width, c.height);
       const d = id.data;
+      // Pass 1: find luminance range (skip fully transparent pixels)
+      let minL = 255, maxL = 0;
+      for (let i = 0; i < d.length; i += 4) {
+        if (d[i + 3] < 10) continue;
+        const luma = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+        if (luma < minL) minL = luma;
+        if (luma > maxL) maxL = luma;
+      }
+      const range = maxL - minL;
+      // Pass 2: stretch contrast then threshold at midpoint
       for (let i = 0; i < d.length; i += 4) {
         const luma = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
-        const v = luma < 180 ? 0 : 255;
+        const stretched = range > 10 ? ((luma - minL) / range) * 255 : luma;
+        const v = stretched < 128 ? 0 : 255;
         d[i] = d[i + 1] = d[i + 2] = v;
+        d[i + 3] = 255; // force fully opaque
       }
       ctx.putImageData(id, 0, 0);
       resolve(c.toDataURL('image/png'));
