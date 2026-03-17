@@ -44,7 +44,27 @@ const checkDateFilter = (dateStr, filter) => {
   return true;
 };
 
-const exportToCSV = (data, filename, options = {}) => {
+// shareOrDownload — on mobile browsers that support Web Share API with files,
+// opens the native share sheet (WhatsApp, email, Drive, etc.).
+// Falls back to a standard anchor-click download on desktop/unsupported browsers.
+const shareOrDownload = async (blob, filename) => {
+  const file = new File([blob], filename, { type: blob.type });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file], title: filename });
+      return; // shared successfully
+    } catch (e) {
+      if (e.name === 'AbortError') return; // user cancelled — don't fall through to download
+    }
+  }
+  // Fallback: direct download
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+};
+
+const exportToCSV = async (data, filename, options = {}) => {
   if(!data || !data.length) return;
   const { title, subtitle, totals } = options;
   const q = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
@@ -64,10 +84,7 @@ const exportToCSV = (data, filename, options = {}) => {
   }
   // BOM prefix ensures correct encoding in Excel
   const blob = new Blob(['\uFEFF' + lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
-  const url = window.URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = filename; a.click();
-  URL.revokeObjectURL(url);
+  await shareOrDownload(blob, filename);
 };
 
-export { APP_NAME, VEHICLES, getPKTDate, getLocalDateStr, formatDateDisp, checkDateFilter, exportToCSV };
+export { APP_NAME, VEHICLES, getPKTDate, getLocalDateStr, formatDateDisp, checkDateFilter, exportToCSV, shareOrDownload };

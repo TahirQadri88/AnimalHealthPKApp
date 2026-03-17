@@ -12,8 +12,9 @@ AlignLeft, Bell, Star, Layers, Globe, PhoneCall, MapPin, Briefcase, ClipboardLis
 RotateCcw, FileText
 } from 'lucide-react';
 import { db, collection, onSnapshot, doc, setDoc, deleteDoc } from './firebase';
-import { APP_NAME, VEHICLES, getPKTDate, getLocalDateStr, formatDateDisp, checkDateFilter, exportToCSV } from './helpers';
+import { APP_NAME, VEHICLES, getPKTDate, getLocalDateStr, formatDateDisp, checkDateFilter, exportToCSV, shareOrDownload } from './helpers';
 import PrintView from './components/PrintView';
+import SearchableSelect from './components/SearchableSelect';
 
 const AppContext = createContext(null);
 
@@ -34,15 +35,34 @@ const RIDER_VEHICLE_TYPES = ['Rider', 'Rickshaw', 'Suzuki'];
 
 // ─── TOP-LEVEL MODAL COMPONENTS (outside App to prevent focus-loss on re-render) ───
 
+const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
 const ModalWrapper = ({ title, children, onClose }) => {
+const panelRef = useRef(null);
 useEffect(() => {
-const prev = document.body.style.overflow;
-document.body.style.overflow = 'hidden';
-return () => { document.body.style.overflow = prev; };
+  const prev = document.body.style.overflow;
+  document.body.style.overflow = 'hidden';
+  // Auto-focus first focusable element
+  const first = panelRef.current?.querySelectorAll(FOCUSABLE)?.[0];
+  first?.focus();
+  return () => { document.body.style.overflow = prev; };
 }, []);
+useEffect(() => {
+  const onKey = (e) => {
+    if (e.key === 'Escape') { onClose(); return; }
+    if (e.key === 'Tab') {
+      const els = Array.from(panelRef.current?.querySelectorAll(FOCUSABLE) || []);
+      if (!els.length) return;
+      const first = els[0]; const last = els[els.length - 1];
+      if (e.shiftKey) { if (document.activeElement === first) { e.preventDefault(); last.focus(); } }
+      else { if (document.activeElement === last) { e.preventDefault(); first.focus(); } }
+    }
+  };
+  window.addEventListener('keydown', onKey);
+  return () => window.removeEventListener('keydown', onKey);
+}, [onClose]);
 return (
 <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex justify-center items-end sm:items-center" onMouseDown={(e) => { if(e.target === e.currentTarget) onClose(); }}>
-<div className="bg-white w-full max-w-lg rounded-t-3xl sm:rounded-3xl h-[85vh] sm:h-auto max-h-[90vh] flex flex-col animate-slide-up shadow-2xl" onMouseDown={e => e.stopPropagation()}>
+<div ref={panelRef} className="bg-white w-full max-w-lg rounded-t-3xl sm:rounded-3xl h-[85vh] sm:h-auto max-h-[90vh] flex flex-col animate-slide-up shadow-2xl" onMouseDown={e => e.stopPropagation()}>
 <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-white rounded-t-3xl sm:rounded-t-3xl">
 <h2 className="text-lg font-bold text-slate-800">{title}</h2>
 <button onClick={onClose} className="p-2 bg-slate-100 rounded-full text-slate-500 hover:bg-slate-200 hover:text-slate-800 transition-colors"><X size={20}/></button>
@@ -76,9 +96,9 @@ const scroll = (d) => ref.current?.scrollBy({ left: d * 100, behavior: 'smooth' 
 const btnBase = `shrink-0 p-1 rounded-lg border border-slate-300 text-slate-500 hover:text-slate-800 transition-all ${bgClass || 'bg-white'}`;
 return (
   <div className={`flex items-center gap-1 ${className}`}>
-    <button onClick={() => scroll(-1)} className={`${btnBase} ${showLeft ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}><ChevronLeft size={14}/></button>
+    <button onClick={() => scroll(-1)} tabIndex={showLeft ? 0 : -1} aria-label="Scroll tabs left" className={`${btnBase} ${showLeft ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}><ChevronLeft size={14}/></button>
     <div ref={ref} className="flex flex-1 gap-1 overflow-x-auto scrollbar-hide" onScroll={check}>{children}</div>
-    <button onClick={() => scroll(1)} className={`${btnBase} ${showRight ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}><ChevronRight size={14}/></button>
+    <button onClick={() => scroll(1)} tabIndex={showRight ? 0 : -1} aria-label="Scroll tabs right" className={`${btnBase} ${showRight ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}><ChevronRight size={14}/></button>
   </div>
 );
 };
@@ -160,7 +180,7 @@ return (
 <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
 <div className="flex justify-between items-center mb-3"><label className="text-[10px] font-bold text-rose-500 uppercase tracking-wider">Manufacturer / Company *</label><button onClick={() => setIsAddingCompany(!isAddingCompany)} className="text-xs font-bold text-indigo-600 hover:text-indigo-700 bg-indigo-50 px-2 py-1 rounded-md transition-colors">{isAddingCompany ? 'Select Existing' : '+ Add New'}</button></div>
 {isAddingCompany ? (<input placeholder="Enter New Company Name..." className={inputClass} value={newCompany} onChange={e => setNewCompany(e.target.value)} />) : (
-<select className={inputClass} value={form.companyId} onChange={e => setForm({...form, companyId: e.target.value})}><option value="">– Select Company –</option>{companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
+<SearchableSelect className={inputClass} value={form.companyId} onChange={e => setForm({...form, companyId: e.target.value})} placeholder="– Select Company –" options={companies.map(c => ({ value: c.id, label: c.name }))} />
 )}
 </div>
 <div className="grid grid-cols-2 gap-4">
@@ -236,9 +256,9 @@ return (
 <div className="space-y-3 bg-indigo-50/50 p-3 rounded-xl border border-indigo-100">
 <div className="flex justify-between items-center"><h3 className="text-xs font-bold text-slate-800 uppercase tracking-widest flex items-center gap-1"><Globe size={14}/> Segment / Classification</h3><button type="button" onClick={()=>setShowSegmentsModal(true)} className="text-[10px] font-bold text-indigo-600 bg-indigo-100 hover:bg-indigo-200 px-2 py-1 rounded-md transition-colors">+ Manage</button></div>
 <div className="grid grid-cols-3 gap-2">
-<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">City</label><select className={inputClass} value={form.city||''} onChange={e=>setForm({...form,city:e.target.value})}><option value="">–</option>{cities.map(c=><option key={c.id} value={c.name}>{c.name}</option>)}</select></div>
-<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Area</label><select className={inputClass} value={form.area||''} onChange={e=>setForm({...form,area:e.target.value})}><option value="">–</option>{areas.map(a=><option key={a.id} value={a.name}>{a.name}</option>)}</select></div>
-<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Type</label><select className={inputClass} value={form.customerType||''} onChange={e=>setForm({...form,customerType:e.target.value})}><option value="">–</option>{customerTypes.map(t=><option key={t.id} value={t.name}>{t.name}</option>)}</select></div>
+<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">City</label><SearchableSelect className={inputClass} value={form.city||''} onChange={e=>setForm({...form,city:e.target.value})} placeholder="–" options={cities.map(c=>({value:c.name,label:c.name}))} /></div>
+<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Area</label><SearchableSelect className={inputClass} value={form.area||''} onChange={e=>setForm({...form,area:e.target.value})} placeholder="–" options={areas.map(a=>({value:a.name,label:a.name}))} /></div>
+<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Type</label><SearchableSelect className={inputClass} value={form.customerType||''} onChange={e=>setForm({...form,customerType:e.target.value})} placeholder="–" options={customerTypes.map(t=>({value:t.name,label:t.name}))} /></div>
 </div>
 </div>
 {isAdmin && (
@@ -279,11 +299,7 @@ const inputClass = "w-full p-3.5 bg-white border border-slate-200 rounded-xl tex
 return (
 <ModalWrapper title={isEdit ? "Edit Payment Receipt" : "Receive Payment"} onClose={handleClose}>
 <form onSubmit={e => { e.preventDefault(); save(); }} className="space-y-4 pb-10">
-<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Select Client</label><select className={inputClass} value={form.customerId} onChange={e=>setForm({...form, customerId: e.target.value})}
-  disabled={isEdit && customers.some(c => c.id === Number(form.customerId) || String(c.id) === String(form.customerId))}>
-  <option value="">– Choose Client –</option>
-  {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-</select>
+<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Select Client</label><SearchableSelect className={inputClass} value={form.customerId} onChange={e=>setForm({...form, customerId: e.target.value})} placeholder="– Choose Client –" options={customers.map(c=>({value:c.id,label:c.name}))} disabled={isEdit && customers.some(c => c.id === Number(form.customerId) || String(c.id) === String(form.customerId))} />
 {isEdit && !customers.some(c => String(c.id) === String(form.customerId)) && (
   <p className="text-[10px] text-amber-600 font-bold mt-1 flex items-center gap-1"><AlertCircle size={11}/> Original client was deleted — please re-assign to an existing client or delete this receipt.</p>
 )}</div>
@@ -1163,14 +1179,8 @@ return (
 </div>
 <div className="relative mb-2"><Search className="absolute left-3.5 top-3.5 text-slate-400" size={18} /><input placeholder="Search Clients..." className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl font-semibold outline-none shadow-sm text-sm" value={search} onChange={e => setSearch(e.target.value)} /></div>
 <ScrollableTabBar className="mb-3 shrink-0">
-  <select value={filterCity} onChange={e=>setFilterCity(e.target.value)} className="bg-white border border-slate-200 px-2.5 py-1.5 rounded-lg font-bold text-[11px] text-slate-700 outline-none shrink-0">
-    <option value="">All Cities</option>
-    {cities.map(c=><option key={c.id} value={c.name}>{c.name}</option>)}
-  </select>
-  <select value={filterArea} onChange={e=>setFilterArea(e.target.value)} className="bg-white border border-slate-200 px-2.5 py-1.5 rounded-lg font-bold text-[11px] text-slate-700 outline-none shrink-0">
-    <option value="">All Areas</option>
-    {areas.map(a=><option key={a.id} value={a.name}>{a.name}</option>)}
-  </select>
+  <SearchableSelect value={filterCity} onChange={e=>setFilterCity(e.target.value)} className="bg-white border border-slate-200 px-2.5 py-1.5 rounded-lg font-bold text-[11px] text-slate-700 outline-none shrink-0 min-w-[90px]" placeholder="All Cities" options={cities.map(c=>({value:c.name,label:c.name}))} />
+  <SearchableSelect value={filterArea} onChange={e=>setFilterArea(e.target.value)} className="bg-white border border-slate-200 px-2.5 py-1.5 rounded-lg font-bold text-[11px] text-slate-700 outline-none shrink-0 min-w-[90px]" placeholder="All Areas" options={areas.map(a=>({value:a.name,label:a.name}))} />
   <select value={filterType} onChange={e=>setFilterType(e.target.value)} className="bg-white border border-slate-200 px-2.5 py-1.5 rounded-lg font-bold text-[11px] text-slate-700 outline-none shrink-0">
     <option value="">All Types</option>
     {customerTypes.map(t=><option key={t.id} value={t.name}>{t.name}</option>)}
@@ -1285,10 +1295,7 @@ return (
 <div className="flex-1 overflow-y-auto p-4 space-y-5 pb-32">
 <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
   <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5"><Users size={12}/> Customer</h3>
-  <select className={inputClass} value={form.customerId} onChange={e => setForm({...form, customerId: e.target.value})}>
-    <option value="">— Select Customer —</option>
-    {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-  </select>
+  <SearchableSelect className={inputClass} value={form.customerId} onChange={e => setForm({...form, customerId: e.target.value})} placeholder="— Select Customer —" options={customers.map(c=>({value:c.id,label:c.name}))} />
 </div>
 <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
   <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Return Details</h3>
@@ -1397,10 +1404,7 @@ return (
       <select value={dateFilter} onChange={e=>setDateFilter(e.target.value)} className="flex-1 bg-white border border-slate-200 px-3 py-2 rounded-lg font-bold text-sm text-slate-700 outline-none shadow-sm">
         <option>All Time</option><option>Today</option><option>This Week</option><option>This Month</option><option>This Year</option>
       </select>
-      <select value={customerFilter} onChange={e=>setCustomerFilter(e.target.value)} className="flex-1 bg-white border border-slate-200 px-3 py-2 rounded-lg font-semibold text-sm text-slate-700 outline-none shadow-sm">
-        <option value="">All Clients</option>
-        {customers.map(c=><option key={c.id} value={String(c.id)}>{c.name}</option>)}
-      </select>
+      <SearchableSelect value={customerFilter} onChange={e=>setCustomerFilter(e.target.value)} className="flex-1 bg-white border border-slate-200 px-3 py-2 rounded-lg font-semibold text-sm text-slate-700 outline-none shadow-sm" placeholder="All Clients" options={customers.map(c=>({value:String(c.id),label:c.name}))} />
     </div>
   </div>
   <div className="bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-2.5 mb-3 flex justify-between items-center">
@@ -1710,7 +1714,7 @@ return (
 };
 
 const AppSettingsView = () => {
-const { appSettings, saveToFirebase, showToast, showConfirm, appUsers, companies, products, customers, invoices, expenses, expenseCategories, payments, cities, areas, customerTypes } = useContext(AppContext);
+const { appSettings, saveToFirebase, showToast, showConfirm, appUsers, companies, products, customers, invoices, expenses, expenseCategories, payments, cities, areas, customerTypes, riders } = useContext(AppContext);
 const [form, setForm] = useState({
   id: 'main',
   businessName: appSettings?.businessName || 'Khyber Traders',
@@ -1737,12 +1741,11 @@ React.useEffect(() => {
   });
 }, [appSettings?.id, appSettings?.businessName, appSettings?.showBusinessNameOnDocs, appSettings?.showBusinessNameOnReports]);
 const saveSettings = async () => { await saveToFirebase('appSettings', 'main', form); showToast('Settings saved!'); };
-const downloadBackup = () => {
-  const backup = { exportedAt: new Date().toISOString(), collections: { app_users: appUsers, companies, products, customers, invoices, expenses, expenseCategories, payments, cities, areas, customerTypes } };
+const downloadBackup = async () => {
+  const backup = { exportedAt: new Date().toISOString(), collections: { app_users: appUsers, appSettings: appSettings ? [appSettings] : [], companies, products, customers, invoices, expenses, expenseCategories, payments, riders, cities, areas, customerTypes } };
   const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob); const a = document.createElement('a');
-  a.href = url; a.download = `AnimalHealthPK_Backup_${new Date().toISOString().slice(0,10).replace(/-/g,'')}.json`;
-  a.click(); URL.revokeObjectURL(url); showToast('Backup downloaded!');
+  await shareOrDownload(blob, `AnimalHealthPK_Backup_${new Date().toISOString().slice(0,10).replace(/-/g,'')}.json`);
+  showToast('Backup downloaded!');
 };
 const handleRestoreFile = async (e) => {
   const file = e.target.files[0]; if (!file) return;
@@ -2908,7 +2911,7 @@ return (
 </div>
 <div className="grid grid-cols-2 gap-3 mb-3">
 <div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Date</label><input type="date" className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-semibold outline-none" value={date} onChange={e=>setDate(e.target.value)}/></div>
-<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Category</label><select className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-semibold outline-none" value={category} onChange={e=>setCategory(e.target.value)}><option value="">– Select –</option>{EXPENSE_GROUPS.map(g => { const cats = expenseCategories.filter(c=>(c.group||'Other')===g); if(!cats.length) return null; return <optgroup key={g} label={g}>{cats.map(c=><option key={c.id} value={c.name}>{c.name}</option>)}</optgroup>; })}</select></div>
+<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Category</label><SearchableSelect className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-semibold outline-none" value={category} onChange={e=>setCategory(e.target.value)} placeholder="– Select –" options={EXPENSE_GROUPS.map(g=>({ group: g, options: expenseCategories.filter(c=>(c.group||'Other')===g).map(c=>({value:c.name,label:c.name})) })).filter(g=>g.options.length>0)} /></div>
 </div>
 <div className="mb-3"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Amount</label><input type="number" placeholder="0.00" className="w-full p-3 bg-white border border-rose-200 text-rose-600 rounded-xl text-lg font-extrabold outline-none focus:border-rose-400" value={amount} onChange={e=>setAmount(e.target.value)}/></div>
 <div className="mb-4"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Short Note</label><input type="text" placeholder="e.g. Paid to Ali for DHA drop" className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-semibold outline-none" value={note} onChange={e=>setNote(e.target.value)}/></div>
@@ -2950,14 +2953,14 @@ return (
 </div>
 <div className="mt-4 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
 <h3 className="text-xs font-bold text-slate-800 uppercase tracking-widest mb-3 flex items-center gap-1.5"><Download size={14} className="text-rose-500"/> Export Expenses</h3>
-<button onClick={() => { const data = expenses.map(e => ({ ID: e.id, Date: e.date, Category: e.category, Amount: e.amount, Note: e.note || '' })); exportToCSV(data, 'Expenses_Export.csv'); }} className="w-full bg-rose-50 border border-rose-100 text-rose-700 py-2.5 rounded-xl font-bold text-xs">Export All Expenses CSV</button>
+<button onClick={() => { const data = expenses.map(e => { const cat = expenseCategories.find(c=>c.name===e.category); return { ID: e.id, Date: e.date, Group: cat?.group||'Other', Category: e.category, Amount: e.amount, Note: e.note || '' }; }); exportToCSV(data, 'Expenses_Export.csv'); }} className="w-full bg-rose-50 border border-rose-100 text-rose-700 py-2.5 rounded-xl font-bold text-xs">Export All Expenses CSV</button>
 </div>
 </div>
 );
 };
 
 const BulkOpsView = () => {
-const { isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig, showConfirm } = useContext(AppContext);
+const { isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, riders, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig, showConfirm } = useContext(AppContext);
 const [bulkProducts, setBulkProducts] = useState([]);
 const [bulkSearch, setBulkSearch] = useState('');
 const [bulkEffectiveDate, setBulkEffectiveDate] = useState(getLocalDateStr());
@@ -3057,21 +3060,27 @@ showToast(`Done! ${addedCount} added, ${updatedCount} updated.`);
 reader.readAsText(file);
 e.target.value = '';
 };
-const exportAll = () => {
+const exportAll = async () => {
 const q = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-const wb = [];
+const wb = ['\uFEFF'];
 wb.push('=== ITEMS ===');
 wb.push(['ID','Name','Company','Unit','BoxQty','Cost','Selling','Status'].join(','));
 products.forEach(p => wb.push([p.id, q(p.name), q(getCompanyName(p.companyId)), q(p.unit), p.unitsInBox, p.costPrice, p.sellingPrice, p.available?'Active':'Inactive'].join(',')));
 wb.push(''); wb.push('=== CUSTOMERS ===');
-wb.push(['ID','Name','Contact','Phone','Address1','Map1','Address2','Map2','OpeningBalance'].join(','));
-customers.forEach(c => wb.push([c.id, q(c.name), q(c.contactPerson||''), q(c.phone||''), q(c.address1||''), q(c.map1||''), q(c.address2||''), q(c.map2||''), c.openingBalance||0].join(',')));
+wb.push(['ID','Name','Contact','Phone','Email','City','Area','Type','Address1','Map1','Address2','Map2','OpeningBalance','CreditLimit'].join(','));
+customers.forEach(c => wb.push([c.id, q(c.name), q(c.contactPerson||''), q(c.phone||''), q(c.email||''), q(c.city||''), q(c.area||''), q(c.customerType||''), q(c.address1||''), q(c.map1||''), q(c.address2||''), q(c.map2||''), c.openingBalance||0, c.creditLimit||0].join(',')));
 wb.push(''); wb.push('=== INVOICES ===');
-wb.push(['ID','Date','Customer','Status','Total','Delivery','Transport','Received','Salesperson','Payment','Notes'].join(','));
-invoices.forEach(o => wb.push([q(o.id), o.date, q(o.customerName), o.status, o.total, o.deliveryBilled||0, o.transportExpense||0, o.receivedAmount||0, q(o.salespersonName||''), o.paymentStatus||'', q(o.notes||'')].join(',')));
-const blob = new Blob([wb.join('\n')], {type:'text/csv'});
-const url = URL.createObjectURL(blob);
-const a = document.createElement('a'); a.href = url; a.download = 'AnimalHealthPK_MasterData.csv'; a.click(); URL.revokeObjectURL(url);
+wb.push(['ID','Date','Customer','Status','IsCreditNote','Total','Delivery','Transport','Vehicle','TransportCo','BiltyNo','DriverName','DriverPhone','RiderID','ReceivedAmt','Salesperson','PaymentStatus','Notes'].join(','));
+invoices.forEach(o => wb.push([q(o.id), o.date, q(o.customerName), o.status, o.isCreditNote?'Yes':'', o.total, o.deliveryBilled||0, o.transportExpense||0, q(o.vehicle||''), q(o.transportCompany||''), q(o.biltyNumber||''), q(o.driverName||''), q(o.driverPhone||''), o.riderId||'', o.receivedAmount||0, q(o.salespersonName||''), o.paymentStatus||'', q(o.notes||'')].join(',')));
+wb.push(''); wb.push('=== PAYMENTS ===');
+wb.push(['ID','Date','CustomerID','Customer','Amount','Note'].join(','));
+const cMap = Object.fromEntries(customers.map(c=>[c.id, c.name]));
+payments.forEach(p => wb.push([q(p.id), p.date, p.customerId, q(cMap[p.customerId]||''), p.amount, q(p.note||'')].join(',')));
+wb.push(''); wb.push('=== RIDERS ===');
+wb.push(['ID','Name','Phone','VehicleType','VehicleNumber'].join(','));
+riders.forEach(r => wb.push([r.id, q(r.name), q(r.phone||''), q(r.vehicleType||''), q(r.vehicleNumber||'')].join(',')));
+const blob = new Blob([wb.join('\n')], {type:'text/csv;charset=utf-8;'});
+await shareOrDownload(blob, 'AnimalHealthPK_MasterData.csv');
 showToast('Master data exported!');
 };
 const visibleProducts = bulkProducts.filter(p => !bulkSearch || p.name.toLowerCase().includes(bulkSearch.toLowerCase()));
@@ -3080,15 +3089,19 @@ return (
 {/* Export Section */}
 <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm mb-4">
 <h3 className="text-xs font-bold text-slate-800 uppercase tracking-widest mb-3 flex items-center gap-1.5"><Download size={14} className="text-indigo-600"/> Export Master Data</h3>
-<div className="flex gap-2 mb-2">
+<div className="flex flex-wrap gap-2 mb-2">
 <button onClick={() => setActiveExportTab('items')} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-colors ${activeExportTab==='items'?'bg-indigo-600 text-white':'bg-slate-100 text-slate-600'}`}>Items</button>
 <button onClick={() => setActiveExportTab('clients')} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-colors ${activeExportTab==='clients'?'bg-indigo-600 text-white':'bg-slate-100 text-slate-600'}`}>Clients</button>
 <button onClick={() => setActiveExportTab('invoices')} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-colors ${activeExportTab==='invoices'?'bg-indigo-600 text-white':'bg-slate-100 text-slate-600'}`}>Invoices</button>
+<button onClick={() => setActiveExportTab('payments')} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-colors ${activeExportTab==='payments'?'bg-emerald-600 text-white':'bg-slate-100 text-slate-600'}`}>Payments</button>
+<button onClick={() => setActiveExportTab('riders')} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-colors ${activeExportTab==='riders'?'bg-amber-500 text-white':'bg-slate-100 text-slate-600'}`}>Riders</button>
 <button onClick={() => setActiveExportTab('all')} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-colors ${activeExportTab==='all'?'bg-indigo-600 text-white':'bg-slate-100 text-slate-600'}`}>All</button>
 </div>
 {activeExportTab === 'items' && <button onClick={() => { const data = products.map(p => ({ ID: p.id, Name: p.name, Company: getCompanyName(p.companyId), Unit: p.unit, BoxQty: p.unitsInBox, Cost: p.costPrice, Selling: p.sellingPrice, Status: p.available ? 'Active' : 'Inactive' })); exportToCSV(data, 'Items_Master.csv'); }} className="w-full bg-indigo-50 border border-indigo-100 text-indigo-700 py-2.5 rounded-xl font-bold text-xs">Export {products.length} Items as CSV</button>}
-{activeExportTab === 'clients' && <button onClick={() => { const data = customers.map(c => ({ ID: c.id, Name: c.name, Contact: c.contactPerson||'', Phone: c.phone||'', Address1: c.address1||'', Map1: c.map1||'', Address2: c.address2||'', Map2: c.map2||'', OpeningBalance: c.openingBalance||0 })); exportToCSV(data, 'Customers_Master.csv'); }} className="w-full bg-indigo-50 border border-indigo-100 text-indigo-700 py-2.5 rounded-xl font-bold text-xs">Export {customers.length} Clients as CSV</button>}
-{activeExportTab === 'invoices' && <button onClick={() => { const data = invoices.map(o => ({ ID: o.id, Date: o.date, Customer: o.customerName, Status: o.status, Total: o.total, Delivery: o.deliveryBilled||0, Transport: o.transportExpense||0, ReceivedAmt: o.receivedAmount||0, Salesperson: o.salespersonName||'', PaymentStatus: o.paymentStatus||'' })); exportToCSV(data, 'Invoices_Export.csv'); }} className="w-full bg-indigo-50 border border-indigo-100 text-indigo-700 py-2.5 rounded-xl font-bold text-xs">Export {invoices.length} Invoices as CSV</button>}
+{activeExportTab === 'clients' && <button onClick={() => { const data = customers.map(c => ({ ID: c.id, Name: c.name, Contact: c.contactPerson||'', Phone: c.phone||'', Email: c.email||'', AltPhone: c.altPhone||'', City: c.city||'', Area: c.area||'', Type: c.customerType||'', Address1: c.address1||'', Map1: c.map1||'', Address2: c.address2||'', Map2: c.map2||'', OpeningBalance: c.openingBalance||0, CreditLimit: c.creditLimit||0 })); exportToCSV(data, 'Customers_Master.csv'); }} className="w-full bg-indigo-50 border border-indigo-100 text-indigo-700 py-2.5 rounded-xl font-bold text-xs">Export {customers.length} Clients as CSV</button>}
+{activeExportTab === 'invoices' && <button onClick={() => { const data = invoices.map(o => ({ ID: o.id, Date: o.date, Customer: o.customerName, Status: o.status, IsCreditNote: o.isCreditNote?'Yes':'', Total: o.total, Delivery: o.deliveryBilled||0, Transport: o.transportExpense||0, Vehicle: o.vehicle||'', TransportCo: o.transportCompany||'', BiltyNo: o.biltyNumber||'', DriverName: o.driverName||'', DriverPhone: o.driverPhone||'', RiderID: o.riderId||'', DeliveryAddrKey: o.deliveryAddressKey||'', ReceivedAmt: o.receivedAmount||0, Salesperson: o.salespersonName||'', PaymentStatus: o.paymentStatus||'', Notes: o.notes||'' })); exportToCSV(data, 'Invoices_Export.csv'); }} className="w-full bg-indigo-50 border border-indigo-100 text-indigo-700 py-2.5 rounded-xl font-bold text-xs">Export {invoices.length} Invoices as CSV</button>}
+{activeExportTab === 'payments' && <button onClick={() => { const cMap = Object.fromEntries(customers.map(c=>[c.id, c.name])); const data = payments.map(p => ({ ID: p.id, Date: p.date, CustomerID: p.customerId, Customer: cMap[p.customerId]||'', Amount: p.amount, Note: p.note||'' })); exportToCSV(data, 'Payments_Export.csv'); }} className="w-full bg-emerald-50 border border-emerald-100 text-emerald-700 py-2.5 rounded-xl font-bold text-xs">Export {payments.length} Payments as CSV</button>}
+{activeExportTab === 'riders' && <button onClick={() => { const data = riders.map(r => ({ ID: r.id, Name: r.name, Phone: r.phone||'', VehicleType: r.vehicleType||'', VehicleNumber: r.vehicleNumber||'' })); exportToCSV(data, 'Riders_Master.csv'); }} className="w-full bg-amber-50 border border-amber-100 text-amber-700 py-2.5 rounded-xl font-bold text-xs">Export {riders.length} Riders as CSV</button>}
 {activeExportTab === 'all' && <button onClick={exportAll} className="w-full bg-indigo-600 text-white py-2.5 rounded-xl font-bold text-xs shadow-sm">Export Full Master Data (CSV)</button>}
 </div>
 
