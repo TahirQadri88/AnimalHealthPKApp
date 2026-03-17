@@ -36,6 +36,7 @@ const SearchableSelect = ({
   const triggerRef = useRef(null);
   const inputRef = useRef(null);
   const listRef = useRef(null);
+  const dropdownRef = useRef(null);
 
   const isGrouped = options.length > 0 && options[0]?.group !== undefined;
 
@@ -80,7 +81,12 @@ const SearchableSelect = ({
   useEffect(() => {
     if (!open) return;
     const close = (e) => {
-      if (!triggerRef.current?.contains(e.target)) {
+      // Must check BOTH the trigger wrapper AND the portal dropdown div,
+      // because the portal lives in document.body (outside triggerRef in the DOM).
+      if (
+        !triggerRef.current?.contains(e.target) &&
+        !dropdownRef.current?.contains(e.target)
+      ) {
         setOpen(false); setSearch(''); setHi(-1);
       }
     };
@@ -113,6 +119,7 @@ const SearchableSelect = ({
     switch (e.key) {
       case 'Escape':
         e.preventDefault();
+        e.stopPropagation(); // prevent Escape from also closing the parent modal
         setOpen(false); setSearch(''); setHi(-1);
         triggerRef.current?.querySelector('button')?.focus();
         break;
@@ -171,6 +178,7 @@ const SearchableSelect = ({
       {/* Dropdown portal — position:fixed escapes overflow:hidden ancestors (modals) */}
       {open && createPortal(
         <div
+          ref={dropdownRef}
           style={{ position: 'fixed', top: pos.top, left: pos.left, width: pos.width, zIndex: 9999 }}
           className="bg-white rounded-xl border border-slate-200 shadow-2xl overflow-hidden"
           onMouseDown={e => e.preventDefault()} // keep focus in search input
