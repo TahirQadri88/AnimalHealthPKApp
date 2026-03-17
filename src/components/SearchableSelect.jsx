@@ -77,25 +77,25 @@ const SearchableSelect = ({
     setOpen(true);
   }, [disabled, filtered.length]);
 
-  // Close on outside click or scroll
+  // Close on outside click (desktop) or outside tap (mobile)
   useEffect(() => {
     if (!open) return;
-    const close = (e) => {
-      // Must check BOTH the trigger wrapper AND the portal dropdown div,
-      // because the portal lives in document.body (outside triggerRef in the DOM).
-      if (
-        !triggerRef.current?.contains(e.target) &&
-        !dropdownRef.current?.contains(e.target)
-      ) {
-        setOpen(false); setSearch(''); setHi(-1);
-      }
+    const isOutside = (target) =>
+      !triggerRef.current?.contains(target) &&
+      !dropdownRef.current?.contains(target);
+    // mousedown covers desktop clicks
+    const onMouseDown = (e) => { if (isOutside(e.target)) { setOpen(false); setSearch(''); setHi(-1); } };
+    // touchstart covers mobile taps — fires before mousedown/click, reliable on all mobile browsers.
+    // We do NOT use a scroll listener because on mobile the soft keyboard appearing fires scroll
+    // events that would close the dropdown immediately after it opens.
+    const onTouchStart = (e) => {
+      if (isOutside(e.touches[0]?.target)) { setOpen(false); setSearch(''); setHi(-1); }
     };
-    const closeOnScroll = () => { setOpen(false); setSearch(''); setHi(-1); };
-    document.addEventListener('mousedown', close);
-    document.addEventListener('scroll', closeOnScroll, { capture: true, passive: true });
+    document.addEventListener('mousedown', onMouseDown);
+    document.addEventListener('touchstart', onTouchStart, { passive: true });
     return () => {
-      document.removeEventListener('mousedown', close);
-      document.removeEventListener('scroll', closeOnScroll, { capture: true });
+      document.removeEventListener('mousedown', onMouseDown);
+      document.removeEventListener('touchstart', onTouchStart);
     };
   }, [open]);
 
