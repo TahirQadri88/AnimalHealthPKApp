@@ -820,8 +820,14 @@ const [search, setSearch] = useState('');
 const [dateFilter, setDateFilter] = useState('All Time');
 const [statusFilter, setStatusFilter] = useState('All');
 const [prodSearch, setProdSearch] = useState('');
+const [customerSearch, setCustomerSearch] = useState('');
+const [showCustomerDrop, setShowCustomerDrop] = useState(false);
+const [riderSearch, setRiderSearch] = useState('');
+const [showRiderDrop, setShowRiderDrop] = useState(false);
 const startNewInvoice = () => {
 setCurrentInvoice({ id: null, customerId: '', customerName: '', customerDetails: {}, items: [], deliveryBilled: 0, transportExpense: 0, vehicle: VEHICLES[0], paymentStatus: 'Pending', receivedAmount: 0, transportCompany: '', biltyNumber: '', driverName: '', driverPhone: '', riderId: '', deliveryAddressKey: 'address1', notes: '' });
+setCustomerSearch(''); setShowCustomerDrop(false);
+setRiderSearch(''); setShowRiderDrop(false);
 setBillingView('form');
 };
 const saveInvoice = async (status) => {
@@ -876,13 +882,41 @@ return (
 <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
 <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5"><Users size={12}/> Select Customer</h3>
 <div className="flex gap-2 items-center">
-<select className={inputClass} value={currentInvoice.customerId} onChange={e => {
-const cid = Number(e.target.value);
-const cName = customers.find(c=>c.id === cid)?.name || '';
-const pastInvs = invoices.filter(inv => inv.customerId === cid).sort((a,b) => new Date(b.date) - new Date(a.date) || b.id.localeCompare(a.id));
-const lastInv = pastInvs[0];
-setCurrentInvoice({ ...currentInvoice, customerId: cid, customerName: cName, vehicle: lastInv ? (lastInv.vehicle || VEHICLES[0]) : VEHICLES[0], transportCompany: lastInv ? (lastInv.transportCompany || '') : '', biltyNumber: lastInv ? (lastInv.biltyNumber || '') : '', driverName: lastInv ? (lastInv.driverName || '') : '', driverPhone: lastInv ? (lastInv.driverPhone || '') : '', riderId: lastInv ? (lastInv.riderId || '') : '', deliveryAddressKey: lastInv ? (lastInv.deliveryAddressKey || 'address1') : 'address1', deliveryBilled: lastInv ? (lastInv.deliveryBilled || 0) : 0, transportExpense: lastInv ? (lastInv.transportExpense || 0) : 0 });
-}}><option value="">– Select Client –</option>{customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
+<div className="relative flex-1">
+  <Search size={16} className="absolute left-3.5 top-3.5 text-slate-400 pointer-events-none z-10"/>
+  <input
+    className={`pl-10 ${inputClass}`}
+    placeholder="Search client…"
+    value={showCustomerDrop ? customerSearch : (customers.find(c => c.id === currentInvoice.customerId)?.name || '')}
+    onFocus={() => { setShowCustomerDrop(true); setCustomerSearch(''); }}
+    onChange={e => setCustomerSearch(e.target.value)}
+    onBlur={() => setTimeout(() => setShowCustomerDrop(false), 150)}
+  />
+  {showCustomerDrop && (
+    <div className="absolute z-50 w-full mt-1 border border-indigo-200 bg-white rounded-xl max-h-52 overflow-y-auto shadow-lg">
+      {customers
+        .filter(c => !customerSearch || c.name.toLowerCase().includes(customerSearch.toLowerCase()))
+        .map(c => (
+          <div
+            key={c.id}
+            className={`px-4 py-2.5 text-sm font-semibold cursor-pointer hover:bg-indigo-50 ${c.id === currentInvoice.customerId ? 'bg-indigo-50 text-indigo-700' : 'text-slate-800'}`}
+            onMouseDown={e => {
+              e.preventDefault();
+              const cid = c.id; const cName = c.name;
+              const pastInvs = invoices.filter(inv => inv.customerId === cid).sort((a,b) => new Date(b.date) - new Date(a.date) || b.id.localeCompare(a.id));
+              const lastInv = pastInvs[0];
+              setCurrentInvoice({ ...currentInvoice, customerId: cid, customerName: cName, vehicle: lastInv ? (lastInv.vehicle || VEHICLES[0]) : VEHICLES[0], transportCompany: lastInv ? (lastInv.transportCompany || '') : '', biltyNumber: lastInv ? (lastInv.biltyNumber || '') : '', driverName: lastInv ? (lastInv.driverName || '') : '', driverPhone: lastInv ? (lastInv.driverPhone || '') : '', riderId: lastInv ? (lastInv.riderId || '') : '', deliveryAddressKey: lastInv ? (lastInv.deliveryAddressKey || 'address1') : 'address1', deliveryBilled: lastInv ? (lastInv.deliveryBilled || 0) : 0, transportExpense: lastInv ? (lastInv.transportExpense || 0) : 0 });
+              setShowCustomerDrop(false);
+            }}
+          >{c.name}</div>
+        ))
+      }
+      {customers.filter(c => !customerSearch || c.name.toLowerCase().includes(customerSearch.toLowerCase())).length === 0 && (
+        <p className="px-4 py-3 text-sm text-slate-400 font-medium">No clients found</p>
+      )}
+    </div>
+  )}
+</div>
 <button onClick={() => { setEditingCustomer(null); setShowCustomerModal(true); }} className="p-3 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-xl font-black shrink-0 transition-colors"><Plus size={18}/></button>
 </div>
 {currentInvoice.customerId && (() => {
@@ -973,10 +1007,38 @@ return (
 {riders.filter(r => r.vehicleType === currentInvoice.vehicle).length > 0 && (
   <div className="col-span-2">
     <label className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider ml-1 mb-1 block">Pick from Registry</label>
-    <select className={`${inputClass} !bg-white !border-indigo-200`} value={currentInvoice.riderId || ''} onChange={e => { const r = riders.find(r => String(r.id) === e.target.value); if (r) setCurrentInvoice({...currentInvoice, riderId: r.id, driverName: r.name, driverPhone: r.phone || ''}); else setCurrentInvoice({...currentInvoice, riderId: '', driverName: '', driverPhone: ''}); }}>
-      <option value="">– Pick a Rider –</option>
-      {riders.filter(r => r.vehicleType === currentInvoice.vehicle).map(r => <option key={r.id} value={r.id}>{r.name}{r.vehicleNumber ? ` (${r.vehicleNumber})` : ''}</option>)}
-    </select>
+    <div className="relative">
+      <Search size={16} className="absolute left-3.5 top-3.5 text-slate-400 pointer-events-none z-10"/>
+      <input
+        className={`pl-10 ${inputClass} !bg-white !border-indigo-200`}
+        placeholder="Search rider…"
+        value={showRiderDrop ? riderSearch : (riders.find(r => String(r.id) === String(currentInvoice.riderId))?.name || '')}
+        onFocus={() => { setShowRiderDrop(true); setRiderSearch(''); }}
+        onChange={e => setRiderSearch(e.target.value)}
+        onBlur={() => setTimeout(() => setShowRiderDrop(false), 150)}
+      />
+      {showRiderDrop && (
+        <div className="absolute z-50 w-full mt-1 border border-indigo-200 bg-white rounded-xl max-h-48 overflow-y-auto shadow-lg">
+          <div
+            className={`px-4 py-2.5 text-sm font-semibold cursor-pointer hover:bg-indigo-50 ${!currentInvoice.riderId ? 'bg-indigo-50 text-indigo-700' : 'text-slate-400'}`}
+            onMouseDown={e => { e.preventDefault(); setCurrentInvoice({...currentInvoice, riderId: '', driverName: '', driverPhone: ''}); setShowRiderDrop(false); }}
+          >– Clear Rider –</div>
+          {riders
+            .filter(r => r.vehicleType === currentInvoice.vehicle && (!riderSearch || r.name.toLowerCase().includes(riderSearch.toLowerCase())))
+            .map(r => (
+              <div
+                key={r.id}
+                className={`px-4 py-2.5 text-sm font-semibold cursor-pointer hover:bg-indigo-50 ${String(r.id) === String(currentInvoice.riderId) ? 'bg-indigo-50 text-indigo-700' : 'text-slate-800'}`}
+                onMouseDown={e => { e.preventDefault(); setCurrentInvoice({...currentInvoice, riderId: r.id, driverName: r.name, driverPhone: r.phone || ''}); setShowRiderDrop(false); }}
+              >{r.name}{r.vehicleNumber ? ` (${r.vehicleNumber})` : ''}</div>
+            ))
+          }
+          {riders.filter(r => r.vehicleType === currentInvoice.vehicle && (!riderSearch || r.name.toLowerCase().includes(riderSearch.toLowerCase()))).length === 0 && (
+            <p className="px-4 py-3 text-sm text-slate-400 font-medium">No riders found</p>
+          )}
+        </div>
+      )}
+    </div>
   </div>
 )}
 <div className="col-span-2 sm:col-span-1"><label className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider ml-1 mb-1 block">Driver Name</label><input placeholder="Name" className={`${inputClass} !bg-white !border-indigo-200`} value={currentInvoice.driverName || ''} onChange={e => setCurrentInvoice({...currentInvoice, driverName: e.target.value, riderId: ''})} /></div>
