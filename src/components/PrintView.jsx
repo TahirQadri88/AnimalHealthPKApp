@@ -317,29 +317,17 @@ const handleThermalPrint = async () => {
   }
 
   const targetW = 302; // 80 mm at 96 dpi
-
-  // Clone and apply high-contrast colours (gray text → black, preserve white-on-dark)
-  const clone = element.cloneNode(true);
-  const parseRgb = s => { const m = (s || '').match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/); return m ? [+m[1], +m[2], +m[3]] : null; };
   const lum = ([r, g, b]) => (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  clone.querySelectorAll('*').forEach(el => {
-    const bgRgb = parseRgb(el.style.background || el.style.backgroundColor);
-    const bgLum = bgRgb ? lum(bgRgb) : 1;
-    const fgRgb = parseRgb(el.style.color);
-    if (fgRgb) {
-      const fgL = lum(fgRgb);
-      // Light bg + gray/muted text → force black
-      if (bgLum >= 0.5 && fgL > 0.15 && fgL < 0.95) el.style.color = '#000000';
-      // Dark bg + dark text → restore white
-      if (bgLum < 0.4 && fgL < 0.7) el.style.color = '#ffffff';
-    }
-    // Lighten near-invisible borders slightly so they print
-    if (el.style.borderColor) {
-      const bcRgb = parseRgb(el.style.borderColor);
-      if (bcRgb && lum(bcRgb) > 0.85) el.style.borderColor = '#aaaaaa';
-    }
-  });
+  // parseRgba returns null for transparent (alpha < 0.1) so transparent bg is treated as white
+  const parseRgba = s => {
+    const m = (s || '').match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
+    if (!m) return null;
+    if (m[4] !== undefined && parseFloat(m[4]) < 0.1) return null;
+    return [+m[1], +m[2], +m[3]];
+  };
 
+  // Clone, position and append — computed styles become available after DOM insertion
+  const clone = element.cloneNode(true);
   Object.assign(clone.style, {
     position: 'fixed', top: '0', left: '0',
     width: targetW + 'px', maxWidth: targetW + 'px', minWidth: targetW + 'px',
@@ -347,6 +335,22 @@ const handleThermalPrint = async () => {
   });
   document.body.appendChild(clone);
   await new Promise(r => setTimeout(r, 200));
+
+  // Apply high-contrast colours using getComputedStyle — captures Tailwind class colours,
+  // not just inline styles. Gray/muted text → black; white-on-dark preserved.
+  clone.querySelectorAll('*').forEach(el => {
+    const cs = window.getComputedStyle(el);
+    const bgRgb = parseRgba(cs.backgroundColor);
+    const fgRgb = parseRgba(cs.color);
+    const bgLum = bgRgb ? lum(bgRgb) : 1; // transparent bg → treat as white
+    if (fgRgb) {
+      const fgL = lum(fgRgb);
+      if (bgLum >= 0.5 && fgL > 0.15 && fgL < 0.95) el.style.color = '#000000';
+      if (bgLum < 0.4 && fgL < 0.7) el.style.color = '#ffffff';
+    }
+    const bcRgb = parseRgba(cs.borderColor);
+    if (bcRgb && lum(bcRgb) > 0.85) el.style.borderColor = '#aaaaaa';
+  });
 
   try {
     const imgDataUrl = await window.htmlToImage.toPng(clone, {
@@ -359,7 +363,7 @@ const handleThermalPrint = async () => {
     if (!newWin) { showToast('Allow popups to enable printing', 'error'); return; }
     newWin.document.write(`<!DOCTYPE html><html><head>
 <title>${docTitle}</title>
-<style>*{margin:0;padding:0;box-sizing:border-box;}@page{size:80mm auto;margin:0;}@media print{body{margin:0;background:white;}}img{width:100%;max-width:100%;display:block;}</style>
+<style>*{margin:0;padding:0;box-sizing:border-box;}html,body{width:80mm;max-width:80mm;overflow:hidden;}@page{size:80mm auto;margin:0;}@media print{body{margin:0;background:white;}}img{width:80mm;max-width:80mm;display:block;}</style>
 </head><body><img src="${imgDataUrl}"><script>window.onload=function(){window.focus();window.print();}<\/script></body></html>`);
     newWin.document.close();
     newWin.document.title = docTitle;
