@@ -2204,7 +2204,8 @@ const getSortedExportData = () => {
      .map(([key,val]) => ({ 'Staff Name': key, 'Orders': val.orders, 'Revenue (Rs)': val.revenue, 'Gross Profit (Rs)': val.profit,
        'Margin %': val.revenue > 0 ? +((val.profit/val.revenue)*100).toFixed(1) : 0 }))
      .sort((a,b)=>b['Revenue (Rs)']-a['Revenue (Rs)']);
-   const dataObj = view === 'By Product' ? reportEngine.byProduct : view === 'By Company' ? reportEngine.byCompany : reportEngine.byCustomer;
+   const segmentKey = view === 'By City' ? 'City' : view === 'By Area' ? 'Area' : view === 'By Type' ? 'Type' : null;
+   const dataObj = view === 'By Product' ? reportEngine.byProduct : view === 'By Company' ? reportEngine.byCompany : view === 'By City' ? reportEngine.byCity : view === 'By Area' ? reportEngine.byArea : view === 'By Type' ? reportEngine.byType : reportEngine.byCustomer;
    let arr = Object.entries(dataObj).map(([key, val]) => ({ key, ...val })).sort((a,b) => b[sortBy] - a[sortBy]);
    if (view === 'By Product') return arr.map(r => ({
      'Product Name': r.key, 'Brand': r.company || '',
@@ -2216,8 +2217,9 @@ const getSortedExportData = () => {
      'Qty Sold': r.qty || 0, 'Revenue (Rs)': r.revenue || r.productRevenue || 0, 'Cost (Rs)': r.cost || 0,
      'Gross Profit (Rs)': r.profit || 0, 'Margin %': (r.revenue||r.productRevenue||0) > 0 ? +((r.profit/(r.revenue||r.productRevenue))*100).toFixed(1) : 0,
    }));
+   const nameKey = segmentKey || 'Customer Name';
    return arr.map(r => ({
-     'Customer Name': r.key,
+     [nameKey]: r.key,
      'Orders': r.orders || 0, 'Revenue (Rs)': r.revenue || r.productRevenue || 0, 'Cost (Rs)': r.cost || 0,
      'Gross Profit (Rs)': r.profit || 0,
    }));
@@ -2267,13 +2269,27 @@ const handleExport = (format) => {
           text += `✅ *Net Profit: Rs. ${kpis.netProfit.toLocaleString('en-US')}*\n`;
           text += `📌 Receivables: Rs. ${kpis.totalReceivables.toLocaleString('en-US')}\n`;
           if (reportEngine.trends.revenue !== null) text += `📈 Revenue trend: ${Number(reportEngine.trends.revenue) >= 0 ? '+' : ''}${reportEngine.trends.revenue}% vs prev period\n`;
+        } else if (view === 'Receivables') {
+          exportData.forEach((r, i) => {
+            const name = r['Customer Name'] || '?';
+            const outstanding = r['Outstanding (Rs)'] || 0;
+            const days = r['Days Since Last Invoice'];
+            text += `${i+1}. *${name}*\n`;
+            text += `   Outstanding: Rs.${Number(outstanding).toLocaleString('en-US')}`;
+            if (days != null) text += ` | ${days} days overdue`;
+            text += `\n`;
+          });
+          if (exportData.length > 0) {
+            const total = exportData.reduce((s,r)=>s+(r['Outstanding (Rs)']||0),0);
+            text += `${'─'.repeat(30)}\nTotal Outstanding: Rs.${total.toLocaleString('en-US')}\n`;
+          }
         } else {
           exportData.forEach((r, i) => {
-            const name = r['Product Name'] || r['Brand Name'] || r['Customer Name'] || r['Staff Name'] || r.Name || '?';
-            const brand = r['Brand'] || r.Company || '';
-            const gp = r['Gross Profit (Rs)'] || r['Outstanding (Rs)'] || 0;
+            const name = r['Product Name'] || r['Brand Name'] || r['Customer Name'] || r['Staff Name'] || r['City'] || r['Area'] || r['Type'] || '?';
+            const brand = r['Brand'] || '';
+            const gp = r['Gross Profit (Rs)'] || 0;
             const rev = r['Revenue (Rs)'] || 0;
-            const qty = r['Qty Sold'] || r.Qty || 0;
+            const qty = r['Qty Sold'] || 0;
             const orders = r['Orders'] || 0;
             const gpMargin = rev > 0 ? ` (${((gp/rev)*100).toFixed(1)}%)` : '';
             text += `${i+1}. *${name}*${brand ? ` — ${brand}` : ''}\n`;
@@ -2283,7 +2299,7 @@ const handleExport = (format) => {
           });
           if (exportData.length > 0) {
             const totalRev = exportData.reduce((s,r)=>s+(r['Revenue (Rs)']||0),0);
-            const totalGP = exportData.reduce((s,r)=>s+(r['Gross Profit (Rs)']||r['Outstanding (Rs)']||0),0);
+            const totalGP = exportData.reduce((s,r)=>s+(r['Gross Profit (Rs)']||0),0);
             text += `${'─'.repeat(30)}\nTotal Rev: Rs.${totalRev.toLocaleString('en-US')} | Total GP: Rs.${totalGP.toLocaleString('en-US')}\n`;
           }
         }
