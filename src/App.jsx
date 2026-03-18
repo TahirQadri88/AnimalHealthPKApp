@@ -636,12 +636,12 @@ return (
 <button key={t} onClick={() => { setTab(t); setNewVal(''); setEditingId(null); }} className={`flex-1 py-2 px-2 rounded-lg font-bold text-xs transition-colors ${tab===t?'bg-white text-indigo-700 shadow-sm':'text-slate-500'}`}>{labelMap[t]}s</button>
 ))}
 </div>
-{tab === 'areas' && areas.some(a => !a.cityName) && (
+{tab === 'areas' && (
   <div className="flex gap-2 items-center bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
     <AlertCircle size={13} className="text-amber-500 shrink-0"/>
-    <span className="text-[11px] font-bold text-amber-700 flex-1">{areas.filter(a=>!a.cityName).length} area(s) have no city</span>
+    <span className="text-[11px] font-bold text-amber-700 flex-1">Assign all areas to a city</span>
     <select id="bulkCitySelect" className="p-1.5 text-xs font-semibold border border-amber-300 rounded-lg outline-none bg-white shrink-0"><option value="">Select City...</option>{cities.map(c=><option key={c.id} value={c.name}>{c.name}</option>)}</select>
-    <button onClick={async()=>{const sel=document.getElementById('bulkCitySelect').value;if(!sel)return showToast('Select a city first','error');const unassigned=areas.filter(a=>!a.cityName);await Promise.all(unassigned.map(a=>saveToFirebase('areas',a.id,{...a,cityName:sel})));showToast(`${unassigned.length} areas assigned to ${sel}`);}} className="text-[11px] font-bold text-white bg-amber-500 px-3 py-1.5 rounded-lg hover:bg-amber-600 transition-colors shrink-0">Assign All</button>
+    <button onClick={async()=>{const sel=document.getElementById('bulkCitySelect').value;if(!sel)return showToast('Select a city first','error');const unassigned=areas.filter(a=>!a.cityName);if(!unassigned.length)return showToast('All areas already have a city');await Promise.all(unassigned.map(a=>saveToFirebase('areas',a.id,{...a,cityName:sel})));showToast(`${unassigned.length} areas assigned to ${sel}`);}} className="text-[11px] font-bold text-white bg-amber-500 px-3 py-1.5 rounded-lg hover:bg-amber-600 transition-colors shrink-0">Assign All</button>
   </div>
 )}
 <div className="flex gap-2">
