@@ -256,8 +256,8 @@ return (
 <div className="space-y-3 bg-indigo-50/50 p-3 rounded-xl border border-indigo-100">
 <div className="flex justify-between items-center"><h3 className="text-xs font-bold text-slate-800 uppercase tracking-widest flex items-center gap-1"><Globe size={14}/> Segment / Classification</h3><button type="button" onClick={()=>setShowSegmentsModal(true)} className="text-[10px] font-bold text-indigo-600 bg-indigo-100 hover:bg-indigo-200 px-2 py-1 rounded-md transition-colors">+ Manage</button></div>
 <div className="grid grid-cols-3 gap-2">
-<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">City</label><SearchableSelect className={inputClass} value={form.city||''} onChange={e=>setForm({...form,city:e.target.value})} placeholder="–" options={cities.map(c=>({value:c.name,label:c.name}))} /></div>
-<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Area</label><SearchableSelect className={inputClass} value={form.area||''} onChange={e=>setForm({...form,area:e.target.value})} placeholder="–" options={areas.map(a=>({value:a.name,label:a.name}))} /></div>
+<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">City</label><SearchableSelect className={inputClass} value={form.city||''} onChange={e=>setForm({...form,city:e.target.value,area:''})} placeholder="–" options={cities.map(c=>({value:c.name,label:c.name}))} /></div>
+<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Area</label><SearchableSelect className={inputClass} value={form.area||''} onChange={e=>setForm({...form,area:e.target.value})} placeholder="–" options={areas.filter(a=>!form.city||!a.cityName||a.cityName===form.city).map(a=>({value:a.name,label:a.name}))} /></div>
 <div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Type</label><SearchableSelect className={inputClass} value={form.customerType||''} onChange={e=>setForm({...form,customerType:e.target.value})} placeholder="–" options={customerTypes.map(t=>({value:t.name,label:t.name}))} /></div>
 </div>
 </div>
@@ -600,8 +600,10 @@ const SegmentsModal = () => {
 const { cities, areas, customerTypes, saveToFirebase, deleteFromFirebase, showToast, setShowSegmentsModal, showConfirm } = useContext(AppContext);
 const [tab, setTab] = useState('cities');
 const [newVal, setNewVal] = useState('');
+const [newCityName, setNewCityName] = useState('');
 const [editingId, setEditingId] = useState(null);
 const [editVal, setEditVal] = useState('');
+const [editCityName, setEditCityName] = useState('');
 const colMap = { cities: cities, areas: areas, customerTypes: customerTypes };
 const fireMap = { cities: 'cities', areas: 'areas', customerTypes: 'customerTypes' };
 const labelMap = { cities: 'City', areas: 'Area', customerTypes: 'Customer Type' };
@@ -609,15 +611,21 @@ const list = colMap[tab];
 const col = fireMap[tab];
 const add = async () => {
   if (!newVal.trim()) return;
-  if (list.some(i => i.name.toLowerCase() === newVal.toLowerCase())) return showToast(`${labelMap[tab]} already exists`, 'error');
+  if (tab === 'areas' && !newCityName) return showToast('Select a City for this Area', 'error');
+  if (list.some(i => i.name.toLowerCase() === newVal.toLowerCase() && (tab !== 'areas' || (i.cityName||'') === newCityName))) return showToast(`${labelMap[tab]} already exists`, 'error');
   const id = Date.now();
-  await saveToFirebase(col, id, { id, name: newVal.trim() });
-  setNewVal('');
+  const data = { id, name: newVal.trim() };
+  if (tab === 'areas') data.cityName = newCityName;
+  await saveToFirebase(col, id, data);
+  setNewVal(''); setNewCityName('');
 };
 const save = async (item) => {
   if (!editVal.trim()) return;
-  if (list.some(i => i.id !== item.id && i.name.toLowerCase() === editVal.toLowerCase())) return showToast('Name already exists', 'error');
-  await saveToFirebase(col, item.id, { ...item, name: editVal.trim() });
+  if (tab === 'areas' && !editCityName) return showToast('Select a City for this Area', 'error');
+  if (list.some(i => i.id !== item.id && i.name.toLowerCase() === editVal.toLowerCase() && (tab !== 'areas' || (i.cityName||'') === editCityName))) return showToast('Name already exists', 'error');
+  const updated = { ...item, name: editVal.trim() };
+  if (tab === 'areas') updated.cityName = editCityName;
+  await saveToFirebase(col, item.id, updated);
   setEditingId(null);
 };
 return (
@@ -629,6 +637,7 @@ return (
 ))}
 </div>
 <div className="flex gap-2">
+{tab === 'areas' && <select value={newCityName} onChange={e=>setNewCityName(e.target.value)} className="p-3 bg-slate-50 border border-slate-200 rounded-xl font-semibold outline-none focus:border-indigo-500 text-sm text-slate-700 shrink-0"><option value="">City...</option>{cities.map(c=><option key={c.id} value={c.name}>{c.name}</option>)}</select>}
 <input type="text" placeholder={`New ${labelMap[tab]}...`} className="flex-1 p-3 bg-slate-50 border border-slate-200 rounded-xl font-semibold outline-none focus:border-indigo-500 text-sm" value={newVal} onChange={e=>setNewVal(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')add();}} />
 <button onClick={add} className="bg-indigo-600 text-white px-4 rounded-xl font-bold hover:bg-indigo-700 transition-colors">Add</button>
 </div>
@@ -639,14 +648,19 @@ return (
 <li key={item.id} className="flex items-center gap-2 p-3 hover:bg-slate-50">
 {editingId === item.id ? (
 <>
+{tab === 'areas' && <select value={editCityName} onChange={e=>setEditCityName(e.target.value)} className="p-2 text-xs font-semibold border border-indigo-300 rounded-lg outline-none shrink-0"><option value="">City...</option>{cities.map(c=><option key={c.id} value={c.name}>{c.name}</option>)}</select>}
 <input autoFocus className="flex-1 p-2 text-sm font-semibold border border-indigo-300 rounded-lg outline-none" value={editVal} onChange={e=>setEditVal(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')save(item);if(e.key==='Escape')setEditingId(null);}} />
 <button onClick={()=>save(item)} className="text-xs font-bold text-indigo-600 px-3 py-1.5 bg-indigo-50 rounded-lg hover:bg-indigo-100">Save</button>
 <button onClick={()=>setEditingId(null)} className="text-xs font-bold text-slate-500 px-2 py-1.5 bg-slate-100 rounded-lg">Cancel</button>
 </>
 ) : (
 <>
-<span className="flex-1 font-semibold text-slate-700 text-sm">{item.name}</span>
-<button onClick={()=>{setEditingId(item.id);setEditVal(item.name);}} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"><Edit size={14}/></button>
+<div className="flex-1 min-w-0">
+  <span className="font-semibold text-slate-700 text-sm">{item.name}</span>
+  {tab === 'areas' && item.cityName && <span className="ml-2 text-[10px] font-bold text-indigo-500 bg-indigo-50 px-1.5 py-0.5 rounded">{item.cityName}</span>}
+  {tab === 'areas' && !item.cityName && <span className="ml-2 text-[10px] font-bold text-amber-500 bg-amber-50 px-1.5 py-0.5 rounded">No City</span>}
+</div>
+<button onClick={()=>{setEditingId(item.id);setEditVal(item.name);setEditCityName(item.cityName||'');}} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"><Edit size={14}/></button>
 <button onClick={async()=>{if(await showConfirm(`Delete "${item.name}"?`))await deleteFromFirebase(col,item.id);}} className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"><Trash2 size={14}/></button>
 </>
 )}
@@ -1181,8 +1195,8 @@ return (
 </div>
 <div className="relative mb-2"><Search className="absolute left-3.5 top-3.5 text-slate-400" size={18} /><input placeholder="Search Clients..." className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl font-semibold outline-none shadow-sm text-sm" value={search} onChange={e => setSearch(e.target.value)} /></div>
 <ScrollableTabBar className="mb-3 shrink-0">
-  <SearchableSelect value={filterCity} onChange={e=>setFilterCity(e.target.value)} className="bg-white border border-slate-200 px-2.5 py-1.5 rounded-lg font-bold text-[11px] text-slate-700 outline-none shrink-0 min-w-[90px]" placeholder="All Cities" options={cities.map(c=>({value:c.name,label:c.name}))} />
-  <SearchableSelect value={filterArea} onChange={e=>setFilterArea(e.target.value)} className="bg-white border border-slate-200 px-2.5 py-1.5 rounded-lg font-bold text-[11px] text-slate-700 outline-none shrink-0 min-w-[90px]" placeholder="All Areas" options={areas.map(a=>({value:a.name,label:a.name}))} />
+  <SearchableSelect value={filterCity} onChange={e=>{setFilterCity(e.target.value);setFilterArea('');}} className="bg-white border border-slate-200 px-2.5 py-1.5 rounded-lg font-bold text-[11px] text-slate-700 outline-none shrink-0 min-w-[90px]" placeholder="All Cities" options={cities.map(c=>({value:c.name,label:c.name}))} />
+  <SearchableSelect value={filterArea} onChange={e=>setFilterArea(e.target.value)} className="bg-white border border-slate-200 px-2.5 py-1.5 rounded-lg font-bold text-[11px] text-slate-700 outline-none shrink-0 min-w-[90px]" placeholder="All Areas" options={areas.filter(a=>!filterCity||!a.cityName||a.cityName===filterCity).map(a=>({value:a.name,label:a.name}))} />
   <select value={filterType} onChange={e=>setFilterType(e.target.value)} className="bg-white border border-slate-200 px-2.5 py-1.5 rounded-lg font-bold text-[11px] text-slate-700 outline-none shrink-0">
     <option value="">All Types</option>
     {customerTypes.map(t=><option key={t.id} value={t.name}>{t.name}</option>)}
