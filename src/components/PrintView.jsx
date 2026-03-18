@@ -534,15 +534,15 @@ const handlePDF = () => {
         .catch(() => { cleanup(); showToast('PDF failed — use Print instead', 'error'); });
     } else {
       const pdfW = isA5 ? 148 : 210;
+      const pdfH = isA5 ? 210 : 297;   // standard A5 / A4 page height — enables true multi-page PDF
       const margins = isA5 ? [8, 8, 12, 8] : [10, 10, 15, 10];
-      const contentWmm = pdfW - margins[1] - margins[3];
-      const pdfH = Math.ceil((elH / fixedW) * contentWmm) + margins[0] + margins[2] + 60;
       html2pdf().set({
         margin: margins, filename: getFileName(),
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { scale: 2, useCORS: true, logging: false, letterRendering: true, scrollY: 0, scrollX: 0, width: fixedW, windowWidth: fixedW },
         jsPDF: { unit: 'mm', format: [pdfW, pdfH], orientation: 'portrait' },
-        pagebreak: { mode: 'avoid-all' },
+        // allow natural page breaks; .keep-together blocks (header, summary) won't be split
+        pagebreak: { mode: ['css', 'legacy'], avoid: ['.keep-together'] },
       }).from(clone).save()
         .then(() => { cleanup(); showToast('PDF saved!'); })
         .catch(() => { cleanup(); showToast('PDF failed — use Print instead', 'error'); });
@@ -581,17 +581,9 @@ const handleImageShare = async () => {
   document.body.appendChild(clone);
   await new Promise(r => setTimeout(r, 200));
 
-  try {
-    const dataUrl = await window.htmlToImage.toJpeg(clone, {
-      quality: 0.95,
-      pixelRatio: 2,
-      backgroundColor: '#ffffff',
-      height: clone.scrollHeight,
-    });
-    if (document.body.contains(clone)) document.body.removeChild(clone);
+  const imgFileName = getFileName().replace(/\.pdf$/, '.jpg');
 
-    const blob = await (await fetch(dataUrl)).blob();
-    const imgFileName = getFileName().replace(/\.pdf$/, '.jpg');
+  const shareBlob = async (blob) => {
     const file = new File([blob], imgFileName, { type: 'image/jpeg' });
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
       navigator.share({ files: [file], title: imgFileName.replace(/\.jpg$/, ''), text: getShareCaption() })
@@ -599,6 +591,68 @@ const handleImageShare = async () => {
     } else {
       downloadImageFallback(blob, imgFileName);
     }
+  };
+
+  try {
+    // For thermal: single tall image (continuous paper — no pagination)
+    if (isThermal) {
+      const dataUrl = await window.htmlToImage.toJpeg(clone, {
+        quality: 0.95, pixelRatio: 2, backgroundColor: '#ffffff', height: clone.scrollHeight,
+      });
+      if (document.body.contains(clone)) document.body.removeChild(clone);
+      shareBlob(await (await fetch(dataUrl)).blob());
+      return;
+    }
+
+    // For A4/A5: capture to canvas then slice into page-sized sections.
+    // Each slice is separated by a slate-200 gap so the output looks like
+    // a stack of pages — matching what the PDF and print outputs produce.
+    const PIXEL_RATIO = 2;
+    const GAP_PX = 20; // gap between pages (in output-canvas pixels)
+
+    const srcCanvas = await window.htmlToImage.toCanvas(clone, {
+      pixelRatio: PIXEL_RATIO,
+      backgroundColor: '#ffffff',
+      height: clone.scrollHeight,
+    });
+    if (document.body.contains(clone)) document.body.removeChild(clone);
+
+    // Page height in output-canvas pixels (aspect ratio of A5 or A4)
+    const pageHeightPx = Math.round(
+      (isA5 ? (210 / 148) : (297 / 210)) * srcCanvas.width
+    );
+    const totalH = srcCanvas.height;
+    const pageCount = Math.ceil(totalH / pageHeightPx);
+
+    if (pageCount <= 1) {
+      // Single page — convert directly (no gap needed)
+      const out = document.createElement('canvas');
+      out.width = srcCanvas.width; out.height = totalH;
+      out.getContext('2d').drawImage(srcCanvas, 0, 0);
+      out.toBlob(blob => shareBlob(blob), 'image/jpeg', 0.95);
+      return;
+    }
+
+    // Multi-page: stitch slices with a visible gap
+    const compositeH = totalH + (pageCount - 1) * GAP_PX;
+    const out = document.createElement('canvas');
+    out.width = srcCanvas.width;
+    out.height = compositeH;
+    const ctx = out.getContext('2d');
+    ctx.fillStyle = '#e2e8f0'; // slate-200 page-gap colour
+    ctx.fillRect(0, 0, out.width, compositeH);
+
+    for (let i = 0; i < pageCount; i++) {
+      const srcY = i * pageHeightPx;
+      const sliceH = Math.min(pageHeightPx, totalH - srcY);
+      const dstY  = i * (pageHeightPx + GAP_PX);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, dstY, out.width, sliceH);
+      ctx.drawImage(srcCanvas, 0, srcY, srcCanvas.width, sliceH, 0, dstY, out.width, sliceH);
+    }
+
+    out.toBlob(blob => shareBlob(blob), 'image/jpeg', 0.95);
+
   } catch (e) {
     if (document.body.contains(clone)) document.body.removeChild(clone);
     showToast('Image failed — use Print instead', 'error');
