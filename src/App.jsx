@@ -1105,7 +1105,7 @@ return (
 {products.filter(p => p.available && p.name.toLowerCase().includes(prodSearch.toLowerCase())).map(p => (
 <div key={p.id} className="p-2 bg-white rounded-lg shadow-sm border border-indigo-100 flex justify-between items-center group">
 <button type="button" className="flex-1 font-semibold text-sm text-slate-800 text-left hover:text-indigo-600 transition-colors" onClick={() => handleAddItem(p, false)}><span>{p.name}</span><span className="text-indigo-600 font-bold ml-2">Rs.{p.sellingPrice}</span></button>
-<button onClick={() => handleAddItem(p, true)} className="px-2.5 py-1 text-[10px] bg-emerald-50 text-emerald-600 border border-emerald-100 rounded font-bold hover:bg-emerald-100 transition-colors ml-2">\ud83c\udf81 Bonus</button>
+<button onClick={() => handleAddItem(p, true)} className="px-2.5 py-1 text-[10px] bg-emerald-50 text-emerald-600 border border-emerald-100 rounded font-bold hover:bg-emerald-100 transition-colors ml-2">🎁 Bonus</button>
 </div>
 ))}
 </div>
