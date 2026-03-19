@@ -765,7 +765,7 @@ return (
         ><Image size={14}/> Image</button>
 
         <a
-          href={`https://wa.me/?text=${generateShareText()}`}
+          href={`https://wa.me/?text=${encodeURIComponent(generateShareText())}`}
           target="_blank"
           rel="noopener noreferrer"
           className="flex items-center gap-1.5 px-3 py-2 bg-green-600 hover:bg-green-500 focus:outline-none focus:ring-2 focus:ring-green-400 text-white rounded-lg font-bold text-xs transition-colors shadow"
