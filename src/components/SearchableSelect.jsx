@@ -90,7 +90,6 @@ const SearchableSelect = ({
     switch (e.key) {
       case 'Escape':
         e.preventDefault();
-        e.stopPropagation(); // prevent Escape from also closing the parent modal
         closeMenu();
         triggerRef.current?.querySelector('button')?.focus();
         break;
@@ -108,7 +107,9 @@ const SearchableSelect = ({
         else if (hi === -1 && filtered.length === 1) emit(filtered[0].value);
         break;
       case 'Tab':
+        e.preventDefault();
         closeMenu();
+        triggerRef.current?.querySelector('button')?.focus();
         break;
       default:
         break;
