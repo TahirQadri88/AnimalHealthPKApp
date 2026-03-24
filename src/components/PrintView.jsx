@@ -269,8 +269,8 @@ const buildHtmlDoc = () => {
     'line-height:1.5', 'box-sizing:border-box',
   ].join(';');
   const pageSize   = isThermal ? '80mm auto' : isA5 ? 'A5 portrait' : 'A4 portrait';
-  // Thermal: 5mm top/bottom, 4mm left/right — covers the printer's 2–3mm hardware non-printable edge
-  const pageMargin = isThermal ? '5mm 4mm' : '10mm';
+  // Thermal: 3mm top/bottom, 2mm left/right — covers the printer's 2–3mm hardware non-printable edge
+  const pageMargin = isThermal ? '3mm 2mm' : '10mm';
   const bodyPad    = isThermal ? '8px' : '16px';
   const docTitle   = getFileName().replace(/\.[^.]+$/, '');
   const html = `<!DOCTYPE html>
@@ -283,12 +283,12 @@ const buildHtmlDoc = () => {
     *{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
     body{margin:0;padding:${bodyPad};background:white;font-family:system-ui,-apple-system,sans-serif;}
     @page{size:${pageSize};margin:0;}
-    @media print{body{padding:${pageMargin};background:white;}#doc>*{width:100%!important;max-width:none!important;min-width:0!important;}}
+    @media print{body{padding:${pageMargin};background:white;}#doc>*{width:100%!important;max-width:none!important;min-width:0!important;padding-left:0!important;padding-right:0!important;}}
     ${isThermal ? `@media print{
       #doc *{
         color:black!important;
         background-color:white!important;
-        border-color:#000!important;
+        border-color:#555!important;
         box-shadow:none!important;
         text-shadow:none!important;
         -webkit-font-smoothing:none!important;
