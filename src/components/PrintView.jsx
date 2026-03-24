@@ -272,7 +272,7 @@ const buildHtmlDoc = () => {
     *{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
     body{margin:0;padding:${bodyPad};background:white;font-family:system-ui,-apple-system,sans-serif;}
     @page{size:${pageSize};margin:0;}
-    @media print{body{padding:${pageMargin};background:white;}#doc>*{width:100%!important;max-width:none!important;}}
+    @media print{body{padding:${pageMargin};background:white;}#doc>*{width:100%!important;max-width:none!important;min-width:0!important;}}
     ${isThermal ? `@media print{#doc *{color:black!important;}[data-dk],[data-dk] *{color:white!important;}}` : ''}
   </style>
 </head>
@@ -283,95 +283,39 @@ const buildHtmlDoc = () => {
   return { html, docTitle };
 };
 
-// ── Thermal print: inline-style clone → HTML print window ────────────────
-// Sends fully styled HTML to the print window so the browser's native print
-// engine (and the printer driver) rasterise at the printer's own DPI.
-// This is fundamentally crisper than pre-rasterising to a PNG — the printer
-// driver receives vector-quality HTML text instead of a scaled bitmap.
-const handleThermalPrint = async () => {
-  const element = document.getElementById('print-document');
-  if (!element) { showToast('Document not found', 'error'); return; }
-  showToast('Preparing thermal print…');
-  const docTitle = getFileName().replace(/\.[^.]+$/, '');
-  const targetW = 270; // 71 mm at 96 dpi
+// ── Thermal print: CSS injection → HTML print window ─────────────────────
+// Extracts the compiled app CSS (all Tailwind utilities + custom styles) from
+// the live page and injects it into the print popup alongside the buildHtmlDoc
+// HTML. Tailwind classes work exactly as on screen — no frozen pixel positions,
+// no image generation. The browser's native print engine rasterises at the
+// printer's own DPI, giving crisp, dark, native-resolution output.
+const handleThermalPrint = () => {
+  // Pull every CSS rule from the live document (same-origin sheets only)
+  let appCss = '';
+  try {
+    appCss = Array.from(document.styleSheets)
+      .flatMap(sheet => {
+        try { return Array.from(sheet.cssRules).map(r => r.cssText); }
+        catch (e) { return []; } // skip cross-origin / unenumerable sheets
+      }).join('\n');
+  } catch (e) {}
 
-  const lum = ([r, g, b]) => (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  const parseRgba = s => {
-    const m = (s || '').match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
-    if (!m) return null;
-    if (m[4] !== undefined && parseFloat(m[4]) < 0.1) return null;
-    return [+m[1], +m[2], +m[3]];
-  };
+  const result = buildHtmlDoc();
+  if (!result) { showToast('Document not found', 'error'); return; }
+  const { html, docTitle } = result;
 
-  // Clone and insert so getComputedStyle reflects Tailwind-applied values
-  const clone = element.cloneNode(true);
-  Object.assign(clone.style, {
-    position: 'fixed', top: '0', left: '0',
-    width: targetW + 'px', maxWidth: targetW + 'px', minWidth: targetW + 'px',
-    margin: '0', padding: '8px 10px', boxShadow: 'none',
-    zIndex: '-1', background: 'white', overflow: 'visible',
-  });
-  document.body.appendChild(clone);
-  await new Promise(r => setTimeout(r, 200));
+  // Inject app CSS first so Tailwind classes resolve; buildHtmlDoc's print
+  // overrides (color:black!important, @page, etc.) follow and win cascade.
+  const augmented = html.replace('<title>', `<style>${appCss}</style>\n  <title>`);
 
-  // Layout/typography properties to inline so the print window needs no CSS framework
-  const INLINE_PROPS = [
-    'display','flexDirection','flexWrap','justifyContent','alignItems',
-    'alignSelf','flexGrow','flexShrink','flexBasis','gap','rowGap','columnGap',
-    'width','height','minWidth','maxWidth','minHeight','boxSizing',
-    'padding','paddingTop','paddingRight','paddingBottom','paddingLeft',
-    'margin','marginTop','marginRight','marginBottom','marginLeft',
-    'fontSize','fontWeight','fontFamily','lineHeight','textAlign',
-    'fontStyle','letterSpacing','textDecoration','whiteSpace','wordBreak',
-    'verticalAlign','overflowWrap',
-    'borderStyle','borderWidth','borderRadius',
-    'borderTopWidth','borderRightWidth','borderBottomWidth','borderLeftWidth',
-    'borderTopStyle','borderRightStyle','borderBottomStyle','borderLeftStyle',
-    'tableLayout','borderCollapse','borderSpacing',
-    'position','float','clear','overflow',
-  ];
-
-  // Inline computed layout/typography, then apply colour corrections
-  clone.querySelectorAll('*').forEach(el => {
-    const cs = window.getComputedStyle(el);
-
-    // Inline all layout + typography props so browser needs no Tailwind in the popup
-    INLINE_PROPS.forEach(p => { const v = cs[p]; if (v) el.style[p] = v; });
-
-    const bgRgb = parseRgba(cs.backgroundColor);
-    const bgLum = bgRgb ? lum(bgRgb) : 1; // null → transparent → treat as white
-
-    if (bgLum < 0.4) {
-      // Dark background (e.g. table header): preserve it, force white text
-      el.style.backgroundColor = cs.backgroundColor;
-      el.style.color = '#ffffff';
-    } else {
-      // Light/medium/coloured background: strip to white, force black text
-      el.style.backgroundColor = '#ffffff';
-      el.style.color = '#000000';
-    }
-
-    // Borders: keep visible ones, make near-invisible ones a neutral grey
-    const bcRgb = parseRgba(cs.borderColor);
-    el.style.borderColor = (bcRgb && lum(bcRgb) < 0.85) ? cs.borderColor : '#cccccc';
-  });
-
-  document.body.removeChild(clone);
-
-  // Open print window with fully inline-styled HTML — no external CSS needed
   const newWin = window.open('', '_blank');
   if (!newWin) { showToast('Allow popups to enable printing', 'error'); return; }
-  newWin.document.write(`<!DOCTYPE html><html><head>
-<title>${docTitle}</title>
-<style>
-  *{margin:0;padding:0;box-sizing:border-box;}
-  html,body{margin:0;padding:0;background:white;font-family:system-ui,-apple-system,sans-serif;}
-  @page{size:80mm auto;margin:0 4mm;}
-  @media print{body{margin:0;background:white;}*{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}
-</style>
-</head><body>${clone.outerHTML}<script>window.onload=function(){window.focus();window.print();}<\/script></body></html>`);
+  newWin.document.open();
+  newWin.document.write(augmented);
   newWin.document.close();
   newWin.document.title = docTitle;
+  newWin.onload = () => { newWin.focus(); newWin.print(); };
+  setTimeout(() => { try { newWin.focus(); newWin.print(); } catch (e) {} }, 900);
 };
 
 // ── Print — opens clean new window and auto-triggers print dialog ─────────
