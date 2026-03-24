@@ -717,8 +717,8 @@ return (
   >
 
     {/* ── Header ── */}
-    <div className="keep-together" style={{ textAlign: 'center', marginBottom: sz('10px','14px','18px'), borderBottom: '2px solid #1e293b', paddingBottom: sz('8px','10px','14px') }}>
-      {showOnDocs && <div style={{ fontSize: sz('14px','18px','22px'), fontWeight: 900, letterSpacing: '-0.5px', textTransform: 'uppercase', color: '#0f172a', lineHeight: 1.2 }}>
+    <div className="keep-together" style={{ textAlign: 'center', marginBottom: sz('14px','18px','22px'), borderBottom: '2px solid #1e293b', paddingBottom: sz('10px','12px','16px') }}>
+      {showOnDocs && <div style={{ fontSize: sz('15px','18px','22px'), fontWeight: 900, letterSpacing: '-0.5px', textTransform: 'uppercase', color: '#0f172a', lineHeight: 1.2 }}>
         {bizName}
       </div>}
       {bizTagline && showOnDocs && <div style={{ fontSize: sz('7px','7.5px','8px'), textTransform: 'uppercase', letterSpacing: '2px', fontWeight: 700, color: '#94a3b8', marginTop: '2px' }}>
@@ -743,7 +743,7 @@ return (
 
     {/* ── Customer / Doc Meta ── */}
     {docType !== 'report' && data && (
-      <div className="keep-together" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: sz('10px','12px','16px'), gap: '8px' }}>
+      <div className="keep-together" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: sz('14px','16px','20px'), gap: '8px' }}>
         {/* Left: customer */}
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: '7px', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '1.2px', color: '#94a3b8', marginBottom: '3px' }}>
@@ -802,7 +802,7 @@ return (
 
     {/* ── Dispatch Logistics ── */}
     {docType === 'dispatch' && data && (
-      <div className="keep-together" style={{ marginBottom: sz('12px','16px','18px'), background: '#fffbeb', padding: sz('8px','10px','12px'), borderRadius: '8px', border: '1px solid #fcd34d', fontSize: sz('8.5px','9px','9.5px'), color: '#78350f' }}>
+      <div className="keep-together" style={{ marginBottom: sz('14px','18px','22px'), background: '#fffbeb', padding: sz('8px','10px','12px'), borderRadius: '8px', border: '1px solid #fcd34d', fontSize: sz('8.5px','9px','9.5px'), color: '#78350f' }}>
         <div style={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '5px', fontSize: '7.5px', color: '#92400e' }}>
           Logistics / Delivery
         </div>
@@ -907,13 +907,13 @@ return (
                 const rGP = r['Gross Profit (Rs)'] || r['Outstanding (Rs)'] || r.GrossProfit || r.Amount || 0;
                 return (
                 <tr key={i} style={{ borderBottom: '1px solid #f1f5f9', background: i % 2 === 0 ? '#fff' : '#f8fafc', pageBreakInside: 'avoid', breakInside: 'avoid' }}>
-                  <td style={{ padding: sz('4px','6px','7px'), fontWeight: 600, wordBreak: 'break-word', lineHeight: 1.3 }}>
+                  <td style={{ padding: sz('6px','8px','9px'), fontWeight: 600, wordBreak: 'break-word', lineHeight: sz('1.5','1.55','1.6') }}>
                     {rName}
                     {rBrand ? <span style={{ fontSize: '7.5px', color: '#94a3b8', display: 'block' }}>{rBrand}</span> : null}
                   </td>
-                  {data.view !== 'Receivables' && <td style={{ padding: sz('4px','6px','7px'), textAlign: 'center' }}>{Number(rQty).toLocaleString('en-US')}</td>}
-                  {data.view !== 'Receivables' && <td style={{ padding: sz('4px','6px','7px'), textAlign: 'right' }}>Rs.{Number(rRev).toLocaleString('en-US')}</td>}
-                  <td style={{ padding: sz('4px','6px','7px'), textAlign: 'right', fontWeight: 800, color: '#059669' }}>
+                  {data.view !== 'Receivables' && <td style={{ padding: sz('6px','8px','9px'), textAlign: 'center', whiteSpace: 'nowrap' }}>{Number(rQty).toLocaleString('en-US')}</td>}
+                  {data.view !== 'Receivables' && <td style={{ padding: sz('6px','8px','9px'), textAlign: 'right', whiteSpace: 'nowrap' }}>Rs.{Number(rRev).toLocaleString('en-US')}</td>}
+                  <td style={{ padding: sz('6px','8px','9px'), textAlign: 'right', fontWeight: 800, color: '#059669', whiteSpace: 'nowrap' }}>
                     Rs.{Number(rGP).toLocaleString('en-US')}
                   </td>
                 </tr>
@@ -930,10 +930,10 @@ return (
               return (
                 <tfoot>
                   <tr style={{ background: '#1e293b', color: 'white', fontWeight: 900, fontSize: sz('8px','9px','10px') }}>
-                    <td style={{ padding: sz('4px 4px','6px 6px','7px 8px') }}>TOTAL ({safeRows.length})</td>
-                    {data.view !== 'Receivables' && <td style={{ padding: sz('4px','6px','7px'), textAlign: 'center' }}>{totalQty.toLocaleString('en-US')}</td>}
-                    {data.view !== 'Receivables' && <td style={{ padding: sz('4px','6px','7px'), textAlign: 'right' }}>Rs.{totalRev.toLocaleString('en-US')}</td>}
-                    <td style={{ padding: sz('4px','6px','7px'), textAlign: 'right' }}>Rs.{totalGP.toLocaleString('en-US')}</td>
+                    <td style={{ padding: sz('6px 4px','8px 6px','9px 8px') }}>TOTAL ({safeRows.length})</td>
+                    {data.view !== 'Receivables' && <td style={{ padding: sz('6px','8px','9px'), textAlign: 'center', whiteSpace: 'nowrap' }}>{totalQty.toLocaleString('en-US')}</td>}
+                    {data.view !== 'Receivables' && <td style={{ padding: sz('6px','8px','9px'), textAlign: 'right', whiteSpace: 'nowrap' }}>Rs.{totalRev.toLocaleString('en-US')}</td>}
+                    <td style={{ padding: sz('6px','8px','9px'), textAlign: 'right', whiteSpace: 'nowrap' }}>Rs.{totalGP.toLocaleString('en-US')}</td>
                   </tr>
                 </tfoot>
               );
@@ -946,22 +946,22 @@ return (
     {/* ── Invoice / Dispatch / Credit Note Items Table ── */}
     {(docType === 'invoice' || docType === 'dispatch' || docType === 'estimate' || docType === 'creditnote') && (
       <>
-        <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', marginBottom: sz('12px','16px','20px'), fontSize: sz('8.5px','10px','11px') }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', marginBottom: sz('16px','20px','24px'), fontSize: sz('9.5px','10px','11px') }}>
           <thead>
             <tr style={{ borderBottom: '2px solid #1e293b', background: '#f8fafc' }}>
-              <th style={{ padding: sz('4px 2px 4px 0','7px 4px 7px 0','8px 6px 8px 0'), textAlign: 'left', fontWeight: 800, color: '#475569', textTransform: 'uppercase', fontSize: sz('7px','7.5px','8px'), letterSpacing: '0.5px', width: isThermal ? '54%' : '50%' }}>
+              <th style={{ padding: sz('6px 2px 6px 0','8px 4px 8px 0','9px 6px 9px 0'), textAlign: 'left', fontWeight: 800, color: '#475569', textTransform: 'uppercase', fontSize: sz('7.5px','7.5px','8px'), letterSpacing: '0.5px', width: isThermal ? (docType === 'dispatch' ? '65%' : '48%') : '50%' }}>
                 Description
               </th>
-              <th style={{ padding: sz('4px 2px','7px 4px','8px 6px'), textAlign: 'center', fontWeight: 800, color: '#475569', textTransform: 'uppercase', fontSize: sz('7px','7.5px','8px'), letterSpacing: '0.5px', whiteSpace: 'nowrap', width: isThermal ? '12%' : '9%' }}>
+              <th style={{ padding: sz('6px 2px','8px 4px','9px 6px'), textAlign: 'center', fontWeight: 800, color: '#475569', textTransform: 'uppercase', fontSize: sz('7.5px','7.5px','8px'), letterSpacing: '0.5px', whiteSpace: 'nowrap', width: isThermal ? (docType === 'dispatch' ? '35%' : '10%') : '9%' }}>
                 {docType === 'dispatch' ? 'Qty / Pack' : 'Qty'}
               </th>
               {(docType === 'invoice' || docType === 'estimate') && (
-                <th style={{ padding: sz('4px 2px','7px 4px','8px 6px'), textAlign: 'right', fontWeight: 800, color: '#475569', textTransform: 'uppercase', fontSize: sz('7px','7.5px','8px'), letterSpacing: '0.5px', width: isThermal ? '34%' : '17%' }}>
+                <th style={{ padding: sz('6px 2px','8px 4px','9px 6px'), textAlign: 'right', fontWeight: 800, color: '#475569', textTransform: 'uppercase', fontSize: sz('7.5px','7.5px','8px'), letterSpacing: '0.5px', whiteSpace: 'nowrap', width: isThermal ? '42%' : '17%' }}>
                   Rate
                 </th>
               )}
               {(docType === 'invoice' || docType === 'estimate') && !isThermal && (
-                <th style={{ padding: sz('','7px 4px 7px 0','8px 0 8px 4px'), textAlign: 'right', fontWeight: 800, color: '#475569', textTransform: 'uppercase', fontSize: '8px', letterSpacing: '0.5px', width: '24%' }}>
+                <th style={{ padding: sz('','8px 4px 8px 0','9px 0 9px 4px'), textAlign: 'right', fontWeight: 800, color: '#475569', textTransform: 'uppercase', fontSize: '8px', letterSpacing: '0.5px', whiteSpace: 'nowrap', width: '24%' }}>
                   Amount
                 </th>
               )}
@@ -970,7 +970,7 @@ return (
           <tbody>
             {safeItems.map((item, idx) => (
               <tr key={idx} style={{ borderBottom: '1px solid #e2e8f0', pageBreakInside: 'avoid', breakInside: 'avoid' }}>
-                <td style={{ padding: sz('5px 2px 5px 0','7px 4px 7px 0','8px 6px 8px 0'), fontWeight: 600, wordBreak: 'break-word', lineHeight: 1.3, color: '#1e293b' }}>
+                <td style={{ padding: sz('6px 2px 6px 0','8px 4px 8px 0','9px 6px 9px 0'), fontWeight: 600, wordBreak: 'break-word', lineHeight: sz('1.5','1.55','1.6'), color: '#1e293b' }}>
                   {item?.name || '—'}
                   {item?.isBonus && (
                     <span style={{ marginLeft: '5px', padding: '1px 5px', background: '#d1fae5', color: '#059669', fontSize: '6.5px', fontWeight: 800, borderRadius: '4px', textTransform: 'uppercase', border: '1px solid #a7f3d0', letterSpacing: '0.5px' }}>
@@ -978,11 +978,11 @@ return (
                     </span>
                   )}
                 </td>
-                <td style={{ padding: sz('5px 2px','7px 4px','8px 6px'), textAlign: 'center', fontWeight: 600, lineHeight: 1.3, color: '#334155' }}>
+                <td style={{ padding: sz('6px 2px','8px 4px','9px 6px'), textAlign: 'center', fontWeight: 600, lineHeight: sz('1.5','1.55','1.6'), color: '#334155', whiteSpace: 'nowrap' }}>
                   {docType === 'dispatch' ? getDispatchQtyStr(item) : (item?.quantity || 0)}
                 </td>
                 {(docType === 'invoice' || docType === 'estimate') && (
-                  <td style={{ padding: sz('5px 2px','7px 4px','8px 6px'), textAlign: 'right', color: '#475569' }}>
+                  <td style={{ padding: sz('6px 2px','8px 4px','9px 6px'), textAlign: 'right', color: '#475569', whiteSpace: 'nowrap' }}>
                     {item?.isBonus ? (
                       <span style={{ color: '#059669', fontWeight: 800, fontSize: sz('7px','8px','9px'), textTransform: 'uppercase' }}>Free</span>
                     ) : (
@@ -1003,7 +1003,7 @@ return (
                   </td>
                 )}
                 {(docType === 'invoice' || docType === 'estimate') && !isThermal && (
-                  <td style={{ padding: sz('','7px 4px 7px 0','8px 0 8px 4px'), textAlign: 'right', fontWeight: 800, color: '#1e293b' }}>
+                  <td style={{ padding: sz('','8px 4px 8px 0','9px 0 9px 4px'), textAlign: 'right', fontWeight: 800, color: '#1e293b', whiteSpace: 'nowrap' }}>
                     {item?.isBonus
                       ? <span style={{ color: '#059669' }}>Rs. 0</span>
                       : `Rs. ${((item?.price || 0) * (item?.quantity || 0)).toLocaleString('en-US')}`}
@@ -1022,10 +1022,10 @@ return (
           {docType === 'dispatch' && safeItems.length > 0 && (
             <tfoot>
               <tr style={{ borderTop: '2px solid #1e293b' }}>
-                <td style={{ padding: sz('5px 2px','7px 4px','8px 6px'), fontWeight: 700, fontSize: sz('8px','9px','10px'), color: '#475569' }}>
+                <td style={{ padding: sz('6px 2px','8px 4px','9px 6px'), fontWeight: 700, fontSize: sz('8px','9px','10px'), color: '#475569' }}>
                   Total SKUs: <strong style={{ color: '#1e293b' }}>{safeItems.length}</strong>
                 </td>
-                <td colSpan={1} style={{ padding: sz('5px','7px','8px'), textAlign: 'center', fontWeight: 800, color: '#1e293b' }}>
+                <td colSpan={1} style={{ padding: sz('6px','8px','9px'), textAlign: 'center', fontWeight: 800, color: '#1e293b' }}>
                   {safeItems.reduce((s, i) => s + (i.quantity || 0), 0)} units
                 </td>
               </tr>
@@ -1074,7 +1074,7 @@ return (
                   <span style={{ color: row.color || '#1e293b', fontVariantNumeric: 'tabular-nums' }}>{row.val}</span>
                 </div>
               ))}
-              <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '2px solid #1e293b', marginTop: sz('4px','5px','6px'), paddingTop: sz('5px','6px','8px'), fontWeight: 900, fontSize: sz('11px','13px','15px'), color: '#1e293b', fontVariantNumeric: 'tabular-nums' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '2px solid #1e293b', marginTop: sz('4px','5px','6px'), paddingTop: sz('5px','6px','8px'), fontWeight: 900, fontSize: sz('12px','13px','15px'), color: '#1e293b', fontVariantNumeric: 'tabular-nums' }}>
                 <span>Net Balance:</span>
                 <span>Rs. {netBalance.toLocaleString('en-US')}</span>
               </div>
@@ -1173,7 +1173,7 @@ return (
           <div style={{ fontSize: sz('7.5px','8.5px','9px'), fontWeight: 700, color: '#15803d', textTransform: 'uppercase', letterSpacing: '2px' }}>
             Amount Received
           </div>
-          <div style={{ fontSize: sz('24px','32px','40px'), fontWeight: 900, color: '#059669', marginTop: sz('4px','6px','8px'), lineHeight: 1.3, fontVariantNumeric: 'tabular-nums' }}>
+          <div style={{ fontSize: sz('26px','32px','40px'), fontWeight: 900, color: '#059669', marginTop: sz('4px','6px','8px'), lineHeight: 1.3, fontVariantNumeric: 'tabular-nums' }}>
             Rs. {(data.receivedAmount || 0).toLocaleString('en-US')}
           </div>
           {data.note && (
@@ -1206,7 +1206,7 @@ return (
       return (
       <>
         {/* Compact summary bar — 4 figures inline, smaller for thermal */}
-        <div className="keep-together" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: sz('4px','6px','8px'), marginBottom: sz('8px','10px','12px') }}>
+        <div className="keep-together" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: sz('4px','6px','8px'), marginBottom: sz('12px','14px','16px') }}>
           {[
             { label: 'Opening', val: data.openingBal || 0, color: '#475569', bg: '#f8fafc', border: '#e2e8f0' },
             { label: 'Debit (Dr)', val: data.totalDebit || 0, color: '#4338ca', bg: '#eef2ff', border: '#c7d2fe' },
@@ -1221,24 +1221,24 @@ return (
         </div>
 
         {/* Ledger table */}
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: sz('7.5px','9px','10px'), tableLayout: 'fixed' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: sz('8.5px','9px','10px'), tableLayout: 'fixed' }}>
           <thead>
             <tr style={{ background: '#1e293b', color: 'white' }}>
-              <th style={{ padding: sz('4px 2px','6px 4px','7px 6px'), textAlign: 'left', fontWeight: 800, textTransform: 'uppercase', fontSize: sz('6px','7px','7.5px'), letterSpacing: '0.5px', width: isThermal ? '22%' : '13%' }}>Date</th>
-              <th style={{ padding: sz('4px 2px','6px 4px','7px 6px'), textAlign: 'left', fontWeight: 800, textTransform: 'uppercase', fontSize: sz('6px','7px','7.5px'), letterSpacing: '0.5px' }}>Particulars</th>
-              <th style={{ padding: sz('4px 2px','6px 4px','7px 6px'), textAlign: 'right', fontWeight: 800, textTransform: 'uppercase', fontSize: sz('6px','7px','7.5px'), letterSpacing: '0.5px', width: isThermal ? '18%' : '15%' }}>Dr</th>
-              <th style={{ padding: sz('4px 2px','6px 4px','7px 6px'), textAlign: 'right', fontWeight: 800, textTransform: 'uppercase', fontSize: sz('6px','7px','7.5px'), letterSpacing: '0.5px', width: isThermal ? '18%' : '15%' }}>Cr</th>
-              <th style={{ padding: sz('4px 2px','6px 4px','7px 6px'), textAlign: 'right', fontWeight: 800, textTransform: 'uppercase', fontSize: sz('6px','7px','7.5px'), letterSpacing: '0.5px', width: isThermal ? '19%' : '17%' }}>Bal</th>
+              <th style={{ padding: sz('6px 2px','8px 4px','9px 6px'), textAlign: 'left', fontWeight: 800, textTransform: 'uppercase', fontSize: sz('6.5px','7px','7.5px'), letterSpacing: '0.5px', width: isThermal ? '14%' : '13%' }}>Date</th>
+              <th style={{ padding: sz('6px 2px','8px 4px','9px 6px'), textAlign: 'left', fontWeight: 800, textTransform: 'uppercase', fontSize: sz('6.5px','7px','7.5px'), letterSpacing: '0.5px' }}>Particulars</th>
+              <th style={{ padding: sz('6px 2px','8px 4px','9px 6px'), textAlign: 'right', fontWeight: 800, textTransform: 'uppercase', fontSize: sz('6.5px','7px','7.5px'), letterSpacing: '0.5px', whiteSpace: 'nowrap', width: isThermal ? '15%' : '15%' }}>Dr</th>
+              <th style={{ padding: sz('6px 2px','8px 4px','9px 6px'), textAlign: 'right', fontWeight: 800, textTransform: 'uppercase', fontSize: sz('6.5px','7px','7.5px'), letterSpacing: '0.5px', whiteSpace: 'nowrap', width: isThermal ? '15%' : '15%' }}>Cr</th>
+              <th style={{ padding: sz('6px 2px','8px 4px','9px 6px'), textAlign: 'right', fontWeight: 800, textTransform: 'uppercase', fontSize: sz('6.5px','7px','7.5px'), letterSpacing: '0.5px', whiteSpace: 'nowrap', width: isThermal ? '16%' : '17%' }}>Bal</th>
             </tr>
           </thead>
           <tbody>
             {safeRows.map((row, i) => (
               <tr key={row.id || i} style={{ borderBottom: '1px solid #f1f5f9', background: i % 2 === 0 ? '#fff' : '#f8fafc', pageBreakInside: 'avoid', breakInside: 'avoid' }}>
-                <td style={{ padding: sz('3px 2px','5px 4px','6px 6px'), color: '#64748b', whiteSpace: 'nowrap', fontSize: sz('6.5px','8px','9px') }}>
+                <td style={{ padding: sz('5px 2px','7px 4px','8px 6px'), color: '#64748b', whiteSpace: 'nowrap', fontSize: sz('6.5px','8px','9px') }}>
                   {formatDateDisp(row.date)}
                 </td>
-                <td style={{ padding: sz('3px 2px','5px 4px','6px 6px'), wordBreak: 'break-word' }}>
-                  <span style={{ fontWeight: 700, display: 'block', lineHeight: 1.3, color: row.isCreditNote ? '#be123c' : '#1e293b', fontSize: sz('7px','8.5px','9.5px') }}>{row.desc || '—'}</span>
+                <td style={{ padding: sz('5px 2px','7px 4px','8px 6px'), wordBreak: 'break-word' }}>
+                  <span style={{ fontWeight: 700, display: 'block', lineHeight: sz('1.5','1.55','1.6'), color: row.isCreditNote ? '#be123c' : '#1e293b', fontSize: sz('7px','8.5px','9.5px') }}>{row.desc || '—'}</span>
                   {!isSimple && <span style={{ fontSize: sz('6px','7px','7.5px'), color: '#94a3b8', fontWeight: 500, display: 'block', marginTop: '1px', wordBreak: 'break-all' }}>{row.ref || ''}</span>}
                   {!isSimple && (row.lineItems || []).length > 0 && (row.lineItems || []).map((li, idx) => (
                     <div key={idx} style={{ fontSize: sz('6px','7px','7.5px'), color: '#475569', display: 'flex', justifyContent: 'space-between', marginTop: '2px', paddingLeft: '6px' }}>
@@ -1252,13 +1252,13 @@ return (
                     </div>
                   )}
                 </td>
-                <td style={{ padding: sz('3px 2px','5px 4px','6px 6px'), textAlign: 'right', fontWeight: 800, color: '#4338ca', fontVariantNumeric: 'tabular-nums', fontSize: sz('7px','8.5px','9.5px') }}>
+                <td style={{ padding: sz('5px 2px','7px 4px','8px 6px'), textAlign: 'right', fontWeight: 800, color: '#4338ca', fontVariantNumeric: 'tabular-nums', fontSize: sz('7px','8.5px','9.5px'), whiteSpace: 'nowrap' }}>
                   {(row.debit || 0) > 0 ? (row.debit || 0).toLocaleString('en-US') : '—'}
                 </td>
-                <td style={{ padding: sz('3px 2px','5px 4px','6px 6px'), textAlign: 'right', fontWeight: 800, color: '#059669', fontVariantNumeric: 'tabular-nums', fontSize: sz('7px','8.5px','9.5px') }}>
+                <td style={{ padding: sz('5px 2px','7px 4px','8px 6px'), textAlign: 'right', fontWeight: 800, color: '#059669', fontVariantNumeric: 'tabular-nums', fontSize: sz('7px','8.5px','9.5px'), whiteSpace: 'nowrap' }}>
                   {(row.credit || 0) > 0 ? (row.credit || 0).toLocaleString('en-US') : '—'}
                 </td>
-                <td style={{ padding: sz('3px 2px','5px 4px','6px 6px'), textAlign: 'right', fontWeight: 900, color: (row.balance || 0) > 0 ? '#be123c' : '#065f46', fontVariantNumeric: 'tabular-nums', fontSize: sz('7px','8.5px','9.5px') }}>
+                <td style={{ padding: sz('5px 2px','7px 4px','8px 6px'), textAlign: 'right', fontWeight: 900, color: (row.balance || 0) > 0 ? '#be123c' : '#065f46', fontVariantNumeric: 'tabular-nums', fontSize: sz('7px','8.5px','9.5px'), whiteSpace: 'nowrap' }}>
                   {(row.balance || 0).toLocaleString('en-US')}
                 </td>
               </tr>
@@ -1269,12 +1269,12 @@ return (
           </tbody>
           <tfoot>
             <tr style={{ background: '#1e293b', color: 'white' }}>
-              <td colSpan={2} style={{ padding: sz('4px 2px','6px 4px','7px 6px'), textAlign: 'right', fontWeight: 700, textTransform: 'uppercase', fontSize: sz('6px','7px','7.5px'), letterSpacing: '0.5px' }}>
+              <td colSpan={2} style={{ padding: sz('6px 2px','8px 4px','9px 6px'), textAlign: 'right', fontWeight: 700, textTransform: 'uppercase', fontSize: sz('6.5px','7px','7.5px'), letterSpacing: '0.5px' }}>
                 Totals:
               </td>
-              <td style={{ padding: sz('4px 2px','6px 4px','7px 6px'), textAlign: 'right', fontWeight: 900, fontVariantNumeric: 'tabular-nums', fontSize: sz('7px','8.5px','9.5px') }}>{(data.totalDebit || 0).toLocaleString('en-US')}</td>
-              <td style={{ padding: sz('4px 2px','6px 4px','7px 6px'), textAlign: 'right', fontWeight: 900, fontVariantNumeric: 'tabular-nums', fontSize: sz('7px','8.5px','9.5px') }}>{(data.totalCredit || 0).toLocaleString('en-US')}</td>
-              <td style={{ padding: sz('4px 2px','6px 4px','7px 6px'), textAlign: 'right', fontWeight: 900, fontVariantNumeric: 'tabular-nums', fontSize: sz('7px','8.5px','9.5px') }}>{closingBal.toLocaleString('en-US')}</td>
+              <td style={{ padding: sz('6px 2px','8px 4px','9px 6px'), textAlign: 'right', fontWeight: 900, fontVariantNumeric: 'tabular-nums', fontSize: sz('7px','8.5px','9.5px'), whiteSpace: 'nowrap' }}>{(data.totalDebit || 0).toLocaleString('en-US')}</td>
+              <td style={{ padding: sz('6px 2px','8px 4px','9px 6px'), textAlign: 'right', fontWeight: 900, fontVariantNumeric: 'tabular-nums', fontSize: sz('7px','8.5px','9.5px'), whiteSpace: 'nowrap' }}>{(data.totalCredit || 0).toLocaleString('en-US')}</td>
+              <td style={{ padding: sz('6px 2px','8px 4px','9px 6px'), textAlign: 'right', fontWeight: 900, fontVariantNumeric: 'tabular-nums', fontSize: sz('7px','8.5px','9.5px'), whiteSpace: 'nowrap' }}>{closingBal.toLocaleString('en-US')}</td>
             </tr>
           </tfoot>
         </table>
