@@ -382,7 +382,7 @@ const handleThermalPrint = async () => {
         for (let i = 0; i < d.length; i += 4) {
           const luma = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
           const stretched = range > 10 ? ((luma - minL) / range) * 255 : luma;
-          const v = stretched < 128 ? 0 : 255;
+          const v = stretched < 150 ? 0 : 255;
           d[i] = d[i + 1] = d[i + 2] = v;
           d[i + 3] = 255; // force fully opaque
         }
@@ -396,7 +396,7 @@ const handleThermalPrint = async () => {
 
   try {
     const rawDataUrl = await window.htmlToImage.toPng(clone, {
-      pixelRatio: 6,           // 6× = ~575 DPI — finer threshold jagging
+      pixelRatio: 2,           // 2× ≈ 604px matches 203 DPI native — avoids downsampling gray artifacts
       backgroundColor: '#ffffff',
     });
     if (document.body.contains(clone)) document.body.removeChild(clone);
@@ -406,7 +406,7 @@ const handleThermalPrint = async () => {
     if (!newWin) { showToast('Allow popups to enable printing', 'error'); return; }
     newWin.document.write(`<!DOCTYPE html><html><head>
 <title>${docTitle}</title>
-<style>*{margin:0;padding:0;box-sizing:border-box;}html,body{width:80mm;max-width:80mm;}@page{size:80mm auto;margin:0;}@media print{body{margin:0;background:white;}}img{width:100%;display:block;}</style>
+<style>*{margin:0;padding:0;box-sizing:border-box;}html,body{margin:0;padding:0;}@page{size:80mm auto;margin:0;}@media print{body{margin:0;background:white;}}img{width:100%;display:block;}</style>
 </head><body><img src="${imgDataUrl}"><script>window.onload=function(){window.focus();window.print();}<\/script></body></html>`);
     newWin.document.close();
     newWin.document.title = docTitle;
