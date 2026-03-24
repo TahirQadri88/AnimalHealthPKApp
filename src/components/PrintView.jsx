@@ -269,8 +269,8 @@ const buildHtmlDoc = () => {
     'line-height:1.5', 'box-sizing:border-box',
   ].join(';');
   const pageSize   = isThermal ? '80mm auto' : isA5 ? 'A5 portrait' : 'A4 portrait';
-  // Thermal: 3mm top/bottom, 2mm left/right — covers the printer's 2–3mm hardware non-printable edge
-  const pageMargin = isThermal ? '3mm 2mm' : '10mm';
+  // Thermal: 3mm top/bottom, 4mm left/right — most thermal printers need ≥3–4mm hardware margin
+  const pageMargin = isThermal ? '3mm 4mm' : '10mm';
   const bodyPad    = isThermal ? '8px' : '16px';
   const docTitle   = getFileName().replace(/\.[^.]+$/, '');
   const html = `<!DOCTYPE html>
