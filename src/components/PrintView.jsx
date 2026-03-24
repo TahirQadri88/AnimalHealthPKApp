@@ -316,7 +316,7 @@ const handleThermalPrint = async () => {
     return;
   }
 
-  const targetW = 302; // 80 mm at 96 dpi
+  const targetW = 270; // 71 mm at 96 dpi — narrower than 80mm paper to clear hardware margins
   const lum = ([r, g, b]) => (0.299 * r + 0.587 * g + 0.114 * b) / 255;
   // parseRgba returns null for transparent (alpha < 0.1) so transparent bg is treated as white
   const parseRgba = s => {
@@ -333,6 +333,11 @@ const handleThermalPrint = async () => {
     width: targetW + 'px', maxWidth: targetW + 'px', minWidth: targetW + 'px',
     margin: '0', padding: '8px 10px', boxShadow: 'none', zIndex: '-1', background: 'white',
     overflow: 'visible',
+    // contrast(8) forces browser's native font-rasteriser to push anti-aliased
+    // gray edge pixels to pure black or white *before* html-to-image captures.
+    // This is applied in the browser's own render path (post sub-pixel hinting),
+    // so it is far more effective than a post-capture pixel-by-pixel threshold.
+    filter: 'contrast(8)',
   });
   document.body.appendChild(clone);
   await new Promise(r => setTimeout(r, 200));
@@ -382,7 +387,7 @@ const handleThermalPrint = async () => {
         for (let i = 0; i < d.length; i += 4) {
           const luma = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
           const stretched = range > 10 ? ((luma - minL) / range) * 255 : luma;
-          const v = stretched < 150 ? 0 : 255;
+          const v = stretched < 185 ? 0 : 255;
           d[i] = d[i + 1] = d[i + 2] = v;
           d[i + 3] = 255; // force fully opaque
         }
@@ -396,7 +401,7 @@ const handleThermalPrint = async () => {
 
   try {
     const rawDataUrl = await window.htmlToImage.toPng(clone, {
-      pixelRatio: 2,           // 2× ≈ 604px matches 203 DPI native — avoids downsampling gray artifacts
+      pixelRatio: 3,           // 3× = 810px — close to 203 DPI native for 100mm, crisp without over-sampling
       backgroundColor: '#ffffff',
     });
     if (document.body.contains(clone)) document.body.removeChild(clone);
@@ -406,7 +411,7 @@ const handleThermalPrint = async () => {
     if (!newWin) { showToast('Allow popups to enable printing', 'error'); return; }
     newWin.document.write(`<!DOCTYPE html><html><head>
 <title>${docTitle}</title>
-<style>*{margin:0;padding:0;box-sizing:border-box;}html,body{margin:0;padding:0;}@page{size:80mm auto;margin:0;}@media print{body{margin:0;background:white;}}img{width:100%;display:block;}</style>
+<style>*{margin:0;padding:0;box-sizing:border-box;}html,body{margin:0;padding:0;}@page{size:80mm auto;margin:0;}img{display:block;width:90%;margin:0 auto;image-rendering:pixelated;image-rendering:-moz-crisp-edges;-ms-interpolation-mode:nearest-neighbor;print-color-adjust:exact;-webkit-print-color-adjust:exact;}@media print{body{margin:0;background:white;}img{filter:none;}}</style>
 </head><body><img src="${imgDataUrl}"><script>window.onload=function(){window.focus();window.print();}<\/script></body></html>`);
     newWin.document.close();
     newWin.document.title = docTitle;
