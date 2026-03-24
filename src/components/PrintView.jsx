@@ -236,14 +236,25 @@ const buildHtmlDoc = () => {
   const clone = element.cloneNode(true);
   clone.removeAttribute('class');
 
-  // THERMAL: mark dark-background elements so CSS can restore white text
+  // THERMAL: pin dark backgrounds with inline !important so print CSS can
+  // safely blanket-white everything else; clear light inline backgrounds
+  // so they also get stripped to white by the print rule below.
   if (isThermal) {
     const parseRgb = s => { const m = (s || '').match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/); return m ? [+m[1], +m[2], +m[3]] : null; };
     const lum = ([r, g, b]) => (0.299 * r + 0.587 * g + 0.114 * b) / 255;
     clone.querySelectorAll('*').forEach(el => {
       const bg = el.style.background || el.style.backgroundColor;
       const rgb = parseRgb(bg);
-      if (rgb && lum(rgb) < 0.45) el.setAttribute('data-dk', '1');
+      if (rgb && lum(rgb) < 0.45) {
+        el.setAttribute('data-dk', '1');
+        // inline !important beats any stylesheet !important — preserves dark bg
+        el.style.setProperty('background-color', `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`, 'important');
+        el.style.background = '';
+      } else {
+        // Clear light inline backgrounds; print CSS rule will force white
+        el.style.background = '';
+        el.style.backgroundColor = '';
+      }
     });
   }
   const paperW  = isThermal ? '80mm' : isA5 ? '148mm' : '210mm';
@@ -273,7 +284,18 @@ const buildHtmlDoc = () => {
     body{margin:0;padding:${bodyPad};background:white;font-family:system-ui,-apple-system,sans-serif;}
     @page{size:${pageSize};margin:0;}
     @media print{body{padding:${pageMargin};background:white;}#doc>*{width:100%!important;max-width:none!important;min-width:0!important;}}
-    ${isThermal ? `@media print{#doc *{color:black!important;}[data-dk],[data-dk] *{color:white!important;}}` : ''}
+    ${isThermal ? `@media print{
+      #doc *{
+        color:black!important;
+        background-color:white!important;
+        border-color:#000!important;
+        box-shadow:none!important;
+        text-shadow:none!important;
+        -webkit-font-smoothing:none!important;
+        font-smooth:never!important;
+      }
+      [data-dk],[data-dk] *{color:white!important;}
+    }` : ''}
   </style>
 </head>
 <body>
