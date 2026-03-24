@@ -288,7 +288,7 @@ const buildHtmlDoc = () => {
       #doc *{
         color:black!important;
         background-color:white!important;
-        border-color:#555!important;
+        border-color:#000!important;
         box-shadow:none!important;
         text-shadow:none!important;
         -webkit-font-smoothing:none!important;
