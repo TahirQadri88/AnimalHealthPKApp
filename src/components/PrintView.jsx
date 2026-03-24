@@ -283,42 +283,19 @@ const buildHtmlDoc = () => {
   return { html, docTitle };
 };
 
-// ── Thermal print: html2canvas 4× scale → image → print window ───────────
-// This gives dark, crisp output on thermal printers regardless of browser DPI.
+// ── Thermal print: inline-style clone → HTML print window ────────────────
+// Sends fully styled HTML to the print window so the browser's native print
+// engine (and the printer driver) rasterise at the printer's own DPI.
+// This is fundamentally crisper than pre-rasterising to a PNG — the printer
+// driver receives vector-quality HTML text instead of a scaled bitmap.
 const handleThermalPrint = async () => {
   const element = document.getElementById('print-document');
   if (!element) { showToast('Document not found', 'error'); return; }
   showToast('Preparing thermal print…');
   const docTitle = getFileName().replace(/\.[^.]+$/, '');
+  const targetW = 270; // 71 mm at 96 dpi
 
-  // Load html-to-image — uses browser-native SVG foreignObject rendering
-  if (!window.htmlToImage) {
-    await new Promise((resolve, reject) => {
-      const s = document.createElement('script');
-      s.src = 'https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.js';
-      s.onload = resolve; s.onerror = reject;
-      document.head.appendChild(s);
-    }).catch(() => null);
-  }
-
-  // If library unavailable, fall back to regular HTML print
-  if (!window.htmlToImage) {
-    showToast('Falling back to standard print…');
-    const result = buildHtmlDoc();
-    if (!result) return;
-    const { html, docTitle: fbTitle } = result;
-    const newWin = window.open('', '_blank');
-    if (!newWin) { showToast('Allow popups to enable printing', 'error'); return; }
-    newWin.document.open(); newWin.document.write(html); newWin.document.close();
-    newWin.document.title = fbTitle;
-    newWin.onload = () => { newWin.focus(); newWin.print(); };
-    setTimeout(() => { try { newWin.focus(); newWin.print(); } catch (e) {} }, 900);
-    return;
-  }
-
-  const targetW = 270; // 71 mm at 96 dpi — narrower than 80mm paper to clear hardware margins
   const lum = ([r, g, b]) => (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  // parseRgba returns null for transparent (alpha < 0.1) so transparent bg is treated as white
   const parseRgba = s => {
     const m = (s || '').match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
     if (!m) return null;
@@ -326,99 +303,75 @@ const handleThermalPrint = async () => {
     return [+m[1], +m[2], +m[3]];
   };
 
-  // Clone, position and append — computed styles become available after DOM insertion
+  // Clone and insert so getComputedStyle reflects Tailwind-applied values
   const clone = element.cloneNode(true);
   Object.assign(clone.style, {
     position: 'fixed', top: '0', left: '0',
     width: targetW + 'px', maxWidth: targetW + 'px', minWidth: targetW + 'px',
-    margin: '0', padding: '8px 10px', boxShadow: 'none', zIndex: '-1', background: 'white',
-    overflow: 'visible',
-    // contrast(8) forces browser's native font-rasteriser to push anti-aliased
-    // gray edge pixels to pure black or white *before* html-to-image captures.
-    // This is applied in the browser's own render path (post sub-pixel hinting),
-    // so it is far more effective than a post-capture pixel-by-pixel threshold.
-    filter: 'contrast(8)',
+    margin: '0', padding: '8px 10px', boxShadow: 'none',
+    zIndex: '-1', background: 'white', overflow: 'visible',
   });
   document.body.appendChild(clone);
   await new Promise(r => setTimeout(r, 200));
 
-  // Apply high-contrast colours using getComputedStyle — captures Tailwind class colours,
-  // not just inline styles. Gray/muted text → black; white-on-dark preserved.
+  // Layout/typography properties to inline so the print window needs no CSS framework
+  const INLINE_PROPS = [
+    'display','flexDirection','flexWrap','justifyContent','alignItems',
+    'alignSelf','flexGrow','flexShrink','flexBasis','gap','rowGap','columnGap',
+    'width','height','minWidth','maxWidth','minHeight','boxSizing',
+    'padding','paddingTop','paddingRight','paddingBottom','paddingLeft',
+    'margin','marginTop','marginRight','marginBottom','marginLeft',
+    'fontSize','fontWeight','fontFamily','lineHeight','textAlign',
+    'fontStyle','letterSpacing','textDecoration','whiteSpace','wordBreak',
+    'verticalAlign','overflowWrap',
+    'borderStyle','borderWidth','borderRadius',
+    'borderTopWidth','borderRightWidth','borderBottomWidth','borderLeftWidth',
+    'borderTopStyle','borderRightStyle','borderBottomStyle','borderLeftStyle',
+    'tableLayout','borderCollapse','borderSpacing',
+    'position','float','clear','overflow',
+  ];
+
+  // Inline computed layout/typography, then apply colour corrections
   clone.querySelectorAll('*').forEach(el => {
     const cs = window.getComputedStyle(el);
+
+    // Inline all layout + typography props so browser needs no Tailwind in the popup
+    INLINE_PROPS.forEach(p => { const v = cs[p]; if (v) el.style[p] = v; });
+
     const bgRgb = parseRgba(cs.backgroundColor);
-    const fgRgb = parseRgba(cs.color);
-    const bgLum = bgRgb ? lum(bgRgb) : 1; // transparent bg → treat as white
-    if (fgRgb) {
-      const fgL = lum(fgRgb);
-      if (bgLum >= 0.5 && fgL > 0.15 && fgL < 0.95) el.style.color = '#000000';
-      if (bgLum < 0.4 && fgL < 0.7) el.style.color = '#ffffff';
+    const bgLum = bgRgb ? lum(bgRgb) : 1; // null → transparent → treat as white
+
+    if (bgLum < 0.4) {
+      // Dark background (e.g. table header): preserve it, force white text
+      el.style.backgroundColor = cs.backgroundColor;
+      el.style.color = '#ffffff';
+    } else {
+      // Light/medium/coloured background: strip to white, force black text
+      el.style.backgroundColor = '#ffffff';
+      el.style.color = '#000000';
     }
+
+    // Borders: keep visible ones, make near-invisible ones a neutral grey
     const bcRgb = parseRgba(cs.borderColor);
-    if (bcRgb && lum(bcRgb) > 0.85) el.style.borderColor = '#aaaaaa';
+    el.style.borderColor = (bcRgb && lum(bcRgb) < 0.85) ? cs.borderColor : '#cccccc';
   });
 
-  // Auto-levels + binary threshold → pure B&W for crisp thermal output.
-  // Step 1: find actual luminance range in the captured image (min/max).
-  // Step 2: stretch that range to 0–255 (so even a globally-light capture is fully utilized).
-  // Step 3: threshold at midpoint 128 → pure black or pure white, alpha forced opaque.
-  // This correctly handles cases where html-to-image renders text as light gray instead of
-  // black — contrast stretch makes the relative difference visible before thresholding.
-  const applyThermalThreshold = dataUrl => new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => {
-      try {
-        const c = document.createElement('canvas');
-        c.width = img.width; c.height = img.height;
-        const ctx = c.getContext('2d');
-        ctx.drawImage(img, 0, 0);
-        const id = ctx.getImageData(0, 0, c.width, c.height);
-        const d = id.data;
-        // Pass 1: find luminance range (skip fully transparent pixels)
-        let minL = 255, maxL = 0;
-        for (let i = 0; i < d.length; i += 4) {
-          if (d[i + 3] < 10) continue;
-          const luma = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
-          if (luma < minL) minL = luma;
-          if (luma > maxL) maxL = luma;
-        }
-        const range = maxL - minL;
-        // Pass 2: stretch contrast then threshold at midpoint
-        for (let i = 0; i < d.length; i += 4) {
-          const luma = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
-          const stretched = range > 10 ? ((luma - minL) / range) * 255 : luma;
-          const v = stretched < 185 ? 0 : 255;
-          d[i] = d[i + 1] = d[i + 2] = v;
-          d[i + 3] = 255; // force fully opaque
-        }
-        ctx.putImageData(id, 0, 0);
-        resolve(c.toDataURL('image/png'));
-      } catch (err) { reject(err); }
-    };
-    img.onerror = reject;
-    img.src = dataUrl;
-  });
+  document.body.removeChild(clone);
 
-  try {
-    const rawDataUrl = await window.htmlToImage.toPng(clone, {
-      pixelRatio: 3,           // 3× = 810px — close to 203 DPI native for 100mm, crisp without over-sampling
-      backgroundColor: '#ffffff',
-    });
-    if (document.body.contains(clone)) document.body.removeChild(clone);
-    const imgDataUrl = await applyThermalThreshold(rawDataUrl).catch(() => rawDataUrl);
-
-    const newWin = window.open('', '_blank');
-    if (!newWin) { showToast('Allow popups to enable printing', 'error'); return; }
-    newWin.document.write(`<!DOCTYPE html><html><head>
+  // Open print window with fully inline-styled HTML — no external CSS needed
+  const newWin = window.open('', '_blank');
+  if (!newWin) { showToast('Allow popups to enable printing', 'error'); return; }
+  newWin.document.write(`<!DOCTYPE html><html><head>
 <title>${docTitle}</title>
-<style>*{margin:0;padding:0;box-sizing:border-box;}html,body{margin:0;padding:0;}@page{size:80mm auto;margin:0;}img{display:block;width:90%;margin:0 auto;image-rendering:pixelated;image-rendering:-moz-crisp-edges;-ms-interpolation-mode:nearest-neighbor;print-color-adjust:exact;-webkit-print-color-adjust:exact;}@media print{body{margin:0;background:white;}img{filter:none;}}</style>
-</head><body><img src="${imgDataUrl}"><script>window.onload=function(){window.focus();window.print();}<\/script></body></html>`);
-    newWin.document.close();
-    newWin.document.title = docTitle;
-  } catch (e) {
-    if (document.body.contains(clone)) document.body.removeChild(clone);
-    showToast('Print failed — try PDF instead', 'error');
-  }
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:white;font-family:system-ui,-apple-system,sans-serif;}
+  @page{size:80mm auto;margin:0 4mm;}
+  @media print{body{margin:0;background:white;}*{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}
+</style>
+</head><body>${clone.outerHTML}<script>window.onload=function(){window.focus();window.print();}<\/script></body></html>`);
+  newWin.document.close();
+  newWin.document.title = docTitle;
 };
 
 // ── Print — opens clean new window and auto-triggers print dialog ─────────
