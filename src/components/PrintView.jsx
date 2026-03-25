@@ -235,6 +235,7 @@ const buildHtmlDoc = () => {
   if (!element) return null;
   const clone = element.cloneNode(true);
   clone.removeAttribute('class');
+  clone.removeAttribute('id'); // prevent injected app-CSS rules targeting #print-document from applying
 
   // THERMAL: pin dark backgrounds with inline !important so print CSS can
   // safely blanket-white everything else; clear light inline backgrounds
@@ -269,8 +270,8 @@ const buildHtmlDoc = () => {
     'line-height:1.5', 'box-sizing:border-box',
   ].join(';');
   const pageSize   = isThermal ? '80mm auto' : isA5 ? 'A5 portrait' : 'A4 portrait';
-  // Thermal: 3mm top/bottom, 4mm left/right — most thermal printers need ≥3–4mm hardware margin
-  const pageMargin = isThermal ? '3mm 4mm' : '10mm';
+  // Thermal: 5mm all sides — symmetric, clears most printers' 3–4mm hardware non-printable zone
+  const pageMargin = isThermal ? '5mm' : '10mm';
   const bodyPad    = isThermal ? '8px' : '16px';
   const docTitle   = getFileName().replace(/\.[^.]+$/, '');
   const html = `<!DOCTYPE html>
