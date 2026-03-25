@@ -145,12 +145,19 @@ return (
 };
 
 const ProductModal = () => {
-const { editingProduct, products, companies, invoices, isAdmin, checkDuplicate, saveToFirebase, showToast, setShowProductModal } = useContext(AppContext);
+const { editingProduct, products, companies, invoices, isAdmin, checkDuplicate, saveToFirebase, showToast, setShowProductModal, productPreFill, setProductPreFill } = useContext(AppContext);
 const isEdit = !!editingProduct;
-const [form, setForm] = useState(isEdit ? editingProduct : { name: '', companyId: '', unit: '', unitsInBox: '', costPrice: '', sellingPrice: '', available: true });
+const [form, setForm] = useState(isEdit ? editingProduct : { name: productPreFill || '', companyId: '', unit: '', unitsInBox: '', costPrice: '', sellingPrice: '', available: true });
 const originalCost = isEdit ? editingProduct.costPrice : '';
-const costChanged = isEdit && form.costPrice !== originalCost;
-const [effectiveDate, setEffectiveDate] = useState(getLocalDateStr());
+const costChanged = isEdit && Number(form.costPrice) !== Number(originalCost);
+const [effectiveDate, setEffectiveDate] = useState(() => {
+  if (!isEdit) return getLocalDateStr();
+  const datesWithProduct = invoices
+    .filter(inv => inv.items?.some(it => it.productId === form.id))
+    .map(inv => inv.date)
+    .sort();
+  return datesWithProduct[0] || getLocalDateStr();
+});
 const [newCompany, setNewCompany] = useState('');
 const [isAddingCompany, setIsAddingCompany] = useState(false);
 const save = async () => {
@@ -184,6 +191,7 @@ showToast(`Product Updated. Cost applied to ${costUpdCount} invoice${costUpdCoun
 } else {
 const newId = Date.now();
 await saveToFirebase('products', newId, { ...formatted, id: newId });
+setProductPreFill('');
 showToast("Product Registered");
 }
 setShowProductModal(false);
@@ -211,7 +219,7 @@ return (
 <div className="bg-amber-50 p-4 rounded-xl border border-amber-200 animate-slide-up mt-2">
 <label className="text-[10px] font-bold text-amber-700 uppercase tracking-wider block mb-2 flex items-center gap-1"><AlertCircle size={14}/> Effective From Date</label>
 <input type="date" className={`${inputClass} !bg-white !border-amber-300 !text-amber-900`} value={effectiveDate} onChange={e => setEffectiveDate(e.target.value)} />
-<p className="text-[10px] text-amber-600 font-medium mt-2 leading-tight">This will retroactively update profitability on past invoices from this date onward.</p>
+<p className="text-[10px] text-amber-600 font-medium mt-2 leading-tight">Updates cost on all invoices from this date onward. Defaults to first sale date so all past invoices are covered — change to a future date to only affect new invoices.</p>
 </div>
 )}
 <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 rounded-xl mt-6 shadow-md shadow-indigo-600/20 active:scale-[0.98] transition-all">Save Product</button>
@@ -806,7 +814,7 @@ return (
 
 // — Tabs —
 const DashboardTab = () => {
-const { isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, analyticsView, setAnalyticsView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig, showConfirm } = useContext(AppContext);
+const { isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, analyticsView, setAnalyticsView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, productPreFill, setProductPreFill, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig, showConfirm } = useContext(AppContext);
 const [dateFilter, setDateFilter] = useState('This Month');
 const [activitySearch, setActivitySearch] = useState('');
 const filteredInvoices = invoices.filter(o => o.status === 'Billed' && checkDateFilter(o.date, dateFilter));
@@ -1125,7 +1133,10 @@ return (
 })()}
 <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
 <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5"><Package size={12}/> Products</h3>
-<div className="flex gap-2 items-center mb-4"><div className="relative flex-1"><Search size={16} className="absolute left-3.5 top-3.5 text-slate-400"/><input placeholder="Search to add..." className={`pl-10 ${inputClass}`} value={prodSearch} onChange={e=>setProdSearch(e.target.value)} /></div></div>
+<div className="flex gap-2 items-center mb-4">
+  <div className="relative flex-1"><Search size={16} className="absolute left-3.5 top-3.5 text-slate-400"/><input placeholder="Search to add..." className={`pl-10 ${inputClass}`} value={prodSearch} onChange={e=>setProdSearch(e.target.value)} /></div>
+  {isAdmin && <button type="button" onClick={() => { setProductPreFill(prodSearch.trim()); setEditingProduct(null); setShowProductModal(true); }} className="flex-shrink-0 flex items-center gap-1 px-3 py-2.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-bold hover:bg-indigo-100 active:scale-95 transition-all" title="Register a new product"><Plus size={14}/> New</button>}
+</div>
 {prodSearch && (
 <div className="border border-indigo-200 bg-indigo-50/50 rounded-xl mb-4 max-h-48 overflow-y-auto p-2 space-y-1 shadow-inner">
 {products.filter(p => p.available && p.name.toLowerCase().includes(prodSearch.toLowerCase())).map(p => (
@@ -3429,6 +3440,7 @@ const [billingView, setBillingView] = useState('list');
 const [currentInvoice, setCurrentInvoice] = useState(null);
 const [showProductModal, setShowProductModal] = useState(false);
 const [editingProduct, setEditingProduct] = useState(null);
+const [productPreFill, setProductPreFill] = useState('');
 const [showCustomerModal, setShowCustomerModal] = useState(false);
 const [editingCustomer, setEditingCustomer] = useState(null);
 const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -3630,7 +3642,7 @@ cities, areas, customerTypes,
 showToast, showConfirm, confirmDialog, setConfirmDialog, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData,
 billingView, setBillingView, currentInvoice, setCurrentInvoice,
 activeTab, setActiveTab, adminView, setAdminView, analyticsView, setAnalyticsView,
-editingProduct, setEditingProduct, showProductModal, setShowProductModal,
+editingProduct, setEditingProduct, showProductModal, setShowProductModal, productPreFill, setProductPreFill,
 editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal,
 showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment,
 showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId,
