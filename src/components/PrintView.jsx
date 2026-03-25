@@ -950,10 +950,10 @@ return (
         <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', marginBottom: sz('16px','20px','24px'), fontSize: sz('9.5px','10px','11px') }}>
           <thead>
             <tr style={{ borderBottom: '2px solid #1e293b', background: '#f8fafc' }}>
-              <th style={{ padding: sz('6px 2px 6px 0','8px 4px 8px 0','9px 6px 9px 0'), textAlign: 'left', fontWeight: 800, color: '#475569', textTransform: 'uppercase', fontSize: sz('7.5px','7.5px','8px'), letterSpacing: '0.5px', width: isThermal ? (docType === 'dispatch' ? '65%' : '48%') : '50%' }}>
+              <th style={{ padding: sz('6px 2px 6px 0','8px 4px 8px 0','9px 6px 9px 0'), textAlign: 'left', fontWeight: 800, color: '#475569', textTransform: 'uppercase', fontSize: sz('7.5px','7.5px','8px'), letterSpacing: '0.5px', width: isThermal ? (docType === 'dispatch' ? '65%' : '48%') : (docType === 'dispatch' ? '65%' : '50%') }}>
                 Description
               </th>
-              <th style={{ padding: sz('6px 2px','8px 4px','9px 6px'), textAlign: 'center', fontWeight: 800, color: '#475569', textTransform: 'uppercase', fontSize: sz('7.5px','7.5px','8px'), letterSpacing: '0.5px', whiteSpace: 'nowrap', width: isThermal ? (docType === 'dispatch' ? '35%' : '10%') : '9%' }}>
+              <th style={{ padding: sz('6px 2px','8px 4px','9px 6px'), textAlign: 'center', fontWeight: 800, color: '#475569', textTransform: 'uppercase', fontSize: sz('7.5px','7.5px','8px'), letterSpacing: '0.5px', whiteSpace: 'nowrap', width: isThermal ? (docType === 'dispatch' ? '35%' : '10%') : (docType === 'dispatch' ? '35%' : '9%') }}>
                 {docType === 'dispatch' ? 'Qty / Pack' : 'Qty'}
               </th>
               {(docType === 'invoice' || docType === 'estimate') && (
@@ -979,7 +979,7 @@ return (
                     </span>
                   )}
                 </td>
-                <td style={{ padding: sz('6px 2px','8px 4px','9px 6px'), textAlign: 'center', fontWeight: 600, lineHeight: sz('1.5','1.55','1.6'), color: '#334155', whiteSpace: 'nowrap' }}>
+                <td style={{ padding: sz('6px 2px','8px 4px','9px 6px'), textAlign: docType === 'dispatch' ? 'left' : 'center', fontWeight: 600, lineHeight: sz('1.5','1.55','1.6'), color: '#334155', whiteSpace: docType === 'dispatch' ? 'normal' : 'nowrap' }}>
                   {docType === 'dispatch' ? getDispatchQtyStr(item) : (item?.quantity || 0)}
                 </td>
                 {(docType === 'invoice' || docType === 'estimate') && (
