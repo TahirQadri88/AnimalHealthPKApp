@@ -1018,7 +1018,7 @@ useEffect(() => {
     lastQtyRef.current.focus();
     lastQtyRef.current.select();
   }
-}, [currentInvoice.items.length]);
+}, [currentInvoice?.items?.length]);
 const saveInvoice = async (status) => {
 if(!currentInvoice.customerId || currentInvoice.items.length === 0) return showToast("Customer and items are required", "error");
 const totalItems = currentInvoice.items.reduce((sum, i) => sum + (i.isBonus ? 0 : i.price * i.quantity), 0);
