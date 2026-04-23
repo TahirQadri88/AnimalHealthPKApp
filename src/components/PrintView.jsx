@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { FileDown, Printer, Share2, X, MessageCircle, Image } from 'lucide-react';
 import { formatDateDisp, getLocalDateStr, APP_NAME } from '../helpers';
 
