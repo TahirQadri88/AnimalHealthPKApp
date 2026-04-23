@@ -790,10 +790,10 @@ return (
           {docType !== 'ledger' && (
             <>
               <div style={{ fontSize: '7px', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '1px', color: '#94a3b8', marginBottom: '2px' }}>Ref #</div>
-              <div style={{ fontWeight: 800, fontSize: sz('9px','11px','12px'), color: '#1e293b', maxWidth: isThermal ? '95px' : '160px', lineHeight: 1.2, fontFamily: 'monospace', ...(isThermal ? { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } : { wordBreak: 'break-all' }) }}>{data.id || '—'}</div>
-              <div style={{ color: '#64748b', fontSize: sz('8px','9px','10px'), marginTop: '2px', fontWeight: 600 }}>{formatDateDisp(data.date)}</div>
+              <div style={{ fontWeight: 800, fontSize: sz('11px','11px','12px'), color: '#1e293b', lineHeight: 1.2, fontFamily: 'monospace', wordBreak: 'break-all' }}>{data.id || '—'}</div>
+              <div style={{ color: '#64748b', fontSize: sz('8.5px','9px','10px'), marginTop: '2px', fontWeight: 600 }}>{formatDateDisp(data.date)}</div>
               {docType === 'invoice' && data.salespersonName && (
-                <div style={{ fontSize: sz('7px','8px','9px'), color: '#94a3b8', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: isThermal ? '90px' : '160px' }}>by {data.salespersonName}</div>
+                <div style={{ fontSize: sz('7.5px','8px','9px'), color: '#94a3b8', marginTop: '2px', wordBreak: 'break-word' }}>by {data.salespersonName}</div>
               )}
             </>
           )}
