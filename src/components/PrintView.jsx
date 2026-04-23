@@ -337,8 +337,8 @@ const handleThermalPrint = () => {
   newWin.document.write(augmented);
   newWin.document.close();
   newWin.document.title = docTitle;
-  newWin.onload = () => { newWin.focus(); newWin.print(); };
-  setTimeout(() => { try { newWin.focus(); newWin.print(); } catch (e) {} }, 900);
+  const tid = setTimeout(() => { try { newWin.focus(); newWin.print(); } catch(e){} }, 900);
+  newWin.onload = () => { clearTimeout(tid); newWin.focus(); newWin.print(); };
 };
 
 // ── Print — opens clean new window and auto-triggers print dialog ─────────
@@ -357,9 +357,8 @@ const handlePrint = () => {
   newWin.document.write(html);
   newWin.document.close();
   newWin.document.title = docTitle;
-  // onload fires after content is rendered; fallback setTimeout for slower devices
-  newWin.onload = () => { newWin.focus(); newWin.print(); };
-  setTimeout(() => { try { newWin.focus(); newWin.print(); } catch (e) {} }, 900);
+  const tid2 = setTimeout(() => { try { newWin.focus(); newWin.print(); } catch(e){} }, 900);
+  newWin.onload = () => { clearTimeout(tid2); newWin.focus(); newWin.print(); };
 };
 
 // ── HTML Share / Download ─────────────────────────────────────────────────
@@ -485,13 +484,23 @@ const handleImageShare = async () => {
   // not a JS CSS reimplementation, so all CSS properties work correctly.
   if (!window.htmlToImage) {
     await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('CDN timeout')), 10000);
       const s = document.createElement('script');
       s.src = 'https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.js';
-      s.onload = resolve; s.onerror = reject;
+      s.onload = () => { clearTimeout(timer); resolve(); };
+      s.onerror = () => { clearTimeout(timer); reject(new Error('CDN error')); };
       document.head.appendChild(s);
-    }).catch(() => { showToast('Image library failed to load', 'error'); });
+    }).catch(() => { showToast('Image library failed to load. Check internet connection.', 'error'); });
     if (!window.htmlToImage) return;
   }
+  const withTimeout = (promise, ms) => Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error('Rendering timed out')), ms)),
+  ]);
+  const toBlob = (canvas) => new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('toBlob timeout')), 20000);
+    canvas.toBlob(blob => { clearTimeout(timer); blob ? resolve(blob) : reject(new Error('toBlob null')); }, 'image/jpeg', 0.95);
+  });
 
   // Clone the element and position it within the viewport at z-index:-1.
   // html-to-image uses SVG foreignObject and cannot render elements at left:-9999px;
@@ -521,9 +530,9 @@ const handleImageShare = async () => {
   try {
     // For thermal: single tall image (continuous paper — no pagination)
     if (isThermal) {
-      const dataUrl = await window.htmlToImage.toJpeg(clone, {
+      const dataUrl = await withTimeout(window.htmlToImage.toJpeg(clone, {
         quality: 0.95, pixelRatio: 2, backgroundColor: '#ffffff', height: clone.scrollHeight,
-      });
+      }), 30000);
       if (document.body.contains(clone)) document.body.removeChild(clone);
       shareBlob(await (await fetch(dataUrl)).blob());
       return;
@@ -535,11 +544,11 @@ const handleImageShare = async () => {
     const PIXEL_RATIO = 2;
     const GAP_PX = 20; // gap between pages (in output-canvas pixels)
 
-    const srcCanvas = await window.htmlToImage.toCanvas(clone, {
+    const srcCanvas = await withTimeout(window.htmlToImage.toCanvas(clone, {
       pixelRatio: PIXEL_RATIO,
       backgroundColor: '#ffffff',
       height: clone.scrollHeight,
-    });
+    }), 30000);
     if (document.body.contains(clone)) document.body.removeChild(clone);
 
     // Page height in output-canvas pixels (aspect ratio of A5 or A4)
@@ -554,7 +563,7 @@ const handleImageShare = async () => {
       const out = document.createElement('canvas');
       out.width = srcCanvas.width; out.height = totalH;
       out.getContext('2d').drawImage(srcCanvas, 0, 0);
-      out.toBlob(blob => shareBlob(blob), 'image/jpeg', 0.95);
+      shareBlob(await toBlob(out));
       return;
     }
 
@@ -576,7 +585,7 @@ const handleImageShare = async () => {
       ctx.drawImage(srcCanvas, 0, srcY, srcCanvas.width, sliceH, 0, dstY, out.width, sliceH);
     }
 
-    out.toBlob(blob => shareBlob(blob), 'image/jpeg', 0.95);
+    shareBlob(await toBlob(out));
 
   } catch (e) {
     if (document.body.contains(clone)) document.body.removeChild(clone);
