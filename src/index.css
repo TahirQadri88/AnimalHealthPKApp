@@ -5,8 +5,9 @@
 @media print {
   @page { margin: 0; }
   html, body { height: auto !important; overflow: visible !important; }
+  #print-root { height: auto !important; min-height: 0 !important; }
   .no-print { display: none !important; }
-  #print-document {
+  #print-document:not(.is-thermal) {
     box-shadow: none !important;
     width: 100% !important;
     max-width: none !important;

@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { FileDown, Printer, Share2, X, MessageCircle, Image } from 'lucide-react';
 import { formatDateDisp, getLocalDateStr, APP_NAME } from '../helpers';
 
@@ -14,6 +14,7 @@ const showOnReports = biz.showBusinessNameOnReports !== false;
 const isThermal = format === 'thermal';
 const isA5 = format === 'a5';
 const printRef = useRef(null);
+const [hidePrevBal, setHidePrevBal] = useState(false);
 
 // Keyboard: Escape closes the print view
 useEffect(() => {
@@ -653,6 +654,14 @@ return (
       {/* Doc type label */}
       <span className="text-slate-400 font-bold text-xs uppercase tracking-widest hidden sm:block">{docLabel}</span>
 
+      {/* Prev Balance toggle (invoices only) */}
+      {docType === 'invoice' && (
+        <button
+          onClick={() => setHidePrevBal(v => !v)}
+          className={`px-3 py-1.5 rounded-lg font-bold text-xs transition-all focus:outline-none focus:ring-2 focus:ring-white/50 ${hidePrevBal ? 'bg-amber-500 text-white' : 'bg-slate-700 text-slate-300 hover:text-white'}`}
+        >{hidePrevBal ? 'Prev Bal: Off' : 'Prev Bal: On'}</button>
+      )}
+
       {/* Actions */}
       <div className="flex items-center gap-2">
         <button
@@ -695,7 +704,7 @@ return (
   <div
     id="print-document"
     ref={printRef}
-    className={`bg-white mx-auto ${docWidth} ${pad}`}
+    className={`bg-white mx-auto ${docWidth} ${pad}${isThermal ? ' is-thermal' : ''}`}
     style={{ fontFamily: "'Inter', system-ui, sans-serif", lineHeight: 1.5, fontSize: isThermal ? '10px' : isA5 ? '11px' : '12px' }}
   >
 
@@ -1049,8 +1058,8 @@ return (
                 { label: 'Items Subtotal', val: `Rs. ${itemsSubtotal.toLocaleString()}` },
                 (data.deliveryBilled || 0) > 0 && { label: `Delivery (${data.vehicle || ''})`, val: `Rs. ${Number(data.deliveryBilled).toLocaleString()}`, muted: true },
                 { label: 'Current Bill', val: `Rs. ${(data.total || 0).toLocaleString()}`, bold: true, large: true, divider: true },
-                { label: 'Previous Balance', val: `Rs. ${prevBalance.toLocaleString()}`, top: true },
-                { label: 'Subtotal', val: `Rs. ${(prevBalance + (data.total || 0)).toLocaleString()}`, bold: true },
+                !hidePrevBal && { label: 'Previous Balance', val: `Rs. ${prevBalance.toLocaleString()}`, top: true },
+                !hidePrevBal && { label: 'Subtotal', val: `Rs. ${(prevBalance + (data.total || 0)).toLocaleString()}`, bold: true },
                 received > 0 && { label: 'Payment Received', val: `− Rs. ${received.toLocaleString()}`, color: '#059669' },
               ].filter(Boolean).map((row, i) => row && (
                 <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: sz('3px','4px','5px'), borderTop: row.divider || row.top ? '1px solid #e2e8f0' : 'none', paddingTop: row.divider || row.top ? sz('4px','5px','7px') : 0, marginTop: row.divider || row.top ? sz('3px','4px','5px') : 0, fontWeight: row.bold ? 800 : 500, fontSize: row.large ? sz('10px','12px','13px') : sz('8px','9px','10px') }}>
@@ -1059,8 +1068,8 @@ return (
                 </div>
               ))}
               <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '2px solid #1e293b', marginTop: sz('4px','5px','6px'), paddingTop: sz('5px','6px','8px'), fontWeight: 900, fontSize: sz('11px','13px','15px'), color: '#1e293b', fontVariantNumeric: 'tabular-nums' }}>
-                <span>Net Balance:</span>
-                <span>Rs. {netBalance.toLocaleString()}</span>
+                <span>{hidePrevBal ? 'Total Due' : 'Net Balance'}:</span>
+                <span>Rs. {(hidePrevBal ? Math.max(0, (data.total || 0) - received) : netBalance).toLocaleString()}</span>
               </div>
               {totalSavings > 0 && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: sz('6px','8px','10px'), padding: sz('5px 8px','6px 10px','8px 12px'), background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: '8px', fontWeight: 800, fontSize: sz('8px','9px','10px'), color: '#065f46' }}>
@@ -1293,15 +1302,23 @@ return (
     @media print {
       @page { margin: 0; size: auto; }
       html, body { height: auto !important; overflow: visible !important; }
-      #print-root { display: block !important; position: relative !important; overflow: visible !important; }
+      #print-root { display: block !important; position: relative !important; height: auto !important; min-height: 0 !important; overflow: visible !important; }
       .no-print { display: none !important; }
-      #print-document {
+      #print-document:not(.is-thermal) {
         box-shadow: none !important;
         width: 100% !important;
         max-width: none !important;
         min-width: unset !important;
         margin: 0 !important;
         padding: 6mm !important;
+        font-size: 10pt !important;
+        position: relative !important;
+        page-break-after: auto !important;
+      }
+      #print-document.is-thermal {
+        box-shadow: none !important;
+        margin: 0 !important;
+        padding: 3mm 4mm !important;
         font-size: 10pt !important;
         position: relative !important;
         page-break-after: auto !important;
