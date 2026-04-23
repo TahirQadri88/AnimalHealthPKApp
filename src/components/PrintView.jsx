@@ -14,6 +14,7 @@ const showOnReports = biz.showBusinessNameOnReports !== false;
 const isThermal = format === 'thermal';
 const isA5 = format === 'a5';
 const printRef = useRef(null);
+const [showPrevBal, setShowPrevBal] = useState(true);
 
 // Keyboard: Escape closes the print view
 useEffect(() => {
@@ -681,20 +682,20 @@ return (
       <span className="text-slate-400 font-bold text-xs uppercase tracking-widest hidden sm:block">{docLabel}</span>
 
       {/* Actions */}
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-1.5">
         <button
           onClick={handleShareHTML}
-          className="flex items-center gap-1.5 px-3 py-2 bg-indigo-600 hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-400 text-white rounded-lg font-bold text-xs transition-colors shadow"
+          className="flex items-center gap-1.5 px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-400 text-white rounded-lg font-bold text-xs transition-colors shadow"
         ><FileDown size={14}/> Save / Share</button>
 
         <button
           onClick={handlePrint}
-          className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-400 text-white rounded-lg font-bold text-xs transition-colors shadow"
+          className="flex items-center gap-1.5 px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-400 text-white rounded-lg font-bold text-xs transition-colors shadow"
         ><Printer size={14}/> Print</button>
 
         <button
           onClick={handleImageShare}
-          className="flex items-center gap-1.5 px-3 py-2 bg-teal-600 hover:bg-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-400 text-white rounded-lg font-bold text-xs transition-colors shadow"
+          className="flex items-center gap-1.5 px-2.5 py-1.5 bg-teal-600 hover:bg-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-400 text-white rounded-lg font-bold text-xs transition-colors shadow"
           title="Share as Image (PNG/JPG) — works with WhatsApp"
         ><Image size={14}/> Image</button>
 
@@ -702,12 +703,20 @@ return (
           href={`https://wa.me/?text=${encodeURIComponent(generateShareText())}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center gap-1.5 px-3 py-2 bg-green-600 hover:bg-green-500 focus:outline-none focus:ring-2 focus:ring-green-400 text-white rounded-lg font-bold text-xs transition-colors shadow"
+          className="flex items-center gap-1.5 px-2.5 py-1.5 bg-green-600 hover:bg-green-500 focus:outline-none focus:ring-2 focus:ring-green-400 text-white rounded-lg font-bold text-xs transition-colors shadow"
         ><MessageCircle size={14}/> WhatsApp</a>
+
+        {docType === 'invoice' && (
+          <button
+            onClick={() => setShowPrevBal(v => !v)}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg font-bold text-xs transition-colors shadow border ${showPrevBal ? 'bg-slate-700 border-slate-600 text-slate-200 hover:bg-slate-600' : 'bg-amber-500 border-amber-400 text-white hover:bg-amber-400'}`}
+            title="Toggle previous balance visibility on invoice"
+          >{showPrevBal ? 'Full Ledger' : 'Bill Only'}</button>
+        )}
 
         <button
           onClick={() => setPrintConfig(null)}
-          className="flex items-center gap-1.5 px-3 py-2 bg-rose-600 hover:bg-rose-500 focus:outline-none focus:ring-2 focus:ring-rose-400 text-white rounded-lg font-bold text-xs transition-colors shadow"
+          className="flex items-center gap-1.5 px-2.5 py-1.5 bg-rose-600 hover:bg-rose-500 focus:outline-none focus:ring-2 focus:ring-rose-400 text-white rounded-lg font-bold text-xs transition-colors shadow"
         ><X size={14}/> Close</button>
       </div>
     </div>
@@ -1075,8 +1084,8 @@ return (
                 { label: 'Items Subtotal', val: `Rs. ${itemsSubtotal.toLocaleString('en-US')}` },
                 (data.deliveryBilled || 0) > 0 && { label: `Delivery (${data.vehicle || ''})`, val: `Rs. ${Number(data.deliveryBilled).toLocaleString('en-US')}`, muted: true },
                 { label: 'Current Bill', val: `Rs. ${(data.total || 0).toLocaleString('en-US')}`, bold: true, large: true, divider: true },
-                { label: 'Previous Balance', val: `Rs. ${prevBalance.toLocaleString('en-US')}`, top: true },
-                { label: 'Subtotal', val: `Rs. ${(prevBalance + (data.total || 0)).toLocaleString('en-US')}`, bold: true },
+                showPrevBal && { label: 'Previous Balance', val: `Rs. ${prevBalance.toLocaleString('en-US')}`, top: true },
+                showPrevBal && { label: 'Subtotal', val: `Rs. ${(prevBalance + (data.total || 0)).toLocaleString('en-US')}`, bold: true },
                 received > 0 && { label: 'Payment Received', val: `− Rs. ${received.toLocaleString('en-US')}`, color: '#059669' },
               ].filter(Boolean).map((row, i) => row && (
                 <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: sz('3px','4px','5px'), borderTop: row.divider || row.top ? '1px solid #e2e8f0' : 'none', paddingTop: row.divider || row.top ? sz('4px','5px','7px') : 0, marginTop: row.divider || row.top ? sz('3px','4px','5px') : 0, fontWeight: row.bold ? 800 : 500, fontSize: row.large ? sz('10px','12px','13px') : sz('8px','9px','10px') }}>
@@ -1086,7 +1095,7 @@ return (
               ))}
               <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '2px solid #1e293b', marginTop: sz('4px','5px','6px'), paddingTop: sz('5px','6px','8px'), fontWeight: 900, fontSize: sz('12px','13px','15px'), color: '#1e293b', fontVariantNumeric: 'tabular-nums' }}>
                 <span>Net Balance:</span>
-                <span>Rs. {netBalance.toLocaleString('en-US')}</span>
+                <span>Rs. {(showPrevBal ? netBalance : (data.total || 0)).toLocaleString('en-US')}</span>
               </div>
               {totalSavings > 0 && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: sz('6px','8px','10px'), padding: sz('5px 8px','6px 10px','8px 12px'), background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: '8px', fontWeight: 800, fontSize: sz('8px','9px','10px'), color: '#065f46' }}>
