@@ -12,8 +12,9 @@ AlignLeft, Bell, Star, Layers, Globe, PhoneCall, MapPin, Briefcase, ClipboardLis
 RotateCcw, FileText
 } from 'lucide-react';
 import { db, collection, onSnapshot, doc, setDoc, deleteDoc } from './firebase';
-import { APP_NAME, VEHICLES, getPKTDate, getLocalDateStr, formatDateDisp, checkDateFilter, exportToCSV } from './helpers';
+import { APP_NAME, VEHICLES, getPKTDate, getLocalDateStr, formatDateDisp, checkDateFilter, exportToCSV, shareOrDownload } from './helpers';
 import PrintView from './components/PrintView';
+import SearchableSelect from './components/SearchableSelect';
 
 const AppContext = createContext(null);
 
@@ -34,15 +35,50 @@ const RIDER_VEHICLE_TYPES = ['Rider', 'Rickshaw', 'Suzuki'];
 
 // ─── TOP-LEVEL MODAL COMPONENTS (outside App to prevent focus-loss on re-render) ───
 
-const ModalWrapper = ({ title, children, onClose }) => {
+const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
+
+// Shared arrow-key handler for tab/pill groups — roving tabIndex pattern
+// items: string[], current: active item id, set: setter fn, groupAttr: data-* attribute name
+const makeArrowNav = (items, current, set, groupAttr) => (e) => {
+  const dirs = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -1, ArrowDown: 1 };
+  if (!(e.key in dirs) && e.key !== 'Home' && e.key !== 'End') return;
+  e.preventDefault();
+  const idx = items.indexOf(current);
+  let next;
+  if (e.key === 'Home') next = 0;
+  else if (e.key === 'End') next = items.length - 1;
+  else next = (idx + dirs[e.key] + items.length) % items.length;
+  set(items[next]);
+  document.querySelector(`[${groupAttr}="${items[next]}"]`)?.focus();
+};
+
+const ModalWrapper = ({ title, children, onClose, maxWidth = 'max-w-lg' }) => {
+const panelRef = useRef(null);
 useEffect(() => {
-const prev = document.body.style.overflow;
-document.body.style.overflow = 'hidden';
-return () => { document.body.style.overflow = prev; };
+  const prev = document.body.style.overflow;
+  document.body.style.overflow = 'hidden';
+  // Auto-focus first focusable element
+  const first = panelRef.current?.querySelectorAll(FOCUSABLE)?.[0];
+  first?.focus();
+  return () => { document.body.style.overflow = prev; };
 }, []);
+useEffect(() => {
+  const onKey = (e) => {
+    if (e.key === 'Escape') { onClose(); return; }
+    if (e.key === 'Tab') {
+      const els = Array.from(panelRef.current?.querySelectorAll(FOCUSABLE) || []);
+      if (!els.length) return;
+      const first = els[0]; const last = els[els.length - 1];
+      if (e.shiftKey) { if (document.activeElement === first) { e.preventDefault(); last.focus(); } }
+      else { if (document.activeElement === last) { e.preventDefault(); first.focus(); } }
+    }
+  };
+  window.addEventListener('keydown', onKey);
+  return () => window.removeEventListener('keydown', onKey);
+}, [onClose]);
 return (
 <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex justify-center items-end sm:items-center" onMouseDown={(e) => { if(e.target === e.currentTarget) onClose(); }}>
-<div className="bg-white w-full max-w-lg rounded-t-3xl sm:rounded-3xl h-[85vh] sm:h-auto max-h-[90vh] flex flex-col animate-slide-up shadow-2xl" onMouseDown={e => e.stopPropagation()}>
+<div ref={panelRef} className={`bg-white w-full ${maxWidth} rounded-t-3xl sm:rounded-3xl h-[85vh] sm:h-auto max-h-[90vh] flex flex-col animate-slide-up shadow-2xl`} onMouseDown={e => e.stopPropagation()}>
 <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-white rounded-t-3xl sm:rounded-t-3xl">
 <h2 className="text-lg font-bold text-slate-800">{title}</h2>
 <button onClick={onClose} className="p-2 bg-slate-100 rounded-full text-slate-500 hover:bg-slate-200 hover:text-slate-800 transition-colors"><X size={20}/></button>
@@ -76,9 +112,9 @@ const scroll = (d) => ref.current?.scrollBy({ left: d * 100, behavior: 'smooth' 
 const btnBase = `shrink-0 p-1 rounded-lg border border-slate-300 text-slate-500 hover:text-slate-800 transition-all ${bgClass || 'bg-white'}`;
 return (
   <div className={`flex items-center gap-1 ${className}`}>
-    <button onClick={() => scroll(-1)} className={`${btnBase} ${showLeft ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}><ChevronLeft size={14}/></button>
+    <button onClick={() => scroll(-1)} tabIndex={showLeft ? 0 : -1} aria-label="Scroll tabs left" className={`${btnBase} ${showLeft ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}><ChevronLeft size={14}/></button>
     <div ref={ref} className="flex flex-1 gap-1 overflow-x-auto scrollbar-hide" onScroll={check}>{children}</div>
-    <button onClick={() => scroll(1)} className={`${btnBase} ${showRight ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}><ChevronRight size={14}/></button>
+    <button onClick={() => scroll(1)} tabIndex={showRight ? 0 : -1} aria-label="Scroll tabs right" className={`${btnBase} ${showRight ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}><ChevronRight size={14}/></button>
   </div>
 );
 };
@@ -109,12 +145,19 @@ return (
 };
 
 const ProductModal = () => {
-const { editingProduct, products, companies, invoices, isAdmin, checkDuplicate, saveToFirebase, showToast, setShowProductModal } = useContext(AppContext);
+const { editingProduct, products, companies, invoices, isAdmin, checkDuplicate, saveToFirebase, showToast, setShowProductModal, productPreFill, setProductPreFill } = useContext(AppContext);
 const isEdit = !!editingProduct;
-const [form, setForm] = useState(isEdit ? editingProduct : { name: '', companyId: '', unit: '', unitsInBox: '', costPrice: '', sellingPrice: '', available: true });
+const [form, setForm] = useState(isEdit ? editingProduct : { name: productPreFill || '', companyId: '', unit: '', unitsInBox: '', costPrice: '', sellingPrice: '', available: true });
 const originalCost = isEdit ? editingProduct.costPrice : '';
-const costChanged = isEdit && form.costPrice !== originalCost;
-const [effectiveDate, setEffectiveDate] = useState(getLocalDateStr());
+const costChanged = isEdit && Number(form.costPrice) !== Number(originalCost);
+const [effectiveDate, setEffectiveDate] = useState(() => {
+  if (!isEdit) return getLocalDateStr();
+  const datesWithProduct = invoices
+    .filter(inv => inv.items?.some(it => it.productId === form.id))
+    .map(inv => inv.date)
+    .sort();
+  return datesWithProduct[0] || getLocalDateStr();
+});
 const [newCompany, setNewCompany] = useState('');
 const [isAddingCompany, setIsAddingCompany] = useState(false);
 const save = async () => {
@@ -148,6 +191,7 @@ showToast(`Product Updated. Cost applied to ${costUpdCount} invoice${costUpdCoun
 } else {
 const newId = Date.now();
 await saveToFirebase('products', newId, { ...formatted, id: newId });
+setProductPreFill('');
 showToast("Product Registered");
 }
 setShowProductModal(false);
@@ -159,8 +203,8 @@ return (
 <div><label className="text-[10px] font-bold text-rose-500 uppercase tracking-wider ml-1 mb-1 block">Product Name *</label><input placeholder="Unique Product Name" className={inputClass} value={form.name} onChange={e => setForm({...form, name: e.target.value})} /></div>
 <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
 <div className="flex justify-between items-center mb-3"><label className="text-[10px] font-bold text-rose-500 uppercase tracking-wider">Manufacturer / Company *</label><button onClick={() => setIsAddingCompany(!isAddingCompany)} className="text-xs font-bold text-indigo-600 hover:text-indigo-700 bg-indigo-50 px-2 py-1 rounded-md transition-colors">{isAddingCompany ? 'Select Existing' : '+ Add New'}</button></div>
-{isAddingCompany ? (<input placeholder="Enter New Company Name..." className={inputClass} value={newCompany} onChange={e => setNewCompany(e.target.value)} />) : (
-<select className={inputClass} value={form.companyId} onChange={e => setForm({...form, companyId: e.target.value})}><option value="">– Select Company –</option>{companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
+{isAddingCompany ? (<input placeholder="Enter New Company Name..." className={inputClass} value={newCompany} onChange={e => setNewCompany(e.target.value)} onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); setIsAddingCompany(false); } }} />) : (
+<SearchableSelect className={inputClass} value={form.companyId} onChange={e => setForm({...form, companyId: e.target.value})} placeholder="– Select Company –" options={companies.map(c => ({ value: c.id, label: c.name }))} />
 )}
 </div>
 <div className="grid grid-cols-2 gap-4">
@@ -175,7 +219,7 @@ return (
 <div className="bg-amber-50 p-4 rounded-xl border border-amber-200 animate-slide-up mt-2">
 <label className="text-[10px] font-bold text-amber-700 uppercase tracking-wider block mb-2 flex items-center gap-1"><AlertCircle size={14}/> Effective From Date</label>
 <input type="date" className={`${inputClass} !bg-white !border-amber-300 !text-amber-900`} value={effectiveDate} onChange={e => setEffectiveDate(e.target.value)} />
-<p className="text-[10px] text-amber-600 font-medium mt-2 leading-tight">This will retroactively update profitability on past invoices from this date onward.</p>
+<p className="text-[10px] text-amber-600 font-medium mt-2 leading-tight">Updates cost on all invoices from this date onward. Defaults to first sale date so all past invoices are covered — change to a future date to only affect new invoices.</p>
 </div>
 )}
 <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 rounded-xl mt-6 shadow-md shadow-indigo-600/20 active:scale-[0.98] transition-all">Save Product</button>
@@ -187,7 +231,7 @@ return (
 const CustomerModal = () => {
 const { editingCustomer, customers, invoices, billingView, currentInvoice, isAdmin, checkDuplicate, saveToFirebase, showToast, setShowCustomerModal, setCurrentInvoice, cities, areas, customerTypes, setShowSegmentsModal } = useContext(AppContext);
 const isEdit = !!editingCustomer;
-const [form, setForm] = useState(isEdit ? editingCustomer : { name: '', contactPerson: '', phone: '', address1: '', map1: '', address2: '', map2: '', openingBalance: 0, city: '', area: '', customerType: '' });
+const [form, setForm] = useState(isEdit ? editingCustomer : { name: '', contactPerson: '', phone: '', address1: '', map1: '', address2: '', map2: '', openingBalance: 0, city: '', area: '', customerType: '', registrationDate: getLocalDateStr() });
 useEffect(() => { if (isEdit && editingCustomer.address && !editingCustomer.address1) { setForm(prev => ({...prev, address1: editingCustomer.address})); } }, [isEdit, editingCustomer]);
 const save = async () => {
 if(!form.name) return showToast("Customer Name required", "error");
@@ -213,15 +257,16 @@ return (
 <form onSubmit={e => { e.preventDefault(); save(); }} className="space-y-5 pb-8">
 <div className="space-y-3">
 <h3 className="text-xs font-bold text-slate-800 uppercase tracking-widest border-b border-slate-200 pb-1">Basic Details</h3>
-<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Customer / Business Name *</label><input placeholder="e.g. Karachi Vet Clinic" className={inputClass} value={form.name} onChange={e => setForm({...form, name: e.target.value})} /></div>
 <div className="grid grid-cols-2 gap-3">
-<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Contact Person</label><input placeholder="Name" className={inputClass} value={form.contactPerson || ''} onChange={e => setForm({...form, contactPerson: e.target.value})} /></div>
+<div className="col-span-2"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Customer / Business Name *</label><input placeholder="e.g. Karachi Vet Clinic" className={inputClass} value={form.name} onChange={e => setForm({...form, name: e.target.value})} /></div>
+<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Registration Date</label><input type="date" className={inputClass} value={form.registrationDate || getLocalDateStr()} onChange={e => setForm({...form, registrationDate: e.target.value})} /></div>
 <div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Phone Number</label><input placeholder="03XXXXXXXXX" className={inputClass} value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} /></div>
 </div>
 <div className="grid grid-cols-2 gap-3">
-<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Email (Optional)</label><input type="email" placeholder="clinic@example.com" className={inputClass} value={form.email || ''} onChange={e => setForm({...form, email: e.target.value})} /></div>
+<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Contact Person</label><input placeholder="Name" className={inputClass} value={form.contactPerson || ''} onChange={e => setForm({...form, contactPerson: e.target.value})} /></div>
 <div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Alt. Phone (Optional)</label><input placeholder="03XXXXXXXXX" className={inputClass} value={form.altPhone || ''} onChange={e => setForm({...form, altPhone: e.target.value})} /></div>
 </div>
+<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Email (Optional)</label><input type="email" placeholder="clinic@example.com" className={inputClass} value={form.email || ''} onChange={e => setForm({...form, email: e.target.value})} /></div>
 </div>
 <div className="space-y-3 bg-slate-100 p-3 rounded-xl border border-slate-200">
 <h3 className="text-xs font-bold text-slate-800 uppercase tracking-widest flex items-center gap-1"><MapPin size={14}/> Primary Location</h3>
@@ -236,9 +281,9 @@ return (
 <div className="space-y-3 bg-indigo-50/50 p-3 rounded-xl border border-indigo-100">
 <div className="flex justify-between items-center"><h3 className="text-xs font-bold text-slate-800 uppercase tracking-widest flex items-center gap-1"><Globe size={14}/> Segment / Classification</h3><button type="button" onClick={()=>setShowSegmentsModal(true)} className="text-[10px] font-bold text-indigo-600 bg-indigo-100 hover:bg-indigo-200 px-2 py-1 rounded-md transition-colors">+ Manage</button></div>
 <div className="grid grid-cols-3 gap-2">
-<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">City</label><select className={inputClass} value={form.city||''} onChange={e=>setForm({...form,city:e.target.value})}><option value="">–</option>{cities.map(c=><option key={c.id} value={c.name}>{c.name}</option>)}</select></div>
-<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Area</label><select className={inputClass} value={form.area||''} onChange={e=>setForm({...form,area:e.target.value})}><option value="">–</option>{areas.map(a=><option key={a.id} value={a.name}>{a.name}</option>)}</select></div>
-<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Type</label><select className={inputClass} value={form.customerType||''} onChange={e=>setForm({...form,customerType:e.target.value})}><option value="">–</option>{customerTypes.map(t=><option key={t.id} value={t.name}>{t.name}</option>)}</select></div>
+<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">City</label><SearchableSelect className={inputClass} value={form.city||''} onChange={e=>setForm({...form,city:e.target.value,area:''})} placeholder="–" options={cities.map(c=>({value:c.name,label:c.name}))} /></div>
+<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Area</label><SearchableSelect className={inputClass} value={form.area||''} onChange={e=>setForm({...form,area:e.target.value})} placeholder="–" options={areas.filter(a=>!form.city||!a.cityName||a.cityName===form.city).map(a=>({value:a.name,label:a.name}))} /></div>
+<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Type</label><SearchableSelect className={inputClass} value={form.customerType||''} onChange={e=>setForm({...form,customerType:e.target.value})} placeholder="–" options={customerTypes.map(t=>({value:t.name,label:t.name}))} /></div>
 </div>
 </div>
 {isAdmin && (
@@ -279,15 +324,11 @@ const inputClass = "w-full p-3.5 bg-white border border-slate-200 rounded-xl tex
 return (
 <ModalWrapper title={isEdit ? "Edit Payment Receipt" : "Receive Payment"} onClose={handleClose}>
 <form onSubmit={e => { e.preventDefault(); save(); }} className="space-y-4 pb-10">
-<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Select Client</label><select className={inputClass} value={form.customerId} onChange={e=>setForm({...form, customerId: e.target.value})}
-  disabled={isEdit && customers.some(c => c.id === Number(form.customerId) || String(c.id) === String(form.customerId))}>
-  <option value="">– Choose Client –</option>
-  {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-</select>
+<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Select Client</label><SearchableSelect className={inputClass} value={form.customerId} onChange={e=>setForm({...form, customerId: e.target.value})} placeholder="– Choose Client –" options={customers.map(c=>({value:c.id,label:c.name}))} disabled={isEdit && customers.some(c => c.id === Number(form.customerId) || String(c.id) === String(form.customerId))} />
 {isEdit && !customers.some(c => String(c.id) === String(form.customerId)) && (
   <p className="text-[10px] text-amber-600 font-bold mt-1 flex items-center gap-1"><AlertCircle size={11}/> Original client was deleted — please re-assign to an existing client or delete this receipt.</p>
 )}</div>
-{form.customerId && (<div className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-center"><p className="text-[10px] uppercase font-bold text-slate-500 tracking-widest">Current Outstanding Balance</p><p className="text-xl font-black text-rose-600 mt-1">Rs. {getCustomerBalance(Number(form.customerId)).toLocaleString()}</p></div>)}
+{form.customerId && (<div className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-center"><p className="text-[10px] uppercase font-bold text-slate-500 tracking-widest">Current Outstanding Balance</p><p className="text-xl font-black text-rose-600 mt-1">Rs. {getCustomerBalance(Number(form.customerId)).toLocaleString('en-US')}</p></div>)}
 <div className="grid grid-cols-2 gap-3">
 <div className="col-span-2"><label className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider ml-1 mb-1 block">Amount Received (Cr)</label><input type="number" placeholder="0.00" className={`${inputClass} !border-emerald-200 !text-emerald-700 !font-extrabold text-lg`} value={form.amount} onChange={e=>setForm({...form, amount: e.target.value})} /></div>
 <div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Date</label><input type="date" className={inputClass} value={form.date} onChange={e=>setForm({...form, date: e.target.value})} /></div>
@@ -300,7 +341,7 @@ return (
 };
 
 const CustomerLedgerModal = () => {
-const { selectedLedgerId, getCustomerLedger, generateReceiptData, setPrintConfig, setShowPaymentModal, setSelectedCustomerForPayment, setShowLedgerModal, deleteFromFirebase, saveToFirebase, invoices, isAdmin, setEditingPayment, payments, setShowCreditNoteModal, setEditingCreditNote, showConfirm } = useContext(AppContext);
+const { selectedLedgerId, getCustomerLedger, generateReceiptData, setPrintConfig, setShowPaymentModal, setSelectedCustomerForPayment, setShowLedgerModal, deleteFromFirebase, saveToFirebase, invoices, isAdmin, setEditingPayment, payments, setShowCreditNoteModal, setEditingCreditNote, showConfirm, setCurrentInvoice, setBillingView, setActiveTab } = useContext(AppContext);
 const [startDate, setStartDate] = useState(() => { const d = new Date(); d.setMonth(d.getMonth() - 1); return getLocalDateStr(d); });
 const [endDate, setEndDate] = useState(getLocalDateStr());
 const [ledgerMode, setLedgerMode] = useState('simple'); // 'simple' | 'detailed'
@@ -313,23 +354,23 @@ const periodTotalDebit = filteredRows.reduce((sum, r) => sum + r.debit, 0);
 const periodTotalCredit = filteredRows.reduce((sum, r) => sum + r.credit, 0);
 const printData = { ...fullLedger, dateRange: { start: startDate, end: endDate }, openingBal: periodOpeningBal, rows: filteredRows, totalDebit: periodTotalDebit, totalCredit: periodTotalCredit, ledgerMode };
 return (
-<ModalWrapper title={`${fullLedger.customerName} - Account Ledger`} onClose={() => setShowLedgerModal(false)}>
+<ModalWrapper title={`${fullLedger.customerName} - Account Ledger`} onClose={() => setShowLedgerModal(false)} maxWidth="max-w-3xl">
 <div className="space-y-4 pb-10">
 <div className="flex items-center gap-2 mb-4 bg-slate-50 p-3 rounded-2xl border border-slate-200">
 <div className="flex-1"><label className="text-[9px] font-bold uppercase text-slate-500 block mb-1 tracking-wider">Start Date</label><input type="date" value={startDate} onChange={e=>setStartDate(e.target.value)} className="w-full p-2 text-xs font-semibold rounded-lg border border-slate-300 outline-none focus:border-indigo-500 bg-white" /></div>
 <div className="flex-1"><label className="text-[9px] font-bold uppercase text-slate-500 block mb-1 tracking-wider">End Date</label><input type="date" value={endDate} onChange={e=>setEndDate(e.target.value)} className="w-full p-2 text-xs font-semibold rounded-lg border border-slate-300 outline-none focus:border-indigo-500 bg-white" /></div>
-<div className="ml-2 text-right bg-rose-50 px-2.5 py-2 rounded-xl border border-rose-200 shadow-sm shrink-0"><p className="text-[9px] font-bold uppercase text-rose-600 tracking-widest whitespace-nowrap">Balance</p><p className="text-sm font-black text-rose-700 mt-0.5 whitespace-nowrap">Rs.{fullLedger.closingBal.toLocaleString()}</p></div>
+<div className="ml-2 text-right bg-rose-50 px-2.5 py-2 rounded-xl border border-rose-200 shadow-sm shrink-0"><p className="text-[9px] font-bold uppercase text-rose-600 tracking-widest whitespace-nowrap">Balance</p><p className="text-sm font-black text-rose-700 mt-0.5 whitespace-nowrap">Rs.{fullLedger.closingBal.toLocaleString('en-US')}</p></div>
 </div>
 {/* Ledger mode toggle */}
 <div className="flex bg-slate-100 p-1 rounded-xl gap-1">
-  <button onClick={() => setLedgerMode('simple')} className={`flex-1 py-2 px-3 rounded-lg font-bold text-xs transition-colors ${ledgerMode==='simple'?'bg-white text-indigo-700 shadow-sm':'text-slate-500 hover:text-slate-700'}`}>Simple Ledger</button>
-  <button onClick={() => setLedgerMode('detailed')} className={`flex-1 py-2 px-3 rounded-lg font-bold text-xs transition-colors ${ledgerMode==='detailed'?'bg-white text-indigo-700 shadow-sm':'text-slate-500 hover:text-slate-700'}`}>Detailed (Items)</button>
+  <button onClick={() => setLedgerMode('simple')} className={`flex-1 py-2 px-3 rounded-lg font-bold text-xs transition-colors ${ledgerMode==='simple'?'bg-indigo-600 text-white shadow-sm':'text-slate-500 hover:bg-slate-200 hover:text-slate-700'}`}>Simple Ledger</button>
+  <button onClick={() => setLedgerMode('detailed')} className={`flex-1 py-2 px-3 rounded-lg font-bold text-xs transition-colors ${ledgerMode==='detailed'?'bg-indigo-600 text-white shadow-sm':'text-slate-500 hover:bg-slate-200 hover:text-slate-700'}`}>Detailed (Items)</button>
 </div>
 {/* Summary row */}
 <div className="grid grid-cols-3 gap-2 text-center">
-  <div className="bg-slate-50 border border-slate-200 rounded-xl px-2 py-2"><p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Debit</p><p className="font-black text-indigo-700 text-sm tabular-nums">Rs.{periodTotalDebit.toLocaleString()}</p></div>
-  <div className="bg-slate-50 border border-slate-200 rounded-xl px-2 py-2"><p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Credit</p><p className="font-black text-emerald-600 text-sm tabular-nums">Rs.{periodTotalCredit.toLocaleString()}</p></div>
-  <div className="bg-rose-50 border border-rose-200 rounded-xl px-2 py-2"><p className="text-[9px] font-bold text-rose-400 uppercase tracking-wider">Period Bal</p><p className="font-black text-rose-700 text-sm tabular-nums">Rs.{(periodOpeningBal+periodTotalDebit-periodTotalCredit).toLocaleString()}</p></div>
+  <div className="bg-slate-50 border border-slate-200 rounded-xl px-2 py-2"><p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Debit</p><p className="font-black text-indigo-700 text-sm tabular-nums">Rs.{periodTotalDebit.toLocaleString('en-US')}</p></div>
+  <div className="bg-slate-50 border border-slate-200 rounded-xl px-2 py-2"><p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Credit</p><p className="font-black text-emerald-600 text-sm tabular-nums">Rs.{periodTotalCredit.toLocaleString('en-US')}</p></div>
+  <div className="bg-rose-50 border border-rose-200 rounded-xl px-2 py-2"><p className="text-[9px] font-bold text-rose-400 uppercase tracking-wider">Period Bal</p><p className="font-black text-rose-700 text-sm tabular-nums">Rs.{(periodOpeningBal+periodTotalDebit-periodTotalCredit).toLocaleString('en-US')}</p></div>
 </div>
 <div className="flex gap-2">
 {isAdmin && <button onClick={() => { setEditingPayment(null); setSelectedCustomerForPayment(fullLedger.id); setShowPaymentModal(true); }} className="flex-1 bg-emerald-500 hover:bg-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-400 text-white font-bold py-3 rounded-xl flex justify-center items-center gap-1.5 shadow-sm active:scale-[0.98] transition-all text-xs"><Wallet size={15} /> Receive Payment</button>}
@@ -341,7 +382,7 @@ return (
 <table className="w-full text-left text-[11px] sm:text-xs min-w-[500px]">
 <thead className="bg-slate-50 text-slate-500 border-b border-slate-200"><tr><th className="py-2.5 px-3 font-bold uppercase tracking-wider">Date</th><th className="py-2.5 px-3 font-bold uppercase tracking-wider">Particulars</th><th className="py-2.5 px-3 text-right font-bold uppercase tracking-wider">Debit</th><th className="py-2.5 px-3 text-right font-bold uppercase tracking-wider">Credit</th><th className="py-2.5 px-3 text-right font-bold uppercase tracking-wider">Balance</th><th className="py-2.5 px-2 text-center"></th></tr></thead>
 <tbody className="divide-y divide-slate-100 text-slate-800">
-<tr className="bg-slate-50/30"><td className="py-2 px-3 text-slate-500 font-medium text-[10px]" colSpan={4}>Opening Balance <span className="text-[9px]">(as of {formatDateDisp(startDate)})</span></td><td className="py-2 px-3 text-right font-bold text-slate-700 tabular-nums">Rs.{periodOpeningBal.toLocaleString()}</td><td></td></tr>
+<tr className="bg-slate-50/30"><td className="py-2 px-3 text-slate-500 font-medium text-[10px]" colSpan={4}>Opening Balance <span className="text-[9px]">(as of {formatDateDisp(startDate)})</span></td><td className="py-2 px-3 text-right font-bold text-slate-700 tabular-nums">Rs.{periodOpeningBal.toLocaleString('en-US')}</td><td></td></tr>
 {filteredRows.map(row => (
 <tr key={row.id} className="hover:bg-slate-50 transition-colors">
 <td className="py-2.5 px-3 font-medium text-slate-600 whitespace-nowrap">{formatDateDisp(row.date)}</td>
@@ -365,14 +406,14 @@ return (
           <tr key={idx} className={idx % 2 === 0 ? '' : 'bg-slate-50/50'}>
             <td className="py-0.5 pr-2 font-semibold text-slate-700 leading-tight">{li.isBonus && <span className="mr-0.5">🎁</span>}{li.name}</td>
             <td className="py-0.5 px-1 text-center text-slate-500 tabular-nums">{li.qty}</td>
-            <td className="py-0.5 px-1 text-right text-slate-500 tabular-nums">{li.isBonus ? '—' : `Rs.${(li.price||0).toLocaleString()}`}</td>
-            <td className="py-0.5 pl-1 text-right font-bold text-slate-700 tabular-nums">{li.isBonus ? <span className="text-emerald-600 font-bold text-[9px]">FREE</span> : `Rs.${(li.subtotal||0).toLocaleString()}`}</td>
+            <td className="py-0.5 px-1 text-right text-slate-500 tabular-nums">{li.isBonus ? '—' : `Rs.${(li.price||0).toLocaleString('en-US')}`}</td>
+            <td className="py-0.5 pl-1 text-right font-bold text-slate-700 tabular-nums">{li.isBonus ? <span className="text-emerald-600 font-bold text-[9px]">FREE</span> : `Rs.${(li.subtotal||0).toLocaleString('en-US')}`}</td>
           </tr>
         ))}
         {(row.deliveryBilled || 0) > 0 && (
           <tr className="border-t border-slate-100">
             <td colSpan={3} className="pt-1 pr-2 text-slate-400 font-semibold">+ Delivery Charge</td>
-            <td className="pt-1 pl-1 text-right font-bold text-slate-600 tabular-nums">Rs.{row.deliveryBilled.toLocaleString()}</td>
+            <td className="pt-1 pl-1 text-right font-bold text-slate-600 tabular-nums">Rs.{row.deliveryBilled.toLocaleString('en-US')}</td>
           </tr>
         )}
       </tbody>
@@ -380,12 +421,13 @@ return (
   </div>
 )}
 </td>
-<td className="py-2.5 px-3 text-right font-extrabold text-indigo-600 tabular-nums">{row.debit > 0 ? row.debit.toLocaleString() : '-'}</td>
-<td className="py-2.5 px-3 text-right font-extrabold text-emerald-600 tabular-nums">{row.credit > 0 ? row.credit.toLocaleString() : '-'}</td>
-<td className="py-2.5 px-3 text-right font-extrabold text-slate-800 tabular-nums">{row.balance.toLocaleString()}</td>
+<td className="py-2.5 px-3 text-right font-extrabold text-indigo-600 tabular-nums">{row.debit > 0 ? row.debit.toLocaleString('en-US') : '-'}</td>
+<td className="py-2.5 px-3 text-right font-extrabold text-emerald-600 tabular-nums">{row.credit > 0 ? row.credit.toLocaleString('en-US') : '-'}</td>
+<td className="py-2.5 px-3 text-right font-extrabold text-slate-800 tabular-nums">{row.balance.toLocaleString('en-US')}</td>
 <td className="py-2.5 px-2 text-center">
 <div className="flex gap-1 justify-center flex-wrap">
 {row.debit > 0 && !row.isCreditNote && (<button onClick={() => { const inv = invoices.find(o => o.id === row.id); if(inv) setPrintConfig({docType:'invoice', format:'thermal', data: inv}); }} title="Print Invoice" className="p-1.5 bg-indigo-50 hover:bg-indigo-100 focus:outline-none focus:ring-1 focus:ring-indigo-400 text-indigo-500 rounded-lg transition-colors"><ReceiptText size={13}/></button>)}
+{isAdmin && row.debit > 0 && !row.isCreditNote && (<button onClick={() => { const inv = invoices.find(o => o.id === row.id); if(inv){ setCurrentInvoice(inv); setBillingView('form'); setActiveTab('billing'); setShowLedgerModal(false); }}} title="Edit Invoice" className="p-1.5 bg-amber-50 hover:bg-amber-100 focus:outline-none focus:ring-1 focus:ring-amber-400 text-amber-600 rounded-lg transition-colors"><Edit size={13}/></button>)}
 {row.isCreditNote && (<button onClick={() => { const cn = invoices.find(o => o.id === row.id); if(cn) setPrintConfig({docType:'creditnote', format:'a4', data: cn}); }} title="Print Credit Note" className="p-1.5 bg-rose-50 hover:bg-rose-100 focus:outline-none focus:ring-1 focus:ring-rose-400 text-rose-500 rounded-lg transition-colors"><FileText size={13}/></button>)}
 {row.credit > 0 && !row.isCreditNote && (<button onClick={() => setPrintConfig({docType: 'receipt', format: 'thermal', data: generateReceiptData(fullLedger, row.id)})} title="Print Receipt" className="p-1.5 bg-emerald-50 hover:bg-emerald-100 focus:outline-none focus:ring-1 focus:ring-emerald-400 text-emerald-600 rounded-lg transition-colors"><Receipt size={13}/></button>)}
 {isAdmin && row.credit > 0 && row.id.startsWith('REC-') && (
@@ -409,7 +451,7 @@ return (
 {filteredRows.length === 0 && (<tr><td colSpan={6} className="text-center py-6 text-slate-400 font-medium">No transactions in this period.</td></tr>)}
 </tbody>
 <tfoot className="bg-slate-50 border-t border-slate-200">
-<tr><td colSpan={2} className="py-2.5 px-3 font-bold text-right uppercase tracking-wider text-slate-500 text-[10px]">Period Totals:</td><td className="py-2.5 px-3 text-right font-black text-indigo-700 tabular-nums">Rs.{periodTotalDebit.toLocaleString()}</td><td className="py-2.5 px-3 text-right font-black text-emerald-600 tabular-nums">Rs.{periodTotalCredit.toLocaleString()}</td><td colSpan={2}></td></tr>
+<tr><td colSpan={2} className="py-2.5 px-3 font-bold text-right uppercase tracking-wider text-slate-500 text-[10px]">Period Totals:</td><td className="py-2.5 px-3 text-right font-black text-indigo-700 tabular-nums">Rs.{periodTotalDebit.toLocaleString('en-US')}</td><td className="py-2.5 px-3 text-right font-black text-emerald-600 tabular-nums">Rs.{periodTotalCredit.toLocaleString('en-US')}</td><td colSpan={2}></td></tr>
 </tfoot>
 </table>
 </div>
@@ -583,61 +625,189 @@ return (
 const SegmentsModal = () => {
 const { cities, areas, customerTypes, saveToFirebase, deleteFromFirebase, showToast, setShowSegmentsModal, showConfirm } = useContext(AppContext);
 const [tab, setTab] = useState('cities');
-const [newVal, setNewVal] = useState('');
+const [expandedCityId, setExpandedCityId] = useState(null);
+const [newCityName, setNewCityName] = useState('');
+const [newAreaName, setNewAreaName] = useState('');
+const [newAreaCityName, setNewAreaCityName] = useState('');
+const [newTypeName, setNewTypeName] = useState('');
 const [editingId, setEditingId] = useState(null);
 const [editVal, setEditVal] = useState('');
-const colMap = { cities: cities, areas: areas, customerTypes: customerTypes };
-const fireMap = { cities: 'cities', areas: 'areas', customerTypes: 'customerTypes' };
-const labelMap = { cities: 'City', areas: 'Area', customerTypes: 'Customer Type' };
-const list = colMap[tab];
-const col = fireMap[tab];
-const add = async () => {
-  if (!newVal.trim()) return;
-  if (list.some(i => i.name.toLowerCase() === newVal.toLowerCase())) return showToast(`${labelMap[tab]} already exists`, 'error');
+const [editCityName, setEditCityName] = useState('');
+
+const addCity = async () => {
+  if (!newCityName.trim()) return;
+  if (cities.some(c => c.name.toLowerCase() === newCityName.toLowerCase())) return showToast('City already exists', 'error');
   const id = Date.now();
-  await saveToFirebase(col, id, { id, name: newVal.trim() });
-  setNewVal('');
+  await saveToFirebase('cities', id, { id, name: newCityName.trim() });
+  setNewCityName('');
 };
-const save = async (item) => {
+const addArea = async (cityName) => {
+  if (!newAreaName.trim()) return;
+  if (areas.some(a => a.name.toLowerCase() === newAreaName.toLowerCase() && (a.cityName||'') === cityName)) return showToast('Area already exists in this city', 'error');
+  const id = Date.now();
+  await saveToFirebase('areas', id, { id, name: newAreaName.trim(), cityName });
+  setNewAreaName('');
+};
+const addType = async () => {
+  if (!newTypeName.trim()) return;
+  if (customerTypes.some(t => t.name.toLowerCase() === newTypeName.toLowerCase())) return showToast('Type already exists', 'error');
+  const id = Date.now();
+  await saveToFirebase('customerTypes', id, { id, name: newTypeName.trim() });
+  setNewTypeName('');
+};
+const saveEdit = async (item, col) => {
   if (!editVal.trim()) return;
-  if (list.some(i => i.id !== item.id && i.name.toLowerCase() === editVal.toLowerCase())) return showToast('Name already exists', 'error');
-  await saveToFirebase(col, item.id, { ...item, name: editVal.trim() });
+  if (col === 'areas' && !editCityName) return showToast('Select a City for this Area', 'error');
+  await saveToFirebase(col, item.id, { ...item, name: editVal.trim(), ...(col === 'areas' ? { cityName: editCityName } : {}) });
   setEditingId(null);
 };
+
+const unassignedAreas = areas.filter(a => !a.cityName);
+
 return (
 <ModalWrapper title="Manage Segments" onClose={() => setShowSegmentsModal(false)}>
 <div className="space-y-4 pb-10">
 <div className="flex bg-slate-100 p-1 rounded-xl gap-1">
-{['cities','areas','customerTypes'].map(t => (
-<button key={t} onClick={() => { setTab(t); setNewVal(''); setEditingId(null); }} className={`flex-1 py-2 px-2 rounded-lg font-bold text-xs transition-colors ${tab===t?'bg-white text-indigo-700 shadow-sm':'text-slate-500'}`}>{labelMap[t]}s</button>
+{[['cities','Cities'],['types','Types']].map(([t,l]) => (
+<button key={t} onClick={() => { setTab(t); setEditingId(null); }} className={`flex-1 py-2 px-2 rounded-lg font-bold text-xs transition-colors ${tab===t?'bg-white text-indigo-700 shadow-sm':'text-slate-500'}`}>{l}</button>
 ))}
 </div>
-<div className="flex gap-2">
-<input type="text" placeholder={`New ${labelMap[tab]}...`} className="flex-1 p-3 bg-slate-50 border border-slate-200 rounded-xl font-semibold outline-none focus:border-indigo-500 text-sm" value={newVal} onChange={e=>setNewVal(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')add();}} />
-<button onClick={add} className="bg-indigo-600 text-white px-4 rounded-xl font-bold hover:bg-indigo-700 transition-colors">Add</button>
-</div>
-<div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-{list.length === 0 && <p className="text-center py-6 text-sm text-slate-400">No {labelMap[tab]}s yet. Add one above.</p>}
-<ul className="divide-y divide-slate-100">
-{list.map(item => (
-<li key={item.id} className="flex items-center gap-2 p-3 hover:bg-slate-50">
-{editingId === item.id ? (
-<>
-<input autoFocus className="flex-1 p-2 text-sm font-semibold border border-indigo-300 rounded-lg outline-none" value={editVal} onChange={e=>setEditVal(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')save(item);if(e.key==='Escape')setEditingId(null);}} />
-<button onClick={()=>save(item)} className="text-xs font-bold text-indigo-600 px-3 py-1.5 bg-indigo-50 rounded-lg hover:bg-indigo-100">Save</button>
-<button onClick={()=>setEditingId(null)} className="text-xs font-bold text-slate-500 px-2 py-1.5 bg-slate-100 rounded-lg">Cancel</button>
-</>
-) : (
-<>
-<span className="flex-1 font-semibold text-slate-700 text-sm">{item.name}</span>
-<button onClick={()=>{setEditingId(item.id);setEditVal(item.name);}} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"><Edit size={14}/></button>
-<button onClick={async()=>{if(await showConfirm(`Delete "${item.name}"?`))await deleteFromFirebase(col,item.id);}} className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"><Trash2 size={14}/></button>
-</>
-)}
-</li>
-))}
-</ul>
-</div>
+
+{/* ── Cities Tab ── */}
+{tab === 'cities' && <>
+  <div className="flex gap-2">
+    <input type="text" placeholder="New City..." className="flex-1 p-3 bg-slate-50 border border-slate-200 rounded-xl font-semibold outline-none focus:border-indigo-500 text-sm" value={newCityName} onChange={e=>setNewCityName(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')addCity();}} />
+    <button onClick={addCity} className="bg-indigo-600 text-white px-4 rounded-xl font-bold hover:bg-indigo-700 transition-colors">Add</button>
+  </div>
+  <div className="space-y-2">
+  {cities.length === 0 && <p className="text-center py-6 text-sm text-slate-400">No cities yet.</p>}
+  {cities.map(city => {
+    const cityAreas = areas.filter(a => (a.cityName||'') === city.name);
+    const isOpen = expandedCityId === city.id;
+    return (
+    <div key={city.id} className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+      {/* City row */}
+      <div className="flex items-center gap-2 p-3 hover:bg-slate-50">
+        <button className="flex-1 flex items-center gap-2 text-left" onClick={()=>setExpandedCityId(isOpen ? null : city.id)}>
+          {isOpen ? <ChevronDown size={15} className="text-indigo-500 shrink-0"/> : <ChevronRight size={15} className="text-slate-400 shrink-0"/>}
+          {editingId === city.id ? (
+            <input autoFocus className="flex-1 p-1.5 text-sm font-semibold border border-indigo-300 rounded-lg outline-none" value={editVal} onChange={e=>setEditVal(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')saveEdit(city,'cities');if(e.key==='Escape')setEditingId(null);}} onClick={e=>e.stopPropagation()} />
+          ) : (
+            <span className="font-bold text-slate-800 text-sm flex-1">{city.name}</span>
+          )}
+          <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded shrink-0">{cityAreas.length} area{cityAreas.length!==1?'s':''}</span>
+        </button>
+        {editingId === city.id ? (
+          <>
+            <button onClick={()=>saveEdit(city,'cities')} className="text-xs font-bold text-indigo-600 px-2 py-1 bg-indigo-50 rounded-lg">Save</button>
+            <button onClick={()=>setEditingId(null)} className="text-xs font-bold text-slate-500 px-2 py-1 bg-slate-100 rounded-lg">Cancel</button>
+          </>
+        ) : (
+          <>
+            <button onClick={()=>{setEditingId(city.id);setEditVal(city.name);}} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"><Edit size={14}/></button>
+            <button onClick={async()=>{if(await showConfirm(`Delete "${city.name}"? Areas under it will become unassigned.`))await deleteFromFirebase('cities',city.id);}} className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"><Trash2 size={14}/></button>
+          </>
+        )}
+      </div>
+      {/* Expanded: areas list + add area */}
+      {isOpen && (
+        <div className="border-t border-slate-100 bg-slate-50">
+          {cityAreas.length === 0 && <p className="text-center py-3 text-xs text-slate-400">No areas yet — add one below.</p>}
+          {cityAreas.map(area => (
+            <div key={area.id} className="flex items-center gap-2 px-4 py-2 border-b border-slate-100 last:border-0 hover:bg-white">
+              <span className="w-2 h-2 rounded-full bg-indigo-300 shrink-0"/>
+              {editingId === area.id ? (
+                <>
+                  <select value={editCityName} onChange={e=>setEditCityName(e.target.value)} className="p-1.5 text-xs font-semibold border border-indigo-300 rounded-lg outline-none bg-white shrink-0">
+                    <option value="">City...</option>
+                    {cities.map(c=><option key={c.id} value={c.name}>{c.name}</option>)}
+                  </select>
+                  <input autoFocus className="flex-1 p-1.5 text-sm font-semibold border border-indigo-300 rounded-lg outline-none" value={editVal} onChange={e=>setEditVal(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')saveEdit(area,'areas');if(e.key==='Escape')setEditingId(null);}} />
+                  <button onClick={()=>saveEdit(area,'areas')} className="text-xs font-bold text-indigo-600 px-2 py-1 bg-indigo-50 rounded-lg">Save</button>
+                  <button onClick={()=>setEditingId(null)} className="text-xs font-bold text-slate-500 px-2 py-1 bg-slate-100 rounded-lg">Cancel</button>
+                </>
+              ) : (
+                <>
+                  <span className="flex-1 text-sm font-semibold text-slate-700">{area.name}</span>
+                  <button onClick={()=>{setEditingId(area.id);setEditVal(area.name);setEditCityName(area.cityName||city.name);}} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"><Edit size={13}/></button>
+                  <button onClick={async()=>{if(await showConfirm(`Delete "${area.name}"?`))await deleteFromFirebase('areas',area.id);}} className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"><Trash2 size={13}/></button>
+                </>
+              )}
+            </div>
+          ))}
+          {/* Add area inline */}
+          <div className="flex gap-2 p-3">
+            <input type="text" placeholder={`New area in ${city.name}...`} className="flex-1 p-2 bg-white border border-slate-200 rounded-lg font-semibold outline-none focus:border-indigo-400 text-sm" value={expandedCityId === city.id ? newAreaName : ''} onChange={e=>setNewAreaName(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')addArea(city.name);}} />
+            <button onClick={()=>addArea(city.name)} className="bg-indigo-500 text-white px-3 rounded-lg font-bold text-xs hover:bg-indigo-600 transition-colors">Add</button>
+          </div>
+        </div>
+      )}
+    </div>
+    );
+  })}
+  {/* Unassigned areas */}
+  {unassignedAreas.length > 0 && (
+    <div className="bg-amber-50 border border-amber-200 rounded-xl overflow-hidden">
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-amber-200">
+        <AlertCircle size={13} className="text-amber-500"/>
+        <span className="text-[11px] font-bold text-amber-700">{unassignedAreas.length} area(s) not assigned to any city</span>
+      </div>
+      {unassignedAreas.map(area => (
+        <div key={area.id} className="flex items-center gap-2 px-4 py-2 border-b border-amber-100 last:border-0">
+          {editingId === area.id ? (
+            <>
+              <select value={editCityName} onChange={e=>setEditCityName(e.target.value)} className="p-1.5 text-xs font-semibold border border-indigo-300 rounded-lg outline-none bg-white shrink-0">
+                <option value="">City...</option>
+                {cities.map(c=><option key={c.id} value={c.name}>{c.name}</option>)}
+              </select>
+              <input autoFocus className="flex-1 p-1.5 text-sm font-semibold border border-indigo-300 rounded-lg outline-none" value={editVal} onChange={e=>setEditVal(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')saveEdit(area,'areas');if(e.key==='Escape')setEditingId(null);}} />
+              <button onClick={()=>saveEdit(area,'areas')} className="text-xs font-bold text-indigo-600 px-2 py-1 bg-indigo-50 rounded-lg">Save</button>
+              <button onClick={()=>setEditingId(null)} className="text-xs font-bold text-slate-500 px-2 py-1 bg-slate-100 rounded-lg">Cancel</button>
+            </>
+          ) : (
+            <>
+              <span className="flex-1 text-sm font-semibold text-slate-700">{area.name}</span>
+              <button onClick={()=>{setEditingId(area.id);setEditVal(area.name);setEditCityName('');}} className="p-1.5 text-amber-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"><Edit size={13}/></button>
+              <button onClick={async()=>{if(await showConfirm(`Delete "${area.name}"?`))await deleteFromFirebase('areas',area.id);}} className="p-1.5 text-amber-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"><Trash2 size={13}/></button>
+            </>
+          )}
+        </div>
+      ))}
+    </div>
+  )}
+  </div>
+</>}
+
+{/* ── Types Tab ── */}
+{tab === 'types' && <>
+  <div className="flex gap-2">
+    <input type="text" placeholder="New Type..." className="flex-1 p-3 bg-slate-50 border border-slate-200 rounded-xl font-semibold outline-none focus:border-indigo-500 text-sm" value={newTypeName} onChange={e=>setNewTypeName(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')addType();}} />
+    <button onClick={addType} className="bg-indigo-600 text-white px-4 rounded-xl font-bold hover:bg-indigo-700 transition-colors">Add</button>
+  </div>
+  <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+    {customerTypes.length === 0 && <p className="text-center py-6 text-sm text-slate-400">No types yet.</p>}
+    <ul className="divide-y divide-slate-100">
+    {customerTypes.map(item => (
+      <li key={item.id} className="flex items-center gap-2 p-3 hover:bg-slate-50">
+        {editingId === item.id ? (
+          <>
+            <input autoFocus className="flex-1 p-2 text-sm font-semibold border border-indigo-300 rounded-lg outline-none" value={editVal} onChange={e=>setEditVal(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')saveEdit(item,'customerTypes');if(e.key==='Escape')setEditingId(null);}} />
+            <button onClick={()=>saveEdit(item,'customerTypes')} className="text-xs font-bold text-indigo-600 px-3 py-1.5 bg-indigo-50 rounded-lg">Save</button>
+            <button onClick={()=>setEditingId(null)} className="text-xs font-bold text-slate-500 px-2 py-1.5 bg-slate-100 rounded-lg">Cancel</button>
+          </>
+        ) : (
+          <>
+            <span className="flex-1 font-semibold text-slate-700 text-sm">{item.name}</span>
+            <button onClick={()=>{setEditingId(item.id);setEditVal(item.name);}} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"><Edit size={14}/></button>
+            <button onClick={async()=>{if(await showConfirm(`Delete "${item.name}"?`))await deleteFromFirebase('customerTypes',item.id);}} className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"><Trash2 size={14}/></button>
+          </>
+        )}
+      </li>
+    ))}
+    </ul>
+  </div>
+</>}
+
 </div>
 </ModalWrapper>
 );
@@ -645,7 +815,7 @@ return (
 
 // — Tabs —
 const DashboardTab = () => {
-const { isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, analyticsView, setAnalyticsView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig, showConfirm } = useContext(AppContext);
+const { isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, analyticsView, setAnalyticsView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, productPreFill, setProductPreFill, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig, showConfirm } = useContext(AppContext);
 const [dateFilter, setDateFilter] = useState('This Month');
 const [activitySearch, setActivitySearch] = useState('');
 const filteredInvoices = invoices.filter(o => o.status === 'Billed' && checkDateFilter(o.date, dateFilter));
@@ -708,14 +878,14 @@ return (
 <div className="grid grid-cols-2 gap-4">
 <div className="bg-gradient-to-br from-indigo-600 to-indigo-800 text-white p-5 rounded-2xl shadow-lg shadow-indigo-600/20">
 <p className="text-[10px] uppercase font-bold text-indigo-100 flex items-center gap-1.5 tracking-wider"><TrendingUp size={14}/> {dateFilter} Sales</p>
-<p className="text-xl sm:text-2xl font-black mt-2 tracking-tight">Rs. {revenue.toLocaleString()}</p>
+<p className="text-xl sm:text-2xl font-black mt-2 tracking-tight">Rs. {revenue.toLocaleString('en-US')}</p>
 </div>
 <button onClick={() => { setSelectedLedgerId(null); setShowLedgerModal(false); setActiveTab('customers'); }} className="bg-gradient-to-br from-rose-500 to-rose-600 text-white p-5 rounded-2xl shadow-lg shadow-rose-500/20 text-left w-full">
 <p className="text-[10px] uppercase font-bold text-rose-100 flex items-center gap-1.5 tracking-wider">
   <DollarSign size={14}/> Receivables
   {topReceivables.length > 0 && <span className="ml-auto bg-white/30 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full">{topReceivables.length}</span>}
 </p>
-<p className="text-xl sm:text-2xl font-black mt-2 tracking-tight">Rs. {totalReceivables.toLocaleString()}</p>
+<p className="text-xl sm:text-2xl font-black mt-2 tracking-tight">Rs. {totalReceivables.toLocaleString('en-US')}</p>
 </button>
 </div>
 
@@ -737,7 +907,7 @@ return (
           {c.phone && <p className="text-[10px] text-slate-400 mt-0.5">{c.phone}</p>}
         </div>
         <div className="text-right ml-3 shrink-0">
-          <p className={`font-extrabold text-sm ${c.balance >= 100000 ? 'text-rose-600' : c.balance >= 50000 ? 'text-amber-600' : 'text-slate-700'}`}>Rs. {c.balance.toLocaleString()}</p>
+          <p className={`font-extrabold text-sm ${c.balance >= 100000 ? 'text-rose-600' : c.balance >= 50000 ? 'text-amber-600' : 'text-slate-700'}`}>Rs. {c.balance.toLocaleString('en-US')}</p>
           {c.balance >= 100000 && <span className="text-[9px] font-bold text-rose-500 uppercase tracking-wider">High</span>}
         </div>
         <ChevronRight size={14} className="text-slate-300 ml-2 shrink-0"/>
@@ -749,7 +919,7 @@ return (
 
 {isAdmin && (
 <button type="button" className="w-full bg-white border border-slate-200 p-5 rounded-2xl shadow-sm flex justify-between items-center hover:border-indigo-200 transition-colors text-left" onClick={() => {setActiveTab('admin'); setAdminView('expenses');}}>
-<div><p className="text-[10px] uppercase font-bold text-slate-500 flex items-center gap-1.5 tracking-wider"><TrendingDown size={14}/> Operational Expenses</p><p className="text-xl font-black text-slate-800 mt-1">Rs. {totalExpenses.toLocaleString()}</p></div>
+<div><p className="text-[10px] uppercase font-bold text-slate-500 flex items-center gap-1.5 tracking-wider"><TrendingDown size={14}/> Operational Expenses</p><p className="text-xl font-black text-slate-800 mt-1">Rs. {totalExpenses.toLocaleString('en-US')}</p></div>
 <span className="p-3 bg-slate-50 text-slate-400 rounded-xl"><ChevronRight size={20}/></span>
 </button>
 )}
@@ -759,7 +929,7 @@ return (
 <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
 <h4 className="text-[10px] font-bold uppercase tracking-widest text-indigo-600 mb-3 flex items-center gap-1.5"><Award size={14}/> By Sales Value</h4>
 <div className="space-y-2.5">
-{topStats.topValue.map((item, i) => (<div key={i} className="flex justify-between items-center"><span className="text-sm font-semibold text-slate-700 truncate mr-2">{i+1}. {item.name}</span><span className="font-bold text-slate-800 text-sm shrink-0">Rs. {item.revenue.toLocaleString()}</span></div>))}
+{topStats.topValue.map((item, i) => (<div key={i} className="flex justify-between items-center"><span className="text-sm font-semibold text-slate-700 truncate mr-2">{i+1}. {item.name}</span><span className="font-bold text-slate-800 text-sm shrink-0">Rs. {item.revenue.toLocaleString('en-US')}</span></div>))}
 {topStats.topValue.length === 0 && <p className="text-xs text-slate-400">No data.</p>}
 </div>
 </div>
@@ -802,7 +972,7 @@ return (
           {entry.kind === 'payment' && entry.note && <span className="ml-1 italic">&bull; {entry.note}</span>}
         </p>
       </div>
-      <p className={`font-extrabold text-sm shrink-0 ${cfg.amountCls}`}>Rs. {entry.amount.toLocaleString()}</p>
+      <p className={`font-extrabold text-sm shrink-0 ${cfg.amountCls}`}>Rs. {entry.amount.toLocaleString('en-US')}</p>
     </div>
   );
 })}
@@ -815,15 +985,40 @@ return (
 };
 
 const BillingTab = () => {
-const { isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig, setShowCreditNoteModal, setEditingCreditNote, showConfirm, riders } = useContext(AppContext);
+const { isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, productPreFill, setProductPreFill, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig, setShowCreditNoteModal, setEditingCreditNote, showConfirm, riders } = useContext(AppContext);
 const [search, setSearch] = useState('');
 const [dateFilter, setDateFilter] = useState('All Time');
 const [statusFilter, setStatusFilter] = useState('All');
 const [prodSearch, setProdSearch] = useState('');
+const [customerSearch, setCustomerSearch] = useState('');
+const [showCustomerDrop, setShowCustomerDrop] = useState(false);
+const [hiCustomer, setHiCustomer] = useState(-1);
+const [riderSearch, setRiderSearch] = useState('');
+const [showRiderDrop, setShowRiderDrop] = useState(false);
+const [hiProduct, setHiProduct] = useState(-1);
+const justAddedRef = useRef(false);
+const lastQtyRef = useRef(null);
+const prodSearchRef = useRef(null);
+const pickCustomer = (c) => {
+  const cid = c.id; const cName = c.name;
+  const pastInvs = invoices.filter(inv => inv.customerId === cid).sort((a,b) => new Date(b.date) - new Date(a.date) || b.id.localeCompare(a.id));
+  const lastInv = pastInvs[0];
+  setCurrentInvoice(prev => ({ ...prev, customerId: cid, customerName: cName, vehicle: lastInv ? (lastInv.vehicle || VEHICLES[0]) : VEHICLES[0], transportCompany: lastInv ? (lastInv.transportCompany || '') : '', biltyNumber: lastInv ? (lastInv.biltyNumber || '') : '', driverName: lastInv ? (lastInv.driverName || '') : '', driverPhone: lastInv ? (lastInv.driverPhone || '') : '', riderId: lastInv ? (lastInv.riderId || '') : '', deliveryAddressKey: lastInv ? (lastInv.deliveryAddressKey || 'address1') : 'address1', deliveryBilled: lastInv ? (lastInv.deliveryBilled || 0) : 0, transportExpense: lastInv ? (lastInv.transportExpense || 0) : 0 }));
+  setShowCustomerDrop(false); setHiCustomer(-1);
+};
 const startNewInvoice = () => {
 setCurrentInvoice({ id: null, customerId: '', customerName: '', customerDetails: {}, items: [], deliveryBilled: 0, transportExpense: 0, vehicle: VEHICLES[0], paymentStatus: 'Pending', receivedAmount: 0, transportCompany: '', biltyNumber: '', driverName: '', driverPhone: '', riderId: '', deliveryAddressKey: 'address1', notes: '' });
+setCustomerSearch(''); setShowCustomerDrop(false);
+setRiderSearch(''); setShowRiderDrop(false);
 setBillingView('form');
 };
+useEffect(() => {
+  if (justAddedRef.current && lastQtyRef.current) {
+    justAddedRef.current = false;
+    lastQtyRef.current.focus();
+    lastQtyRef.current.select();
+  }
+}, [currentInvoice?.items?.length]);
 const saveInvoice = async (status) => {
 if(!currentInvoice.customerId || currentInvoice.items.length === 0) return showToast("Customer and items are required", "error");
 const totalItems = currentInvoice.items.reduce((sum, i) => sum + (i.isBonus ? 0 : i.price * i.quantity), 0);
@@ -834,7 +1029,7 @@ if (!finalInvoice.id) {
   const prefix = status === 'Estimate' ? 'EST' : status === 'Booked' ? 'ORD' : 'INV';
   const nextNum = getNextSeqNum(invoices, prefix);
   finalInvoice.id = `${prefix}-${String(nextNum).padStart(4, '0')}`;
-  finalInvoice.date = getLocalDateStr();
+  if (!finalInvoice.date) finalInvoice.date = getLocalDateStr();
 }
 await saveToFirebase('invoices', finalInvoice.id, finalInvoice);
 const statusLabels = { Estimate: 'Estimate', Booked: 'Draft Order', Billed: 'Invoice' };
@@ -869,21 +1064,52 @@ const canSaveAsEstimate = !isEdit || editingStatus === 'Estimate' || editingStat
 return (
 <div className="h-full flex flex-col bg-slate-50 absolute inset-0 z-20 animate-slide-up">
 <div className="bg-white/80 backdrop-blur-md p-4 border-b border-slate-200 flex justify-between items-center sticky top-0 z-30 shadow-sm">
-<div><h2 className="text-lg font-extrabold text-slate-800 tracking-tight">{isEdit ? `${formTypeLabel} — ${currentInvoice.id}` : formTypeLabel}</h2><p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{formatDateDisp(currentInvoice.date || getLocalDateStr())}</p></div>
+<div><h2 className="text-lg font-extrabold text-slate-800 tracking-tight">{isEdit ? `${formTypeLabel} — ${currentInvoice.id}` : formTypeLabel}</h2><input type="date" value={currentInvoice.date || getLocalDateStr()} onChange={e => setCurrentInvoice({...currentInvoice, date: e.target.value})} className="text-[11px] font-bold text-slate-500 bg-transparent border-0 outline-none cursor-pointer hover:text-indigo-600 transition-colors mt-0.5 p-0" /></div>
 <button onClick={() => setBillingView('list')} className="p-2 bg-slate-100 rounded-full text-slate-600 hover:bg-slate-200 transition-colors"><X size={20}/></button>
 </div>
 <div className="flex-1 overflow-y-auto p-4 space-y-5 pb-4">
 <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
 <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5"><Users size={12}/> Select Customer</h3>
 <div className="flex gap-2 items-center">
-<select className={inputClass} value={currentInvoice.customerId} onChange={e => {
-const cid = Number(e.target.value);
-const cName = customers.find(c=>c.id === cid)?.name || '';
-const pastInvs = invoices.filter(inv => inv.customerId === cid).sort((a,b) => new Date(b.date) - new Date(a.date) || b.id.localeCompare(a.id));
-const lastInv = pastInvs[0];
-setCurrentInvoice({ ...currentInvoice, customerId: cid, customerName: cName, vehicle: lastInv ? (lastInv.vehicle || VEHICLES[0]) : VEHICLES[0], transportCompany: lastInv ? (lastInv.transportCompany || '') : '', biltyNumber: lastInv ? (lastInv.biltyNumber || '') : '', driverName: lastInv ? (lastInv.driverName || '') : '', driverPhone: lastInv ? (lastInv.driverPhone || '') : '', riderId: lastInv ? (lastInv.riderId || '') : '', deliveryAddressKey: lastInv ? (lastInv.deliveryAddressKey || 'address1') : 'address1', deliveryBilled: lastInv ? (lastInv.deliveryBilled || 0) : 0, transportExpense: lastInv ? (lastInv.transportExpense || 0) : 0 });
-}}><option value="">– Select Client –</option>{customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
+<div className="relative flex-1">
+  <Search size={16} className="absolute left-3.5 top-3.5 text-slate-400 pointer-events-none z-10"/>
+  <input
+    className={`pl-10 ${inputClass}`}
+    placeholder="Search client…"
+    value={showCustomerDrop ? customerSearch : (customers.find(c => c.id === currentInvoice.customerId)?.name || '')}
+    onFocus={() => { setShowCustomerDrop(true); setCustomerSearch(''); setHiCustomer(-1); }}
+    onChange={e => { setCustomerSearch(e.target.value); setHiCustomer(-1); }}
+    onBlur={() => setTimeout(() => { setShowCustomerDrop(false); setHiCustomer(-1); }, 150)}
+    onKeyDown={e => {
+      const filtC = customers.filter(c => !customerSearch || c.name.toLowerCase().includes(customerSearch.toLowerCase()));
+      if (e.key === 'ArrowDown') { e.preventDefault(); setHiCustomer(h => Math.min(h + 1, filtC.length - 1)); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); setHiCustomer(h => Math.max(h - 1, 0)); }
+      else if (e.key === 'Enter') { e.preventDefault(); if (hiCustomer >= 0 && filtC[hiCustomer]) pickCustomer(filtC[hiCustomer]); else if (filtC.length === 1) pickCustomer(filtC[0]); }
+      else if (e.key === 'Escape') { setShowCustomerDrop(false); setHiCustomer(-1); }
+    }}
+  />
+  {showCustomerDrop && (
+    <div className="absolute z-50 w-full mt-1 border border-indigo-200 bg-white rounded-xl max-h-52 overflow-y-auto shadow-lg">
+      {customers
+        .filter(c => !customerSearch || c.name.toLowerCase().includes(customerSearch.toLowerCase()))
+        .map((c, idx) => (
+          <button
+            type="button"
+            key={c.id}
+            data-cust-idx={idx}
+            className={`w-full text-left px-4 py-2.5 text-sm font-semibold cursor-pointer transition-colors ${c.id === currentInvoice.customerId ? 'bg-indigo-50 text-indigo-700' : idx === hiCustomer ? 'bg-indigo-50 text-indigo-700' : 'text-slate-800 hover:bg-indigo-50'}`}
+            onMouseDown={e => { e.preventDefault(); pickCustomer(c); }}
+          >{c.name}</button>
+        ))
+      }
+      {customers.filter(c => !customerSearch || c.name.toLowerCase().includes(customerSearch.toLowerCase())).length === 0 && (
+        <p className="px-4 py-3 text-sm text-slate-400 font-medium">No clients found</p>
+      )}
+    </div>
+  )}
+</div>
 <button onClick={() => { setEditingCustomer(null); setShowCustomerModal(true); }} className="p-3 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-xl font-black shrink-0 transition-colors"><Plus size={18}/></button>
+{currentInvoice.customerId && <button type="button" onClick={() => { setSelectedLedgerId(currentInvoice.customerId); setShowLedgerModal(true); }} className="p-3 bg-slate-100 text-slate-600 hover:bg-slate-200 rounded-xl shrink-0 transition-colors" title="View Customer Ledger"><BookOpen size={18}/></button>}
 </div>
 {currentInvoice.customerId && (() => {
   const cust = customers.find(c => c.id === currentInvoice.customerId);
@@ -894,7 +1120,7 @@ setCurrentInvoice({ ...currentInvoice, customerId: cid, customerName: cName, veh
     return (
       <div className={`mt-2 p-2.5 rounded-xl border text-xs font-semibold flex items-center gap-2 ${overLimit ? 'bg-rose-50 border-rose-200 text-rose-700' : 'bg-amber-50 border-amber-200 text-amber-700'}`}>
         <AlertCircle size={14} className="shrink-0"/>
-        <span>{overLimit ? `⚠ Credit limit exceeded! Balance Rs.${bal.toLocaleString()} ≥ limit Rs.${limit.toLocaleString()}` : `Outstanding balance: Rs.${bal.toLocaleString()}${limit > 0 ? ` (limit: Rs.${limit.toLocaleString()})` : ''}`}</span>
+        <span>{overLimit ? `⚠ Credit limit exceeded! Balance Rs.${bal.toLocaleString('en-US')} ≥ limit Rs.${limit.toLocaleString('en-US')}` : `Outstanding balance: Rs.${bal.toLocaleString('en-US')}${limit > 0 ? ` (limit: Rs.${limit.toLocaleString('en-US')})` : ''}`}</span>
       </div>
     );
   }
@@ -920,19 +1146,22 @@ setCurrentInvoice({ ...currentInvoice, customerId: cid, customerName: cName, veh
 })()}
 <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
 <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5"><Package size={12}/> Products</h3>
-<div className="flex gap-2 items-center mb-4"><div className="relative flex-1"><Search size={16} className="absolute left-3.5 top-3.5 text-slate-400"/><input placeholder="Search to add..." className={`pl-10 ${inputClass}`} value={prodSearch} onChange={e=>setProdSearch(e.target.value)} /></div></div>
+<div className="flex gap-2 items-center mb-4">
+  <div className="relative flex-1"><Search size={16} className="absolute left-3.5 top-3.5 text-slate-400"/><input ref={prodSearchRef} placeholder="Search to add..." className={`pl-10 ${inputClass}`} value={prodSearch} onChange={e=>{ setProdSearch(e.target.value); setHiProduct(-1); }} onKeyDown={e => { const filtP = products.filter(p => p.available && p.name.toLowerCase().includes(prodSearch.toLowerCase())); if (e.key === 'ArrowDown') { e.preventDefault(); setHiProduct(h => Math.min(h + 1, filtP.length - 1)); } else if (e.key === 'ArrowUp') { e.preventDefault(); setHiProduct(h => Math.max(h - 1, 0)); } else if (e.key === 'Enter') { e.preventDefault(); const p = hiProduct >= 0 ? filtP[hiProduct] : filtP.length === 1 ? filtP[0] : null; if (p) { justAddedRef.current = true; handleAddItem(p, false); setProdSearch(''); setHiProduct(-1); } } else if (e.key === 'Escape') { setProdSearch(''); setHiProduct(-1); } }} /></div>
+  {isAdmin && <button type="button" onClick={() => { setProductPreFill(prodSearch.trim()); setEditingProduct(null); setShowProductModal(true); }} className="flex-shrink-0 flex items-center gap-1 px-3 py-2.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-bold hover:bg-indigo-100 active:scale-95 transition-all" title="Register a new product"><Plus size={14}/> New</button>}
+</div>
 {prodSearch && (
 <div className="border border-indigo-200 bg-indigo-50/50 rounded-xl mb-4 max-h-48 overflow-y-auto p-2 space-y-1 shadow-inner">
-{products.filter(p => p.available && p.name.toLowerCase().includes(prodSearch.toLowerCase())).map(p => (
-<div key={p.id} className="p-2 bg-white rounded-lg shadow-sm border border-indigo-100 flex justify-between items-center group">
-<button type="button" className="flex-1 font-semibold text-sm text-slate-800 text-left hover:text-indigo-600 transition-colors" onClick={() => handleAddItem(p, false)}><span>{p.name}</span><span className="text-indigo-600 font-bold ml-2">Rs.{p.sellingPrice}</span></button>
-<button onClick={() => handleAddItem(p, true)} className="px-2.5 py-1 text-[10px] bg-emerald-50 text-emerald-600 border border-emerald-100 rounded font-bold hover:bg-emerald-100 transition-colors ml-2">\ud83c\udf81 Bonus</button>
+{products.filter(p => p.available && p.name.toLowerCase().includes(prodSearch.toLowerCase())).map((p, idx) => (
+<div key={p.id} className={`p-2 rounded-lg shadow-sm border flex justify-between items-center group ${idx === hiProduct ? 'bg-indigo-100 border-indigo-300' : 'bg-white border-indigo-100'}`}>
+<button type="button" className="flex-1 font-semibold text-sm text-slate-800 text-left hover:text-indigo-600 transition-colors" onClick={() => { justAddedRef.current = true; handleAddItem(p, false); setProdSearch(''); setHiProduct(-1); }}><span>{p.name}</span><span className="text-indigo-600 font-bold ml-2">Rs.{p.sellingPrice}</span></button>
+<button onClick={() => handleAddItem(p, true)} className="px-2.5 py-1 text-[10px] bg-emerald-50 text-emerald-600 border border-emerald-100 rounded font-bold hover:bg-emerald-100 transition-colors ml-2">🎁 Bonus</button>
 </div>
 ))}
 </div>
 )}
 <div className="space-y-3">
-{currentInvoice.items.map(item => {
+{currentInvoice.items.map((item, idx) => {
 const itemKey = item.uniqueId || item.productId;
 return (
 <div key={itemKey} className="bg-slate-50 p-3 rounded-xl border border-slate-200 shadow-sm">
@@ -950,7 +1179,7 @@ return (
 <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Quantity</label>
 <div className="flex items-center bg-white border border-slate-200 rounded-lg p-0.5 shadow-sm">
 <button onClick={() => setCurrentInvoice({...currentInvoice, items: currentInvoice.items.map(i => (i.uniqueId || i.productId) === itemKey ? {...i, quantity: i.quantity - 1} : i).filter(i=>i.quantity>0)})} className="w-8 h-8 rounded-md bg-slate-50 text-slate-600 font-bold hover:bg-slate-100 transition-colors">-</button>
-<input type="number" className="w-12 text-center text-sm font-bold bg-transparent outline-none appearance-none" value={item.quantity} onChange={(e) => setCurrentInvoice({...currentInvoice, items: currentInvoice.items.map(i => (i.uniqueId || i.productId) === itemKey ? {...i, quantity: Number(e.target.value)} : i)})} />
+<input type="number" ref={idx === currentInvoice.items.length - 1 ? lastQtyRef : null} className="w-12 text-center text-sm font-bold bg-transparent outline-none appearance-none" value={item.quantity} onChange={(e) => setCurrentInvoice({...currentInvoice, items: currentInvoice.items.map(i => (i.uniqueId || i.productId) === itemKey ? {...i, quantity: Number(e.target.value)} : i)})} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); prodSearchRef.current?.focus(); } }} />
 <button onClick={() => setCurrentInvoice({...currentInvoice, items: currentInvoice.items.map(i => (i.uniqueId || i.productId) === itemKey ? {...i, quantity: i.quantity + 1} : i)})} className="w-8 h-8 rounded-md bg-indigo-50 text-indigo-600 font-bold hover:bg-indigo-100 transition-colors">+</button>
 </div>
 </div>
@@ -973,10 +1202,38 @@ return (
 {riders.filter(r => r.vehicleType === currentInvoice.vehicle).length > 0 && (
   <div className="col-span-2">
     <label className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider ml-1 mb-1 block">Pick from Registry</label>
-    <select className={`${inputClass} !bg-white !border-indigo-200`} value={currentInvoice.riderId || ''} onChange={e => { const r = riders.find(r => String(r.id) === e.target.value); if (r) setCurrentInvoice({...currentInvoice, riderId: r.id, driverName: r.name, driverPhone: r.phone || ''}); else setCurrentInvoice({...currentInvoice, riderId: '', driverName: '', driverPhone: ''}); }}>
-      <option value="">– Pick a Rider –</option>
-      {riders.filter(r => r.vehicleType === currentInvoice.vehicle).map(r => <option key={r.id} value={r.id}>{r.name}{r.vehicleNumber ? ` (${r.vehicleNumber})` : ''}</option>)}
-    </select>
+    <div className="relative">
+      <Search size={16} className="absolute left-3.5 top-3.5 text-slate-400 pointer-events-none z-10"/>
+      <input
+        className={`pl-10 ${inputClass} !bg-white !border-indigo-200`}
+        placeholder="Search rider…"
+        value={showRiderDrop ? riderSearch : (riders.find(r => String(r.id) === String(currentInvoice.riderId))?.name || '')}
+        onFocus={() => { setShowRiderDrop(true); setRiderSearch(''); }}
+        onChange={e => setRiderSearch(e.target.value)}
+        onBlur={() => setTimeout(() => setShowRiderDrop(false), 150)}
+      />
+      {showRiderDrop && (
+        <div className="absolute z-50 w-full mt-1 border border-indigo-200 bg-white rounded-xl max-h-48 overflow-y-auto shadow-lg">
+          <div
+            className={`px-4 py-2.5 text-sm font-semibold cursor-pointer hover:bg-indigo-50 ${!currentInvoice.riderId ? 'bg-indigo-50 text-indigo-700' : 'text-slate-400'}`}
+            onMouseDown={e => { e.preventDefault(); setCurrentInvoice({...currentInvoice, riderId: '', driverName: '', driverPhone: ''}); setShowRiderDrop(false); }}
+          >– Clear Rider –</div>
+          {riders
+            .filter(r => r.vehicleType === currentInvoice.vehicle && (!riderSearch || r.name.toLowerCase().includes(riderSearch.toLowerCase())))
+            .map(r => (
+              <div
+                key={r.id}
+                className={`px-4 py-2.5 text-sm font-semibold cursor-pointer hover:bg-indigo-50 ${String(r.id) === String(currentInvoice.riderId) ? 'bg-indigo-50 text-indigo-700' : 'text-slate-800'}`}
+                onMouseDown={e => { e.preventDefault(); setCurrentInvoice({...currentInvoice, riderId: r.id, driverName: r.name, driverPhone: r.phone || ''}); setShowRiderDrop(false); }}
+              >{r.name}{r.vehicleNumber ? ` (${r.vehicleNumber})` : ''}</div>
+            ))
+          }
+          {riders.filter(r => r.vehicleType === currentInvoice.vehicle && (!riderSearch || r.name.toLowerCase().includes(riderSearch.toLowerCase()))).length === 0 && (
+            <p className="px-4 py-3 text-sm text-slate-400 font-medium">No riders found</p>
+          )}
+        </div>
+      )}
+    </div>
   </div>
 )}
 <div className="col-span-2 sm:col-span-1"><label className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider ml-1 mb-1 block">Driver Name</label><input placeholder="Name" className={`${inputClass} !bg-white !border-indigo-200`} value={currentInvoice.driverName || ''} onChange={e => setCurrentInvoice({...currentInvoice, driverName: e.target.value, riderId: ''})} /></div>
@@ -1001,7 +1258,7 @@ return (
 </div>
 <div className="bg-gradient-to-br from-emerald-50 to-teal-50 p-6 rounded-2xl border border-emerald-100 text-center shadow-sm">
 <p className="text-emerald-600 font-bold uppercase text-[10px] tracking-widest mb-1">Grand Total</p>
-<p className="text-4xl font-black text-emerald-800 tracking-tight">Rs. {grandTotal.toLocaleString()}</p>
+<p className="text-4xl font-black text-emerald-800 tracking-tight">Rs. {grandTotal.toLocaleString('en-US')}</p>
 </div>
 {isEdit && isAdmin && (<button onClick={async () => { if(await showConfirm("Permanently delete?")) { await deleteFromFirebase('invoices', currentInvoice.id); setBillingView('list'); } }} className="w-full bg-white text-rose-600 font-bold p-4 rounded-xl flex justify-center items-center gap-2 border border-rose-200 hover:bg-rose-50 shadow-sm mt-4"><Trash2 size={18}/> Delete {editingStatus === 'Estimate' ? 'Estimate' : editingStatus === 'Booked' ? 'Draft Order' : 'Invoice'}</button>)}
 </div>
@@ -1019,29 +1276,33 @@ const filtered = invoices.filter(o => (o.customerName.toLowerCase().includes(sea
 return (
 <div className="p-4 flex flex-col h-full">
 <div className="flex gap-2 mb-4">
-<div className="relative flex-1"><Search className="absolute left-3.5 top-3.5 text-slate-400" size={18} /><input placeholder="Search Invoices..." className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl font-semibold outline-none shadow-sm text-sm" value={search} onChange={e => setSearch(e.target.value)} /></div>
+<div className="relative flex-1"><Search className="absolute left-3.5 top-3.5 text-slate-400" size={18} /><input placeholder="Search Invoices..." className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl font-semibold outline-none shadow-sm text-sm" value={search} onChange={e => setSearch(e.target.value)} onKeyDown={e => { if (e.key === 'Escape' && search) { e.stopPropagation(); setSearch(''); } }} /></div>
 <button onClick={startNewInvoice} className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-3 rounded-xl shadow-md font-bold flex items-center gap-1.5 active:scale-95"><Plus size={18}/> New</button>
 </div>
 <div className="flex items-center gap-2 mb-3"><Calendar size={18} className="text-slate-400" /><select value={dateFilter} onChange={e => setDateFilter(e.target.value)} className="bg-white border border-slate-200 px-3 py-2 rounded-lg font-bold text-sm text-slate-700 outline-none flex-1"><option>All Time</option><option>Today</option><option>This Week</option><option>This Month</option><option>This Year</option></select></div>
 <div className="flex gap-1.5 mb-4">
 {[{v:'All',l:'All'},{v:'Estimate',l:'Quotes'},{v:'Booked',l:'Orders'},{v:'Billed',l:'Invoices'},{v:'CreditNote',l:'Returns'}].map(({v,l}) => (
-<button key={v} onClick={() => setStatusFilter(v)} className={`flex-1 py-1.5 rounded-lg font-bold text-xs transition-all ${statusFilter===v ? (v==='Estimate'?'bg-violet-600 text-white':v==='Booked'?'bg-amber-500 text-white':v==='Billed'?'bg-indigo-600 text-white':v==='CreditNote'?'bg-rose-600 text-white':'bg-slate-800 text-white') : 'bg-white text-slate-500 border border-slate-200 hover:border-slate-300'}`}>{l}</button>
+<button key={v} data-billingstatus={v} tabIndex={statusFilter===v?0:-1}
+  onClick={() => setStatusFilter(v)}
+  onKeyDown={makeArrowNav(['All','Estimate','Booked','Billed','CreditNote'],statusFilter,setStatusFilter,'data-billingstatus')}
+  className={`flex-1 py-1.5 rounded-lg font-bold text-xs transition-all ${statusFilter===v ? (v==='Estimate'?'bg-violet-600 text-white':v==='Booked'?'bg-amber-500 text-white':v==='Billed'?'bg-indigo-600 text-white':v==='CreditNote'?'bg-rose-600 text-white':'bg-slate-800 text-white') : 'bg-white text-slate-500 border border-slate-200 hover:border-slate-300'}`}>{l}</button>
 ))}
 </div>
 <div className="flex-1 overflow-y-auto space-y-3 pb-24 pr-1">
-{filtered.slice().reverse().map(o => (
+{filtered.slice().sort((a, b) => (b.date || '').localeCompare(a.date || '')).map(o => (
 <div key={o.id} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden group hover:border-indigo-200">
 <div className={`absolute top-0 left-0 w-1.5 h-full ${o.status==='CreditNote'?'bg-rose-500':o.status==='Estimate'?'bg-violet-400':o.status==='Billed'?(o.paymentStatus==='Paid'?'bg-emerald-500':'bg-amber-500'):'bg-slate-300'}`}></div>
 <div className="flex justify-between border-b border-slate-100 pb-3 mb-3 pl-3">
 <div><h4 className="font-bold text-slate-800 text-sm">{o.customerName}</h4><p className="text-[11px] text-slate-500 font-medium mt-0.5">{o.id} • {formatDateDisp(o.date)} • <span className={`font-bold ${o.status==='Billed'?'text-indigo-600':o.status==='Estimate'?'text-violet-600':o.status==='CreditNote'?'text-rose-600':'text-amber-500'}`}>{o.status==='CreditNote'?'Credit Note':o.status==='Booked'?'Draft Order':o.status}</span></p></div>
-<div className="text-right"><p className={`font-extrabold text-base ${o.status==='CreditNote'?'text-rose-600':'text-indigo-700'}`}>{o.status==='CreditNote'?'-':''} Rs. {o.total.toLocaleString()}</p><p className={`text-[9px] font-bold uppercase tracking-widest mt-1 ${o.status==='Billed'?'text-indigo-500':o.status==='CreditNote'?'text-rose-500':'text-slate-400'}`}>{o.status==='CreditNote'?'Credit Note':o.status==='Booked'?'Draft Order':o.status}</p></div>
+<div className="text-right"><p className={`font-extrabold text-base ${o.status==='CreditNote'?'text-rose-600':'text-indigo-700'}`}>{o.status==='CreditNote'?'-':''} Rs. {o.total.toLocaleString('en-US')}</p><p className={`text-[9px] font-bold uppercase tracking-widest mt-1 ${o.status==='Billed'?'text-indigo-500':o.status==='CreditNote'?'text-rose-500':'text-slate-400'}`}>{o.status==='CreditNote'?'Credit Note':o.status==='Booked'?'Draft Order':o.status}</p></div>
 </div>
 <div className="flex justify-between items-center pl-3">
 <div className="flex items-center gap-2"><span className={`text-[9px] px-2 py-0.5 rounded font-bold uppercase tracking-wider ${o.paymentStatus==='Paid'?'bg-emerald-100 text-emerald-700':o.paymentStatus==='Partial'?'bg-amber-100 text-amber-700':'bg-rose-100 text-rose-700'}`}>{o.paymentStatus}</span></div>
 <div className="flex gap-1.5">
 {o.status === 'Estimate' && isAdmin && <button onClick={async () => { await saveToFirebase('invoices', o.id, {...o, status: 'Booked'}); showToast('Converted to Draft Order'); }} title="Convert to Draft Order" className="p-2 bg-amber-50 text-amber-600 hover:bg-amber-100 border border-amber-200 rounded-lg"><Save size={14}/></button>}
-{(o.status === 'Estimate' || o.status === 'Booked') && isAdmin && <button onClick={async () => { await saveToFirebase('invoices', o.id, {...o, status: 'Billed'}); showToast('Converted to Invoice'); }} title="Issue as Invoice" className="p-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-200 rounded-lg"><ReceiptText size={14}/></button>}
+{(o.status === 'Estimate' || o.status === 'Booked') && isAdmin && <button onClick={async () => { const newId = `INV-${String(getNextSeqNum(invoices, 'INV')).padStart(4, '0')}`; await saveToFirebase('invoices', newId, {...o, id: newId, status: 'Billed', date: getLocalDateStr()}); await deleteFromFirebase('invoices', o.id); showToast(`Converted to Invoice: ${newId}`); }} title="Issue as Invoice" className="p-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-200 rounded-lg"><ReceiptText size={14}/></button>}
 {o.status === 'Billed' && isAdmin && <button onClick={() => { setEditingCreditNote({customerId: o.customerId, id: o.id}); setShowCreditNoteModal(true); }} title="Issue Credit Note / Return" className="p-2 bg-rose-50 text-rose-500 hover:bg-rose-100 border border-rose-200 rounded-lg"><RotateCcw size={14}/></button>}
+<button onClick={() => { setSelectedLedgerId(o.customerId); setShowLedgerModal(true); }} title="Customer Ledger" className="p-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-500 rounded-lg"><BookOpen size={14}/></button>
 {isAdmin && o.status !== 'CreditNote' && <button onClick={() => { setCurrentInvoice(o); setBillingView('form'); }} className="p-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 rounded-lg"><Edit size={16}/></button>}
 {isAdmin && <button onClick={async () => { if(await showConfirm(`Delete ${o.id}?`)) await deleteFromFirebase('invoices', o.id); }} title="Delete" className="p-2 bg-rose-50 text-rose-500 hover:bg-rose-100 rounded-lg"><Trash2 size={16}/></button>}
 {o.status === 'Estimate' ? <button onClick={() => setPrintConfig({docType: 'estimate', format: 'a4', data: o})} title="View Estimate" className="p-2 bg-violet-50 text-violet-600 hover:bg-violet-100 rounded-lg"><FileText size={16}/></button> : o.status === 'Booked' ? <><button onClick={() => setPrintConfig({docType: 'dispatch', format: 'thermal', data: o})} title="Dispatch Note" className="p-2 bg-amber-50 text-amber-600 rounded-lg"><Truck size={16}/></button><button onClick={() => setPrintConfig({docType: 'estimate', format: 'a4', data: o})} title="View Order" className="p-2 bg-slate-50 text-slate-600 rounded-lg"><FileText size={16}/></button></> : o.status === 'CreditNote' ? <button onClick={() => setPrintConfig({docType: 'creditnote', format: 'a4', data: o})} title="Print Credit Note" className="p-2 bg-rose-50 text-rose-600 rounded-lg"><FileText size={16}/></button> : <><button onClick={() => setPrintConfig({docType: 'dispatch', format: 'thermal', data: o})} title="Dispatch" className="p-2 bg-amber-50 text-amber-600 rounded-lg"><Truck size={16}/></button><button onClick={() => setPrintConfig({docType: 'invoice', format: 'thermal', data: o})} title="Print" className="p-2 bg-indigo-50 text-indigo-600 rounded-lg"><ReceiptText size={16}/></button></>}
@@ -1060,7 +1321,7 @@ const [search, setSearch] = useState('');
 return (
 <div className="p-4 flex flex-col h-full">
 <div className="flex gap-2 mb-4">
-<div className="relative flex-1"><Search className="absolute left-3.5 top-3.5 text-slate-400" size={18} /><input placeholder="Search Inventory..." className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl font-semibold outline-none shadow-sm text-sm" value={search} onChange={e => setSearch(e.target.value)} /></div>
+<div className="relative flex-1"><Search className="absolute left-3.5 top-3.5 text-slate-400" size={18} /><input placeholder="Search Inventory..." className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl font-semibold outline-none shadow-sm text-sm" value={search} onChange={e => setSearch(e.target.value)} onKeyDown={e => { if (e.key === 'Escape' && search) { e.stopPropagation(); setSearch(''); } }} /></div>
 <button onClick={() => { setEditingProduct(null); setShowProductModal(true); }} className="bg-indigo-600 text-white p-3 rounded-xl shadow-md"><Plus size={20}/></button>
 </div>
 <div className="flex-1 overflow-y-auto space-y-3 pb-24 pr-1">
@@ -1071,7 +1332,7 @@ return (
 {isAdmin && (<div className="flex gap-1.5"><button onClick={() => { setEditingProduct(p); setShowProductModal(true); }} className="p-2 bg-slate-50 text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"><Edit size={16}/></button><button onClick={async () => { if(await showConfirm(`Permanently delete ${p.name}?`)) await deleteFromFirebase('products', p.id); }} className="p-2 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-100 transition-colors"><Trash2 size={16}/></button></div>)}
 </div>
 <div className="flex justify-between items-end border-t border-slate-100 pt-3 mt-1">
-<div className="flex flex-col"><span className="text-indigo-700 font-extrabold text-lg">Rs. {p.sellingPrice.toLocaleString()}</span>{isAdmin && <span className="text-slate-400 text-[9px] font-bold uppercase mt-0.5">Cost: Rs. {p.costPrice}</span>}</div>
+<div className="flex flex-col"><span className="text-indigo-700 font-extrabold text-lg">Rs. {p.sellingPrice.toLocaleString('en-US')}</span>{isAdmin && <span className="text-slate-400 text-[9px] font-bold uppercase mt-0.5">Cost: Rs. {p.costPrice}</span>}</div>
 {isAdmin ? (<button onClick={async () => { await saveToFirebase('products', p.id, {...p, available: !p.available}) }} className={`px-3 py-1.5 rounded-lg text-[9px] font-bold uppercase ${p.available ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-rose-50 text-rose-600 border border-rose-100'}`}>{p.available ? 'In Stock' : 'Out Stock'}</button>) : (<span className={`px-3 py-1.5 rounded-lg text-[9px] font-bold uppercase ${p.available ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-rose-50 text-rose-600 border border-rose-100'}`}>{p.available ? 'In Stock' : 'Out Stock'}</span>)}
 </div>
 </div>
@@ -1088,27 +1349,23 @@ const [filterCity, setFilterCity] = useState('');
 const [filterArea, setFilterArea] = useState('');
 const [filterType, setFilterType] = useState('');
 const [filterBalance, setFilterBalance] = useState('All');
-const activeFilters = filterCity || filterArea || filterType || filterBalance !== 'All';
-const clearFilters = () => { setFilterCity(''); setFilterArea(''); setFilterType(''); setFilterBalance('All'); };
+const [showIncompleteOnly, setShowIncompleteOnly] = useState(false);
+const incompleteIds = useMemo(() => new Set(customers.filter(c => !c.city || !c.area || !c.customerType).map(c => c.id)), [customers]);
+const activeFilters = filterCity || filterArea || filterType || filterBalance !== 'All' || showIncompleteOnly;
+const clearFilters = () => { setFilterCity(''); setFilterArea(''); setFilterType(''); setFilterBalance('All'); setShowIncompleteOnly(false); };
 return (
 <div className="p-4 flex flex-col h-full">
 <div className="flex justify-between items-center mb-4">
-<h2 className="text-2xl font-extrabold text-slate-800 tracking-tight">Ledgers</h2>
+<h2 className="text-2xl font-extrabold text-slate-800 tracking-tight">Ledgers{incompleteIds.size > 0 && !showIncompleteOnly && <span className="text-[11px] text-amber-600 font-bold ml-2 align-middle">· {incompleteIds.size} incomplete</span>}</h2>
 <div className="flex gap-2">
 {isAdmin && <button onClick={() => { setSelectedCustomerForPayment(null); setShowPaymentModal(true); }} className="bg-emerald-500 text-white p-2 px-3 rounded-xl shadow-md flex items-center gap-1 text-xs font-bold"><Wallet size={16}/> Pay</button>}
 {isAdmin && <button onClick={() => { setEditingCustomer(null); setShowCustomerModal(true); }} className="bg-indigo-600 text-white p-2 rounded-xl shadow-md"><Plus size={18}/></button>}
 </div>
 </div>
-<div className="relative mb-2"><Search className="absolute left-3.5 top-3.5 text-slate-400" size={18} /><input placeholder="Search Clients..." className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl font-semibold outline-none shadow-sm text-sm" value={search} onChange={e => setSearch(e.target.value)} /></div>
+<div className="relative mb-2"><Search className="absolute left-3.5 top-3.5 text-slate-400" size={18} /><input placeholder="Search Clients..." className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl font-semibold outline-none shadow-sm text-sm" value={search} onChange={e => setSearch(e.target.value)} onKeyDown={e => { if (e.key === 'Escape' && search) { e.stopPropagation(); setSearch(''); } }} /></div>
 <ScrollableTabBar className="mb-3 shrink-0">
-  <select value={filterCity} onChange={e=>setFilterCity(e.target.value)} className="bg-white border border-slate-200 px-2.5 py-1.5 rounded-lg font-bold text-[11px] text-slate-700 outline-none shrink-0">
-    <option value="">All Cities</option>
-    {cities.map(c=><option key={c.id} value={c.name}>{c.name}</option>)}
-  </select>
-  <select value={filterArea} onChange={e=>setFilterArea(e.target.value)} className="bg-white border border-slate-200 px-2.5 py-1.5 rounded-lg font-bold text-[11px] text-slate-700 outline-none shrink-0">
-    <option value="">All Areas</option>
-    {areas.map(a=><option key={a.id} value={a.name}>{a.name}</option>)}
-  </select>
+  <SearchableSelect value={filterCity} onChange={e=>{setFilterCity(e.target.value);setFilterArea('');}} className="bg-white border border-slate-200 px-2.5 py-1.5 rounded-lg font-bold text-[11px] text-slate-700 outline-none shrink-0 min-w-[90px]" placeholder="All Cities" options={cities.map(c=>({value:c.name,label:c.name}))} />
+  <SearchableSelect value={filterArea} onChange={e=>setFilterArea(e.target.value)} className="bg-white border border-slate-200 px-2.5 py-1.5 rounded-lg font-bold text-[11px] text-slate-700 outline-none shrink-0 min-w-[90px]" placeholder="All Areas" options={areas.filter(a=>!filterCity||!a.cityName||a.cityName===filterCity).map(a=>({value:a.name,label:a.name}))} />
   <select value={filterType} onChange={e=>setFilterType(e.target.value)} className="bg-white border border-slate-200 px-2.5 py-1.5 rounded-lg font-bold text-[11px] text-slate-700 outline-none shrink-0">
     <option value="">All Types</option>
     {customerTypes.map(t=><option key={t.id} value={t.name}>{t.name}</option>)}
@@ -1119,6 +1376,7 @@ return (
     <option value="Advance">Advance (Cr)</option>
     <option value="Clear">Cleared</option>
   </select>
+  <button onClick={() => setShowIncompleteOnly(v => !v)} className={`shrink-0 text-[10px] font-bold px-2.5 py-1.5 rounded-lg flex items-center gap-1 border transition-colors ${showIncompleteOnly ? 'bg-amber-500 text-white border-amber-500' : 'bg-white text-amber-600 border-amber-300 hover:bg-amber-50'}`}><AlertCircle size={10}/> Incomplete{incompleteIds.size > 0 ? ` (${incompleteIds.size})` : ''}</button>
   {activeFilters && <button onClick={clearFilters} className="shrink-0 text-[10px] font-bold text-rose-500 bg-rose-50 border border-rose-100 px-2.5 py-1.5 rounded-lg flex items-center gap-1 hover:bg-rose-100 transition-colors"><X size={10}/> Clear</button>}
 </ScrollableTabBar>
 <div className="flex-1 overflow-y-auto space-y-3 pb-24 pr-1">
@@ -1129,7 +1387,8 @@ const cityMatch = !filterCity || (c.city||'') === filterCity;
 const areaMatch = !filterArea || (c.area||'') === filterArea;
 const typeMatch = !filterType || (c.customerType||'') === filterType;
 const balMatch = filterBalance === 'All' || (filterBalance === 'Outstanding' && bal > 0) || (filterBalance === 'Advance' && bal < 0) || (filterBalance === 'Clear' && bal === 0);
-return nameMatch && cityMatch && areaMatch && typeMatch && balMatch;
+const incompleteMatch = !showIncompleteOnly || incompleteIds.has(c.id);
+return nameMatch && cityMatch && areaMatch && typeMatch && balMatch && incompleteMatch;
 }).map(c => {
 const bal = getCustomerBalance(c.id);
 return (
@@ -1137,9 +1396,10 @@ return (
 <button type="button" className="flex-1 text-left" onClick={() => { setSelectedLedgerId(c.id); setShowLedgerModal(true); }}>
 <h4 className="font-bold text-slate-800 text-sm hover:text-indigo-600">{c.name}</h4>
 <p className="text-[11px] font-medium text-slate-500 mt-0.5">{c.contactPerson ? `${c.contactPerson} - ` : ''}{c.phone}</p>
+{incompleteIds.has(c.id) && <div className="flex flex-wrap gap-1 mt-1">{!c.city && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">No City</span>}{!c.area && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">No Area</span>}{!c.customerType && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">No Type</span>}</div>}
 <div className="mt-2.5">
 <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-md ${bal > 0 ? 'bg-rose-50 text-rose-600 border border-rose-100' : bal < 0 ? 'bg-indigo-50 text-indigo-600 border border-indigo-100' : 'bg-emerald-50 text-emerald-600 border border-emerald-100'}`}>
-Bal: Rs. {bal.toLocaleString()} {bal > 0 ? '(Dr)' : bal < 0 ? '(Cr)' : ''}
+Bal: Rs. {bal.toLocaleString('en-US')} {bal > 0 ? '(Dr)' : bal < 0 ? '(Cr)' : ''}
 </span>
 </div>
 </button>
@@ -1223,10 +1483,7 @@ return (
 <div className="flex-1 overflow-y-auto p-4 space-y-5 pb-32">
 <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
   <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5"><Users size={12}/> Customer</h3>
-  <select className={inputClass} value={form.customerId} onChange={e => setForm({...form, customerId: e.target.value})}>
-    <option value="">— Select Customer —</option>
-    {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-  </select>
+  <SearchableSelect className={inputClass} value={form.customerId} onChange={e => setForm({...form, customerId: e.target.value})} placeholder="— Select Customer —" options={customers.map(c=>({value:c.id,label:c.name}))} />
 </div>
 <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
   <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Return Details</h3>
@@ -1271,7 +1528,7 @@ return (
           </div>
           <div className="text-right">
             <p className="text-[9px] text-slate-400 font-bold uppercase">Subtotal</p>
-            <p className="font-extrabold text-rose-700 text-sm">Rs.{(item.price * item.quantity).toLocaleString()}</p>
+            <p className="font-extrabold text-rose-700 text-sm">Rs.{(item.price * item.quantity).toLocaleString('en-US')}</p>
           </div>
         </div>
       </div>
@@ -1281,7 +1538,7 @@ return (
 </div>
 <div className="bg-gradient-to-br from-rose-50 to-pink-50 p-6 rounded-2xl border border-rose-100 text-center shadow-sm">
   <p className="text-rose-600 font-bold uppercase text-[10px] tracking-widest mb-1">Total Credit</p>
-  <p className="text-4xl font-black text-rose-800 tracking-tight">Rs. {grandTotal.toLocaleString()}</p>
+  <p className="text-4xl font-black text-rose-800 tracking-tight">Rs. {grandTotal.toLocaleString('en-US')}</p>
 </div>
 </div>
 <div className="p-4 bg-white/80 backdrop-blur-md border-t border-slate-200 fixed bottom-0 w-full max-w-md flex gap-3 z-30">
@@ -1335,15 +1592,12 @@ return (
       <select value={dateFilter} onChange={e=>setDateFilter(e.target.value)} className="flex-1 bg-white border border-slate-200 px-3 py-2 rounded-lg font-bold text-sm text-slate-700 outline-none shadow-sm">
         <option>All Time</option><option>Today</option><option>This Week</option><option>This Month</option><option>This Year</option>
       </select>
-      <select value={customerFilter} onChange={e=>setCustomerFilter(e.target.value)} className="flex-1 bg-white border border-slate-200 px-3 py-2 rounded-lg font-semibold text-sm text-slate-700 outline-none shadow-sm">
-        <option value="">All Clients</option>
-        {customers.map(c=><option key={c.id} value={String(c.id)}>{c.name}</option>)}
-      </select>
+      <SearchableSelect value={customerFilter} onChange={e=>setCustomerFilter(e.target.value)} className="flex-1 bg-white border border-slate-200 px-3 py-2 rounded-lg font-semibold text-sm text-slate-700 outline-none shadow-sm" placeholder="All Clients" options={customers.map(c=>({value:String(c.id),label:c.name}))} />
     </div>
   </div>
   <div className="bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-2.5 mb-3 flex justify-between items-center">
     <span className="text-xs font-bold text-emerald-700 uppercase tracking-widest">{filtered.length} Receipts</span>
-    <span className="font-black text-emerald-800 text-sm">Total: Rs. {totalAmount.toLocaleString()}</span>
+    <span className="font-black text-emerald-800 text-sm">Total: Rs. {totalAmount.toLocaleString('en-US')}</span>
   </div>
   <div className="flex-1 overflow-y-auto space-y-2.5 pb-24 pr-1">
     {filtered.map(p => (
@@ -1355,7 +1609,7 @@ return (
             {p.note && <p className="text-[11px] text-slate-400 mt-0.5 italic truncate">{p.note}</p>}
           </div>
           <div className="text-right ml-3 shrink-0">
-            <p className="font-extrabold text-emerald-600 text-base">Rs. {p.amount.toLocaleString()}</p>
+            <p className="font-extrabold text-emerald-600 text-base">Rs. {p.amount.toLocaleString('en-US')}</p>
             <div className="flex gap-1 mt-1.5 justify-end">
               <button onClick={() => {
                 const ledger = getCustomerLedger(p.customerId);
@@ -1454,7 +1708,10 @@ return (
   <div className="bg-slate-100 p-1 rounded-xl">
   <ScrollableTabBar bgClass="bg-slate-100">
     {tabConfig.map(t=>(
-      <button key={t.id} onClick={()=>{setTab(t.id);setSearch('');}} className={`py-2 px-3 rounded-lg font-bold text-xs whitespace-nowrap transition-colors ${tab===t.id?'bg-white text-teal-700 shadow-sm':'text-slate-500'}`}>{t.label}</button>
+      <button key={t.id} data-masterstab={t.id} tabIndex={tab===t.id?0:-1}
+        onClick={()=>{setTab(t.id);setSearch('');}}
+        onKeyDown={makeArrowNav(tabConfig.map(x=>x.id),tab,id=>{setTab(id);setSearch('');}, 'data-masterstab')}
+        className={`py-2 px-3 rounded-lg font-bold text-xs whitespace-nowrap transition-colors ${tab===t.id?'bg-white text-teal-700 shadow-sm':'text-slate-500'}`}>{t.label}</button>
     ))}
   </ScrollableTabBar>
   </div>
@@ -1581,7 +1838,7 @@ return (
         {editingId === rider.id ? (
           <div className="space-y-2">
             <div className="grid grid-cols-2 gap-2">
-              <input autoFocus className="col-span-2 p-2 text-sm font-semibold border border-indigo-300 rounded-lg outline-none" value={editForm.name||''} onChange={e=>setEditForm({...editForm,name:e.target.value})} placeholder="Name" onKeyDown={e=>{if(e.key==='Escape')setEditingId(null);}} />
+              <input autoFocus className="col-span-2 p-2 text-sm font-semibold border border-indigo-300 rounded-lg outline-none" value={editForm.name||''} onChange={e=>setEditForm({...editForm,name:e.target.value})} placeholder="Name" onKeyDown={e=>{if(e.key==='Escape')setEditingId(null);if(e.key==='Enter'){e.preventDefault();saveEdit(rider);}}} />
               <input className="p-2 text-sm font-semibold border border-slate-200 rounded-lg outline-none" value={editForm.phone||''} onChange={e=>setEditForm({...editForm,phone:e.target.value})} placeholder="Phone" />
               <input className="p-2 text-sm font-semibold border border-slate-200 rounded-lg outline-none" value={editForm.vehicleNumber||''} onChange={e=>setEditForm({...editForm,vehicleNumber:e.target.value})} placeholder="Vehicle No." />
               <select className="col-span-2 p-2 text-sm font-semibold border border-slate-200 rounded-lg outline-none" value={editForm.vehicleType||'Rider'} onChange={e=>setEditForm({...editForm,vehicleType:e.target.value})}>{RIDER_VEHICLE_TYPES.map(t=><option key={t} value={t}>{t}</option>)}</select>
@@ -1622,14 +1879,12 @@ return (
 <h2 className="text-2xl font-extrabold text-slate-800 tracking-tight mb-4">Admin Hub</h2>
 <div className="bg-slate-200 p-1 rounded-xl">
 <ScrollableTabBar bgClass="bg-slate-200">
-<button onClick={()=>setAdminView('analytics')} className={`py-2 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 whitespace-nowrap ${adminView==='analytics'?'bg-white text-indigo-700 shadow-sm':'text-slate-500'}`}><BarChart3 size={14}/> Analytics</button>
-<button onClick={()=>setAdminView('expenses')} className={`py-2 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 whitespace-nowrap ${adminView==='expenses'?'bg-white text-rose-600 shadow-sm':'text-slate-500'}`}><Wallet size={14}/> Expenses</button>
-<button onClick={()=>setAdminView('masters')} className={`py-2 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 whitespace-nowrap ${adminView==='masters'?'bg-white text-teal-600 shadow-sm':'text-slate-500'}`}><Archive size={14}/> Masters</button>
-<button onClick={()=>setAdminView('bulk')} className={`py-2 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 whitespace-nowrap ${adminView==='bulk'?'bg-white text-emerald-600 shadow-sm':'text-slate-500'}`}><Upload size={14}/> Bulk Ops</button>
-<button onClick={()=>setAdminView('segments')} className={`py-2 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 whitespace-nowrap ${adminView==='segments'?'bg-white text-purple-600 shadow-sm':'text-slate-500'}`}><Globe size={14}/> Segments</button>
-<button onClick={()=>setAdminView('users')} className={`py-2 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 whitespace-nowrap ${adminView==='users'?'bg-white text-amber-600 shadow-sm':'text-slate-500'}`}><Users size={14}/> Users</button>
-<button onClick={()=>setAdminView('settings')} className={`py-2 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 whitespace-nowrap ${adminView==='settings'?'bg-white text-slate-700 shadow-sm':'text-slate-500'}`}><Settings size={14}/> Settings</button>
-<button onClick={()=>setAdminView('riders')} className={`py-2 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 whitespace-nowrap ${adminView==='riders'?'bg-white text-indigo-600 shadow-sm':'text-slate-500'}`}><Truck size={14}/> Riders</button>
+{[['analytics','bg-white text-indigo-700',<BarChart3 size={14}/>,'Analytics'],['expenses','bg-white text-rose-600',<Wallet size={14}/>,'Expenses'],['masters','bg-white text-teal-600',<Archive size={14}/>,'Masters'],['bulk','bg-white text-emerald-600',<Upload size={14}/>,'Bulk Ops'],['segments','bg-white text-purple-600',<Globe size={14}/>,'Segments'],['users','bg-white text-amber-600',<Users size={14}/>,'Users'],['settings','bg-white text-slate-700',<Settings size={14}/>,'Settings'],['riders','bg-white text-indigo-600',<Truck size={14}/>,'Riders']].map(([v,activeClass,icon,label])=>(
+  <button key={v} data-admintab={v} tabIndex={adminView===v?0:-1}
+    onClick={()=>setAdminView(v)}
+    onKeyDown={makeArrowNav(['analytics','expenses','masters','bulk','segments','users','settings','riders'],adminView,setAdminView,'data-admintab')}
+    className={`py-2 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 whitespace-nowrap ${adminView===v?activeClass+' shadow-sm':'text-slate-500'}`}>{icon} {label}</button>
+))}
 </ScrollableTabBar>
 </div>
 </div>
@@ -1648,7 +1903,7 @@ return (
 };
 
 const AppSettingsView = () => {
-const { appSettings, saveToFirebase, showToast, showConfirm, appUsers, companies, products, customers, invoices, expenses, expenseCategories, payments, cities, areas, customerTypes } = useContext(AppContext);
+const { appSettings, saveToFirebase, showToast, showConfirm, appUsers, companies, products, customers, invoices, expenses, expenseCategories, payments, cities, areas, customerTypes, riders } = useContext(AppContext);
 const [form, setForm] = useState({
   id: 'main',
   businessName: appSettings?.businessName || 'Khyber Traders',
@@ -1675,12 +1930,11 @@ React.useEffect(() => {
   });
 }, [appSettings?.id, appSettings?.businessName, appSettings?.showBusinessNameOnDocs, appSettings?.showBusinessNameOnReports]);
 const saveSettings = async () => { await saveToFirebase('appSettings', 'main', form); showToast('Settings saved!'); };
-const downloadBackup = () => {
-  const backup = { exportedAt: new Date().toISOString(), collections: { app_users: appUsers, companies, products, customers, invoices, expenses, expenseCategories, payments, cities, areas, customerTypes } };
+const downloadBackup = async () => {
+  const backup = { exportedAt: new Date().toISOString(), collections: { app_users: appUsers, appSettings: appSettings ? [appSettings] : [], companies, products, customers, invoices, expenses, expenseCategories, payments, riders, cities, areas, customerTypes } };
   const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob); const a = document.createElement('a');
-  a.href = url; a.download = `AnimalHealthPK_Backup_${new Date().toISOString().slice(0,10).replace(/-/g,'')}.json`;
-  a.click(); URL.revokeObjectURL(url); showToast('Backup downloaded!');
+  await shareOrDownload(blob, `AnimalHealthPK_Backup_${new Date().toISOString().slice(0,10).replace(/-/g,'')}.json`);
+  showToast('Backup downloaded!');
 };
 const handleRestoreFile = async (e) => {
   const file = e.target.files[0]; if (!file) return;
@@ -1797,12 +2051,12 @@ return (
 </div>
 <div className="grid grid-cols-3 gap-2 pt-3 border-t border-slate-100">
 <div className="text-center"><p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Orders</p><p className="font-extrabold text-slate-700 text-lg">{userInvoices.length}</p></div>
-<div className="text-center"><p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Revenue</p><p className="font-extrabold text-emerald-600 text-sm">Rs.{totalSales.toLocaleString()}</p></div>
-<div className="text-center"><p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">GP</p><p className={`font-extrabold text-sm ${totalProfit >= 0 ? 'text-indigo-600' : 'text-rose-600'}`}>Rs.{totalProfit.toLocaleString()}</p></div>
+<div className="text-center"><p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Revenue</p><p className="font-extrabold text-emerald-600 text-sm">Rs.{totalSales.toLocaleString('en-US')}</p></div>
+<div className="text-center"><p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">GP</p><p className={`font-extrabold text-sm ${totalProfit >= 0 ? 'text-indigo-600' : 'text-rose-600'}`}>Rs.{totalProfit.toLocaleString('en-US')}</p></div>
 </div>
 {userInvoices.length > 0 && (
 <div className="mt-2 pt-2 border-t border-slate-100 flex justify-between text-[10px] text-slate-500">
-<span>Avg order: <span className="font-bold text-slate-700">Rs.{avgOrder.toLocaleString()}</span></span>
+<span>Avg order: <span className="font-bold text-slate-700">Rs.{avgOrder.toLocaleString('en-US')}</span></span>
 <span>Last sale: <span className="font-bold text-slate-700">{formatDateDisp(userInvoices.slice().sort((a,b)=>b.date.localeCompare(a.date))[0]?.date)}</span></span>
 </div>
 )}
@@ -1887,7 +2141,7 @@ return (
   <div className="flex items-center gap-2">
   <div className="flex-1">
   <div className="flex items-center gap-2"><span className="font-bold text-slate-800 text-sm">{item.name}</span>{stats.orders > 0 && <span className="text-[9px] font-bold bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded border border-indigo-100">{stats.orders} orders</span>}</div>
-  {stats.orders > 0 && <p className="text-[10px] text-slate-400 mt-0.5">{stats.customers.size} clients · Rs.{stats.revenue.toLocaleString()} revenue</p>}
+  {stats.orders > 0 && <p className="text-[10px] text-slate-400 mt-0.5">{stats.customers.size} clients · Rs.{stats.revenue.toLocaleString('en-US')} revenue</p>}
   </div>
   <button onClick={()=>{setEditingId(item.id);setEditVal(item.name);}} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg"><Edit size={14}/></button>
   <button onClick={async()=>{if(await showConfirm(`Delete "${item.name}"?`))await deleteFromFirebase(col,item.id);}} className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg"><Trash2 size={14}/></button>
@@ -2134,7 +2388,8 @@ const getSortedExportData = () => {
      .map(([key,val]) => ({ 'Staff Name': key, 'Orders': val.orders, 'Revenue (Rs)': val.revenue, 'Gross Profit (Rs)': val.profit,
        'Margin %': val.revenue > 0 ? +((val.profit/val.revenue)*100).toFixed(1) : 0 }))
      .sort((a,b)=>b['Revenue (Rs)']-a['Revenue (Rs)']);
-   const dataObj = view === 'By Product' ? reportEngine.byProduct : view === 'By Company' ? reportEngine.byCompany : reportEngine.byCustomer;
+   const segmentKey = view === 'By City' ? 'City' : view === 'By Area' ? 'Area' : view === 'By Type' ? 'Type' : null;
+   const dataObj = view === 'By Product' ? reportEngine.byProduct : view === 'By Company' ? reportEngine.byCompany : view === 'By City' ? reportEngine.byCity : view === 'By Area' ? reportEngine.byArea : view === 'By Type' ? reportEngine.byType : reportEngine.byCustomer;
    let arr = Object.entries(dataObj).map(([key, val]) => ({ key, ...val })).sort((a,b) => b[sortBy] - a[sortBy]);
    if (view === 'By Product') return arr.map(r => ({
      'Product Name': r.key, 'Brand': r.company || '',
@@ -2146,8 +2401,9 @@ const getSortedExportData = () => {
      'Qty Sold': r.qty || 0, 'Revenue (Rs)': r.revenue || r.productRevenue || 0, 'Cost (Rs)': r.cost || 0,
      'Gross Profit (Rs)': r.profit || 0, 'Margin %': (r.revenue||r.productRevenue||0) > 0 ? +((r.profit/(r.revenue||r.productRevenue))*100).toFixed(1) : 0,
    }));
+   const nameKey = segmentKey || 'Customer Name';
    return arr.map(r => ({
-     'Customer Name': r.key,
+     [nameKey]: r.key,
      'Orders': r.orders || 0, 'Revenue (Rs)': r.revenue || r.productRevenue || 0, 'Cost (Rs)': r.cost || 0,
      'Gross Profit (Rs)': r.profit || 0,
    }));
@@ -2186,35 +2442,49 @@ const handleExport = (format) => {
         let text = `📊 *${APP_NAME}*\n*${title}* | Period: ${filterLabel}\n${'─'.repeat(30)}\n`;
         if (view === 'Overview') {
           text += `💰 *Sales & Profitability*\n`;
-          text += `Product Sales: Rs. ${kpis.productRevenue.toLocaleString()}\n`;
-          text += `Total COGS:    Rs. ${kpis.totalCOGS.toLocaleString()}\n`;
-          text += `Gross Margin:  Rs. ${kpis.grossMargin.toLocaleString()} (${margin}%)\n`;
+          text += `Product Sales: Rs. ${kpis.productRevenue.toLocaleString('en-US')}\n`;
+          text += `Total COGS:    Rs. ${kpis.totalCOGS.toLocaleString('en-US')}\n`;
+          text += `Gross Margin:  Rs. ${kpis.grossMargin.toLocaleString('en-US')} (${margin}%)\n`;
           text += `\n🚛 *Delivery*\n`;
-          text += `Billed: Rs. ${kpis.deliveryBilled.toLocaleString()} | Expense: Rs. ${kpis.transportExpense.toLocaleString()}\n`;
+          text += `Billed: Rs. ${kpis.deliveryBilled.toLocaleString('en-US')} | Expense: Rs. ${kpis.transportExpense.toLocaleString('en-US')}\n`;
           text += `\n💸 *Expenses*\n`;
-          text += `Operational: Rs. ${kpis.totalExpenses.toLocaleString()}\n`;
+          text += `Operational: Rs. ${kpis.totalExpenses.toLocaleString('en-US')}\n`;
           text += `\n${'─'.repeat(30)}\n`;
-          text += `✅ *Net Profit: Rs. ${kpis.netProfit.toLocaleString()}*\n`;
-          text += `📌 Receivables: Rs. ${kpis.totalReceivables.toLocaleString()}\n`;
+          text += `✅ *Net Profit: Rs. ${kpis.netProfit.toLocaleString('en-US')}*\n`;
+          text += `📌 Receivables: Rs. ${kpis.totalReceivables.toLocaleString('en-US')}\n`;
           if (reportEngine.trends.revenue !== null) text += `📈 Revenue trend: ${Number(reportEngine.trends.revenue) >= 0 ? '+' : ''}${reportEngine.trends.revenue}% vs prev period\n`;
+        } else if (view === 'Receivables') {
+          exportData.forEach((r, i) => {
+            const name = r['Customer Name'] || '?';
+            const outstanding = r['Outstanding (Rs)'] || 0;
+            const days = r['Days Since Last Invoice'];
+            text += `${i+1}. *${name}*\n`;
+            text += `   Outstanding: Rs.${Number(outstanding).toLocaleString('en-US')}`;
+            if (days != null) text += ` | ${days} days overdue`;
+            text += `\n`;
+          });
+          if (exportData.length > 0) {
+            const total = exportData.reduce((s,r)=>s+(r['Outstanding (Rs)']||0),0);
+            text += `${'─'.repeat(30)}\nTotal Outstanding: Rs.${total.toLocaleString('en-US')}\n`;
+          }
         } else {
           exportData.forEach((r, i) => {
-            const name = r['Product Name'] || r['Brand Name'] || r['Customer Name'] || r['Staff Name'] || r.Name || '?';
-            const brand = r['Brand'] || r.Company || '';
-            const gp = r['Gross Profit (Rs)'] || r['Outstanding (Rs)'] || 0;
+            const name = r['Product Name'] || r['Brand Name'] || r['Customer Name'] || r['Staff Name'] || r['City'] || r['Area'] || r['Type'] || '?';
+            const brand = r['Brand'] || '';
+            const gp = r['Gross Profit (Rs)'] || 0;
             const rev = r['Revenue (Rs)'] || 0;
-            const qty = r['Qty Sold'] || r.Qty || 0;
+            const qty = r['Qty Sold'] || 0;
             const orders = r['Orders'] || 0;
             const gpMargin = rev > 0 ? ` (${((gp/rev)*100).toFixed(1)}%)` : '';
             text += `${i+1}. *${name}*${brand ? ` — ${brand}` : ''}\n`;
-            if (qty) text += `   Qty: ${Number(qty).toLocaleString()} | `;
+            if (qty) text += `   Qty: ${Number(qty).toLocaleString('en-US')} | `;
             if (orders) text += `   Orders: ${orders} | `;
-            text += `Rev: Rs.${Number(rev).toLocaleString()} | GP: Rs.${Number(gp).toLocaleString()}${gpMargin}\n`;
+            text += `Rev: Rs.${Number(rev).toLocaleString('en-US')} | GP: Rs.${Number(gp).toLocaleString('en-US')}${gpMargin}\n`;
           });
           if (exportData.length > 0) {
             const totalRev = exportData.reduce((s,r)=>s+(r['Revenue (Rs)']||0),0);
-            const totalGP = exportData.reduce((s,r)=>s+(r['Gross Profit (Rs)']||r['Outstanding (Rs)']||0),0);
-            text += `${'─'.repeat(30)}\nTotal Rev: Rs.${totalRev.toLocaleString()} | Total GP: Rs.${totalGP.toLocaleString()}\n`;
+            const totalGP = exportData.reduce((s,r)=>s+(r['Gross Profit (Rs)']||0),0);
+            text += `${'─'.repeat(30)}\nTotal Rev: Rs.${totalRev.toLocaleString('en-US')} | Total GP: Rs.${totalGP.toLocaleString('en-US')}\n`;
           }
         }
         navigator.clipboard.writeText(text).catch(()=>{});
@@ -2287,11 +2557,11 @@ const renderTable = (dataObj, type) => {
                       {row.company && <div className="text-[9px] text-slate-400 uppercase tracking-widest mt-0.5">{row.company}</div>}
                       <div className="w-full bg-slate-100 rounded-full h-1 mt-1.5 max-w-[100px]"><div className="bg-emerald-400 h-1 rounded-full" style={{width:`${barW}%`}}></div></div>
                     </td>
-                    {type !== 'Customer' && <td className="p-3 text-center bg-slate-50/50 font-bold">{(row.qty||0).toLocaleString()}</td>}
+                    {type !== 'Customer' && <td className="p-3 text-center bg-slate-50/50 font-bold">{(row.qty||0).toLocaleString('en-US')}</td>}
                     {type === 'Customer' && <td className="p-3 text-center bg-slate-50/50 font-bold">{row.orders||0}</td>}
-                    <td className="p-3 text-right text-slate-800 font-bold">Rs.{rev.toLocaleString()}</td>
+                    <td className="p-3 text-right text-slate-800 font-bold">Rs.{rev.toLocaleString('en-US')}</td>
                     <td className="p-3 text-right text-slate-500">{revShare}%</td>
-                    <td className="p-3 text-right font-bold" style={{color: gp >= 0 ? '#059669' : '#e11d48'}}>Rs.{gp.toLocaleString()}</td>
+                    <td className="p-3 text-right font-bold" style={{color: gp >= 0 ? '#059669' : '#e11d48'}}>Rs.{gp.toLocaleString('en-US')}</td>
                     <td className="p-3 text-right text-indigo-600 font-bold">{margin}%</td>
                   </tr>
                 );
@@ -2300,10 +2570,10 @@ const renderTable = (dataObj, type) => {
             <tfoot className="bg-slate-50 border-t-2 border-slate-300 font-black text-slate-800 text-xs">
               <tr>
                 <td className="p-3 uppercase tracking-wider text-slate-600">Totals</td>
-                <td className="p-3 text-center">{totalQtyOrOrders.toLocaleString()}</td>
-                <td className="p-3 text-right">Rs.{totalRev.toLocaleString()}</td>
+                <td className="p-3 text-center">{totalQtyOrOrders.toLocaleString('en-US')}</td>
+                <td className="p-3 text-right">Rs.{totalRev.toLocaleString('en-US')}</td>
                 <td className="p-3 text-right text-slate-500">100%</td>
-                <td className="p-3 text-right text-emerald-700">Rs.{totalGP.toLocaleString()}</td>
+                <td className="p-3 text-right text-emerald-700">Rs.{totalGP.toLocaleString('en-US')}</td>
                 <td className="p-3 text-right text-indigo-700">{totalRev > 0 ? ((totalGP/totalRev)*100).toFixed(1) : 0}%</td>
               </tr>
             </tfoot>
@@ -2339,8 +2609,8 @@ const renderSegmentTable = (dataObj, label) => {
                     <div className="w-full bg-slate-100 rounded-full h-1 mt-1.5 max-w-[100px]"><div className="bg-indigo-400 h-1 rounded-full" style={{width:`${barW}%`}}></div></div>
                   </td>
                   <td className="p-3 text-center bg-slate-50/50 font-bold">{row.orders||0}</td>
-                  <td className="p-3 text-right font-bold text-slate-800">Rs.{rev.toLocaleString()}</td>
-                  <td className="p-3 text-right font-bold" style={{color: gp >= 0 ? '#059669' : '#e11d48'}}>Rs.{gp.toLocaleString()}</td>
+                  <td className="p-3 text-right font-bold text-slate-800">Rs.{rev.toLocaleString('en-US')}</td>
+                  <td className="p-3 text-right font-bold" style={{color: gp >= 0 ? '#059669' : '#e11d48'}}>Rs.{gp.toLocaleString('en-US')}</td>
                   <td className="p-3 text-right text-indigo-600 font-bold">{margin}%</td>
                 </tr>
               );
@@ -2406,7 +2676,10 @@ return (
     {/* View Tabs */}
     <ScrollableTabBar className="pb-2 shrink-0">
        {['Overview','Insights','Monthly Trend','By Product','By Company','By Customer','By City','By Area','By Type','By Salesperson','Receivables'].map(v => (
-         <button key={v} onClick={() => setView(v)} className={`px-3 py-1.5 rounded-xl font-bold text-[11px] whitespace-nowrap shadow-sm transition-colors ${view === v ? 'bg-slate-800 text-white' : 'bg-white text-slate-600 border border-slate-200'}`}>{v}</button>
+         <button key={v} data-analytictab={v} tabIndex={view===v?0:-1}
+           onClick={() => setView(v)}
+           onKeyDown={makeArrowNav(['Overview','Insights','Monthly Trend','By Product','By Company','By Customer','By City','By Area','By Type','By Salesperson','Receivables'],view,setView,'data-analytictab')}
+           className={`px-3 py-1.5 rounded-xl font-bold text-[11px] whitespace-nowrap shadow-sm transition-colors ${view === v ? 'bg-slate-800 text-white' : 'bg-white text-slate-600 border border-slate-200'}`}>{v}</button>
        ))}
     </ScrollableTabBar>
 
@@ -2491,7 +2764,7 @@ return (
                    return (
                      <div key={date} className="flex flex-col items-center min-w-[22px] group relative">
                        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[9px] font-bold px-1.5 py-1 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-none">
-                         {date.slice(5)}<br/>Rev: {data.revenue.toLocaleString()}<br/>GP: {data.profit.toLocaleString()}
+                         {date.slice(5)}<br/>Rev: {data.revenue.toLocaleString('en-US')}<br/>GP: {data.profit.toLocaleString('en-US')}
                        </div>
                        <div className="flex gap-0.5 items-end" style={{height:'96px'}}>
                          <div className="w-2 bg-indigo-400 rounded-t" style={{height:`${rH}%`}}></div>
@@ -2515,7 +2788,7 @@ return (
                    <div key={name} className="flex items-center gap-3">
                      <span className="w-5 h-5 bg-slate-100 rounded-full flex items-center justify-center text-[10px] font-bold text-slate-500 shrink-0">{i+1}</span>
                      <div className="flex-1 min-w-0">
-                       <div className="flex justify-between text-xs"><span className="font-semibold text-slate-700 truncate">{name}</span><span className="font-bold text-emerald-600 ml-2 shrink-0">Rs.{data.profit.toLocaleString()}</span></div>
+                       <div className="flex justify-between text-xs"><span className="font-semibold text-slate-700 truncate">{name}</span><span className="font-bold text-emerald-600 ml-2 shrink-0">Rs.{data.profit.toLocaleString('en-US')}</span></div>
                        <div className="w-full bg-slate-100 rounded-full h-1.5 mt-1"><div className="bg-emerald-500 h-1.5 rounded-full" style={{width:`${Math.min((data.profit/maxP)*100,100)}%`}}></div></div>
                      </div>
                    </div>
@@ -2534,7 +2807,7 @@ return (
                    return (
                      <div key={cat} className="flex items-center gap-3">
                        <div className="flex-1 min-w-0">
-                         <div className="flex justify-between text-xs"><span className="font-semibold text-slate-600 truncate">{cat}</span><span className="font-bold text-rose-500 ml-2 shrink-0">Rs.{amt.toLocaleString()}</span></div>
+                         <div className="flex justify-between text-xs"><span className="font-semibold text-slate-600 truncate">{cat}</span><span className="font-bold text-rose-500 ml-2 shrink-0">Rs.{amt.toLocaleString('en-US')}</span></div>
                          <div className="w-full bg-slate-100 rounded-full h-1.5 mt-1"><div className="bg-rose-400 h-1.5 rounded-full" style={{width:`${Math.min((amt/maxAmt)*100,100)}%`}}></div></div>
                        </div>
                      </div>
@@ -2548,22 +2821,22 @@ return (
            <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white p-6 rounded-3xl shadow-xl border border-slate-800">
               <p className="text-[10px] uppercase font-bold text-slate-400 mb-5 tracking-widest flex justify-between"><span>P&L Dashboard</span><span className="text-indigo-300">{filterLabel}</span></p>
               <div className="space-y-3.5">
-                <div className="flex justify-between items-center text-sm font-medium"><span className="text-slate-300">Gross Product Sales</span><span className="font-bold text-white">Rs.{reportEngine.kpis.productRevenue.toLocaleString()}</span></div>
-                <div className="flex justify-between items-center text-sm font-medium"><span className="text-rose-300">Total COGS</span><span className="font-bold text-rose-300">- Rs.{reportEngine.kpis.totalCOGS.toLocaleString()}</span></div>
-                <div className="flex justify-between items-center text-sm font-medium"><span className="text-indigo-300">Product Margin</span><span className="font-bold text-indigo-300">Rs.{reportEngine.kpis.grossMargin.toLocaleString()}</span></div>
+                <div className="flex justify-between items-center text-sm font-medium"><span className="text-slate-300">Gross Product Sales</span><span className="font-bold text-white">Rs.{reportEngine.kpis.productRevenue.toLocaleString('en-US')}</span></div>
+                <div className="flex justify-between items-center text-sm font-medium"><span className="text-rose-300">Total COGS</span><span className="font-bold text-rose-300">- Rs.{reportEngine.kpis.totalCOGS.toLocaleString('en-US')}</span></div>
+                <div className="flex justify-between items-center text-sm font-medium"><span className="text-indigo-300">Product Margin</span><span className="font-bold text-indigo-300">Rs.{reportEngine.kpis.grossMargin.toLocaleString('en-US')}</span></div>
                 <div className="h-px bg-slate-700"></div>
-                <div className="flex justify-between items-center text-xs"><span className="text-slate-400">Delivery Billed</span><span className="font-bold text-slate-300">+ Rs.{reportEngine.kpis.deliveryBilled.toLocaleString()}</span></div>
-                <div className="flex justify-between items-center text-xs"><span className="text-rose-400">Transport Expenses</span><span className="font-bold text-rose-400">- Rs.{reportEngine.kpis.transportExpense.toLocaleString()}</span></div>
-                <div className="flex justify-between items-center text-xs"><span className="text-rose-400">Operational Expenses</span><span className="font-bold text-rose-400">- Rs.{reportEngine.kpis.totalExpenses.toLocaleString()}</span></div>
+                <div className="flex justify-between items-center text-xs"><span className="text-slate-400">Delivery Billed</span><span className="font-bold text-slate-300">+ Rs.{reportEngine.kpis.deliveryBilled.toLocaleString('en-US')}</span></div>
+                <div className="flex justify-between items-center text-xs"><span className="text-rose-400">Transport Expenses</span><span className="font-bold text-rose-400">- Rs.{reportEngine.kpis.transportExpense.toLocaleString('en-US')}</span></div>
+                <div className="flex justify-between items-center text-xs"><span className="text-rose-400">Operational Expenses</span><span className="font-bold text-rose-400">- Rs.{reportEngine.kpis.totalExpenses.toLocaleString('en-US')}</span></div>
                 <div className="h-px bg-slate-700"></div>
-                <div className="flex justify-between items-center"><span className="font-bold uppercase tracking-widest text-emerald-400 text-xs">Net Profit</span><span className={`font-black text-3xl tracking-tight ${reportEngine.kpis.netProfit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>Rs.{reportEngine.kpis.netProfit.toLocaleString()}</span></div>
+                <div className="flex justify-between items-center"><span className="font-bold uppercase tracking-widest text-emerald-400 text-xs">Net Profit</span><span className={`font-black text-3xl tracking-tight ${reportEngine.kpis.netProfit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>Rs.{reportEngine.kpis.netProfit.toLocaleString('en-US')}</span></div>
               </div>
            </div>
 
            {/* Total receivables */}
            <div className="bg-rose-50 p-5 rounded-2xl border border-rose-100 shadow-sm">
               <p className="text-[10px] font-bold uppercase text-rose-600 flex items-center gap-1.5 tracking-wider"><AlertCircle size={14}/> All-Time Receivables</p>
-              <p className="text-2xl font-black text-rose-700 mt-2 tracking-tight">Rs.{reportEngine.kpis.totalReceivables.toLocaleString()}</p>
+              <p className="text-2xl font-black text-rose-700 mt-2 tracking-tight">Rs.{reportEngine.kpis.totalReceivables.toLocaleString('en-US')}</p>
            </div>
         </div>
       )}
@@ -2592,15 +2865,15 @@ return (
                     <tr key={i} className="hover:bg-slate-50">
                       <td className="p-3 font-bold text-slate-800">{name}</td>
                       <td className="p-3 text-center font-bold">{data.orders}</td>
-                      <td className="p-3 text-right font-bold text-slate-800">Rs.{data.revenue.toLocaleString()}</td>
-                      <td className="p-3 text-right font-bold text-emerald-600">Rs.{data.profit.toLocaleString()}</td>
+                      <td className="p-3 text-right font-bold text-slate-800">Rs.{data.revenue.toLocaleString('en-US')}</td>
+                      <td className="p-3 text-right font-bold text-emerald-600">Rs.{data.profit.toLocaleString('en-US')}</td>
                       <td className="p-3 text-right font-bold text-indigo-600">{margin}%</td>
                     </tr>
                   );
                 })}
               </tbody>
               <tfoot className="bg-slate-50 border-t-2 border-slate-300 font-black text-xs">
-                {(() => { const totalRev = Object.values(reportEngine.bySalesperson).reduce((s,d)=>s+d.revenue,0); const totalGP = Object.values(reportEngine.bySalesperson).reduce((s,d)=>s+d.profit,0); const totalOrders = Object.values(reportEngine.bySalesperson).reduce((s,d)=>s+d.orders,0); return (<tr><td className="p-3 text-slate-600 uppercase tracking-wider">Totals</td><td className="p-3 text-center">{totalOrders}</td><td className="p-3 text-right">Rs.{totalRev.toLocaleString()}</td><td className="p-3 text-right text-emerald-700">Rs.{totalGP.toLocaleString()}</td><td className="p-3 text-right text-indigo-700">{totalRev > 0 ? ((totalGP/totalRev)*100).toFixed(1) : 0}%</td></tr>); })()}
+                {(() => { const totalRev = Object.values(reportEngine.bySalesperson).reduce((s,d)=>s+d.revenue,0); const totalGP = Object.values(reportEngine.bySalesperson).reduce((s,d)=>s+d.profit,0); const totalOrders = Object.values(reportEngine.bySalesperson).reduce((s,d)=>s+d.orders,0); return (<tr><td className="p-3 text-slate-600 uppercase tracking-wider">Totals</td><td className="p-3 text-center">{totalOrders}</td><td className="p-3 text-right">Rs.{totalRev.toLocaleString('en-US')}</td><td className="p-3 text-right text-emerald-700">Rs.{totalGP.toLocaleString('en-US')}</td><td className="p-3 text-right text-indigo-700">{totalRev > 0 ? ((totalGP/totalRev)*100).toFixed(1) : 0}%</td></tr>); })()}
               </tfoot>
             </table>
           </div>
@@ -2618,7 +2891,7 @@ return (
             </div>
             <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Outstanding</p>
-              <p className="text-2xl font-black mt-1 text-rose-600">Rs.{reportEngine.kpis.totalReceivables.toLocaleString()}</p>
+              <p className="text-2xl font-black mt-1 text-rose-600">Rs.{reportEngine.kpis.totalReceivables.toLocaleString('en-US')}</p>
               <p className="text-[10px] text-slate-400 mt-1">{reportEngine.receivablesList.length} customers with balance</p>
             </div>
           </div>
@@ -2635,11 +2908,11 @@ return (
               <div key={key} className={`bg-white rounded-2xl shadow-sm border border-${color}-100 overflow-hidden`}>
                 <div className={`bg-${color}-50 border-b border-${color}-100 p-3 flex justify-between items-center`}>
                   <span className={`text-xs font-bold text-${color}-700 uppercase tracking-widest`}>{label} ({bucket.length})</span>
-                  <span className={`text-xs font-black text-${color}-700`}>Rs.{total.toLocaleString()}</span>
+                  <span className={`text-xs font-black text-${color}-700`}>Rs.{total.toLocaleString('en-US')}</span>
                 </div>
                 <div className="divide-y divide-slate-100">
                   {bucket.map((r,i) => {
-                    const waMsg = `Assalam o Alaikum ${r.name},\n\nYour outstanding balance with ${APP_NAME} is *Rs. ${r.amount.toLocaleString()}*.\n\nKindly process the payment at your earliest convenience.\n\nJazakAllah Khair`;
+                    const waMsg = `Assalam o Alaikum ${r.name},\n\nYour outstanding balance with ${APP_NAME} is *Rs. ${r.amount.toLocaleString('en-US')}*.\n\nKindly process the payment at your earliest convenience.\n\nJazakAllah Khair`;
                     return (
                       <div key={i} className="flex justify-between items-center p-3">
                         <div className="flex-1 min-w-0">
@@ -2647,7 +2920,7 @@ return (
                           <p className="text-[10px] text-slate-400">{r.daysSince} days since last invoice {r.lastInvDate ? `(${formatDateDisp(r.lastInvDate)})` : ''}</p>
                         </div>
                         <div className="flex items-center gap-2 ml-2 shrink-0">
-                          <span className="font-extrabold text-rose-600 text-sm">Rs.{r.amount.toLocaleString()}</span>
+                          <span className="font-extrabold text-rose-600 text-sm">Rs.{r.amount.toLocaleString('en-US')}</span>
                           {r.phone && (
                             <a href={`https://wa.me/92${r.phone.replace(/^0/,'').replace(/\D/g,'')}?text=${encodeURIComponent(waMsg)}`} target="_blank" rel="noopener noreferrer" className="p-1.5 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 transition-colors border border-green-100" title="Send WhatsApp reminder">
                               <PhoneCall size={13}/>
@@ -2682,8 +2955,8 @@ return (
           return (Object.entries(reportEngine.byProduct).sort((a,b)=>b[1].revenue-a[1].revenue).every(([k,d]) => { cum += d.revenue; return cum / total <= 0.8 || k === Object.keys(reportEngine.byProduct)[0]; }));
         }).length || Math.max(1, Math.ceil(Object.keys(reportEngine.byProduct).length * 0.2));
         const insightCards = [
-          { label: 'Gross Margin', value: `${gpMargin}%`, sub: `Rs.${kpis.grossMargin.toLocaleString()} on Rs.${kpis.productRevenue.toLocaleString()} sales`, color: Number(gpMargin) >= 25 ? 'emerald' : Number(gpMargin) >= 15 ? 'amber' : 'rose', icon: TrendingUp },
-          { label: 'Net Profit Margin', value: `${netMargin}%`, sub: `Rs.${kpis.netProfit.toLocaleString()} after all expenses`, color: Number(netMargin) >= 15 ? 'emerald' : Number(netMargin) >= 5 ? 'amber' : 'rose', icon: DollarSign },
+          { label: 'Gross Margin', value: `${gpMargin}%`, sub: `Rs.${kpis.grossMargin.toLocaleString('en-US')} on Rs.${kpis.productRevenue.toLocaleString('en-US')} sales`, color: Number(gpMargin) >= 25 ? 'emerald' : Number(gpMargin) >= 15 ? 'amber' : 'rose', icon: TrendingUp },
+          { label: 'Net Profit Margin', value: `${netMargin}%`, sub: `Rs.${kpis.netProfit.toLocaleString('en-US')} after all expenses`, color: Number(netMargin) >= 15 ? 'emerald' : Number(netMargin) >= 5 ? 'amber' : 'rose', icon: DollarSign },
           { label: 'Collection Rate', value: `${reportEngine.collectionRate}%`, sub: `of billed amount recovered`, color: Number(reportEngine.collectionRate) >= 80 ? 'emerald' : Number(reportEngine.collectionRate) >= 50 ? 'amber' : 'rose', icon: Wallet },
           { label: 'Active Customers', value: `${reportEngine.newCustCount + reportEngine.repeatCustCount}`, sub: `${reportEngine.newCustCount} new · ${reportEngine.repeatCustCount} repeat`, color: 'indigo', icon: Users },
         ];
@@ -2701,22 +2974,22 @@ return (
             {/* Key callouts */}
             <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
               <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5"><Zap size={12} className="text-amber-500"/> Smart Callouts</p>
-              {topProduct && <div className="flex items-start gap-2 text-sm"><span className="text-emerald-600 font-black shrink-0">★</span><p className="text-slate-700"><span className="font-bold">{topProduct[0]}</span> is your most profitable product — Rs.{topProduct[1].profit.toLocaleString()} GP ({topProduct[1].qty} units sold)</p></div>}
-              {topCustomer && <div className="flex items-start gap-2 text-sm"><span className="text-indigo-600 font-black shrink-0">★</span><p className="text-slate-700"><span className="font-bold">{topCustomer[0]}</span> is your top customer — Rs.{(topCustomer[1].productRevenue||0).toLocaleString()} revenue in {topCustomer[1].orders} orders</p></div>}
-              {reportEngine.agingBuckets.days90plus.length > 0 && <div className="flex items-start gap-2 text-sm"><span className="text-rose-600 font-black shrink-0">!</span><p className="text-slate-700"><span className="font-bold text-rose-600">{reportEngine.agingBuckets.days90plus.length} customer{reportEngine.agingBuckets.days90plus.length>1?'s':''}</span> overdue 90+ days — Rs.{reportEngine.agingBuckets.days90plus.reduce((s,r)=>s+r.amount,0).toLocaleString()} at risk</p></div>}
+              {topProduct && <div className="flex items-start gap-2 text-sm"><span className="text-emerald-600 font-black shrink-0">★</span><p className="text-slate-700"><span className="font-bold">{topProduct[0]}</span> is your most profitable product — Rs.{topProduct[1].profit.toLocaleString('en-US')} GP ({topProduct[1].qty} units sold)</p></div>}
+              {topCustomer && <div className="flex items-start gap-2 text-sm"><span className="text-indigo-600 font-black shrink-0">★</span><p className="text-slate-700"><span className="font-bold">{topCustomer[0]}</span> is your top customer — Rs.{(topCustomer[1].productRevenue||0).toLocaleString('en-US')} revenue in {topCustomer[1].orders} orders</p></div>}
+              {reportEngine.agingBuckets.days90plus.length > 0 && <div className="flex items-start gap-2 text-sm"><span className="text-rose-600 font-black shrink-0">!</span><p className="text-slate-700"><span className="font-bold text-rose-600">{reportEngine.agingBuckets.days90plus.length} customer{reportEngine.agingBuckets.days90plus.length>1?'s':''}</span> overdue 90+ days — Rs.{reportEngine.agingBuckets.days90plus.reduce((s,r)=>s+r.amount,0).toLocaleString('en-US')} at risk</p></div>}
               {reportEngine.trends.revenue !== null && <div className="flex items-start gap-2 text-sm"><span className={`font-black shrink-0 ${Number(reportEngine.trends.revenue)>=0?'text-emerald-600':'text-rose-600'}`}>{Number(reportEngine.trends.revenue)>=0?'↑':'↓'}</span><p className="text-slate-700">Revenue is <span className="font-bold">{Number(reportEngine.trends.revenue)>=0?'up':'down'} {Math.abs(reportEngine.trends.revenue)}%</span> vs previous period</p></div>}
-              {kpis.deliveryBilled > kpis.transportExpense && <div className="flex items-start gap-2 text-sm"><span className="text-emerald-600 font-black shrink-0">+</span><p className="text-slate-700">Delivery net contribution: <span className="font-bold text-emerald-700">Rs.{(kpis.deliveryBilled - kpis.transportExpense).toLocaleString()}</span></p></div>}
+              {kpis.deliveryBilled > kpis.transportExpense && <div className="flex items-start gap-2 text-sm"><span className="text-emerald-600 font-black shrink-0">+</span><p className="text-slate-700">Delivery net contribution: <span className="font-bold text-emerald-700">Rs.{(kpis.deliveryBilled - kpis.transportExpense).toLocaleString('en-US')}</span></p></div>}
             </div>
             {/* P&L summary */}
             <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white p-5 rounded-3xl shadow-xl">
               <p className="text-[10px] uppercase font-bold text-slate-400 mb-4 tracking-widest">P&L Summary · {filterLabel}</p>
               {[
-                ['Gross Sales', `Rs.${kpis.productRevenue.toLocaleString()}`, 'text-white'],
-                ['COGS', `- Rs.${kpis.totalCOGS.toLocaleString()}`, 'text-rose-300'],
-                ['Gross Profit', `Rs.${kpis.grossMargin.toLocaleString()} (${gpMargin}%)`, 'text-indigo-300'],
-                ['Delivery Net', `+ Rs.${(kpis.deliveryBilled-kpis.transportExpense).toLocaleString()}`, 'text-slate-300'],
-                ['Operational Expenses', `- Rs.${kpis.totalExpenses.toLocaleString()}`, 'text-rose-300'],
-                ['Net Profit', `Rs.${kpis.netProfit.toLocaleString()} (${netMargin}%)`, kpis.netProfit >= 0 ? 'text-emerald-400 text-lg font-black' : 'text-rose-400 text-lg font-black'],
+                ['Gross Sales', `Rs.${kpis.productRevenue.toLocaleString('en-US')}`, 'text-white'],
+                ['COGS', `- Rs.${kpis.totalCOGS.toLocaleString('en-US')}`, 'text-rose-300'],
+                ['Gross Profit', `Rs.${kpis.grossMargin.toLocaleString('en-US')} (${gpMargin}%)`, 'text-indigo-300'],
+                ['Delivery Net', `+ Rs.${(kpis.deliveryBilled-kpis.transportExpense).toLocaleString('en-US')}`, 'text-slate-300'],
+                ['Operational Expenses', `- Rs.${kpis.totalExpenses.toLocaleString('en-US')}`, 'text-rose-300'],
+                ['Net Profit', `Rs.${kpis.netProfit.toLocaleString('en-US')} (${netMargin}%)`, kpis.netProfit >= 0 ? 'text-emerald-400 text-lg font-black' : 'text-rose-400 text-lg font-black'],
               ].map(([label, val, cls]) => (
                 <div key={label} className="flex justify-between items-center text-sm py-1.5 border-b border-slate-700 last:border-0">
                   <span className="text-slate-400">{label}</span>
@@ -2751,7 +3024,7 @@ return (
                   return (
                     <div key={m} className="flex flex-col items-center min-w-[28px] group relative flex-1">
                       <div className="absolute bottom-7 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-[9px] font-bold px-2 py-1.5 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-none shadow-lg">
-                        {monthNames[parseInt(mo)-1]} {yr.slice(2)}<br/>Rev: Rs.{d.revenue.toLocaleString()}<br/>GP: Rs.{d.profit.toLocaleString()}<br/>Orders: {d.orders}
+                        {monthNames[parseInt(mo)-1]} {yr.slice(2)}<br/>Rev: Rs.{d.revenue.toLocaleString('en-US')}<br/>GP: Rs.{d.profit.toLocaleString('en-US')}<br/>Orders: {d.orders}
                       </div>
                       <div className="flex gap-0.5 items-end" style={{height:'100px'}}>
                         <div className="w-3 bg-indigo-400 rounded-t-sm" style={{height:`${rH}%`}}></div>
@@ -2783,16 +3056,16 @@ return (
                         <tr key={m} className="hover:bg-slate-50">
                           <td className="p-3 font-bold text-slate-800">{monthNames[parseInt(mo)-1]} {yr}</td>
                           <td className="p-3 text-center">{d.orders}</td>
-                          <td className="p-3 text-right">Rs.{d.revenue.toLocaleString()}</td>
-                          <td className="p-3 text-right text-rose-500">Rs.{d.cost.toLocaleString()}</td>
-                          <td className="p-3 text-right font-bold text-emerald-600">Rs.{d.profit.toLocaleString()}</td>
+                          <td className="p-3 text-right">Rs.{d.revenue.toLocaleString('en-US')}</td>
+                          <td className="p-3 text-right text-rose-500">Rs.{d.cost.toLocaleString('en-US')}</td>
+                          <td className="p-3 text-right font-bold text-emerald-600">Rs.{d.profit.toLocaleString('en-US')}</td>
                           <td className="p-3 text-right text-indigo-600">{margin}%</td>
                         </tr>
                       );
                     })}
                   </tbody>
                   <tfoot className="bg-slate-50 border-t-2 border-slate-300 font-black text-xs">
-                    {(() => { const totRev = months.reduce((s,m)=>s+reportEngine.monthlyData[m].revenue,0); const totGP = months.reduce((s,m)=>s+reportEngine.monthlyData[m].profit,0); const totOrd = months.reduce((s,m)=>s+reportEngine.monthlyData[m].orders,0); const totCost = months.reduce((s,m)=>s+reportEngine.monthlyData[m].cost,0); return (<tr><td className="p-3 text-slate-600 uppercase tracking-wider">Totals ({months.length}mo)</td><td className="p-3 text-center">{totOrd}</td><td className="p-3 text-right">Rs.{totRev.toLocaleString()}</td><td className="p-3 text-right text-rose-600">Rs.{totCost.toLocaleString()}</td><td className="p-3 text-right text-emerald-700">Rs.{totGP.toLocaleString()}</td><td className="p-3 text-right text-indigo-700">{totRev > 0 ? ((totGP/totRev)*100).toFixed(1) : 0}%</td></tr>); })()}
+                    {(() => { const totRev = months.reduce((s,m)=>s+reportEngine.monthlyData[m].revenue,0); const totGP = months.reduce((s,m)=>s+reportEngine.monthlyData[m].profit,0); const totOrd = months.reduce((s,m)=>s+reportEngine.monthlyData[m].orders,0); const totCost = months.reduce((s,m)=>s+reportEngine.monthlyData[m].cost,0); return (<tr><td className="p-3 text-slate-600 uppercase tracking-wider">Totals ({months.length}mo)</td><td className="p-3 text-center">{totOrd}</td><td className="p-3 text-right">Rs.{totRev.toLocaleString('en-US')}</td><td className="p-3 text-right text-rose-600">Rs.{totCost.toLocaleString('en-US')}</td><td className="p-3 text-right text-emerald-700">Rs.{totGP.toLocaleString('en-US')}</td><td className="p-3 text-right text-indigo-700">{totRev > 0 ? ((totGP/totRev)*100).toFixed(1) : 0}%</td></tr>); })()}
                   </tfoot>
                 </table>
               </div>
@@ -2846,7 +3119,7 @@ return (
 </div>
 <div className="grid grid-cols-2 gap-3 mb-3">
 <div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Date</label><input type="date" className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-semibold outline-none" value={date} onChange={e=>setDate(e.target.value)}/></div>
-<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Category</label><select className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-semibold outline-none" value={category} onChange={e=>setCategory(e.target.value)}><option value="">– Select –</option>{EXPENSE_GROUPS.map(g => { const cats = expenseCategories.filter(c=>(c.group||'Other')===g); if(!cats.length) return null; return <optgroup key={g} label={g}>{cats.map(c=><option key={c.id} value={c.name}>{c.name}</option>)}</optgroup>; })}</select></div>
+<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Category</label><SearchableSelect className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-semibold outline-none" value={category} onChange={e=>setCategory(e.target.value)} placeholder="– Select –" options={EXPENSE_GROUPS.map(g=>({ group: g, options: expenseCategories.filter(c=>(c.group||'Other')===g).map(c=>({value:c.name,label:c.name})) })).filter(g=>g.options.length>0)} /></div>
 </div>
 <div className="mb-3"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Amount</label><input type="number" placeholder="0.00" className="w-full p-3 bg-white border border-rose-200 text-rose-600 rounded-xl text-lg font-extrabold outline-none focus:border-rose-400" value={amount} onChange={e=>setAmount(e.target.value)}/></div>
 <div className="mb-4"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Short Note</label><input type="text" placeholder="e.g. Paid to Ali for DHA drop" className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-semibold outline-none" value={note} onChange={e=>setNote(e.target.value)}/></div>
@@ -2868,7 +3141,7 @@ return (
 </div>
 <div className="ml-auto text-right">
 <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Total</p>
-<p className="font-extrabold text-rose-600 text-base">Rs.{filteredTotal.toLocaleString()}</p>
+<p className="font-extrabold text-rose-600 text-base">Rs.{filteredTotal.toLocaleString('en-US')}</p>
 </div>
 </div>
 <div className="space-y-2.5">
@@ -2876,7 +3149,7 @@ return (
 <div key={exp.id} className={`bg-white p-3.5 rounded-2xl border shadow-sm flex justify-between items-center ${editingExpense?.id === exp.id ? 'border-amber-300 ring-2 ring-amber-200' : 'border-slate-200'}`}>
 <div>{(() => { const cat = expenseCategories.find(c=>c.name===exp.category); const grp = cat?.group||'Other'; return <p className="font-bold text-slate-800 text-sm flex items-center gap-1.5"><Tag size={12} className="text-slate-400"/> {exp.category} <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border ${EXPENSE_GROUP_COLORS[grp]}`}>{grp}</span></p>; })()}<p className="text-[11px] text-slate-500 font-medium mt-0.5">{formatDateDisp(exp.date)} {exp.note ? `- ${exp.note}` : ''}</p></div>
 <div className="text-right ml-3">
-<p className="font-extrabold text-rose-600 text-base">Rs.{exp.amount.toLocaleString()}</p>
+<p className="font-extrabold text-rose-600 text-base">Rs.{exp.amount.toLocaleString('en-US')}</p>
 <div className="flex gap-2 mt-1 justify-end">
 <button onClick={() => startEdit(exp)} className="text-[10px] text-indigo-500 hover:text-indigo-700 font-bold uppercase">Edit</button>
 <button onClick={async ()=>{ if(await showConfirm("Delete expense?")) await deleteFromFirebase('expenses', exp.id) }} className="text-[10px] text-slate-400 hover:text-rose-500 font-bold uppercase">Del</button>
@@ -2888,14 +3161,14 @@ return (
 </div>
 <div className="mt-4 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
 <h3 className="text-xs font-bold text-slate-800 uppercase tracking-widest mb-3 flex items-center gap-1.5"><Download size={14} className="text-rose-500"/> Export Expenses</h3>
-<button onClick={() => { const data = expenses.map(e => ({ ID: e.id, Date: e.date, Category: e.category, Amount: e.amount, Note: e.note || '' })); exportToCSV(data, 'Expenses_Export.csv'); }} className="w-full bg-rose-50 border border-rose-100 text-rose-700 py-2.5 rounded-xl font-bold text-xs">Export All Expenses CSV</button>
+<button onClick={() => { const data = expenses.map(e => { const cat = expenseCategories.find(c=>c.name===e.category); return { ID: e.id, Date: e.date, Group: cat?.group||'Other', Category: e.category, Amount: e.amount, Note: e.note || '' }; }); exportToCSV(data, 'Expenses_Export.csv'); }} className="w-full bg-rose-50 border border-rose-100 text-rose-700 py-2.5 rounded-xl font-bold text-xs">Export All Expenses CSV</button>
 </div>
 </div>
 );
 };
 
 const BulkOpsView = () => {
-const { isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig, showConfirm } = useContext(AppContext);
+const { isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, riders, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig, showConfirm } = useContext(AppContext);
 const [bulkProducts, setBulkProducts] = useState([]);
 const [bulkSearch, setBulkSearch] = useState('');
 const [bulkEffectiveDate, setBulkEffectiveDate] = useState(getLocalDateStr());
@@ -2995,21 +3268,27 @@ showToast(`Done! ${addedCount} added, ${updatedCount} updated.`);
 reader.readAsText(file);
 e.target.value = '';
 };
-const exportAll = () => {
+const exportAll = async () => {
 const q = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-const wb = [];
+const wb = ['\uFEFF'];
 wb.push('=== ITEMS ===');
 wb.push(['ID','Name','Company','Unit','BoxQty','Cost','Selling','Status'].join(','));
 products.forEach(p => wb.push([p.id, q(p.name), q(getCompanyName(p.companyId)), q(p.unit), p.unitsInBox, p.costPrice, p.sellingPrice, p.available?'Active':'Inactive'].join(',')));
 wb.push(''); wb.push('=== CUSTOMERS ===');
-wb.push(['ID','Name','Contact','Phone','Address1','Map1','Address2','Map2','OpeningBalance'].join(','));
-customers.forEach(c => wb.push([c.id, q(c.name), q(c.contactPerson||''), q(c.phone||''), q(c.address1||''), q(c.map1||''), q(c.address2||''), q(c.map2||''), c.openingBalance||0].join(',')));
+wb.push(['ID','Name','Contact','Phone','Email','City','Area','Type','Address1','Map1','Address2','Map2','OpeningBalance','CreditLimit'].join(','));
+customers.forEach(c => wb.push([c.id, q(c.name), q(c.contactPerson||''), q(c.phone||''), q(c.email||''), q(c.city||''), q(c.area||''), q(c.customerType||''), q(c.address1||''), q(c.map1||''), q(c.address2||''), q(c.map2||''), c.openingBalance||0, c.creditLimit||0].join(',')));
 wb.push(''); wb.push('=== INVOICES ===');
-wb.push(['ID','Date','Customer','Status','Total','Delivery','Transport','Received','Salesperson','Payment','Notes'].join(','));
-invoices.forEach(o => wb.push([q(o.id), o.date, q(o.customerName), o.status, o.total, o.deliveryBilled||0, o.transportExpense||0, o.receivedAmount||0, q(o.salespersonName||''), o.paymentStatus||'', q(o.notes||'')].join(',')));
-const blob = new Blob([wb.join('\n')], {type:'text/csv'});
-const url = URL.createObjectURL(blob);
-const a = document.createElement('a'); a.href = url; a.download = 'AnimalHealthPK_MasterData.csv'; a.click(); URL.revokeObjectURL(url);
+wb.push(['ID','Date','Customer','Status','IsCreditNote','Total','Delivery','Transport','Vehicle','TransportCo','BiltyNo','DriverName','DriverPhone','RiderID','ReceivedAmt','Salesperson','PaymentStatus','Notes'].join(','));
+invoices.forEach(o => wb.push([q(o.id), o.date, q(o.customerName), o.status, o.isCreditNote?'Yes':'', o.total, o.deliveryBilled||0, o.transportExpense||0, q(o.vehicle||''), q(o.transportCompany||''), q(o.biltyNumber||''), q(o.driverName||''), q(o.driverPhone||''), o.riderId||'', o.receivedAmount||0, q(o.salespersonName||''), o.paymentStatus||'', q(o.notes||'')].join(',')));
+wb.push(''); wb.push('=== PAYMENTS ===');
+wb.push(['ID','Date','CustomerID','Customer','Amount','Note'].join(','));
+const cMap = Object.fromEntries(customers.map(c=>[c.id, c.name]));
+payments.forEach(p => wb.push([q(p.id), p.date, p.customerId, q(cMap[p.customerId]||''), p.amount, q(p.note||'')].join(',')));
+wb.push(''); wb.push('=== RIDERS ===');
+wb.push(['ID','Name','Phone','VehicleType','VehicleNumber'].join(','));
+riders.forEach(r => wb.push([r.id, q(r.name), q(r.phone||''), q(r.vehicleType||''), q(r.vehicleNumber||'')].join(',')));
+const blob = new Blob([wb.join('\n')], {type:'text/csv;charset=utf-8;'});
+await shareOrDownload(blob, 'AnimalHealthPK_MasterData.csv');
 showToast('Master data exported!');
 };
 const visibleProducts = bulkProducts.filter(p => !bulkSearch || p.name.toLowerCase().includes(bulkSearch.toLowerCase()));
@@ -3018,15 +3297,19 @@ return (
 {/* Export Section */}
 <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm mb-4">
 <h3 className="text-xs font-bold text-slate-800 uppercase tracking-widest mb-3 flex items-center gap-1.5"><Download size={14} className="text-indigo-600"/> Export Master Data</h3>
-<div className="flex gap-2 mb-2">
+<div className="flex flex-wrap gap-2 mb-2">
 <button onClick={() => setActiveExportTab('items')} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-colors ${activeExportTab==='items'?'bg-indigo-600 text-white':'bg-slate-100 text-slate-600'}`}>Items</button>
 <button onClick={() => setActiveExportTab('clients')} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-colors ${activeExportTab==='clients'?'bg-indigo-600 text-white':'bg-slate-100 text-slate-600'}`}>Clients</button>
 <button onClick={() => setActiveExportTab('invoices')} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-colors ${activeExportTab==='invoices'?'bg-indigo-600 text-white':'bg-slate-100 text-slate-600'}`}>Invoices</button>
+<button onClick={() => setActiveExportTab('payments')} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-colors ${activeExportTab==='payments'?'bg-emerald-600 text-white':'bg-slate-100 text-slate-600'}`}>Payments</button>
+<button onClick={() => setActiveExportTab('riders')} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-colors ${activeExportTab==='riders'?'bg-amber-500 text-white':'bg-slate-100 text-slate-600'}`}>Riders</button>
 <button onClick={() => setActiveExportTab('all')} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-colors ${activeExportTab==='all'?'bg-indigo-600 text-white':'bg-slate-100 text-slate-600'}`}>All</button>
 </div>
 {activeExportTab === 'items' && <button onClick={() => { const data = products.map(p => ({ ID: p.id, Name: p.name, Company: getCompanyName(p.companyId), Unit: p.unit, BoxQty: p.unitsInBox, Cost: p.costPrice, Selling: p.sellingPrice, Status: p.available ? 'Active' : 'Inactive' })); exportToCSV(data, 'Items_Master.csv'); }} className="w-full bg-indigo-50 border border-indigo-100 text-indigo-700 py-2.5 rounded-xl font-bold text-xs">Export {products.length} Items as CSV</button>}
-{activeExportTab === 'clients' && <button onClick={() => { const data = customers.map(c => ({ ID: c.id, Name: c.name, Contact: c.contactPerson||'', Phone: c.phone||'', Address1: c.address1||'', Map1: c.map1||'', Address2: c.address2||'', Map2: c.map2||'', OpeningBalance: c.openingBalance||0 })); exportToCSV(data, 'Customers_Master.csv'); }} className="w-full bg-indigo-50 border border-indigo-100 text-indigo-700 py-2.5 rounded-xl font-bold text-xs">Export {customers.length} Clients as CSV</button>}
-{activeExportTab === 'invoices' && <button onClick={() => { const data = invoices.map(o => ({ ID: o.id, Date: o.date, Customer: o.customerName, Status: o.status, Total: o.total, Delivery: o.deliveryBilled||0, Transport: o.transportExpense||0, ReceivedAmt: o.receivedAmount||0, Salesperson: o.salespersonName||'', PaymentStatus: o.paymentStatus||'' })); exportToCSV(data, 'Invoices_Export.csv'); }} className="w-full bg-indigo-50 border border-indigo-100 text-indigo-700 py-2.5 rounded-xl font-bold text-xs">Export {invoices.length} Invoices as CSV</button>}
+{activeExportTab === 'clients' && <button onClick={() => { const data = customers.map(c => ({ ID: c.id, Name: c.name, Contact: c.contactPerson||'', Phone: c.phone||'', Email: c.email||'', AltPhone: c.altPhone||'', City: c.city||'', Area: c.area||'', Type: c.customerType||'', Address1: c.address1||'', Map1: c.map1||'', Address2: c.address2||'', Map2: c.map2||'', OpeningBalance: c.openingBalance||0, CreditLimit: c.creditLimit||0 })); exportToCSV(data, 'Customers_Master.csv'); }} className="w-full bg-indigo-50 border border-indigo-100 text-indigo-700 py-2.5 rounded-xl font-bold text-xs">Export {customers.length} Clients as CSV</button>}
+{activeExportTab === 'invoices' && <button onClick={() => { const data = invoices.map(o => ({ ID: o.id, Date: o.date, Customer: o.customerName, Status: o.status, IsCreditNote: o.isCreditNote?'Yes':'', Total: o.total, Delivery: o.deliveryBilled||0, Transport: o.transportExpense||0, Vehicle: o.vehicle||'', TransportCo: o.transportCompany||'', BiltyNo: o.biltyNumber||'', DriverName: o.driverName||'', DriverPhone: o.driverPhone||'', RiderID: o.riderId||'', DeliveryAddrKey: o.deliveryAddressKey||'', ReceivedAmt: o.receivedAmount||0, Salesperson: o.salespersonName||'', PaymentStatus: o.paymentStatus||'', Notes: o.notes||'' })); exportToCSV(data, 'Invoices_Export.csv'); }} className="w-full bg-indigo-50 border border-indigo-100 text-indigo-700 py-2.5 rounded-xl font-bold text-xs">Export {invoices.length} Invoices as CSV</button>}
+{activeExportTab === 'payments' && <button onClick={() => { const cMap = Object.fromEntries(customers.map(c=>[c.id, c.name])); const data = payments.map(p => ({ ID: p.id, Date: p.date, CustomerID: p.customerId, Customer: cMap[p.customerId]||'', Amount: p.amount, Note: p.note||'' })); exportToCSV(data, 'Payments_Export.csv'); }} className="w-full bg-emerald-50 border border-emerald-100 text-emerald-700 py-2.5 rounded-xl font-bold text-xs">Export {payments.length} Payments as CSV</button>}
+{activeExportTab === 'riders' && <button onClick={() => { const data = riders.map(r => ({ ID: r.id, Name: r.name, Phone: r.phone||'', VehicleType: r.vehicleType||'', VehicleNumber: r.vehicleNumber||'' })); exportToCSV(data, 'Riders_Master.csv'); }} className="w-full bg-amber-50 border border-amber-100 text-amber-700 py-2.5 rounded-xl font-bold text-xs">Export {riders.length} Riders as CSV</button>}
 {activeExportTab === 'all' && <button onClick={exportAll} className="w-full bg-indigo-600 text-white py-2.5 rounded-xl font-bold text-xs shadow-sm">Export Full Master Data (CSV)</button>}
 </div>
 
@@ -3171,6 +3454,7 @@ const [billingView, setBillingView] = useState('list');
 const [currentInvoice, setCurrentInvoice] = useState(null);
 const [showProductModal, setShowProductModal] = useState(false);
 const [editingProduct, setEditingProduct] = useState(null);
+const [productPreFill, setProductPreFill] = useState('');
 const [showCustomerModal, setShowCustomerModal] = useState(false);
 const [editingCustomer, setEditingCustomer] = useState(null);
 const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -3372,7 +3656,7 @@ cities, areas, customerTypes,
 showToast, showConfirm, confirmDialog, setConfirmDialog, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData,
 billingView, setBillingView, currentInvoice, setCurrentInvoice,
 activeTab, setActiveTab, adminView, setAdminView, analyticsView, setAnalyticsView,
-editingProduct, setEditingProduct, showProductModal, setShowProductModal,
+editingProduct, setEditingProduct, showProductModal, setShowProductModal, productPreFill, setProductPreFill,
 editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal,
 showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment,
 showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId,
@@ -3403,7 +3687,8 @@ return (
         const active = activeTab === tab.id;
         const draftCount = tab.id === 'billing' ? invoices.filter(o => o.status === 'Booked' || o.status === 'Estimate').length : 0;
         return (
-          <button key={tab.id} onClick={() => setActiveTab(tab.id)} title={`Alt+${tab.label[0].toLowerCase()}`}
+          <button key={tab.id} data-sidenav={tab.id} tabIndex={active ? 0 : -1} onClick={() => setActiveTab(tab.id)} title={`Alt+${tab.label[0].toLowerCase()}`}
+            onKeyDown={makeArrowNav(TABS.filter(t=>!t.adminOnly||isAdmin).map(t=>t.id), activeTab, setActiveTab, 'data-sidenav')}
             className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-semibold text-sm transition-all ${active ? 'bg-indigo-50 text-indigo-700 shadow-sm' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'}`}>
             <div className="relative shrink-0">
               <tab.icon size={18} strokeWidth={active ? 2.5 : 2} />
@@ -3464,7 +3749,9 @@ return (
         const active = activeTab === tab.id;
         const draftCount = tab.id === 'billing' ? invoices.filter(o => o.status === 'Booked' || o.status === 'Estimate').length : 0;
         return (
-          <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex flex-col items-center justify-center w-full transition-all ${active ? 'text-indigo-600' : 'text-slate-400'}`}>
+          <button key={tab.id} data-sidenav={tab.id} tabIndex={active ? 0 : -1} onClick={() => setActiveTab(tab.id)}
+            onKeyDown={makeArrowNav(TABS.filter(t=>!t.adminOnly||isAdmin).map(t=>t.id), activeTab, setActiveTab, 'data-sidenav')}
+            className={`flex flex-col items-center justify-center w-full transition-all ${active ? 'text-indigo-600' : 'text-slate-400'}`}>
             <div className={`relative p-1.5 rounded-xl transition-all ${active ? 'bg-indigo-50 shadow-sm' : ''}`}>
               <tab.icon size={22} strokeWidth={active ? 2.5 : 2} />
               {draftCount > 0 && <span className="absolute -top-1 -right-1 bg-amber-500 text-white text-[8px] font-black w-4 h-4 rounded-full flex items-center justify-center leading-none">{draftCount > 9 ? '9+' : draftCount}</span>}
