@@ -1050,6 +1050,19 @@ return (
               </tr>
             </tfoot>
           )}
+          {docType === 'invoice' && safeItems.length > 0 && (
+            <tfoot>
+              <tr style={{ borderTop: '2px solid #1e293b' }}>
+                <td style={{ padding: sz('6px 2px','8px 4px','9px 6px'), fontWeight: 700, fontSize: sz('8px','9px','10px'), color: '#475569' }}>
+                  Total SKUs: <strong style={{ color: '#1e293b' }}>{safeItems.length}</strong>
+                </td>
+                <td style={{ padding: sz('6px 2px','8px 4px','9px 6px'), textAlign: 'center', fontWeight: 800, color: '#1e293b', fontSize: sz('8px','9px','10px') }}>
+                  {safeItems.reduce((s, i) => s + (i.quantity || 0), 0)} units
+                </td>
+                <td colSpan={isThermal ? 1 : 2} />
+              </tr>
+            </tfoot>
+          )}
         </table>
 
         {/* Estimate Totals */}
