@@ -635,9 +635,12 @@ const downloadImageFallback = (blob, fileName) => {
 };
 
 // ── Layout helpers ────────────────────────────────────────────────────────
-// Enrich items: fill in missing unit/unitsInBox from product master at render time
+// A unit value is only valid if it's a non-numeric string longer than 1 char (e.g. "Vial", not "6" or "1")
+const isValidUnit = (u) => !!u && isNaN(u) && String(u).trim().length > 1;
+
+// Enrich items: fill in missing/invalid unit from product master at render time
 const safeItems = (data?.items || []).map(item => {
-  if (item.unit) return item;
+  if (isValidUnit(item.unit)) return item;
   const prod = findProduct(item);
   if (!prod) return item;
   return { ...item, unit: prod.unit || '', unitsInBox: item.unitsInBox || prod.unitsInBox || 1 };
@@ -1412,7 +1415,7 @@ return (
 
   {/* ── Unit debug panel (on-screen only, dispatch, items missing unit) ── */}
   {docType === 'dispatch' && (() => {
-    const missing = (data?.items || []).filter(item => !item.unit);
+    const missing = (data?.items || []).filter(item => !isValidUnit(item.unit));
     if (missing.length === 0) return null;
     return (
       <div className="no-print mx-auto mt-3 p-3 rounded-xl border-2 border-amber-400 bg-amber-50 text-[11px]" style={{ maxWidth: 400 }}>
@@ -1422,7 +1425,7 @@ return (
           return (
             <div key={i} className="mb-1.5 p-1.5 bg-white rounded border border-amber-200">
               <span className="font-bold text-slate-800">{item.name}</span>
-              <span className="text-slate-500"> · id:{String(item.productId||'none').slice(-6)}</span>
+              <span className="text-slate-500"> · stored unit="{String(item.unit??'')}"</span>
               {prod
                 ? <span className="text-emerald-700 font-bold"> → found: unit="{prod.unit||'EMPTY'}"</span>
                 : <span className="text-rose-600 font-bold"> → NO MATCH in {products.length} products</span>

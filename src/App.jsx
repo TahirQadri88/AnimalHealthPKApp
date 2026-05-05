@@ -2042,10 +2042,11 @@ const run = async () => {
     if (!prod) { const nl=(item.name||'').toLowerCase().trim(); prod=products.find(p=>{const pn=(p.name||'').toLowerCase().trim();return pn&&(nl.startsWith(pn.slice(0,10))||pn.startsWith(nl.slice(0,10)));}) || null; }
     return prod;
   };
+  const isValidUnit = (u) => !!u && isNaN(u) && String(u).trim().length > 1;
   let invoicesFixed=0, itemsFixed=0;
   for (const inv of invoices) {
     const updatedItems = inv.items?.map(item => {
-      if (item.unit) return item;
+      if (isValidUnit(item.unit)) return item;
       const prod = findProd(item);
       if (!prod) return item;
       itemsFixed++;
