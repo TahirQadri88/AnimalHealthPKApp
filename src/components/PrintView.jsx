@@ -1070,21 +1070,21 @@ return (
                     Total SKUs: <strong style={{ color: '#1e293b' }}>{safeItems.length}</strong>
                   </td>
                   <td colSpan={1} style={{ padding: sz('6px','8px','9px'), textAlign: 'left', fontWeight: 800, color: '#1e293b' }}>
-                    <div style={{ fontSize: sz('8.5px','9.5px','10.5px'), fontWeight: 800, color: '#1e293b', marginBottom: '3px' }}>
+                    <div style={{ fontSize: sz('8.5px','9.5px','10.5px'), fontWeight: 800, color: '#1e293b', marginBottom: totalPacks > 0 ? '3px' : 0 }}>
                       {totalUnits} units total
                     </div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px' }}>
-                      {totalPacks > 0 && (
+                    {totalPacks > 0 && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px' }}>
                         <span style={{ background: '#e0f2fe', color: '#0369a1', borderRadius: '3px', padding: '1px 4px', fontWeight: 700, fontSize: sz('7px','7.5px','8px') }}>
                           {totalPacks} {totalPacks === 1 ? 'Pack' : 'Packs'}
                         </span>
-                      )}
-                      {totalLoose > 0 && (
-                        <span style={{ background: '#fef3c7', color: '#92400e', borderRadius: '3px', padding: '1px 4px', fontWeight: 700, fontSize: sz('7px','7.5px','8px') }}>
-                          {totalLoose} Loose
-                        </span>
-                      )}
-                    </div>
+                        {totalLoose > 0 && (
+                          <span style={{ background: '#fef3c7', color: '#92400e', borderRadius: '3px', padding: '1px 4px', fontWeight: 700, fontSize: sz('7px','7.5px','8px') }}>
+                            {totalLoose} Loose
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </td>
                 </tr>
               </tfoot>
