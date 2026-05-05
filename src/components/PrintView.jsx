@@ -1413,33 +1413,6 @@ return (
     </div>
   </div>
 
-  {/* ── Unit debug panel (on-screen only, dispatch, items missing unit) ── */}
-  {docType === 'dispatch' && (() => {
-    const missing = (data?.items || []).filter(item => !isValidUnit(item.unit));
-    if (missing.length === 0) return null;
-    return (
-      <div className="no-print mx-auto mt-3 p-3 rounded-xl border-2 border-amber-400 bg-amber-50 text-[11px]" style={{ maxWidth: 400 }}>
-        <div className="font-black text-amber-900 mb-2">⚠ Unit lookup debug ({missing.length} items missing unit | {products.length} products loaded)</div>
-        {missing.map((item, i) => {
-          const prod = findProduct(item);
-          return (
-            <div key={i} className="mb-1.5 p-1.5 bg-white rounded border border-amber-200">
-              <span className="font-bold text-slate-800">{item.name}</span>
-              <span className="text-slate-500"> · stored unit="{String(item.unit??'')}"</span>
-              {prod
-                ? <span className="text-emerald-700 font-bold"> → found: unit="{prod.unit||'EMPTY'}"</span>
-                : <span className="text-rose-600 font-bold"> → NO MATCH in {products.length} products</span>
-              }
-            </div>
-          );
-        })}
-        {products.length > 0 && (
-          <div className="mt-1 text-slate-500">Sample products: {products.slice(0,3).map(p=>`"${p.name}"`).join(', ')}</div>
-        )}
-      </div>
-    );
-  })()}
-
   {/* ── Print/PDF styles ── */}
   <style>{`
     #print-document {
