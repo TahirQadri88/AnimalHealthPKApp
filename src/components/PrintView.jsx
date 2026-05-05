@@ -28,7 +28,7 @@ const getDispatchParts = (item) => {
   if (!item) return { qty: 0, uib: 1, boxes: 0, loose: 0 };
   let uib = item.unitsInBox;
   if (!uib) {
-    const prod = products.find(p => p.id === item.productId);
+    const prod = products.find(p => String(p.id) === String(item.productId) || String(p.id) === String(item.uniqueId));
     uib = prod ? prod.unitsInBox : 1;
   }
   uib = Number(uib) || 1;
@@ -998,7 +998,7 @@ return (
                 <td style={{ padding: sz('6px 2px','8px 4px','9px 6px'), textAlign: docType === 'dispatch' ? 'left' : 'center', fontWeight: 600, lineHeight: sz('1.5','1.55','1.6'), color: '#334155', whiteSpace: docType === 'dispatch' ? 'normal' : 'nowrap' }}>
                   {docType === 'dispatch' ? (() => {
                     const { qty, uib, boxes, loose } = getDispatchParts(item);
-                    const rawUnit = item?.unit || products.find(p => p.id === item?.productId)?.unit || '';
+                    const rawUnit = item?.unit || products.find(p => String(p.id) === String(item?.productId) || String(p.id) === String(item?.uniqueId))?.unit || '';
                     const unitLabel = rawUnit && isNaN(rawUnit) && String(rawUnit).trim().length > 1 ? rawUnit : '';
                     if (uib <= 1) return <span style={{ fontWeight: 800, color: '#1e293b' }}>{qty}{unitLabel && <span style={{ fontWeight: 500, color: '#64748b', fontSize: sz('7.5px','8px','8.5px'), marginLeft: '3px' }}>{unitLabel}</span>}</span>;
                     return (
