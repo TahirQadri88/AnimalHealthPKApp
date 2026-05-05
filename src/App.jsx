@@ -1025,7 +1025,12 @@ if(!currentInvoice.customerId || currentInvoice.items.length === 0) return showT
 const totalItems = currentInvoice.items.reduce((sum, i) => sum + (i.isBonus ? 0 : i.price * i.quantity), 0);
 const grandTotal = totalItems + Number(currentInvoice.deliveryBilled || 0);
 const activeCustomer = customers.find(c => c.id === currentInvoice.customerId);
-const finalInvoice = { ...currentInvoice, total: grandTotal, status: status, salespersonId: currentUser.id, salespersonName: currentUser.name, customerDetails: activeCustomer ? { contactPerson: activeCustomer.contactPerson || '', phone: activeCustomer.phone || '', address1: activeCustomer.address1 || activeCustomer.address || '', map1: activeCustomer.map1 || '', address2: activeCustomer.address2 || '', map2: activeCustomer.map2 || '' } : {} };
+const enrichedItems = currentInvoice.items.map(item => {
+  if (item.unit && item.unitsInBox) return item;
+  const prod = products.find(p => String(p.id) === String(item.productId) || String(p.id) === String(item.uniqueId) || p.name === item.name);
+  return { ...item, unit: item.unit || prod?.unit || '', unitsInBox: item.unitsInBox || prod?.unitsInBox || 1 };
+});
+const finalInvoice = { ...currentInvoice, items: enrichedItems, total: grandTotal, status: status, salespersonId: currentUser.id, salespersonName: currentUser.name, customerDetails: activeCustomer ? { contactPerson: activeCustomer.contactPerson || '', phone: activeCustomer.phone || '', address1: activeCustomer.address1 || activeCustomer.address || '', map1: activeCustomer.map1 || '', address2: activeCustomer.address2 || '', map2: activeCustomer.map2 || '' } : {} };
 if (!finalInvoice.id) {
   const prefix = status === 'Estimate' ? 'EST' : status === 'Booked' ? 'ORD' : 'INV';
   const nextNum = getNextSeqNum(invoices, prefix);
