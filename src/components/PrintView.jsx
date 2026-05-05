@@ -24,8 +24,8 @@ useEffect(() => {
 }, []);
 
 // ── Helpers ───────────────────────────────────────────────────────────────
-const getDispatchQtyStr = (item) => {
-  if (!item) return '0';
+const getDispatchParts = (item) => {
+  if (!item) return { qty: 0, uib: 1, boxes: 0, loose: 0 };
   let uib = item.unitsInBox;
   if (!uib) {
     const prod = products.find(p => p.id === item.productId);
@@ -33,13 +33,9 @@ const getDispatchQtyStr = (item) => {
   }
   uib = Number(uib) || 1;
   const qty = Number(item.quantity) || 0;
-  if (uib <= 1) return `${qty}`;
-  const boxes = Math.floor(qty / uib);
-  const loose = qty % uib;
-  const boxText = boxes === 1 ? 'Box' : 'Boxes';
-  if (boxes > 0 && loose > 0) return `${qty} (${boxes} ${boxText}, ${loose} Loose)`;
-  if (boxes > 0) return `${qty} (${boxes} ${boxText})`;
-  return `${qty} (${loose} Loose)`;
+  const boxes = uib > 1 ? Math.floor(qty / uib) : 0;
+  const loose  = uib > 1 ? qty % uib : qty;
+  return { qty, uib, boxes, loose };
 };
 
 const safeStr = (s) => String(s ?? '').replace(/[^a-zA-Z0-9_\-]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
@@ -169,7 +165,9 @@ const generateShareText = () => {
     }
     text += `\n\n*Items to Deliver:*\n`;
     (data.items || []).forEach(i => {
-      text += `• ${i.name}${i.isBonus ? ' 🎁 BONUS' : ''} → ${getDispatchQtyStr(i)}\n`;
+      const { qty: dQty, uib: dUib, boxes: dBoxes, loose: dLoose } = getDispatchParts(i);
+      const dQtyStr = dUib <= 1 ? `${dQty}` : dBoxes > 0 && dLoose > 0 ? `${dQty} (${dBoxes} ${dBoxes===1?'Box':'Boxes'}, ${dLoose} Loose)` : dBoxes > 0 ? `${dQty} (${dBoxes} ${dBoxes===1?'Box':'Boxes'})` : `${dQty} (${dLoose} Loose)`;
+      text += `• ${i.name}${i.isBonus ? ' 🎁 BONUS' : ''} → ${dQtyStr}\n`;
     });
     text += `${hr}\n`;
     text += `Total SKUs: ${(data.items || []).length} | Confirm receipt upon delivery.`;
@@ -998,7 +996,31 @@ return (
                   )}
                 </td>
                 <td style={{ padding: sz('6px 2px','8px 4px','9px 6px'), textAlign: docType === 'dispatch' ? 'left' : 'center', fontWeight: 600, lineHeight: sz('1.5','1.55','1.6'), color: '#334155', whiteSpace: docType === 'dispatch' ? 'normal' : 'nowrap' }}>
-                  {docType === 'dispatch' ? getDispatchQtyStr(item) : (item?.quantity || 0)}
+                  {docType === 'dispatch' ? (() => {
+                    const { qty, uib, boxes, loose } = getDispatchParts(item);
+                    const rawUnit = item?.unit || products.find(p => p.id === item?.productId)?.unit || '';
+                    const unitLabel = rawUnit && isNaN(rawUnit) && String(rawUnit).trim().length > 1 ? rawUnit : '';
+                    if (uib <= 1) return <span style={{ fontWeight: 800, color: '#1e293b' }}>{qty}{unitLabel && <span style={{ fontWeight: 500, color: '#64748b', fontSize: sz('7.5px','8px','8.5px'), marginLeft: '3px' }}>{unitLabel}</span>}</span>;
+                    return (
+                      <div>
+                        <div style={{ fontWeight: 800, color: '#1e293b', fontSize: sz('9.5px','10px','11px') }}>
+                          {qty}{unitLabel && <span style={{ fontWeight: 500, color: '#64748b', fontSize: sz('7.5px','8px','8.5px'), marginLeft: '3px' }}>{unitLabel}</span>}
+                        </div>
+                        {boxes > 0 && (
+                          <div style={{ marginTop: '2px', display: 'flex', flexWrap: 'wrap', gap: '2px' }}>
+                            <span style={{ background: '#e0f2fe', color: '#0369a1', borderRadius: '3px', padding: '1px 4px', fontWeight: 700, fontSize: sz('7px','7.5px','8px') }}>
+                              {boxes} {boxes === 1 ? 'Pack' : 'Packs'}
+                            </span>
+                            {loose > 0 && (
+                              <span style={{ background: '#fef3c7', color: '#92400e', borderRadius: '3px', padding: '1px 4px', fontWeight: 700, fontSize: sz('7px','7.5px','8px') }}>
+                                {loose} Loose
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })() : (item?.quantity || 0)}
                 </td>
                 {(docType === 'invoice' || docType === 'estimate') && (
                   <td style={{ padding: sz('6px 2px','8px 4px','9px 6px'), textAlign: 'right', color: '#475569', whiteSpace: 'nowrap' }}>
@@ -1038,15 +1060,47 @@ return (
               </tr>
             )}
           </tbody>
-          {docType === 'dispatch' && safeItems.length > 0 && (
+          {docType === 'dispatch' && safeItems.length > 0 && (() => {
+            const totalUnits = safeItems.reduce((s, i) => s + (Number(i.quantity) || 0), 0);
+            const totalPacks = safeItems.reduce((s, i) => s + getDispatchParts(i).boxes, 0);
+            const totalLoose = safeItems.reduce((s, i) => { const { loose, uib } = getDispatchParts(i); return s + (uib > 1 ? loose : 0); }, 0);
+            return (
+              <tfoot>
+                <tr style={{ borderTop: '2px solid #1e293b' }}>
+                  <td style={{ padding: sz('6px 2px','8px 4px','9px 6px'), fontWeight: 700, fontSize: sz('8px','9px','10px'), color: '#475569' }}>
+                    Total SKUs: <strong style={{ color: '#1e293b' }}>{safeItems.length}</strong>
+                  </td>
+                  <td colSpan={1} style={{ padding: sz('6px','8px','9px'), textAlign: 'left', fontWeight: 800, color: '#1e293b' }}>
+                    <div style={{ fontSize: sz('8.5px','9.5px','10.5px'), fontWeight: 800, color: '#1e293b', marginBottom: totalPacks > 0 ? '3px' : 0 }}>
+                      {totalUnits} units total
+                    </div>
+                    {totalPacks > 0 && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px' }}>
+                        <span style={{ background: '#e0f2fe', color: '#0369a1', borderRadius: '3px', padding: '1px 4px', fontWeight: 700, fontSize: sz('7px','7.5px','8px') }}>
+                          {totalPacks} {totalPacks === 1 ? 'Pack' : 'Packs'}
+                        </span>
+                        {totalLoose > 0 && (
+                          <span style={{ background: '#fef3c7', color: '#92400e', borderRadius: '3px', padding: '1px 4px', fontWeight: 700, fontSize: sz('7px','7.5px','8px') }}>
+                            {totalLoose} Loose
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              </tfoot>
+            );
+          })()}
+          {docType === 'invoice' && safeItems.length > 0 && (
             <tfoot>
               <tr style={{ borderTop: '2px solid #1e293b' }}>
                 <td style={{ padding: sz('6px 2px','8px 4px','9px 6px'), fontWeight: 700, fontSize: sz('8px','9px','10px'), color: '#475569' }}>
                   Total SKUs: <strong style={{ color: '#1e293b' }}>{safeItems.length}</strong>
                 </td>
-                <td colSpan={1} style={{ padding: sz('6px','8px','9px'), textAlign: 'center', fontWeight: 800, color: '#1e293b' }}>
+                <td style={{ padding: sz('6px 2px','8px 4px','9px 6px'), textAlign: 'center', fontWeight: 800, color: '#1e293b', fontSize: sz('8px','9px','10px') }}>
                   {safeItems.reduce((s, i) => s + (i.quantity || 0), 0)} units
                 </td>
+                <td colSpan={isThermal ? 1 : 2} />
               </tr>
             </tfoot>
           )}
