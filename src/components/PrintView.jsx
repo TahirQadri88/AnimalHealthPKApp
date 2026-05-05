@@ -24,17 +24,38 @@ useEffect(() => {
 }, []);
 
 // ── Helpers ───────────────────────────────────────────────────────────────
+// Pre-built maps for fast, reliable product lookup (rebuilt each render when products change)
+const _prodById   = new Map(products.map(p => [String(p.id), p]));
+const _prodByName = new Map(products.map(p => [(p.name || '').toLowerCase().trim(), p]));
+const _prodByWord = (() => {
+  const m = new Map();
+  products.forEach(p => {
+    const w = (p.name || '').toLowerCase().trim().split(/\s+/)[0];
+    if (w && w.length > 2 && !m.has(w)) m.set(w, p);
+  });
+  return m;
+})();
+
 const findProduct = (item) => {
   if (!item) return null;
-  const idStr = String(item.productId || '');
-  const uidStr = String(item.uniqueId || '');
+  const idStr   = String(item.productId || '');
+  const uidStr  = String(item.uniqueId  || '');
   const nameLower = (item.name || '').toLowerCase().trim();
-  return products.find(p =>
-    (idStr && String(p.id) === idStr) ||
-    (uidStr && String(p.id) === uidStr) ||
-    (nameLower && p.name?.toLowerCase().trim() === nameLower) ||
-    (nameLower && p.name?.toLowerCase().trim().startsWith(nameLower.slice(0, 10)))
-  ) || null;
+  // 1. exact ID / uniqueId
+  let p = (idStr  && _prodById.get(idStr))  || (uidStr && _prodById.get(uidStr)) || null;
+  // 2. exact name (case-insensitive)
+  if (!p && nameLower) p = _prodByName.get(nameLower) || null;
+  // 3. prefix: product name starts with item name prefix (up to 10 chars)
+  if (!p && nameLower) p = products.find(q => q.name?.toLowerCase().trim().startsWith(nameLower.slice(0, 10))) || null;
+  // 4. first word match (most resilient for "Rexavil" ↔ "Rexavil 10ml" etc.)
+  if (!p && nameLower) {
+    const fw = nameLower.split(/\s+/)[0];
+    if (fw && fw.length > 2) p = _prodByWord.get(fw) || null;
+  }
+  // 5. item name starts with product name prefix (reverse prefix)
+  if (!p && nameLower) p = products.find(q => { const qn = (q.name||'').toLowerCase().trim(); return qn && nameLower.startsWith(qn.slice(0,10)); }) || null;
+  if (!p && nameLower) console.warn('[PrintView] No product match:', item.name, '| id:', item.productId, '| pool:', products.length);
+  return p;
 };
 const getDispatchParts = (item) => {
   if (!item) return { qty: 0, uib: 1, boxes: 0, loose: 0 };
@@ -614,7 +635,13 @@ const downloadImageFallback = (blob, fileName) => {
 };
 
 // ── Layout helpers ────────────────────────────────────────────────────────
-const safeItems = data?.items || [];
+// Enrich items: fill in missing unit/unitsInBox from product master at render time
+const safeItems = (data?.items || []).map(item => {
+  if (item.unit) return item;
+  const prod = findProduct(item);
+  if (!prod) return item;
+  return { ...item, unit: prod.unit || '', unitsInBox: item.unitsInBox || prod.unitsInBox || 1 };
+});
 const safeRows  = data?.rows  || [];
 
 const docWidth = isThermal
