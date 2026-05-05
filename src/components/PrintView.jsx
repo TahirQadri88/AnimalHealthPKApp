@@ -24,11 +24,23 @@ useEffect(() => {
 }, []);
 
 // ── Helpers ───────────────────────────────────────────────────────────────
+const findProduct = (item) => {
+  if (!item) return null;
+  const idStr = String(item.productId || '');
+  const uidStr = String(item.uniqueId || '');
+  const nameLower = (item.name || '').toLowerCase().trim();
+  return products.find(p =>
+    (idStr && String(p.id) === idStr) ||
+    (uidStr && String(p.id) === uidStr) ||
+    (nameLower && p.name?.toLowerCase().trim() === nameLower) ||
+    (nameLower && p.name?.toLowerCase().trim().startsWith(nameLower.slice(0, 10)))
+  ) || null;
+};
 const getDispatchParts = (item) => {
   if (!item) return { qty: 0, uib: 1, boxes: 0, loose: 0 };
   let uib = item.unitsInBox;
   if (!uib) {
-    const prod = products.find(p => String(p.id) === String(item.productId) || String(p.id) === String(item.uniqueId) || p.name === item.name);
+    const prod = findProduct(item);
     uib = prod ? prod.unitsInBox : 1;
   }
   uib = Number(uib) || 1;
@@ -998,7 +1010,7 @@ return (
                 <td style={{ padding: sz('6px 2px','8px 4px','9px 6px'), textAlign: docType === 'dispatch' ? 'left' : 'center', fontWeight: 600, lineHeight: sz('1.5','1.55','1.6'), color: '#334155', whiteSpace: docType === 'dispatch' ? 'normal' : 'nowrap' }}>
                   {docType === 'dispatch' ? (() => {
                     const { qty, uib, boxes, loose } = getDispatchParts(item);
-                    const rawUnit = item?.unit || products.find(p => String(p.id) === String(item?.productId) || String(p.id) === String(item?.uniqueId) || p.name === item?.name)?.unit || '';
+                    const rawUnit = item?.unit || findProduct(item)?.unit || '';
                     const unitLabel = rawUnit && isNaN(rawUnit) && String(rawUnit).trim().length > 1 ? rawUnit : '';
                     if (uib <= 1) return <span style={{ fontWeight: 800, color: '#1e293b' }}>{qty}{unitLabel && <span style={{ fontWeight: 500, color: '#64748b', fontSize: sz('7.5px','8px','8.5px'), marginLeft: '3px' }}>{unitLabel}</span>}</span>;
                     return (

@@ -1027,7 +1027,13 @@ const grandTotal = totalItems + Number(currentInvoice.deliveryBilled || 0);
 const activeCustomer = customers.find(c => c.id === currentInvoice.customerId);
 const enrichedItems = currentInvoice.items.map(item => {
   if (item.unit && item.unitsInBox) return item;
-  const prod = products.find(p => String(p.id) === String(item.productId) || String(p.id) === String(item.uniqueId) || p.name === item.name);
+  const nameLower = (item.name || '').toLowerCase().trim();
+  const prod = products.find(p =>
+    (item.productId && String(p.id) === String(item.productId)) ||
+    (item.uniqueId && String(p.id) === String(item.uniqueId)) ||
+    (nameLower && p.name?.toLowerCase().trim() === nameLower) ||
+    (nameLower && p.name?.toLowerCase().trim().startsWith(nameLower.slice(0, 10)))
+  );
   return { ...item, unit: item.unit || prod?.unit || '', unitsInBox: item.unitsInBox || prod?.unitsInBox || 1 };
 });
 const finalInvoice = { ...currentInvoice, items: enrichedItems, total: grandTotal, status: status, salespersonId: currentUser.id, salespersonName: currentUser.name, customerDetails: activeCustomer ? { contactPerson: activeCustomer.contactPerson || '', phone: activeCustomer.phone || '', address1: activeCustomer.address1 || activeCustomer.address || '', map1: activeCustomer.map1 || '', address2: activeCustomer.address2 || '', map2: activeCustomer.map2 || '' } : {} };
