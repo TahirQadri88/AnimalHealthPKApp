@@ -998,24 +998,25 @@ return (
                 <td style={{ padding: sz('6px 2px','8px 4px','9px 6px'), textAlign: docType === 'dispatch' ? 'left' : 'center', fontWeight: 600, lineHeight: sz('1.5','1.55','1.6'), color: '#334155', whiteSpace: docType === 'dispatch' ? 'normal' : 'nowrap' }}>
                   {docType === 'dispatch' ? (() => {
                     const { qty, uib, boxes, loose } = getDispatchParts(item);
-                    if (uib <= 1) return <span>{qty}</span>;
+                    const unitLabel = item?.unit && isNaN(item.unit) && String(item.unit).trim().length > 1 ? item.unit : '';
+                    if (uib <= 1) return <span style={{ fontWeight: 800, color: '#1e293b' }}>{qty}{unitLabel && <span style={{ fontWeight: 500, color: '#64748b', fontSize: sz('7.5px','8px','8.5px'), marginLeft: '3px' }}>{unitLabel}</span>}</span>;
                     return (
                       <div>
                         <div style={{ fontWeight: 800, color: '#1e293b', fontSize: sz('9.5px','10px','11px') }}>
-                          {qty} <span style={{ fontWeight: 500, color: '#64748b', fontSize: sz('7.5px','8px','8.5px') }}>{item?.unit || 'units'}</span>
+                          {qty}{unitLabel && <span style={{ fontWeight: 500, color: '#64748b', fontSize: sz('7.5px','8px','8.5px'), marginLeft: '3px' }}>{unitLabel}</span>}
                         </div>
-                        <div style={{ marginTop: '2px', display: 'flex', flexWrap: 'wrap', gap: '2px' }}>
-                          {boxes > 0 && (
+                        {boxes > 0 && (
+                          <div style={{ marginTop: '2px', display: 'flex', flexWrap: 'wrap', gap: '2px' }}>
                             <span style={{ background: '#e0f2fe', color: '#0369a1', borderRadius: '3px', padding: '1px 4px', fontWeight: 700, fontSize: sz('7px','7.5px','8px') }}>
                               {boxes} {boxes === 1 ? 'Pack' : 'Packs'}
                             </span>
-                          )}
-                          {loose > 0 && (
-                            <span style={{ background: '#fef3c7', color: '#92400e', borderRadius: '3px', padding: '1px 4px', fontWeight: 700, fontSize: sz('7px','7.5px','8px') }}>
-                              {loose} Loose
-                            </span>
-                          )}
-                        </div>
+                            {loose > 0 && (
+                              <span style={{ background: '#fef3c7', color: '#92400e', borderRadius: '3px', padding: '1px 4px', fontWeight: 700, fontSize: sz('7px','7.5px','8px') }}>
+                                {loose} Loose
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </div>
                     );
                   })() : (item?.quantity || 0)}
