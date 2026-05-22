@@ -1457,18 +1457,12 @@ const CreditNoteModal = () => {
 const { currentUser, products, customers, invoices, showToast, saveToFirebase, setShowCreditNoteModal, editingCreditNote, setEditingCreditNote, getCompanyName } = useContext(AppContext);
 const inputClass = "w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all shadow-sm text-slate-800 placeholder-slate-400";
 
-// Pre-load items from original invoice if opened via invoice Return button
-const originalInvoice = editingCreditNote?.id ? invoices.find(o => o.id === editingCreditNote.id) : null;
-const preItems = originalInvoice
-  ? originalInvoice.items.filter(i => !i.isBonus).map(i => ({ ...i, _soldQty: i.quantity, quantity: i.quantity }))
-  : [];
-
 const [form, setForm] = useState({
   customerId: editingCreditNote?.customerId || '',
   originalInvoiceId: editingCreditNote?.id || '',
   date: getLocalDateStr(),
   reason: '',
-  items: preItems,
+  items: [],
 });
 const [custSearch, setCustSearch]   = useState('');
 const [showCustDrop, setShowCustDrop] = useState(false);
