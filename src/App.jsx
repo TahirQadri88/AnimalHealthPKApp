@@ -1451,13 +1451,13 @@ Bal: Rs. {bal.toLocaleString('en-US')} {bal > 0 ? '(Dr)' : bal < 0 ? '(Cr)' : ''
 
 // ─── Credit Note Modal ───
 const CreditNoteModal = () => {
-const { isAdmin, currentUser, products, customers, invoices, showToast, saveToFirebase, setShowCreditNoteModal, editingCreditNote, setEditingCreditNote, getCompanyName } = useContext(AppContext);
+const { currentUser, products, customers, invoices, showToast, saveToFirebase, setShowCreditNoteModal, editingCreditNote, setEditingCreditNote, getCompanyName } = useContext(AppContext);
 const inputClass = "w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all shadow-sm text-slate-800 placeholder-slate-400";
 
-// If opened from a specific invoice, pre-load its items
+// Pre-load items from original invoice if opened via invoice Return button
 const originalInvoice = editingCreditNote?.id ? invoices.find(o => o.id === editingCreditNote.id) : null;
-const preloadedItems = originalInvoice
-  ? originalInvoice.items.filter(i => !i.isBonus).map(i => ({ ...i, _maxQty: i.quantity }))
+const preItems = originalInvoice
+  ? originalInvoice.items.filter(i => !i.isBonus).map(i => ({ ...i, _soldQty: i.quantity, quantity: i.quantity }))
   : [];
 
 const [form, setForm] = useState({
@@ -1465,50 +1465,65 @@ const [form, setForm] = useState({
   originalInvoiceId: editingCreditNote?.id || '',
   date: getLocalDateStr(),
   reason: '',
-  items: preloadedItems,
+  items: preItems,
 });
-const [prodSearch, setProdSearch] = useState('');
-const [historySearch, setHistorySearch] = useState('');
-const [activeTab, setActiveTab] = useState(preloadedItems.length > 0 ? 'items' : 'history');
+const [custSearch, setCustSearch]   = useState('');
+const [showCustDrop, setShowCustDrop] = useState(false);
+const [hiCust, setHiCust]           = useState(-1);
+const [prodSearch, setProdSearch]   = useState('');
+const [hiProd, setHiProd]           = useState(-1);
+const custSearchRef = useRef(null);
+const prodSearchRef = useRef(null);
+const lastQtyRef    = useRef(null);
 
 const grandTotal = form.items.reduce((s, i) => s + (i.price * i.quantity), 0);
-
-// Build purchase history for selected customer
 const custId = Number(form.customerId);
+
+// Customer's purchase history (most-recent price per product)
 const purchaseHistory = React.useMemo(() => {
   if (!custId) return [];
   const seen = new Map();
-  invoices
-    .filter(o => o.customerId === custId && (o.status === 'Billed' || o.status === 'Booked'))
-    .sort((a, b) => b.date > a.date ? 1 : -1)
+  [...invoices]
+    .filter(o => o.customerId === custId && o.status === 'Billed')
+    .sort((a, b) => (b.date > a.date ? 1 : -1))
     .forEach(inv => {
       (inv.items || []).filter(i => !i.isBonus).forEach(item => {
-        const key = String(item.productId || item.uniqueId || item.name);
-        if (!seen.has(key)) seen.set(key, { ...item, _lastInvoice: inv.id });
+        const k = String(item.productId || item.uniqueId || item.name);
+        if (!seen.has(k)) seen.set(k, { ...item, _soldQty: item.quantity, _invId: inv.id });
       });
     });
   return Array.from(seen.values());
 }, [custId, invoices]);
 
-const addItem = (item) => {
-  const key = String(item.productId || item.uniqueId || item.name);
-  const exists = form.items.find(i => String(i.productId || i.uniqueId || i.name) === key);
-  if (exists) { setForm(f => ({ ...f, items: f.items.map(i => String(i.productId || i.uniqueId || i.name) === key ? { ...i, quantity: i.quantity + 1 } : i) })); }
-  else { setForm(f => ({ ...f, items: [...f.items, { ...item, quantity: 1 }] })); }
-  setProdSearch(''); setHistorySearch('');
+const addedKeys = new Set(form.items.map(i => String(i.productId || i.uniqueId || i.name)));
+
+const itemKey = (i) => String(i.productId || i.uniqueId || i.name);
+
+const addHistoryItem = (item) => {
+  const k = itemKey(item);
+  if (addedKeys.has(k)) {
+    setForm(f => ({ ...f, items: f.items.map(i => itemKey(i) === k ? { ...i, quantity: i.quantity + 1 } : i) }));
+  } else {
+    setForm(f => ({ ...f, items: [...f.items, { ...item, quantity: 1 }] }));
+  }
+  setTimeout(() => prodSearchRef.current?.focus(), 50);
 };
 
-const addFromProduct = (p) => {
-  const key = String(p.id);
-  const exists = form.items.find(i => String(i.productId) === key);
-  if (exists) { setForm(f => ({ ...f, items: f.items.map(i => String(i.productId) === key ? { ...i, quantity: i.quantity + 1 } : i) })); }
-  else { setForm(f => ({ ...f, items: [...f.items, { productId: p.id, name: p.name, price: p.sellingPrice, costPrice: p.costPrice, company: getCompanyName(p.companyId), quantity: 1, unit: p.unit, unitsInBox: p.unitsInBox, isBonus: false }] })); }
-  setProdSearch('');
+const addProduct = (p) => {
+  const k = String(p.id);
+  if (form.items.find(i => String(i.productId) === k)) {
+    setForm(f => ({ ...f, items: f.items.map(i => String(i.productId) === k ? { ...i, quantity: i.quantity + 1 } : i) }));
+  } else {
+    setForm(f => ({ ...f, items: [...f.items, { productId: p.id, name: p.name, price: p.sellingPrice, costPrice: p.costPrice, company: getCompanyName(p.companyId), quantity: 1, unit: p.unit, unitsInBox: p.unitsInBox }] }));
+  }
+  setProdSearch(''); setHiProd(-1);
+  setTimeout(() => lastQtyRef.current?.focus(), 50);
 };
 
-const updateQty = (key, qty) => {
-  if (qty <= 0) { setForm(f => ({ ...f, items: f.items.filter(i => String(i.productId || i.uniqueId || i.name) !== key) })); }
-  else { setForm(f => ({ ...f, items: f.items.map(i => String(i.productId || i.uniqueId || i.name) === key ? { ...i, quantity: qty } : i) })); }
+const pickCustomer = (c) => {
+  setForm(f => ({ ...f, customerId: c.id, items: [] }));
+  setShowCustDrop(false); setCustSearch(''); setHiCust(-1);
+  setTimeout(() => prodSearchRef.current?.focus(), 80);
 };
 
 const save = async () => {
@@ -1520,7 +1535,7 @@ const save = async () => {
     customerId: Number(form.customerId),
     customerName: cust?.name || '',
     originalInvoiceId: form.originalInvoiceId || '',
-    items: form.items.map(({ _maxQty, _lastInvoice, ...rest }) => rest),
+    items: form.items.map(({ _soldQty, _invId, ...rest }) => rest),
     deliveryBilled: 0,
     total: grandTotal,
     reason: form.reason || '',
@@ -1531,167 +1546,213 @@ const save = async () => {
   };
   await saveToFirebase('invoices', cn.id, cn);
   showToast('Credit Note Saved!');
-  setEditingCreditNote(null);
-  setShowCreditNoteModal(false);
+  setEditingCreditNote(null); setShowCreditNoteModal(false);
 };
 
-const historyFiltered = purchaseHistory.filter(i => !historySearch || (i.name || '').toLowerCase().includes(historySearch.toLowerCase()));
-const addedKeys = new Set(form.items.map(i => String(i.productId || i.uniqueId || i.name)));
+// Filtered product list for search
+const filteredProds = prodSearch
+  ? products.filter(p => p.name.toLowerCase().includes(prodSearch.toLowerCase()))
+  : [];
+// History items filtered by search (when search active, show matching history; else show all)
+const historyList = prodSearch
+  ? purchaseHistory.filter(i => (i.name || '').toLowerCase().includes(prodSearch.toLowerCase()))
+  : purchaseHistory;
 
 return (
-<div className="h-full flex flex-col bg-slate-50 absolute inset-0 z-20 animate-slide-up">
+<div className="h-full flex flex-col bg-slate-50 absolute inset-0 z-20 animate-slide-up"
+  onKeyDown={e => { if (e.ctrlKey && e.key === 'Enter') { e.preventDefault(); save(); } }}>
+
+{/* Header */}
 <div className="bg-white/80 backdrop-blur-md p-4 border-b border-slate-200 flex justify-between items-center sticky top-0 z-30 shadow-sm">
-<div>
-  <h2 className="text-lg font-extrabold text-slate-800 tracking-tight">Sales Return / Credit Note</h2>
-  <p className="text-[10px] font-bold text-rose-500 uppercase tracking-widest">{originalInvoice ? `From ${originalInvoice.id}` : 'General Return'}</p>
+  <div>
+    <h2 className="text-lg font-extrabold text-slate-800 tracking-tight">Sales Return / Credit Note</h2>
+    <input type="date" value={form.date} onChange={e => setForm(f=>({...f,date:e.target.value}))}
+      className="text-[11px] font-bold text-slate-500 bg-transparent border-0 outline-none cursor-pointer hover:text-rose-600 mt-0.5 p-0" />
+  </div>
+  <button onClick={() => { setEditingCreditNote(null); setShowCreditNoteModal(false); }} className="p-2 bg-slate-100 rounded-full text-slate-600 hover:bg-slate-200 transition-colors"><X size={20}/></button>
 </div>
-<button onClick={() => { setEditingCreditNote(null); setShowCreditNoteModal(false); }} className="p-2 bg-slate-100 rounded-full text-slate-600 hover:bg-slate-200 transition-colors"><X size={20}/></button>
-</div>
+
 <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-32">
 
-  {/* Customer */}
+  {/* ── Customer ── */}
   <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
     <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5"><Users size={12}/> Customer</h3>
-    <SearchableSelect className={inputClass} value={form.customerId} onChange={e => { setForm(f => ({...f, customerId: e.target.value})); setActiveTab('history'); }} placeholder="— Select Customer —" options={customers.map(c=>({value:c.id,label:c.name}))} />
-  </div>
-
-  {/* Return Details */}
-  <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-    <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Return Details</h3>
-    <div className="grid grid-cols-2 gap-3 mb-3">
-      <div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Date</label><input type="date" className={inputClass} value={form.date} onChange={e => setForm(f=>({...f,date:e.target.value}))} /></div>
-      <div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Orig. Invoice</label><input placeholder="INV-XXXX (optional)" className={inputClass} value={form.originalInvoiceId} onChange={e => setForm(f=>({...f,originalInvoiceId:e.target.value}))} /></div>
-    </div>
-    <input placeholder="Reason: e.g. Expired, Wrong item, Excess stock..." className={inputClass} value={form.reason} onChange={e => setForm(f=>({...f,reason:e.target.value}))} />
-  </div>
-
-  {/* Items Panel */}
-  <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-    {/* Tab bar */}
-    <div className="flex border-b border-slate-100">
-      {[['items', `Return List (${form.items.length})`], ['history', 'Purchase History'], ['search', 'Search All']].map(([tab, label]) => (
-        <button key={tab} onClick={() => setActiveTab(tab)}
-          className={`flex-1 py-2.5 text-[10px] font-bold uppercase tracking-wider transition-colors ${activeTab===tab ? 'text-rose-600 border-b-2 border-rose-500 bg-rose-50/40' : 'text-slate-400 hover:text-slate-600'}`}>
-          {label}
-        </button>
-      ))}
-    </div>
-
-    <div className="p-4">
-      {/* Tab: Return List */}
-      {activeTab === 'items' && (
-        <div className="space-y-3">
-          {form.items.length === 0 && (
-            <p className="text-center text-slate-400 text-sm py-6 font-medium">No items added yet — use Purchase History or Search All tab</p>
+    <div className="relative">
+      <Search size={16} className="absolute left-3.5 top-3.5 text-slate-400 pointer-events-none z-10"/>
+      <input ref={custSearchRef} autoFocus={!form.customerId}
+        className={`pl-10 ${inputClass}`} placeholder="Search customer…"
+        value={showCustDrop ? custSearch : (customers.find(c => c.id === custId)?.name || '')}
+        onFocus={() => { setShowCustDrop(true); setCustSearch(''); setHiCust(-1); }}
+        onChange={e => { setCustSearch(e.target.value); setHiCust(-1); }}
+        onBlur={() => setTimeout(() => { setShowCustDrop(false); setHiCust(-1); }, 150)}
+        onKeyDown={e => {
+          const fc = customers.filter(c => !custSearch || c.name.toLowerCase().includes(custSearch.toLowerCase()));
+          if (e.key === 'ArrowDown') { e.preventDefault(); setHiCust(h => Math.min(h+1, fc.length-1)); }
+          else if (e.key === 'ArrowUp') { e.preventDefault(); setHiCust(h => Math.max(h-1, 0)); }
+          else if (e.key === 'Enter') { e.preventDefault(); if (hiCust >= 0 && fc[hiCust]) pickCustomer(fc[hiCust]); else if (fc.length === 1) pickCustomer(fc[0]); }
+          else if (e.key === 'Escape') { setShowCustDrop(false); }
+        }}
+      />
+      {showCustDrop && (
+        <div className="absolute z-50 w-full mt-1 border border-rose-200 bg-white rounded-xl max-h-52 overflow-y-auto shadow-lg">
+          {customers.filter(c => !custSearch || c.name.toLowerCase().includes(custSearch.toLowerCase())).map((c, idx) => (
+            <button type="button" key={c.id}
+              className={`w-full text-left px-4 py-2.5 text-sm font-semibold transition-colors ${c.id === custId || idx === hiCust ? 'bg-rose-50 text-rose-700' : 'text-slate-800 hover:bg-rose-50'}`}
+              onMouseDown={e => { e.preventDefault(); pickCustomer(c); }}>{c.name}</button>
+          ))}
+          {customers.filter(c => !custSearch || c.name.toLowerCase().includes(custSearch.toLowerCase())).length === 0 && (
+            <p className="px-4 py-3 text-sm text-slate-400">No customers found</p>
           )}
-          {form.items.map(item => {
-            const key = String(item.productId || item.uniqueId || item.name);
+        </div>
+      )}
+    </div>
+  </div>
+
+  {/* ── Items ── */}
+  <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+    <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+      <Package size={12}/> Returned Items
+      {form.items.length > 0 && <span className="ml-1 text-rose-600 font-bold normal-case tracking-normal">{form.items.length} SKU{form.items.length!==1?'s':''} · {form.items.reduce((s,i)=>s+(i.quantity||0),0)} units</span>}
+    </h3>
+
+    {/* Search input — shows history items when no query, all products when typing */}
+    <div className="relative mb-3">
+      <Search size={16} className="absolute left-3.5 top-3.5 text-slate-400"/>
+      <input ref={prodSearchRef}
+        placeholder={custId ? 'Search to add… (history shown below)' : 'Select a customer first…'}
+        disabled={!custId}
+        className={`pl-10 ${inputClass} ${!custId ? 'opacity-50 cursor-not-allowed' : ''}`}
+        value={prodSearch}
+        onChange={e => { setProdSearch(e.target.value); setHiProd(-1); }}
+        onKeyDown={e => {
+          // Arrow navigation over merged list: history items first (when no search), then products
+          const list = prodSearch ? filteredProds.map(p => ({ _type:'prod', p })) : historyList.slice(0,8).map(i => ({ _type:'hist', i }));
+          if (e.key === 'ArrowDown') { e.preventDefault(); setHiProd(h => Math.min(h+1, list.length-1)); }
+          else if (e.key === 'ArrowUp') { e.preventDefault(); setHiProd(h => Math.max(h-1, 0)); }
+          else if (e.key === 'Enter') {
+            e.preventDefault();
+            const entry = hiProd >= 0 ? list[hiProd] : list.length === 1 ? list[0] : null;
+            if (!entry) return;
+            if (entry._type === 'hist') addHistoryItem(entry.i);
+            else addProduct(entry.p);
+          }
+          else if (e.key === 'Escape') { setProdSearch(''); setHiProd(-1); }
+        }}
+      />
+    </div>
+
+    {/* Dropdown list: purchase history OR search results */}
+    {custId && (prodSearch ? filteredProds.length > 0 : historyList.length > 0) && (
+      <div className="border border-rose-200 bg-rose-50/30 rounded-xl mb-4 max-h-56 overflow-y-auto p-2 space-y-1 shadow-inner">
+        {prodSearch ? (
+          // Search results from all products
+          filteredProds.map((p, idx) => {
+            const inList = form.items.some(i => String(i.productId) === String(p.id));
             return (
-              <div key={key} className="bg-slate-50 p-3 rounded-xl border border-slate-200 shadow-sm">
-                <div className="flex justify-between items-start mb-2">
-                  <div>
-                    <p className="font-bold text-sm text-slate-800 leading-tight">{item.name}</p>
-                    {item._maxQty && <p className="text-[10px] text-slate-400 mt-0.5">Sold: {item._maxQty} {item.unit || ''}</p>}
-                    {item._lastInvoice && !item._maxQty && <p className="text-[10px] text-slate-400 mt-0.5">Last: {item._lastInvoice}</p>}
-                  </div>
-                  <button onClick={() => setForm(f=>({...f, items: f.items.filter(i => String(i.productId||i.uniqueId||i.name) !== key)}))} className="text-slate-300 hover:text-rose-500 transition-colors"><X size={16}/></button>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex flex-col">
-                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5 ml-1">Rate (Rs)</label>
-                    <input type="number" className="w-24 p-1.5 text-sm font-extrabold text-rose-700 bg-white border border-rose-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-500 shadow-inner" value={item.price}
-                      onChange={e => setForm(f=>({...f, items: f.items.map(i => String(i.productId||i.uniqueId||i.name)===key ? {...i, price: Number(e.target.value)} : i)}))} />
-                  </div>
-                  <div className="flex flex-col items-center">
-                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Qty</label>
-                    <div className="flex items-center bg-white border border-slate-200 rounded-lg p-0.5 shadow-sm">
-                      <button onClick={() => updateQty(key, item.quantity - 1)} className="w-8 h-8 rounded-md bg-slate-50 text-slate-600 font-bold hover:bg-slate-100">-</button>
-                      <input type="number" className="w-12 text-center text-sm font-bold bg-transparent outline-none appearance-none" value={item.quantity}
-                        onChange={e => updateQty(key, Number(e.target.value))} />
-                      <button onClick={() => updateQty(key, item.quantity + 1)} className="w-8 h-8 rounded-md bg-rose-50 text-rose-600 font-bold hover:bg-rose-100">+</button>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-[9px] text-slate-400 font-bold uppercase">Subtotal</p>
-                    <p className="font-extrabold text-rose-700 text-sm">Rs.{(item.price * item.quantity).toLocaleString('en-US')}</p>
-                  </div>
-                </div>
+              <div key={p.id} className={`p-2 rounded-lg border flex items-center justify-between ${idx === hiProd ? 'bg-rose-100 border-rose-300' : 'bg-white border-rose-100'}`}>
+                <button type="button" className="flex-1 text-left font-semibold text-sm text-slate-800 hover:text-rose-700" onClick={() => addProduct(p)}>
+                  {p.name}
+                  <span className="ml-2 text-[10px] font-bold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded">Rs.{p.sellingPrice}</span>
+                </button>
+                {inList && <span className="text-[10px] font-bold text-rose-500 ml-2">✓</span>}
               </div>
             );
-          })}
-        </div>
-      )}
-
-      {/* Tab: Purchase History */}
-      {activeTab === 'history' && (
-        <div>
-          {!custId ? (
-            <p className="text-center text-slate-400 text-sm py-6">Select a customer first to see their purchase history</p>
-          ) : purchaseHistory.length === 0 ? (
-            <p className="text-center text-slate-400 text-sm py-6">No purchase history found for this customer</p>
-          ) : (
-            <>
-              <div className="relative mb-3"><Search size={14} className="absolute left-3 top-3 text-slate-400"/><input placeholder="Filter items..." className="w-full pl-8 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-rose-400" value={historySearch} onChange={e=>setHistorySearch(e.target.value)} /></div>
-              <div className="space-y-2 max-h-80 overflow-y-auto">
-                {historyFiltered.map((item, idx) => {
-                  const key = String(item.productId || item.uniqueId || item.name);
-                  const inList = addedKeys.has(key);
-                  return (
-                    <button key={idx} onClick={() => addItem(item)}
-                      className={`w-full p-2.5 rounded-xl border flex items-center justify-between transition-colors text-left ${inList ? 'bg-rose-50 border-rose-200' : 'bg-white border-slate-200 hover:bg-rose-50 hover:border-rose-200'}`}>
-                      <div>
-                        <p className="font-semibold text-sm text-slate-800">{item.name}</p>
-                        <p className="text-[10px] text-slate-400">{item._lastInvoice} · Rs.{item.price}</p>
-                      </div>
-                      <span className={`text-xs font-bold px-2 py-1 rounded-lg ${inList ? 'bg-rose-100 text-rose-600' : 'bg-slate-100 text-slate-500'}`}>{inList ? '✓ Added' : '+ Add'}</span>
-                    </button>
-                  );
-                })}
+          })
+        ) : (
+          // Purchase history items (no search active)
+          historyList.map((item, idx) => {
+            const k = itemKey(item);
+            const inList = addedKeys.has(k);
+            return (
+              <div key={k} className={`p-2 rounded-lg border flex items-center justify-between gap-2 ${idx === hiProd ? 'bg-rose-100 border-rose-300' : 'bg-white border-rose-100'}`}>
+                <button type="button" className="flex-1 text-left" onClick={() => addHistoryItem(item)}>
+                  <span className="font-semibold text-sm text-slate-800">{item.name}</span>
+                  <span className="ml-2 text-[10px] font-bold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded">Rs.{item.price}</span>
+                  <span className="ml-1 text-[10px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">×{item._soldQty || item.quantity}</span>
+                  {item._invId && <span className="ml-1 text-[10px] text-slate-400">{item._invId}</span>}
+                </button>
+                {inList && <span className="text-[10px] font-bold text-rose-500 shrink-0">✓ Added</span>}
               </div>
-            </>
-          )}
-        </div>
-      )}
+            );
+          })
+        )}
+        {prodSearch && filteredProds.length === 0 && (
+          <p className="text-center text-slate-400 text-sm py-3">No products found</p>
+        )}
+      </div>
+    )}
+    {custId && !prodSearch && historyList.length === 0 && (
+      <p className="text-sm text-slate-400 text-center py-3 mb-3">No purchase history — type to search all products</p>
+    )}
 
-      {/* Tab: Search All Products */}
-      {activeTab === 'search' && (
-        <div>
-          <div className="relative mb-3"><Search size={14} className="absolute left-3 top-3 text-slate-400"/><input autoFocus placeholder="Search any product..." className="w-full pl-8 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-rose-400" value={prodSearch} onChange={e=>setProdSearch(e.target.value)} /></div>
-          {prodSearch && (
-            <div className="space-y-2 max-h-80 overflow-y-auto">
-              {products.filter(p => p.name.toLowerCase().includes(prodSearch.toLowerCase())).map(p => {
-                const inList = addedKeys.has(String(p.id));
-                return (
-                  <button key={p.id} onClick={() => addFromProduct(p)}
-                    className={`w-full p-2.5 rounded-xl border flex items-center justify-between transition-colors text-left ${inList ? 'bg-rose-50 border-rose-200' : 'bg-white border-slate-200 hover:bg-rose-50 hover:border-rose-200'}`}>
-                    <span className="font-semibold text-sm text-slate-800">{p.name}</span>
-                    <span className={`text-xs font-bold px-2 py-1 rounded-lg ${inList ? 'bg-rose-100 text-rose-600' : 'bg-slate-100 text-slate-500'}`}>{inList ? '✓ Added' : `Rs.${p.sellingPrice}`}</span>
-                  </button>
-                );
-              })}
-              {products.filter(p => p.name.toLowerCase().includes(prodSearch.toLowerCase())).length === 0 && (
-                <p className="text-center text-slate-400 text-sm py-4">No products found</p>
-              )}
+    {/* Added return items */}
+    <div className="space-y-3">
+      {form.items.map((item, idx) => {
+        const k = itemKey(item);
+        return (
+          <div key={k} data-item-row="1" className="bg-slate-50 p-3 rounded-xl border border-slate-200 shadow-sm">
+            <div className="flex justify-between items-start mb-2">
+              <div>
+                <p className="font-bold text-sm text-slate-800 leading-tight">{item.name}</p>
+                {item._soldQty && <span className="text-[10px] text-slate-400">Sold: ×{item._soldQty}</span>}
+              </div>
+              <button tabIndex={-1} onClick={() => setForm(f=>({...f, items: f.items.filter(i => itemKey(i) !== k)}))} className="text-slate-300 hover:text-rose-500 transition-colors"><X size={16}/></button>
             </div>
-          )}
-          {!prodSearch && <p className="text-center text-slate-400 text-sm py-6">Type to search products</p>}
-        </div>
-      )}
+            <div className="flex items-center justify-between">
+              <div className="flex flex-col">
+                <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5 ml-1">Rate (Rs)</label>
+                <input type="number" data-item-rate="1"
+                  className="w-24 p-1.5 text-sm font-extrabold text-rose-700 bg-white border border-rose-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-500 shadow-inner"
+                  value={item.price}
+                  onChange={e => setForm(f=>({...f, items: f.items.map(i => itemKey(i)===k ? {...i, price: Number(e.target.value)} : i)}))}
+                  onKeyDown={e => { if (e.key==='Enter') { e.preventDefault(); const q = e.target.closest('[data-item-row]')?.querySelector('[data-item-qty]'); q?.focus(); q?.select(); } }} />
+              </div>
+              <div className="flex flex-col items-center">
+                <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Qty</label>
+                <div className="flex items-center bg-white border border-slate-200 rounded-lg p-0.5 shadow-sm">
+                  <button tabIndex={-1} onClick={() => setForm(f=>({...f, items: f.items.map(i => itemKey(i)===k ? {...i, quantity: i.quantity-1} : i).filter(i=>i.quantity>0)}))} className="w-8 h-8 rounded-md bg-slate-50 text-slate-600 font-bold hover:bg-slate-100">-</button>
+                  <input data-item-qty="1" type="number" ref={idx === form.items.length-1 ? lastQtyRef : null}
+                    className="w-12 text-center text-sm font-bold bg-transparent outline-none appearance-none"
+                    value={item.quantity}
+                    onChange={e => setForm(f=>({...f, items: f.items.map(i => itemKey(i)===k ? {...i, quantity: Number(e.target.value)||1} : i)}))}
+                    onKeyDown={e => { if (e.key==='Enter') { e.preventDefault(); prodSearchRef.current?.focus(); } }} />
+                  <button tabIndex={-1} onClick={() => setForm(f=>({...f, items: f.items.map(i => itemKey(i)===k ? {...i, quantity: i.quantity+1} : i)}))} className="w-8 h-8 rounded-md bg-rose-50 text-rose-600 font-bold hover:bg-rose-100">+</button>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-[9px] text-slate-400 font-bold uppercase">Subtotal</p>
+                <p className="font-extrabold text-rose-700 text-sm">Rs.{(item.price * item.quantity).toLocaleString('en-US')}</p>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+      {form.items.length === 0 && custId && <p className="text-center text-slate-400 text-sm py-2">Pick items from the list above to return</p>}
     </div>
   </div>
 
-  {/* Total */}
+  {/* ── Return details (reason + invoice ref) ── */}
+  <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+    <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Return Reason &amp; Reference</h3>
+    <div className="grid grid-cols-2 gap-3">
+      <div className="col-span-2"><input placeholder="Reason: Expired, Wrong item, Excess stock…" className={inputClass} value={form.reason} onChange={e=>setForm(f=>({...f,reason:e.target.value}))} /></div>
+      <div className="col-span-2"><input placeholder="Original Invoice (optional): INV-XXXX" className={inputClass} value={form.originalInvoiceId} onChange={e=>setForm(f=>({...f,originalInvoiceId:e.target.value}))} /></div>
+    </div>
+  </div>
+
+  {/* ── Total ── */}
   {form.items.length > 0 && (
     <div className="bg-gradient-to-br from-rose-50 to-pink-50 p-5 rounded-2xl border border-rose-100 text-center shadow-sm">
-      <p className="text-rose-600 font-bold uppercase text-[10px] tracking-widest mb-1">{form.items.length} item{form.items.length!==1?'s':''} · Total Credit</p>
+      <p className="text-rose-600 font-bold uppercase text-[10px] tracking-widest mb-1">{form.items.length} SKU{form.items.length!==1?'s':''} · Total Credit</p>
       <p className="text-4xl font-black text-rose-800 tracking-tight">Rs. {grandTotal.toLocaleString('en-US')}</p>
     </div>
   )}
 </div>
 
+{/* Footer */}
 <div className="p-4 bg-white/80 backdrop-blur-md border-t border-slate-200 fixed bottom-0 w-full max-w-md flex gap-3 z-30">
   <button onClick={() => { setEditingCreditNote(null); setShowCreditNoteModal(false); }} className="flex-1 bg-white text-slate-700 border border-slate-300 py-3.5 rounded-xl font-bold shadow-sm flex justify-center items-center gap-2"><X size={18}/> Cancel</button>
-  <button onClick={save} className="flex-[2] bg-rose-600 hover:bg-rose-700 text-white py-3.5 rounded-xl font-bold shadow-md flex justify-center items-center gap-2 active:scale-95 transition-all"><RotateCcw size={18}/> Save Credit Note</button>
+  <button onClick={save} className="flex-[2] bg-rose-600 hover:bg-rose-700 text-white py-3.5 rounded-xl font-bold shadow-md flex justify-center items-center gap-2 active:scale-95 transition-all"><RotateCcw size={18}/> Save · Ctrl+↵</button>
 </div>
 </div>
 );
