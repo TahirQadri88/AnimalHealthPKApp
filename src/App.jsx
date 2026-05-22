@@ -2606,11 +2606,13 @@ const reportEngine = useMemo(() => {
   // Credit Note impact — subtract returned values from all metrics (after monthlyData is built)
   const creditNotes = invoices.filter(o => o.status === 'CreditNote' && checkCustomFilter(o.date) && (filterCustomers.size === 0 || filterCustomers.has(String(o.customerId))) && (filterSalespersons.size === 0 || filterSalespersons.has(String(o.salespersonId))));
   creditNotes.forEach(cn => {
+    let cnRev = 0, cnCost = 0;
     (cn.items || []).forEach(item => {
       if (item.isBonus) return;
       const rev = (item.price || 0) * (item.quantity || 0);
       const cost = (item.costPrice || 0) * (item.quantity || 0);
       const gp = rev - cost;
+      cnRev += rev; cnCost += cost;
       kpis.productRevenue -= rev; kpis.totalCOGS -= cost; kpis.grossMargin -= gp;
       kpis.netProfit -= gp;
       const pKey = item.name;
@@ -2618,12 +2620,30 @@ const reportEngine = useMemo(() => {
       byProduct[pKey].qty -= (item.quantity || 0); byProduct[pKey].revenue -= rev; byProduct[pKey].cost -= cost; byProduct[pKey].profit -= gp;
       const cmpKey = item.company || 'Unknown';
       if (!byCompany[cmpKey]) byCompany[cmpKey] = { qty: 0, revenue: 0, cost: 0, profit: 0 };
-      byCompany[cmpKey].revenue -= rev; byCompany[cmpKey].profit -= gp;
+      byCompany[cmpKey].revenue -= rev; byCompany[cmpKey].cost -= cost; byCompany[cmpKey].profit -= gp;
     });
+    const cnGP = cnRev - cnCost;
+    // Customer breakdown
     if (!byCustomer[cn.customerName]) byCustomer[cn.customerName] = { productRevenue: 0, cost: 0, profit: 0, orders: 0 };
-    byCustomer[cn.customerName].productRevenue -= cn.total; byCustomer[cn.customerName].profit -= cn.total;
+    byCustomer[cn.customerName].productRevenue -= cnRev;
+    byCustomer[cn.customerName].cost -= cnCost;
+    byCustomer[cn.customerName].profit -= cnGP;
+    // Salesperson breakdown
+    const cnSp = cn.salespersonName || 'Unknown';
+    if (!bySalesperson[cnSp]) bySalesperson[cnSp] = { revenue: 0, profit: 0, orders: 0 };
+    bySalesperson[cnSp].revenue -= cnRev; bySalesperson[cnSp].profit -= cnGP;
+    // Segment breakdowns
+    const cnSeg = custSegment[cn.customerName] || {};
+    ['city', 'area', 'type'].forEach(k => {
+      const val = cnSeg[k] || 'Unknown';
+      const map = k === 'city' ? byCity : k === 'area' ? byArea : byType;
+      if (map[val]) { map[val].revenue -= cnRev; map[val].profit -= cnGP; }
+    });
+    // Monthly trend
     const month = cn.date.slice(0, 7);
-    if (monthlyData[month]) { monthlyData[month].revenue -= cn.total; monthlyData[month].profit -= cn.total; }
+    if (monthlyData[month]) { monthlyData[month].revenue -= cnRev; monthlyData[month].cost -= cnCost; monthlyData[month].profit -= cnGP; }
+    // Daily breakdown
+    if (dailyBreakdown[cn.date]) { dailyBreakdown[cn.date].revenue -= cnRev; dailyBreakdown[cn.date].profit -= cnGP; }
   });
   kpis.creditNotesCount = creditNotes.length;
   kpis.creditNotesTotal = creditNotes.reduce((s, cn) => s + cn.total, 0);
@@ -3084,7 +3104,8 @@ return (
            <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white p-6 rounded-3xl shadow-xl border border-slate-800">
               <p className="text-[10px] uppercase font-bold text-slate-400 mb-5 tracking-widest flex justify-between"><span>P&L Dashboard</span><span className="text-indigo-300">{filterLabel}</span></p>
               <div className="space-y-3.5">
-                <div className="flex justify-between items-center text-sm font-medium"><span className="text-slate-300">Gross Product Sales</span><span className="font-bold text-white">Rs.{reportEngine.kpis.productRevenue.toLocaleString('en-US')}</span></div>
+                <div className="flex justify-between items-center text-sm font-medium"><span className="text-slate-300">Gross Product Sales</span><span className="font-bold text-white">Rs.{(reportEngine.kpis.productRevenue + reportEngine.kpis.creditNotesTotal).toLocaleString('en-US')}</span></div>
+                {reportEngine.kpis.creditNotesTotal > 0 && <div className="flex justify-between items-center text-xs"><span className="text-rose-300">Sales Returns ({reportEngine.kpis.creditNotesCount})</span><span className="font-bold text-rose-300">− Rs.{reportEngine.kpis.creditNotesTotal.toLocaleString('en-US')}</span></div>}
                 <div className="flex justify-between items-center text-sm font-medium"><span className="text-rose-300">Total COGS</span><span className="font-bold text-rose-300">- Rs.{reportEngine.kpis.totalCOGS.toLocaleString('en-US')}</span></div>
                 <div className="flex justify-between items-center text-sm font-medium"><span className="text-indigo-300">Product Margin</span><span className="font-bold text-indigo-300">Rs.{reportEngine.kpis.grossMargin.toLocaleString('en-US')}</span></div>
                 <div className="h-px bg-slate-700"></div>
