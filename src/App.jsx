@@ -303,18 +303,20 @@ const { selectedCustomerForPayment, customers, payments, getCustomerBalance, sav
 const isEdit = !!editingPayment;
 const [form, setForm] = useState(
   isEdit
-    ? { customerId: editingPayment.customerId, amount: editingPayment.amount, date: editingPayment.date, note: editingPayment.note || 'Cash Payment' }
-    : { customerId: selectedCustomerForPayment || '', amount: '', date: getLocalDateStr(), note: 'Cash Payment' }
+    ? { customerId: editingPayment.customerId, amount: editingPayment.amount, discount: editingPayment.discount || 0, date: editingPayment.date, note: editingPayment.note || 'Cash Payment' }
+    : { customerId: selectedCustomerForPayment || '', amount: '', discount: 0, date: getLocalDateStr(), note: 'Cash Payment' }
 );
 const handleClose = () => { setEditingPayment(null); setShowPaymentModal(false); };
+const discount = Number(form.discount) || 0;
+const totalCredit = (Number(form.amount) || 0) + discount;
 const save = async () => {
 if(!form.customerId || !form.amount) return showToast("Customer and Amount are required", "error");
 if (isEdit) {
-  const updated = { ...editingPayment, customerId: Number(form.customerId), amount: Number(form.amount), date: form.date, note: form.note };
+  const updated = { ...editingPayment, customerId: Number(form.customerId), amount: Number(form.amount), discount, date: form.date, note: form.note };
   await saveToFirebase('payments', updated.id, updated);
   showToast("Payment Receipt Updated!");
 } else {
-  const newPayment = { id: `REC-${String(getNextSeqNum(payments, 'REC')).padStart(4, '0')}`, customerId: Number(form.customerId), amount: Number(form.amount), date: form.date, note: form.note };
+  const newPayment = { id: `REC-${String(getNextSeqNum(payments, 'REC')).padStart(4, '0')}`, customerId: Number(form.customerId), amount: Number(form.amount), discount, date: form.date, note: form.note };
   await saveToFirebase('payments', newPayment.id, newPayment);
   showToast("Payment Received & Ledger Updated!");
 }
@@ -330,7 +332,12 @@ return (
 )}</div>
 {form.customerId && (<div className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-center"><p className="text-[10px] uppercase font-bold text-slate-500 tracking-widest">Current Outstanding Balance</p><p className="text-xl font-black text-rose-600 mt-1">Rs. {getCustomerBalance(Number(form.customerId)).toLocaleString('en-US')}</p></div>)}
 <div className="grid grid-cols-2 gap-3">
-<div className="col-span-2"><label className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider ml-1 mb-1 block">Amount Received (Cr)</label><input type="number" placeholder="0.00" className={`${inputClass} !border-emerald-200 !text-emerald-700 !font-extrabold text-lg`} value={form.amount} onChange={e=>setForm({...form, amount: e.target.value})} /></div>
+<div className="col-span-2"><label className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider ml-1 mb-1 block">Amount Received (Cash / Cheque)</label><input type="number" placeholder="0.00" className={`${inputClass} !border-emerald-200 !text-emerald-700 !font-extrabold text-lg`} value={form.amount} onChange={e=>setForm({...form, amount: e.target.value})} /></div>
+<div><label className="text-[10px] font-bold text-amber-600 uppercase tracking-wider ml-1 mb-1 block">Round-off Discount</label><input type="number" placeholder="0" className={`${inputClass} !border-amber-200 !text-amber-700 !font-bold`} value={form.discount || ''} onChange={e=>setForm({...form, discount: Number(e.target.value)||0})} /></div>
+<div className="bg-amber-50 border border-amber-100 rounded-xl p-3 flex flex-col justify-center">
+  <p className="text-[10px] font-bold text-amber-600 uppercase tracking-widest">Total Credit</p>
+  <p className="text-lg font-black text-amber-800">Rs. {totalCredit.toLocaleString('en-US')}</p>
+</div>
 <div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Date</label><input type="date" className={inputClass} value={form.date} onChange={e=>setForm({...form, date: e.target.value})} /></div>
 <div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Mode / Note</label><input type="text" placeholder="e.g. Cash / Cheque No." className={inputClass} value={form.note} onChange={e=>setForm({...form, note: e.target.value})} /></div>
 </div>
@@ -1008,7 +1015,7 @@ const pickCustomer = (c) => {
   setTimeout(() => prodSearchRef.current?.focus(), 80);
 };
 const startNewInvoice = () => {
-setCurrentInvoice({ id: null, customerId: '', customerName: '', customerDetails: {}, items: [], deliveryBilled: 0, transportExpense: 0, vehicle: VEHICLES[0], paymentStatus: 'Pending', receivedAmount: 0, transportCompany: '', biltyNumber: '', driverName: '', driverPhone: '', riderId: '', deliveryAddressKey: 'address1', notes: '' });
+setCurrentInvoice({ id: null, customerId: '', customerName: '', customerDetails: {}, items: [], deliveryBilled: 0, transportExpense: 0, discount: 0, vehicle: VEHICLES[0], paymentStatus: 'Pending', receivedAmount: 0, transportCompany: '', biltyNumber: '', driverName: '', driverPhone: '', riderId: '', deliveryAddressKey: 'address1', notes: '' });
 setCustomerSearch(''); setShowCustomerDrop(false);
 setRiderSearch(''); setShowRiderDrop(false);
 setBillingView('form');
@@ -1023,7 +1030,7 @@ useEffect(() => {
 const saveInvoice = async (status) => {
 if(!currentInvoice.customerId || currentInvoice.items.length === 0) return showToast("Customer and items are required", "error");
 const totalItems = currentInvoice.items.reduce((sum, i) => sum + (i.isBonus ? 0 : i.price * i.quantity), 0);
-const grandTotal = totalItems + Number(currentInvoice.deliveryBilled || 0);
+const grandTotal = totalItems + Number(currentInvoice.deliveryBilled || 0) - Number(currentInvoice.discount || 0);
 const activeCustomer = customers.find(c => c.id === currentInvoice.customerId);
 const enrichedItems = currentInvoice.items.map(item => {
   if (item.unit && item.unitsInBox) return item;
@@ -1068,7 +1075,7 @@ setProdSearch('');
 if (billingView === 'form') {
 const isEdit = !!currentInvoice.id;
 const editingStatus = currentInvoice.status || '';
-const grandTotal = currentInvoice.items.reduce((s,i)=>s+(i.isBonus?0:i.price*i.quantity),0) + Number(currentInvoice.deliveryBilled||0);
+const grandTotal = currentInvoice.items.reduce((s,i)=>s+(i.isBonus?0:i.price*i.quantity),0) + Number(currentInvoice.deliveryBilled||0) - Number(currentInvoice.discount||0);
 const formTypeLabel = isEdit
   ? (editingStatus === 'Estimate' ? 'Edit Estimate' : editingStatus === 'Booked' ? 'Edit Draft Order' : editingStatus === 'CreditNote' ? 'Credit Note' : `Edit Invoice`)
   : (statusFilter === 'Estimate' ? 'New Estimate / Quotation' : statusFilter === 'Booked' ? 'New Draft Order' : 'New Invoice');
@@ -1253,9 +1260,10 @@ return (
 <div className="col-span-2 sm:col-span-1"><label className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider ml-1 mb-1 block">Driver Phone</label><input placeholder="03XX..." className={`${inputClass} !bg-white !border-indigo-200`} value={currentInvoice.driverPhone || ''} onChange={e => setCurrentInvoice({...currentInvoice, driverPhone: e.target.value})} /></div>
 </div>
 )}
-<div className="grid grid-cols-2 gap-3 mb-2">
-<div><label className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider ml-1 mb-1 block">Delivery Billed (+)</label><input type="number" className={inputClass} value={currentInvoice.deliveryBilled} onChange={e => setCurrentInvoice({...currentInvoice, deliveryBilled: e.target.value})} /></div>
+<div className="grid grid-cols-3 gap-2 mb-2">
+<div><label className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider ml-1 mb-1 block">Delivery (+)</label><input type="number" className={inputClass} value={currentInvoice.deliveryBilled} onChange={e => setCurrentInvoice({...currentInvoice, deliveryBilled: e.target.value})} /></div>
 <div><label className="text-[10px] font-bold text-rose-500 uppercase tracking-wider ml-1 mb-1 block">Driver Exp (-)</label><input type="number" className={inputClass} value={currentInvoice.transportExpense} onChange={e => setCurrentInvoice({...currentInvoice, transportExpense: e.target.value})} /></div>
+<div><label className="text-[10px] font-bold text-amber-600 uppercase tracking-wider ml-1 mb-1 block">Discount (-)</label><input type="number" className={inputClass} value={currentInvoice.discount || ''} placeholder="0" onChange={e => setCurrentInvoice({...currentInvoice, discount: Number(e.target.value) || 0})} /></div>
 </div>
 <div className="mt-4 bg-slate-50 p-3 rounded-xl border border-slate-200">
 <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 block mb-2">Payment Received</label>
@@ -3744,7 +3752,9 @@ const cnLines = (cn.items || []).map(i => ({ name: i.name, qty: i.quantity, pric
 entries.push({ id: cn.id, date: cn.date, ref: cn.originalInvoiceId ? `Ref: ${cn.originalInvoiceId}` : cn.id, desc: `Credit Note / Sales Return${cn.reason ? ` \u2014 ${cn.reason}` : ''}`, debit: 0, credit: cn.total, lineItems: cnLines, isCreditNote: true, timestamp: new Date(cn.date).getTime() + 3 });
 });
 payments.filter(p => p.customerId === customerId).forEach(pay => {
-entries.push({ id: pay.id, date: pay.date, ref: pay.id, desc: pay.note || 'Payment Received', debit: 0, credit: Number(pay.amount), timestamp: new Date(pay.date).getTime() + 2 });
+const payDiscount = Number(pay.discount || 0);
+  const payDesc = (pay.note || 'Payment Received') + (payDiscount > 0 ? ` + Discount Rs.${payDiscount.toLocaleString('en-US')}` : '');
+  entries.push({ id: pay.id, date: pay.date, ref: pay.id, desc: payDesc, debit: 0, credit: Number(pay.amount) + payDiscount, discount: payDiscount, timestamp: new Date(pay.date).getTime() + 2 });
 });
 entries.sort((a, b) => a.timestamp === b.timestamp ? a.id.localeCompare(b.id) : a.timestamp - b.timestamp);
 let runningBal = openingBal;
@@ -3773,11 +3783,15 @@ const isInvoicePayment = row.id.endsWith('-PAY');
 const actualId = isInvoicePayment ? row.ref : row.id;
 const entryIndex = ledger.rows.findIndex(r => r.id === row.id);
 const prevBalance = entryIndex > 0 ? ledger.rows[entryIndex - 1].balance : ledger.openingBal;
+const payDiscount = row.discount || 0;
+const amountReceived = row.credit - payDiscount;
 return {
 id: actualId,
 date: row.date,
 customerName: ledger.customerName,
-receivedAmount: row.credit,
+receivedAmount: amountReceived,
+discount: payDiscount,
+totalCredit: row.credit,
 prevBalance: prevBalance,
 newBalance: row.balance,
 note: row.desc
@@ -3916,7 +3930,7 @@ return (
       <h2 className="text-base font-bold text-slate-800 capitalize">{TABS.find(t=>t.id===activeTab)?.label || ''}</h2>
       <div className="flex items-center gap-3">
         {activeTab === 'billing' && billingView === 'list' && (
-          <button onClick={() => { setCurrentInvoice({ id: null, customerId: '', customerName: '', customerDetails: {}, items: [], deliveryBilled: 0, transportExpense: 0, vehicle: VEHICLES[0], paymentStatus: 'Pending', receivedAmount: 0, transportCompany: '', biltyNumber: '', driverName: '', driverPhone: '', riderId: '', deliveryAddressKey: 'address1', notes: '' }); setBillingView('form'); }} className="flex items-center gap-1.5 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700 transition-colors shadow-sm"><Plus size={16}/> New Invoice <kbd className="ml-1 text-[9px] bg-indigo-500 px-1.5 py-0.5 rounded font-mono">Alt+B</kbd></button>
+          <button onClick={() => { setCurrentInvoice({ id: null, customerId: '', customerName: '', customerDetails: {}, items: [], deliveryBilled: 0, transportExpense: 0, discount: 0, vehicle: VEHICLES[0], paymentStatus: 'Pending', receivedAmount: 0, transportCompany: '', biltyNumber: '', driverName: '', driverPhone: '', riderId: '', deliveryAddressKey: 'address1', notes: '' }); setBillingView('form'); }} className="flex items-center gap-1.5 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700 transition-colors shadow-sm"><Plus size={16}/> New Invoice <kbd className="ml-1 text-[9px] bg-indigo-500 px-1.5 py-0.5 rounded font-mono">Alt+B</kbd></button>
         )}
         {activeTab === 'customers' && (
           <button onClick={() => { setSelectedCustomerForPayment(null); setShowPaymentModal(true); }} className="flex items-center gap-1.5 bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-emerald-600 transition-colors shadow-sm"><Wallet size={16}/> Receive Payment</button>

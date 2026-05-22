@@ -1172,13 +1172,15 @@ return (
         {docType === 'invoice' && data && (() => {
           const { prevBalance, received, netBalance } = getInvoiceLedger();
           const totalSavings = safeItems.reduce((s, i) => s + (i?.isBonus ? (i?.originalPrice || 0) * (i?.quantity || 0) : 0), 0);
-          const itemsSubtotal = (data.total || 0) - (data.deliveryBilled || 0);
+          const invoiceDiscount = Number(data.discount || 0);
+          const itemsSubtotal = (data.total || 0) - (data.deliveryBilled || 0) + invoiceDiscount;
 
           return (
             <div className="keep-together" style={{ marginLeft: 'auto', width: isThermal ? '100%' : sz('','240px','280px'), borderTop: '2px solid #1e293b', paddingTop: sz('8px','10px','12px') }}>
               {[
                 { label: 'Items Subtotal', val: `Rs. ${itemsSubtotal.toLocaleString('en-US')}` },
                 (data.deliveryBilled || 0) > 0 && { label: `Delivery (${data.vehicle || ''})`, val: `Rs. ${Number(data.deliveryBilled).toLocaleString('en-US')}`, muted: true },
+                invoiceDiscount > 0 && { label: 'Discount', val: `− Rs. ${invoiceDiscount.toLocaleString('en-US')}`, color: '#d97706' },
                 { label: 'Current Bill', val: `Rs. ${(data.total || 0).toLocaleString('en-US')}`, bold: true, large: true, divider: true },
                 showPrevBal && { label: 'Previous Balance', val: `Rs. ${prevBalance.toLocaleString('en-US')}`, top: true },
                 showPrevBal && { label: 'Subtotal', val: `Rs. ${(prevBalance + (data.total || 0)).toLocaleString('en-US')}`, bold: true },
@@ -1291,6 +1293,11 @@ return (
           <div style={{ fontSize: sz('26px','32px','40px'), fontWeight: 900, color: '#059669', marginTop: sz('4px','6px','8px'), lineHeight: 1.3, fontVariantNumeric: 'tabular-nums' }}>
             Rs. {(data.receivedAmount || 0).toLocaleString('en-US')}
           </div>
+          {(data.discount || 0) > 0 && (
+            <div style={{ marginTop: sz('4px','6px','8px'), fontSize: sz('8px','9px','10px'), fontWeight: 700, color: '#92400e', background: '#fef3c7', borderRadius: '6px', padding: sz('3px 8px','4px 10px','5px 12px'), display: 'inline-block' }}>
+              + Round-off Discount: Rs. {Number(data.discount).toLocaleString('en-US')}
+            </div>
+          )}
           {data.note && (
             <div style={{ marginTop: sz('6px','8px','10px'), fontSize: sz('9px','10px','11px'), fontWeight: 700, color: '#15803d', lineHeight: 1.4 }}>
               {data.note}
@@ -1300,9 +1307,11 @@ return (
         <div style={{ borderTop: '2px solid #1e293b', paddingTop: sz('10px','14px','16px') }}>
           {[
             { label: 'Previous Balance', val: `Rs. ${(data.prevBalance || 0).toLocaleString('en-US')}`, color: '#64748b' },
-            { label: 'Amount Credited', val: `− Rs. ${(data.receivedAmount || 0).toLocaleString('en-US')}`, color: '#059669' },
-          ].map((r, i) => (
-            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: sz('5px','7px','8px'), fontWeight: 600, fontSize: sz('10px','11px','12px'), color: r.color }}>
+            { label: 'Cash / Cheque Received', val: `− Rs. ${(data.receivedAmount || 0).toLocaleString('en-US')}`, color: '#059669' },
+            (data.discount || 0) > 0 && { label: 'Round-off Discount', val: `− Rs. ${Number(data.discount).toLocaleString('en-US')}`, color: '#d97706' },
+            (data.discount || 0) > 0 && { label: 'Total Credited', val: `− Rs. ${(data.totalCredit || data.receivedAmount || 0).toLocaleString('en-US')}`, color: '#059669', bold: true },
+          ].filter(Boolean).map((r, i) => (
+            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: sz('5px','7px','8px'), fontWeight: r.bold ? 800 : 600, fontSize: sz('10px','11px','12px'), color: r.color }}>
               <span>{r.label}:</span><span>{r.val}</span>
             </div>
           ))}
