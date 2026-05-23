@@ -436,6 +436,8 @@ return (
 {row.debit > 0 && !row.isCreditNote && (<button onClick={() => { const inv = invoices.find(o => o.id === row.id); if(inv) setPrintConfig({docType:'invoice', format:'thermal', data: inv}); }} title="Print Invoice" className="p-1.5 bg-indigo-50 hover:bg-indigo-100 focus:outline-none focus:ring-1 focus:ring-indigo-400 text-indigo-500 rounded-lg transition-colors"><ReceiptText size={13}/></button>)}
 {isAdmin && row.debit > 0 && !row.isCreditNote && (<button onClick={() => { const inv = invoices.find(o => o.id === row.id); if(inv){ setCurrentInvoice(inv); setBillingView('form'); setActiveTab('billing'); setShowLedgerModal(false); }}} title="Edit Invoice" className="p-1.5 bg-amber-50 hover:bg-amber-100 focus:outline-none focus:ring-1 focus:ring-amber-400 text-amber-600 rounded-lg transition-colors"><Edit size={13}/></button>)}
 {row.isCreditNote && (<button onClick={() => { const cn = invoices.find(o => o.id === row.id); if(cn) setPrintConfig({docType:'creditnote', format:'a4', data: cn}); }} title="Print Credit Note" className="p-1.5 bg-rose-50 hover:bg-rose-100 focus:outline-none focus:ring-1 focus:ring-rose-400 text-rose-500 rounded-lg transition-colors"><FileText size={13}/></button>)}
+{row.isCreditNote && isAdmin && (<button onClick={() => { setEditingCreditNote({ customerId: fullLedger.id, id: row.id }); setShowLedgerModal(false); setShowCreditNoteModal(true); }} title="Edit Credit Note" className="p-1.5 bg-amber-50 hover:bg-amber-100 focus:outline-none focus:ring-1 focus:ring-amber-400 text-amber-600 rounded-lg transition-colors"><Edit size={13}/></button>)}
+{row.isCreditNote && isAdmin && (<button onClick={async () => { if (await showConfirm(`Delete ${row.id}?`)) await deleteFromFirebase('invoices', row.id); }} title="Delete Credit Note" className="p-1.5 bg-rose-50 hover:bg-rose-100 focus:outline-none focus:ring-1 focus:ring-rose-400 text-rose-500 rounded-lg transition-colors"><Trash2 size={13}/></button>)}
 {row.credit > 0 && !row.isCreditNote && (<button onClick={() => setPrintConfig({docType: 'receipt', format: 'thermal', data: generateReceiptData(fullLedger, row.id)})} title="Print Receipt" className="p-1.5 bg-emerald-50 hover:bg-emerald-100 focus:outline-none focus:ring-1 focus:ring-emerald-400 text-emerald-600 rounded-lg transition-colors"><Receipt size={13}/></button>)}
 {isAdmin && row.credit > 0 && row.id.startsWith('REC-') && (
 <button title="Edit Payment" onClick={() => { const pay = payments.find(p => p.id === row.id); if(pay){ setEditingPayment(pay); setSelectedCustomerForPayment(fullLedger.id); setShowPaymentModal(true); }}} className="p-1.5 bg-amber-50 hover:bg-amber-100 focus:outline-none focus:ring-1 focus:ring-amber-400 text-amber-600 rounded-lg transition-colors"><Edit size={13}/></button>
@@ -1457,12 +1459,15 @@ const CreditNoteModal = () => {
 const { currentUser, products, customers, invoices, showToast, saveToFirebase, setShowCreditNoteModal, editingCreditNote, setEditingCreditNote, getCompanyName } = useContext(AppContext);
 const inputClass = "w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all shadow-sm text-slate-800 placeholder-slate-400";
 
+// Editing an existing CN (id starts with 'CN-') vs new
+const existingCN = editingCreditNote?.id?.startsWith('CN-') ? invoices.find(o => o.id === editingCreditNote.id) : null;
+
 const [form, setForm] = useState({
-  customerId: editingCreditNote?.customerId || '',
-  originalInvoiceId: editingCreditNote?.id || '',
-  date: getLocalDateStr(),
-  reason: '',
-  items: [],
+  customerId: existingCN?.customerId || editingCreditNote?.customerId || '',
+  originalInvoiceId: existingCN ? (existingCN.originalInvoiceId || '') : (!editingCreditNote?.id?.startsWith('CN-') ? editingCreditNote?.id || '' : ''),
+  date: existingCN?.date || getLocalDateStr(),
+  reason: existingCN?.reason || '',
+  items: existingCN ? existingCN.items.map(i => ({ ...i, _soldQty: i.quantity })) : [],
 });
 const [custSearch, setCustSearch]   = useState('');
 const [showCustDrop, setShowCustDrop] = useState(false);
@@ -1527,7 +1532,7 @@ const save = async () => {
   if (!form.customerId || form.items.length === 0) return showToast('Customer and at least one item required', 'error');
   const cust = customers.find(c => c.id === Number(form.customerId));
   const cn = {
-    id: `CN-${String(getNextSeqNum(invoices, 'CN')).padStart(4, '0')}`,
+    id: existingCN ? existingCN.id : `CN-${String(getNextSeqNum(invoices, 'CN')).padStart(4, '0')}`,
     date: form.date,
     customerId: Number(form.customerId),
     customerName: cust?.name || '',
@@ -1542,7 +1547,7 @@ const save = async () => {
     customerDetails: cust ? { contactPerson: cust.contactPerson || '', phone: cust.phone || '', address1: cust.address1 || cust.address || '' } : {},
   };
   await saveToFirebase('invoices', cn.id, cn);
-  showToast('Credit Note Saved!');
+  showToast(existingCN ? 'Credit Note Updated!' : 'Credit Note Saved!');
   setEditingCreditNote(null); setShowCreditNoteModal(false);
 };
 

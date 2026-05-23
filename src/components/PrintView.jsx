@@ -673,6 +673,20 @@ const docLabel = {
 const sz = (thermal, a5, a4) => isThermal ? thermal : isA5 ? a5 : a4;
 const pad = sz('p-3', 'p-5', 'p-7');
 
+// Ledger totals for credit note
+const getCreditNoteLedger = () => {
+  if (docType !== 'creditnote' || !data?.customerId) return { prevBalance: 0, newBalance: 0 };
+  const ledger = getCustomerLedger(data.customerId);
+  let prevBalance = 0;
+  if (ledger && ledger.rows) {
+    const idx = ledger.rows.findIndex(r => r.id === data.id);
+    if (idx > 0) prevBalance = ledger.rows[idx - 1]?.balance || 0;
+    else if (idx === 0) prevBalance = ledger.openingBal || 0;
+    else prevBalance = ledger.closingBal || 0;
+  }
+  return { prevBalance, newBalance: prevBalance - (data.total || 0) };
+};
+
 // Ledger totals for invoice
 const getInvoiceLedger = () => {
   if (docType !== 'invoice' || !data?.customerId) return { prevBalance: 0, received: 0, netBalance: data?.total || 0 };
@@ -1207,20 +1221,28 @@ return (
         {/* Credit Note Totals */}
         {docType === 'creditnote' && data && (() => {
           const cnSubtotal = safeItems.reduce((s, i) => s + (i?.isBonus ? 0 : (i?.price || 0) * (i?.quantity || 0)), 0);
+          const { prevBalance, newBalance } = getCreditNoteLedger();
           return (
             <div className="keep-together" style={{ marginLeft: 'auto', width: isThermal ? '100%' : sz('','240px','280px'), borderTop: '2px solid #e11d48', paddingTop: sz('8px','10px','12px') }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: sz('12px','14px','16px'), color: '#e11d48' }}>
-                <span>Total Credit:</span>
-                <span>Rs. {cnSubtotal.toLocaleString('en-US')}</span>
-              </div>
-              {data.originalInvoiceId && (
-                <div style={{ marginTop: '8px', fontSize: sz('7px','8px','9px'), color: '#64748b' }}>
-                  <strong>Original Invoice:</strong> {data.originalInvoiceId}
+              {[
+                { label: 'Items Subtotal', val: `Rs. ${cnSubtotal.toLocaleString('en-US')}` },
+                { label: 'Credit Note', val: `− Rs. ${cnSubtotal.toLocaleString('en-US')}`, bold: true, large: true, divider: true, color: '#e11d48' },
+                { label: 'Previous Balance', val: `Rs. ${prevBalance.toLocaleString('en-US')}`, top: true },
+                { label: 'Balance After Return', val: `Rs. ${newBalance.toLocaleString('en-US')}`, bold: true, color: newBalance <= 0 ? '#059669' : '#1e293b' },
+              ].map((row, i) => (
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: sz('3px','4px','5px'), borderTop: row.divider || row.top ? '1px solid #e2e8f0' : 'none', paddingTop: row.divider || row.top ? sz('4px','5px','7px') : 0, marginTop: row.divider || row.top ? sz('3px','4px','5px') : 0, fontWeight: row.bold ? 800 : 500, fontSize: row.large ? sz('10px','12px','13px') : sz('8px','9px','10px'), fontVariantNumeric: 'tabular-nums' }}>
+                  <span style={{ color: '#475569' }}>{row.label}:</span>
+                  <span style={{ color: row.color || '#1e293b' }}>{row.val}</span>
                 </div>
-              )}
-              {data.reason && (
-                <div style={{ marginTop: '4px', fontSize: sz('7px','8px','9px'), color: '#64748b' }}>
-                  <strong>Reason:</strong> {data.reason}
+              ))}
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '2px solid #e11d48', marginTop: sz('4px','5px','6px'), paddingTop: sz('5px','6px','8px'), fontWeight: 900, fontSize: sz('12px','13px','15px'), color: '#e11d48', fontVariantNumeric: 'tabular-nums' }}>
+                <span>Net Balance:</span>
+                <span>Rs. {newBalance.toLocaleString('en-US')}</span>
+              </div>
+              {(data.originalInvoiceId || data.reason) && (
+                <div style={{ marginTop: sz('6px','8px','10px'), fontSize: sz('7px','8px','9px'), color: '#64748b', lineHeight: 1.6 }}>
+                  {data.originalInvoiceId && <div><strong>Ref Invoice:</strong> {data.originalInvoiceId}</div>}
+                  {data.reason && <div><strong>Reason:</strong> {data.reason}</div>}
                 </div>
               )}
             </div>
