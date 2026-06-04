@@ -9,7 +9,7 @@ Wallet, Download, Upload, TrendingDown, Filter, ArrowUpDown, Award, CreditCard,
 FileDown, BookOpen, ShoppingCart, Tag, Building2, BarChart2, PieChart, Activity,
 Percent, Hash, Zap, Archive, RefreshCw, Eye, EyeOff, ChevronDown, ChevronUp,
 AlignLeft, Bell, Star, Layers, Globe, PhoneCall, MapPin, Briefcase, ClipboardList, Copy,
-RotateCcw, FileText, Github
+RotateCcw, FileText, Database
 } from 'lucide-react';
 import { db, collection, onSnapshot, doc, setDoc, deleteDoc } from './firebase';
 import { APP_NAME, VEHICLES, getPKTDate, getLocalDateStr, formatDateDisp, checkDateFilter, exportToCSV, shareOrDownload } from './helpers';
@@ -2113,19 +2113,6 @@ return (
 )
 };
 
-const uploadToGist = async (token, backupObj, existingGistId) => {
-  const filename = `AnimalHealthPK_Backup_${new Date().toISOString().slice(0,10)}.json`;
-  const method = existingGistId ? 'PATCH' : 'POST';
-  const url = existingGistId ? `https://api.github.com/gists/${existingGistId}` : 'https://api.github.com/gists';
-  const res = await fetch(url, {
-    method,
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', 'X-GitHub-Api-Version': '2022-11-28' },
-    body: JSON.stringify({ description: 'AnimalHealth.PK Auto Backup', public: false, files: { [filename]: { content: JSON.stringify(backupObj, null, 2) } } }),
-  });
-  if (!res.ok) { const err = await res.text(); throw new Error(`GitHub ${res.status}: ${err}`); }
-  const data = await res.json();
-  return data.id;
-};
 
 const AppSettingsView = () => {
 const { appSettings, saveToFirebase, showToast, showConfirm, appUsers, companies, products, customers, invoices, expenses, expenseCategories, payments, cities, areas, customerTypes, riders } = useContext(AppContext);
@@ -2139,11 +2126,10 @@ const [form, setForm] = useState({
   address: appSettings?.address || '',
   showBusinessNameOnDocs: appSettings?.showBusinessNameOnDocs !== false,
   showBusinessNameOnReports: appSettings?.showBusinessNameOnReports !== false,
-  githubToken: appSettings?.githubToken || '',
-  githubFreq: appSettings?.githubFreq || 'weekly',
+  backupFreq: appSettings?.backupFreq || appSettings?.githubFreq || 'weekly',
 });
 const [restoring, setRestoring] = useState(false);
-const [githubBacking, setGithubBacking] = useState(false);
+const [firebaseBacking, setFirebaseBacking] = useState(false);
 React.useEffect(() => {
   if (appSettings?.id) setForm({
     id: 'main',
@@ -2155,10 +2141,9 @@ React.useEffect(() => {
     address: appSettings.address || '',
     showBusinessNameOnDocs: appSettings.showBusinessNameOnDocs !== false,
     showBusinessNameOnReports: appSettings.showBusinessNameOnReports !== false,
-    githubToken: appSettings.githubToken || '',
-    githubFreq: appSettings.githubFreq || 'weekly',
+    backupFreq: appSettings.backupFreq || appSettings.githubFreq || 'weekly',
   });
-}, [appSettings?.id, appSettings?.businessName, appSettings?.showBusinessNameOnDocs, appSettings?.showBusinessNameOnReports, appSettings?.githubToken, appSettings?.githubFreq]);
+}, [appSettings?.id, appSettings?.businessName, appSettings?.showBusinessNameOnDocs, appSettings?.showBusinessNameOnReports, appSettings?.backupFreq, appSettings?.githubFreq]);
 const saveSettings = async () => { await saveToFirebase('appSettings', 'main', form); showToast('Settings saved!'); };
 const downloadBackup = async () => {
   const backup = { exportedAt: new Date().toISOString(), collections: { app_users: appUsers, appSettings: appSettings ? [appSettings] : [], companies, products, customers, invoices, expenses, expenseCategories, payments, riders, cities, areas, customerTypes } };
@@ -2167,16 +2152,19 @@ const downloadBackup = async () => {
   showToast('Backup downloaded!');
 };
 const buildBackupObj = () => ({ exportedAt: new Date().toISOString(), collections: { app_users: appUsers, appSettings: appSettings ? [appSettings] : [], companies, products, customers, invoices, expenses, expenseCategories, payments, riders, cities, areas, customerTypes } });
-const manualGistBackup = async () => {
-  const token = appSettings?.githubToken || form.githubToken;
-  if (!token) return showToast('Enter a GitHub token first', 'error');
-  setGithubBacking(true);
+const manualFirebaseBackup = async () => {
+  setFirebaseBacking(true);
   try {
-    const newId = await uploadToGist(token, buildBackupObj(), appSettings?.githubGistId);
-    await saveToFirebase('appSettings', 'main', { ...appSettings, ...form, githubGistId: newId, lastBackupAt: new Date().toISOString() });
-    showToast('Backup uploaded to GitHub Gist!');
-  } catch(e) { showToast(`GitHub backup failed: ${e.message}`, 'error'); }
-  finally { setGithubBacking(false); }
+    const backup = buildBackupObj();
+    const date = new Date().toISOString().slice(0, 10);
+    const cols = ['app_users', 'appSettings', 'companies', 'products', 'customers', 'invoices', 'expenses', 'expenseCategories', 'payments', 'riders', 'cities', 'areas', 'customerTypes'];
+    for (const col of cols) {
+      await saveToFirebase('backups', `${date}_${col}`, { items: backup.collections[col] || [], backedUpAt: backup.exportedAt });
+    }
+    await saveToFirebase('appSettings', 'main', { ...appSettings, ...form, lastBackupAt: new Date().toISOString() });
+    showToast('Backup saved to Firebase!');
+  } catch(e) { showToast(`Backup failed: ${e.message}`, 'error'); }
+  finally { setFirebaseBacking(false); }
 };
 const handleRestoreFile = async (e) => {
   const file = e.target.files[0]; if (!file) return;
@@ -2251,20 +2239,14 @@ return (
   </div>
   <FixInvoiceUnitsButton />
 
-  {/* ── GitHub Auto-Backup ── */}
+  {/* ── Firebase Auto-Backup ── */}
   <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
-    <h3 className="font-black text-slate-800 text-base mb-1 flex items-center gap-2"><Github size={16}/> GitHub Auto-Backup</h3>
-    <p className="text-xs text-slate-400 mb-4">Saves a JSON backup to a private GitHub Gist automatically. Requires a Personal Access Token with <strong className="text-slate-600">gist</strong> scope.</p>
+    <h3 className="font-black text-slate-800 text-base mb-1 flex items-center gap-2"><Database size={16}/> Firebase Auto-Backup</h3>
+    <p className="text-xs text-slate-400 mb-4">Saves a full backup to your Firebase database automatically. No token needed — uses your existing login.</p>
     <div className="space-y-3">
       <div>
-        <label className={labelCls}>Personal Access Token</label>
-        <input type="password" className={inputCls} placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
-          value={form.githubToken} onChange={e => setForm(p=>({...p, githubToken: e.target.value}))} autoComplete="off"/>
-        <p className="text-[10px] text-slate-400 mt-1">Create at github.com → Settings → Developer settings → Personal access tokens → <strong>gist</strong> scope only</p>
-      </div>
-      <div>
         <label className={labelCls}>Auto-Backup Frequency</label>
-        <select className={inputCls} value={form.githubFreq} onChange={e => setForm(p=>({...p, githubFreq: e.target.value}))}>
+        <select className={inputCls} value={form.backupFreq} onChange={e => setForm(p=>({...p, backupFreq: e.target.value}))}>
           <option value="never">Never (manual only)</option>
           <option value="daily">Daily</option>
           <option value="weekly">Weekly</option>
@@ -2272,15 +2254,14 @@ return (
         </select>
       </div>
       {appSettings?.lastBackupAt && (
-        <div className="flex items-center justify-between text-[11px]">
+        <div className="text-[11px]">
           <span className="text-emerald-600 font-bold">Last backup: {appSettings.lastBackupAt.slice(0,10)}</span>
-          {appSettings?.githubGistId && <a href={`https://gist.github.com/${appSettings.githubGistId}`} target="_blank" rel="noopener noreferrer" className="text-indigo-500 hover:underline font-semibold">View Gist ↗</a>}
         </div>
       )}
     </div>
     <div className="flex gap-2 mt-4">
       <button type="button" onClick={saveSettings} className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5"><Save size={13}/> Save Settings</button>
-      <button type="button" onClick={manualGistBackup} disabled={!form.githubToken || githubBacking} className="flex-1 bg-slate-800 hover:bg-slate-700 text-white font-bold py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 disabled:opacity-40"><Upload size={13}/> {githubBacking ? 'Uploading…' : 'Backup Now'}</button>
+      <button type="button" onClick={manualFirebaseBackup} disabled={firebaseBacking} className="flex-1 bg-slate-800 hover:bg-slate-700 text-white font-bold py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 disabled:opacity-40"><Upload size={13}/> {firebaseBacking ? 'Saving…' : 'Backup Now'}</button>
     </div>
   </div>
 </div>
@@ -3969,21 +3950,26 @@ React.useEffect(() => {
   }
 }, [appSettings?.id, appSettings?.showBusinessNameOnDocs]);
 
-// Auto-backup to GitHub Gist (runs once per session when settings load)
+// Auto-backup to Firebase (runs once per session when settings load)
 const autoBackupRan = React.useRef(false);
 React.useEffect(() => {
   if (autoBackupRan.current) return;
-  if (!appSettings?.id || !appSettings?.githubToken || !appSettings?.githubFreq || appSettings.githubFreq === 'never') return;
+  const freq = appSettings?.backupFreq || appSettings?.githubFreq;
+  if (!appSettings?.id || !freq || freq === 'never') return;
   const lastAt = appSettings.lastBackupAt ? new Date(appSettings.lastBackupAt) : new Date(0);
-  const dueAfterDays = appSettings.githubFreq === 'daily' ? 1 : appSettings.githubFreq === 'weekly' ? 7 : 30;
+  const dueAfterDays = freq === 'daily' ? 1 : freq === 'weekly' ? 7 : 30;
   if ((Date.now() - lastAt.getTime()) / 86400000 < dueAfterDays) return;
   autoBackupRan.current = true;
-  const backup = { exportedAt: new Date().toISOString(), collections: { app_users: appUsers, appSettings: [appSettings], companies, products, customers, invoices, expenses, expenseCategories, payments, riders, cities, areas, customerTypes } };
-  uploadToGist(appSettings.githubToken, backup, appSettings.githubGistId)
-    .then(newId => saveToFirebase('appSettings', 'main', { ...appSettings, githubGistId: newId, lastBackupAt: new Date().toISOString() }))
-    .then(() => showToast('Auto-backup uploaded to GitHub Gist'))
+  const exportedAt = new Date().toISOString();
+  const date = exportedAt.slice(0, 10);
+  const cols = { app_users: appUsers, appSettings: [appSettings], companies, products, customers, invoices, expenses, expenseCategories, payments, riders, cities, areas, customerTypes };
+  Promise.all(Object.entries(cols).map(([col, items]) =>
+    saveToFirebase('backups', `${date}_${col}`, { items: items || [], backedUpAt: exportedAt })
+  ))
+    .then(() => saveToFirebase('appSettings', 'main', { ...appSettings, lastBackupAt: exportedAt }))
+    .then(() => showToast('Auto-backup saved to Firebase'))
     .catch(e => console.warn('Auto-backup failed:', e));
-}, [appSettings?.id, appSettings?.githubToken, appSettings?.githubFreq, appSettings?.lastBackupAt]);
+}, [appSettings?.id, appSettings?.backupFreq, appSettings?.githubFreq, appSettings?.lastBackupAt]);
 
 const deleteFromFirebase = async (collectionName, id) => {
 try {
