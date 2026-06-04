@@ -24,11 +24,44 @@ useEffect(() => {
 }, []);
 
 // ── Helpers ───────────────────────────────────────────────────────────────
+// Pre-built maps for fast, reliable product lookup (rebuilt each render when products change)
+const _prodById   = new Map(products.map(p => [String(p.id), p]));
+const _prodByName = new Map(products.map(p => [(p.name || '').toLowerCase().trim(), p]));
+const _prodByWord = (() => {
+  const m = new Map();
+  products.forEach(p => {
+    const w = (p.name || '').toLowerCase().trim().split(/\s+/)[0];
+    if (w && w.length > 2 && !m.has(w)) m.set(w, p);
+  });
+  return m;
+})();
+
+const findProduct = (item) => {
+  if (!item) return null;
+  const idStr   = String(item.productId || '');
+  const uidStr  = String(item.uniqueId  || '');
+  const nameLower = (item.name || '').toLowerCase().trim();
+  // 1. exact ID / uniqueId
+  let p = (idStr  && _prodById.get(idStr))  || (uidStr && _prodById.get(uidStr)) || null;
+  // 2. exact name (case-insensitive)
+  if (!p && nameLower) p = _prodByName.get(nameLower) || null;
+  // 3. prefix: product name starts with item name prefix (up to 10 chars)
+  if (!p && nameLower) p = products.find(q => q.name?.toLowerCase().trim().startsWith(nameLower.slice(0, 10))) || null;
+  // 4. first word match (most resilient for "Rexavil" ↔ "Rexavil 10ml" etc.)
+  if (!p && nameLower) {
+    const fw = nameLower.split(/\s+/)[0];
+    if (fw && fw.length > 2) p = _prodByWord.get(fw) || null;
+  }
+  // 5. item name starts with product name prefix (reverse prefix)
+  if (!p && nameLower) p = products.find(q => { const qn = (q.name||'').toLowerCase().trim(); return qn && nameLower.startsWith(qn.slice(0,10)); }) || null;
+  if (!p && nameLower) console.warn('[PrintView] No product match:', item.name, '| id:', item.productId, '| pool:', products.length);
+  return p;
+};
 const getDispatchParts = (item) => {
   if (!item) return { qty: 0, uib: 1, boxes: 0, loose: 0 };
   let uib = item.unitsInBox;
   if (!uib) {
-    const prod = products.find(p => p.id === item.productId);
+    const prod = findProduct(item);
     uib = prod ? prod.unitsInBox : 1;
   }
   uib = Number(uib) || 1;
@@ -305,59 +338,26 @@ const buildHtmlDoc = () => {
   return { html, docTitle };
 };
 
-// ── Thermal print: CSS injection → HTML print window ─────────────────────
-// Extracts the compiled app CSS (all Tailwind utilities + custom styles) from
-// the live page and injects it into the print popup alongside the buildHtmlDoc
-// HTML. Tailwind classes work exactly as on screen — no frozen pixel positions,
-// no image generation. The browser's native print engine rasterises at the
-// printer's own DPI, giving crisp, dark, native-resolution output.
-const handleThermalPrint = () => {
-  // Pull every CSS rule from the live document (same-origin sheets only)
+// ── Print — CSS injection for all formats → native browser print at full DPI ─
+const handlePrint = () => {
+  const result = buildHtmlDoc();
+  if (!result) { showToast('Document not found', 'error'); return; }
+  const { html, docTitle } = result;
+
   let appCss = '';
   try {
     appCss = Array.from(document.styleSheets)
-      .flatMap(sheet => {
-        try { return Array.from(sheet.cssRules).map(r => r.cssText); }
-        catch (e) { return []; } // skip cross-origin / unenumerable sheets
-      }).join('\n');
-  } catch (e) {}
-
-  const result = buildHtmlDoc();
-  if (!result) { showToast('Document not found', 'error'); return; }
-  const { html, docTitle } = result;
-
-  // Inject app CSS first so Tailwind classes resolve; buildHtmlDoc's print
-  // overrides (color:black!important, @page, etc.) follow and win cascade.
-  const augmented = html.replace('<title>', `<style>${appCss}</style>\n  <title>`);
+      .flatMap(sheet => { try { return Array.from(sheet.cssRules).map(r => r.cssText); } catch(e) { return []; } })
+      .join('\n');
+  } catch(e) {}
+  const augmented = appCss ? html.replace('<title>', `<style>${appCss}</style>\n  <title>`) : html;
 
   const newWin = window.open('', '_blank');
   if (!newWin) { showToast('Allow popups to enable printing', 'error'); return; }
-  newWin.document.open();
-  newWin.document.write(augmented);
-  newWin.document.close();
+  newWin.document.open(); newWin.document.write(augmented); newWin.document.close();
   newWin.document.title = docTitle;
   const tid = setTimeout(() => { try { newWin.focus(); newWin.print(); } catch(e){} }, 900);
   newWin.onload = () => { clearTimeout(tid); newWin.focus(); newWin.print(); };
-};
-
-// ── Print — opens clean new window and auto-triggers print dialog ─────────
-const handlePrint = () => {
-  // Thermal: render via html2canvas at 4× scale for dark, crisp output
-  if (isThermal) { handleThermalPrint(); return; }
-
-  const result = buildHtmlDoc();
-  if (!result) { showToast('Document not found', 'error'); return; }
-  const { html, docTitle } = result;
-  // about:blank window: no URL in address bar, @page{margin:0} removes header/footer space.
-  // Explicit document.title ensures iOS uses the invoice/receipt ID as the PDF filename.
-  const newWin = window.open('', '_blank');
-  if (!newWin) { showToast('Allow popups to enable printing', 'error'); return; }
-  newWin.document.open();
-  newWin.document.write(html);
-  newWin.document.close();
-  newWin.document.title = docTitle;
-  const tid2 = setTimeout(() => { try { newWin.focus(); newWin.print(); } catch(e){} }, 900);
-  newWin.onload = () => { clearTimeout(tid2); newWin.focus(); newWin.print(); };
 };
 
 // ── HTML Share / Download ─────────────────────────────────────────────────
@@ -462,7 +462,7 @@ const handlePDF = () => {
       html2pdf().set({
         margin: margins, filename: getFileName(),
         image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, logging: false, letterRendering: true, scrollY: 0, scrollX: 0, width: fixedW, windowWidth: fixedW },
+        html2canvas: { scale: 3, useCORS: true, logging: false, letterRendering: true, scrollY: 0, scrollX: 0, width: fixedW, windowWidth: fixedW },
         jsPDF: { unit: 'mm', format: [pdfW, pdfH], orientation: 'portrait' },
         // allow natural page breaks; .keep-together blocks (header, summary) won't be split
         pagebreak: { mode: ['css', 'legacy'], avoid: ['.keep-together'] },
@@ -530,7 +530,7 @@ const handleImageShare = async () => {
     // For thermal: single tall image (continuous paper — no pagination)
     if (isThermal) {
       const dataUrl = await withTimeout(window.htmlToImage.toJpeg(clone, {
-        quality: 0.95, pixelRatio: 2, backgroundColor: '#ffffff', height: clone.scrollHeight,
+        quality: 0.95, pixelRatio: 3, backgroundColor: '#ffffff', height: clone.scrollHeight,
       }), 30000);
       if (document.body.contains(clone)) document.body.removeChild(clone);
       shareBlob(await (await fetch(dataUrl)).blob());
@@ -540,7 +540,7 @@ const handleImageShare = async () => {
     // For A4/A5: capture to canvas then slice into page-sized sections.
     // Each slice is separated by a slate-200 gap so the output looks like
     // a stack of pages — matching what the PDF and print outputs produce.
-    const PIXEL_RATIO = 2;
+    const PIXEL_RATIO = 3;
     const GAP_PX = 20; // gap between pages (in output-canvas pixels)
 
     const srcCanvas = await withTimeout(window.htmlToImage.toCanvas(clone, {
@@ -602,7 +602,16 @@ const downloadImageFallback = (blob, fileName) => {
 };
 
 // ── Layout helpers ────────────────────────────────────────────────────────
-const safeItems = data?.items || [];
+// A unit value is only valid if it's a non-numeric string longer than 1 char (e.g. "Vial", not "6" or "1")
+const isValidUnit = (u) => !!u && isNaN(u) && String(u).trim().length > 1;
+
+// Enrich items: fill in missing/invalid unit from product master at render time
+const safeItems = (data?.items || []).map(item => {
+  if (isValidUnit(item.unit)) return item;
+  const prod = findProduct(item);
+  if (!prod) return item;
+  return { ...item, unit: prod.unit || '', unitsInBox: item.unitsInBox || prod.unitsInBox || 1 };
+});
 const safeRows  = data?.rows  || [];
 
 const docWidth = isThermal
@@ -630,6 +639,20 @@ const docLabel = {
 // Sizing helpers
 const sz = (thermal, a5, a4) => isThermal ? thermal : isA5 ? a5 : a4;
 const pad = sz('p-3', 'p-5', 'p-7');
+
+// Ledger totals for credit note
+const getCreditNoteLedger = () => {
+  if (docType !== 'creditnote' || !data?.customerId) return { prevBalance: 0, newBalance: 0 };
+  const ledger = getCustomerLedger(data.customerId);
+  let prevBalance = 0;
+  if (ledger && ledger.rows) {
+    const idx = ledger.rows.findIndex(r => r.id === data.id);
+    if (idx > 0) prevBalance = ledger.rows[idx - 1]?.balance || 0;
+    else if (idx === 0) prevBalance = ledger.openingBal || 0;
+    else prevBalance = ledger.closingBal || 0;
+  }
+  return { prevBalance, newBalance: prevBalance - (data.total || 0) };
+};
 
 // Ledger totals for invoice
 const getInvoiceLedger = () => {
@@ -998,7 +1021,7 @@ return (
                 <td style={{ padding: sz('6px 2px','8px 4px','9px 6px'), textAlign: docType === 'dispatch' ? 'left' : 'center', fontWeight: 600, lineHeight: sz('1.5','1.55','1.6'), color: '#334155', whiteSpace: docType === 'dispatch' ? 'normal' : 'nowrap' }}>
                   {docType === 'dispatch' ? (() => {
                     const { qty, uib, boxes, loose } = getDispatchParts(item);
-                    const rawUnit = item?.unit || products.find(p => p.id === item?.productId)?.unit || '';
+                    const rawUnit = item?.unit || findProduct(item)?.unit || '';
                     const unitLabel = rawUnit && isNaN(rawUnit) && String(rawUnit).trim().length > 1 ? rawUnit : '';
                     if (uib <= 1) return <span style={{ fontWeight: 800, color: '#1e293b' }}>{qty}{unitLabel && <span style={{ fontWeight: 500, color: '#64748b', fontSize: sz('7.5px','8px','8.5px'), marginLeft: '3px' }}>{unitLabel}</span>}</span>;
                     return (
@@ -1130,13 +1153,15 @@ return (
         {docType === 'invoice' && data && (() => {
           const { prevBalance, received, netBalance } = getInvoiceLedger();
           const totalSavings = safeItems.reduce((s, i) => s + (i?.isBonus ? (i?.originalPrice || 0) * (i?.quantity || 0) : 0), 0);
-          const itemsSubtotal = (data.total || 0) - (data.deliveryBilled || 0);
+          const invoiceDiscount = Number(data.discount || 0);
+          const itemsSubtotal = (data.total || 0) - (data.deliveryBilled || 0) + invoiceDiscount;
 
           return (
             <div className="keep-together" style={{ marginLeft: 'auto', width: isThermal ? '100%' : sz('','240px','280px'), borderTop: '2px solid #1e293b', paddingTop: sz('8px','10px','12px') }}>
               {[
                 { label: 'Items Subtotal', val: `Rs. ${itemsSubtotal.toLocaleString('en-US')}` },
                 (data.deliveryBilled || 0) > 0 && { label: `Delivery (${data.vehicle || ''})`, val: `Rs. ${Number(data.deliveryBilled).toLocaleString('en-US')}`, muted: true },
+                invoiceDiscount > 0 && { label: 'Discount', val: `− Rs. ${invoiceDiscount.toLocaleString('en-US')}`, color: '#d97706' },
                 { label: 'Current Bill', val: `Rs. ${(data.total || 0).toLocaleString('en-US')}`, bold: true, large: true, divider: true },
                 showPrevBal && { label: 'Previous Balance', val: `Rs. ${prevBalance.toLocaleString('en-US')}`, top: true },
                 showPrevBal && { label: 'Subtotal', val: `Rs. ${(prevBalance + (data.total || 0)).toLocaleString('en-US')}`, bold: true },
@@ -1163,20 +1188,28 @@ return (
         {/* Credit Note Totals */}
         {docType === 'creditnote' && data && (() => {
           const cnSubtotal = safeItems.reduce((s, i) => s + (i?.isBonus ? 0 : (i?.price || 0) * (i?.quantity || 0)), 0);
+          const { prevBalance, newBalance } = getCreditNoteLedger();
           return (
             <div className="keep-together" style={{ marginLeft: 'auto', width: isThermal ? '100%' : sz('','240px','280px'), borderTop: '2px solid #e11d48', paddingTop: sz('8px','10px','12px') }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: sz('12px','14px','16px'), color: '#e11d48' }}>
-                <span>Total Credit:</span>
-                <span>Rs. {cnSubtotal.toLocaleString('en-US')}</span>
-              </div>
-              {data.originalInvoiceId && (
-                <div style={{ marginTop: '8px', fontSize: sz('7px','8px','9px'), color: '#64748b' }}>
-                  <strong>Original Invoice:</strong> {data.originalInvoiceId}
+              {[
+                { label: 'Items Subtotal', val: `Rs. ${cnSubtotal.toLocaleString('en-US')}` },
+                { label: 'Credit Note', val: `− Rs. ${cnSubtotal.toLocaleString('en-US')}`, bold: true, large: true, divider: true, color: '#e11d48' },
+                { label: 'Previous Balance', val: `Rs. ${prevBalance.toLocaleString('en-US')}`, top: true },
+                { label: 'Balance After Return', val: `Rs. ${newBalance.toLocaleString('en-US')}`, bold: true, color: newBalance <= 0 ? '#059669' : '#1e293b' },
+              ].map((row, i) => (
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: sz('3px','4px','5px'), borderTop: row.divider || row.top ? '1px solid #e2e8f0' : 'none', paddingTop: row.divider || row.top ? sz('4px','5px','7px') : 0, marginTop: row.divider || row.top ? sz('3px','4px','5px') : 0, fontWeight: row.bold ? 800 : 500, fontSize: row.large ? sz('10px','12px','13px') : sz('8px','9px','10px'), fontVariantNumeric: 'tabular-nums' }}>
+                  <span style={{ color: '#475569' }}>{row.label}:</span>
+                  <span style={{ color: row.color || '#1e293b' }}>{row.val}</span>
                 </div>
-              )}
-              {data.reason && (
-                <div style={{ marginTop: '4px', fontSize: sz('7px','8px','9px'), color: '#64748b' }}>
-                  <strong>Reason:</strong> {data.reason}
+              ))}
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '2px solid #e11d48', marginTop: sz('4px','5px','6px'), paddingTop: sz('5px','6px','8px'), fontWeight: 900, fontSize: sz('12px','13px','15px'), color: '#e11d48', fontVariantNumeric: 'tabular-nums' }}>
+                <span>Net Balance:</span>
+                <span>Rs. {newBalance.toLocaleString('en-US')}</span>
+              </div>
+              {(data.originalInvoiceId || data.reason) && (
+                <div style={{ marginTop: sz('6px','8px','10px'), fontSize: sz('7px','8px','9px'), color: '#64748b', lineHeight: 1.6 }}>
+                  {data.originalInvoiceId && <div><strong>Ref Invoice:</strong> {data.originalInvoiceId}</div>}
+                  {data.reason && <div><strong>Reason:</strong> {data.reason}</div>}
                 </div>
               )}
             </div>
@@ -1249,6 +1282,11 @@ return (
           <div style={{ fontSize: sz('26px','32px','40px'), fontWeight: 900, color: '#059669', marginTop: sz('4px','6px','8px'), lineHeight: 1.3, fontVariantNumeric: 'tabular-nums' }}>
             Rs. {(data.receivedAmount || 0).toLocaleString('en-US')}
           </div>
+          {(data.discount || 0) > 0 && (
+            <div style={{ marginTop: sz('4px','6px','8px'), fontSize: sz('8px','9px','10px'), fontWeight: 700, color: '#92400e', background: '#fef3c7', borderRadius: '6px', padding: sz('3px 8px','4px 10px','5px 12px'), display: 'inline-block' }}>
+              + Round-off Discount: Rs. {Number(data.discount).toLocaleString('en-US')}
+            </div>
+          )}
           {data.note && (
             <div style={{ marginTop: sz('6px','8px','10px'), fontSize: sz('9px','10px','11px'), fontWeight: 700, color: '#15803d', lineHeight: 1.4 }}>
               {data.note}
@@ -1258,9 +1296,11 @@ return (
         <div style={{ borderTop: '2px solid #1e293b', paddingTop: sz('10px','14px','16px') }}>
           {[
             { label: 'Previous Balance', val: `Rs. ${(data.prevBalance || 0).toLocaleString('en-US')}`, color: '#64748b' },
-            { label: 'Amount Credited', val: `− Rs. ${(data.receivedAmount || 0).toLocaleString('en-US')}`, color: '#059669' },
-          ].map((r, i) => (
-            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: sz('5px','7px','8px'), fontWeight: 600, fontSize: sz('10px','11px','12px'), color: r.color }}>
+            { label: 'Cash / Cheque Received', val: `− Rs. ${(data.receivedAmount || 0).toLocaleString('en-US')}`, color: '#059669' },
+            (data.discount || 0) > 0 && { label: 'Round-off Discount', val: `− Rs. ${Number(data.discount).toLocaleString('en-US')}`, color: '#d97706' },
+            (data.discount || 0) > 0 && { label: 'Total Credited', val: `− Rs. ${(data.totalCredit || data.receivedAmount || 0).toLocaleString('en-US')}`, color: '#059669', bold: true },
+          ].filter(Boolean).map((r, i) => (
+            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: sz('5px','7px','8px'), fontWeight: r.bold ? 800 : 600, fontSize: sz('10px','11px','12px'), color: r.color }}>
               <span>{r.label}:</span><span>{r.val}</span>
             </div>
           ))}

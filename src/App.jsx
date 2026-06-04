@@ -9,7 +9,7 @@ Wallet, Download, Upload, TrendingDown, Filter, ArrowUpDown, Award, CreditCard,
 FileDown, BookOpen, ShoppingCart, Tag, Building2, BarChart2, PieChart, Activity,
 Percent, Hash, Zap, Archive, RefreshCw, Eye, EyeOff, ChevronDown, ChevronUp,
 AlignLeft, Bell, Star, Layers, Globe, PhoneCall, MapPin, Briefcase, ClipboardList, Copy,
-RotateCcw, FileText
+RotateCcw, FileText, Github
 } from 'lucide-react';
 import { db, collection, onSnapshot, doc, setDoc, deleteDoc } from './firebase';
 import { APP_NAME, VEHICLES, getPKTDate, getLocalDateStr, formatDateDisp, checkDateFilter, exportToCSV, shareOrDownload } from './helpers';
@@ -303,18 +303,20 @@ const { selectedCustomerForPayment, customers, payments, getCustomerBalance, sav
 const isEdit = !!editingPayment;
 const [form, setForm] = useState(
   isEdit
-    ? { customerId: editingPayment.customerId, amount: editingPayment.amount, date: editingPayment.date, note: editingPayment.note || 'Cash Payment' }
-    : { customerId: selectedCustomerForPayment || '', amount: '', date: getLocalDateStr(), note: 'Cash Payment' }
+    ? { customerId: editingPayment.customerId, amount: editingPayment.amount, discount: editingPayment.discount || 0, date: editingPayment.date, note: editingPayment.note || 'Cash Payment' }
+    : { customerId: selectedCustomerForPayment || '', amount: '', discount: 0, date: getLocalDateStr(), note: 'Cash Payment' }
 );
 const handleClose = () => { setEditingPayment(null); setShowPaymentModal(false); };
+const discount = Number(form.discount) || 0;
+const totalCredit = (Number(form.amount) || 0) + discount;
 const save = async () => {
 if(!form.customerId || !form.amount) return showToast("Customer and Amount are required", "error");
 if (isEdit) {
-  const updated = { ...editingPayment, customerId: Number(form.customerId), amount: Number(form.amount), date: form.date, note: form.note };
+  const updated = { ...editingPayment, customerId: Number(form.customerId), amount: Number(form.amount), discount, date: form.date, note: form.note };
   await saveToFirebase('payments', updated.id, updated);
   showToast("Payment Receipt Updated!");
 } else {
-  const newPayment = { id: `REC-${String(getNextSeqNum(payments, 'REC')).padStart(4, '0')}`, customerId: Number(form.customerId), amount: Number(form.amount), date: form.date, note: form.note };
+  const newPayment = { id: `REC-${String(getNextSeqNum(payments, 'REC')).padStart(4, '0')}`, customerId: Number(form.customerId), amount: Number(form.amount), discount, date: form.date, note: form.note };
   await saveToFirebase('payments', newPayment.id, newPayment);
   showToast("Payment Received & Ledger Updated!");
 }
@@ -330,7 +332,12 @@ return (
 )}</div>
 {form.customerId && (<div className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-center"><p className="text-[10px] uppercase font-bold text-slate-500 tracking-widest">Current Outstanding Balance</p><p className="text-xl font-black text-rose-600 mt-1">Rs. {getCustomerBalance(Number(form.customerId)).toLocaleString('en-US')}</p></div>)}
 <div className="grid grid-cols-2 gap-3">
-<div className="col-span-2"><label className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider ml-1 mb-1 block">Amount Received (Cr)</label><input type="number" placeholder="0.00" className={`${inputClass} !border-emerald-200 !text-emerald-700 !font-extrabold text-lg`} value={form.amount} onChange={e=>setForm({...form, amount: e.target.value})} /></div>
+<div className="col-span-2"><label className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider ml-1 mb-1 block">Amount Received (Cash / Cheque)</label><input type="number" placeholder="0.00" className={`${inputClass} !border-emerald-200 !text-emerald-700 !font-extrabold text-lg`} value={form.amount} onChange={e=>setForm({...form, amount: e.target.value})} /></div>
+<div><label className="text-[10px] font-bold text-amber-600 uppercase tracking-wider ml-1 mb-1 block">Round-off Discount</label><input type="number" placeholder="0" className={`${inputClass} !border-amber-200 !text-amber-700 !font-bold`} value={form.discount || ''} onChange={e=>setForm({...form, discount: Number(e.target.value)||0})} /></div>
+<div className="bg-amber-50 border border-amber-100 rounded-xl p-3 flex flex-col justify-center">
+  <p className="text-[10px] font-bold text-amber-600 uppercase tracking-widest">Total Credit</p>
+  <p className="text-lg font-black text-amber-800">Rs. {totalCredit.toLocaleString('en-US')}</p>
+</div>
 <div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Date</label><input type="date" className={inputClass} value={form.date} onChange={e=>setForm({...form, date: e.target.value})} /></div>
 <div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Mode / Note</label><input type="text" placeholder="e.g. Cash / Cheque No." className={inputClass} value={form.note} onChange={e=>setForm({...form, note: e.target.value})} /></div>
 </div>
@@ -429,6 +436,8 @@ return (
 {row.debit > 0 && !row.isCreditNote && (<button onClick={() => { const inv = invoices.find(o => o.id === row.id); if(inv) setPrintConfig({docType:'invoice', format:'thermal', data: inv}); }} title="Print Invoice" className="p-1.5 bg-indigo-50 hover:bg-indigo-100 focus:outline-none focus:ring-1 focus:ring-indigo-400 text-indigo-500 rounded-lg transition-colors"><ReceiptText size={13}/></button>)}
 {isAdmin && row.debit > 0 && !row.isCreditNote && (<button onClick={() => { const inv = invoices.find(o => o.id === row.id); if(inv){ setCurrentInvoice(inv); setBillingView('form'); setActiveTab('billing'); setShowLedgerModal(false); }}} title="Edit Invoice" className="p-1.5 bg-amber-50 hover:bg-amber-100 focus:outline-none focus:ring-1 focus:ring-amber-400 text-amber-600 rounded-lg transition-colors"><Edit size={13}/></button>)}
 {row.isCreditNote && (<button onClick={() => { const cn = invoices.find(o => o.id === row.id); if(cn) setPrintConfig({docType:'creditnote', format:'a4', data: cn}); }} title="Print Credit Note" className="p-1.5 bg-rose-50 hover:bg-rose-100 focus:outline-none focus:ring-1 focus:ring-rose-400 text-rose-500 rounded-lg transition-colors"><FileText size={13}/></button>)}
+{row.isCreditNote && isAdmin && (<button onClick={() => { setEditingCreditNote({ customerId: fullLedger.id, id: row.id }); setShowLedgerModal(false); setShowCreditNoteModal(true); }} title="Edit Credit Note" className="p-1.5 bg-amber-50 hover:bg-amber-100 focus:outline-none focus:ring-1 focus:ring-amber-400 text-amber-600 rounded-lg transition-colors"><Edit size={13}/></button>)}
+{row.isCreditNote && isAdmin && (<button onClick={async () => { if (await showConfirm(`Delete ${row.id}?`)) await deleteFromFirebase('invoices', row.id); }} title="Delete Credit Note" className="p-1.5 bg-rose-50 hover:bg-rose-100 focus:outline-none focus:ring-1 focus:ring-rose-400 text-rose-500 rounded-lg transition-colors"><Trash2 size={13}/></button>)}
 {row.credit > 0 && !row.isCreditNote && (<button onClick={() => setPrintConfig({docType: 'receipt', format: 'thermal', data: generateReceiptData(fullLedger, row.id)})} title="Print Receipt" className="p-1.5 bg-emerald-50 hover:bg-emerald-100 focus:outline-none focus:ring-1 focus:ring-emerald-400 text-emerald-600 rounded-lg transition-colors"><Receipt size={13}/></button>)}
 {isAdmin && row.credit > 0 && row.id.startsWith('REC-') && (
 <button title="Edit Payment" onClick={() => { const pay = payments.find(p => p.id === row.id); if(pay){ setEditingPayment(pay); setSelectedCustomerForPayment(fullLedger.id); setShowPaymentModal(true); }}} className="p-1.5 bg-amber-50 hover:bg-amber-100 focus:outline-none focus:ring-1 focus:ring-amber-400 text-amber-600 rounded-lg transition-colors"><Edit size={13}/></button>
@@ -1008,7 +1017,7 @@ const pickCustomer = (c) => {
   setTimeout(() => prodSearchRef.current?.focus(), 80);
 };
 const startNewInvoice = () => {
-setCurrentInvoice({ id: null, customerId: '', customerName: '', customerDetails: {}, items: [], deliveryBilled: 0, transportExpense: 0, vehicle: VEHICLES[0], paymentStatus: 'Pending', receivedAmount: 0, transportCompany: '', biltyNumber: '', driverName: '', driverPhone: '', riderId: '', deliveryAddressKey: 'address1', notes: '' });
+setCurrentInvoice({ id: null, customerId: '', customerName: '', customerDetails: {}, items: [], deliveryBilled: 0, transportExpense: 0, discount: 0, vehicle: VEHICLES[0], paymentStatus: 'Pending', receivedAmount: 0, transportCompany: '', biltyNumber: '', driverName: '', driverPhone: '', riderId: '', deliveryAddressKey: 'address1', notes: '' });
 setCustomerSearch(''); setShowCustomerDrop(false);
 setRiderSearch(''); setShowRiderDrop(false);
 setBillingView('form');
@@ -1023,9 +1032,20 @@ useEffect(() => {
 const saveInvoice = async (status) => {
 if(!currentInvoice.customerId || currentInvoice.items.length === 0) return showToast("Customer and items are required", "error");
 const totalItems = currentInvoice.items.reduce((sum, i) => sum + (i.isBonus ? 0 : i.price * i.quantity), 0);
-const grandTotal = totalItems + Number(currentInvoice.deliveryBilled || 0);
+const grandTotal = totalItems + Number(currentInvoice.deliveryBilled || 0) - Number(currentInvoice.discount || 0);
 const activeCustomer = customers.find(c => c.id === currentInvoice.customerId);
-const finalInvoice = { ...currentInvoice, total: grandTotal, status: status, salespersonId: currentUser.id, salespersonName: currentUser.name, customerDetails: activeCustomer ? { contactPerson: activeCustomer.contactPerson || '', phone: activeCustomer.phone || '', address1: activeCustomer.address1 || activeCustomer.address || '', map1: activeCustomer.map1 || '', address2: activeCustomer.address2 || '', map2: activeCustomer.map2 || '' } : {} };
+const enrichedItems = currentInvoice.items.map(item => {
+  if (item.unit && item.unitsInBox) return item;
+  const nameLower = (item.name || '').toLowerCase().trim();
+  const prod = products.find(p =>
+    (item.productId && String(p.id) === String(item.productId)) ||
+    (item.uniqueId && String(p.id) === String(item.uniqueId)) ||
+    (nameLower && p.name?.toLowerCase().trim() === nameLower) ||
+    (nameLower && p.name?.toLowerCase().trim().startsWith(nameLower.slice(0, 10)))
+  );
+  return { ...item, unit: item.unit || prod?.unit || '', unitsInBox: item.unitsInBox || prod?.unitsInBox || 1 };
+});
+const finalInvoice = { ...currentInvoice, items: enrichedItems, total: grandTotal, status: status, salespersonId: currentUser.id, salespersonName: currentUser.name, customerDetails: activeCustomer ? { contactPerson: activeCustomer.contactPerson || '', phone: activeCustomer.phone || '', address1: activeCustomer.address1 || activeCustomer.address || '', map1: activeCustomer.map1 || '', address2: activeCustomer.address2 || '', map2: activeCustomer.map2 || '' } : {} };
 if (!finalInvoice.id) {
   const prefix = status === 'Estimate' ? 'EST' : status === 'Booked' ? 'ORD' : 'INV';
   const nextNum = getNextSeqNum(invoices, prefix);
@@ -1057,7 +1077,7 @@ setProdSearch('');
 if (billingView === 'form') {
 const isEdit = !!currentInvoice.id;
 const editingStatus = currentInvoice.status || '';
-const grandTotal = currentInvoice.items.reduce((s,i)=>s+(i.isBonus?0:i.price*i.quantity),0) + Number(currentInvoice.deliveryBilled||0);
+const grandTotal = currentInvoice.items.reduce((s,i)=>s+(i.isBonus?0:i.price*i.quantity),0) + Number(currentInvoice.deliveryBilled||0) - Number(currentInvoice.discount||0);
 const formTypeLabel = isEdit
   ? (editingStatus === 'Estimate' ? 'Edit Estimate' : editingStatus === 'Booked' ? 'Edit Draft Order' : editingStatus === 'CreditNote' ? 'Credit Note' : `Edit Invoice`)
   : (statusFilter === 'Estimate' ? 'New Estimate / Quotation' : statusFilter === 'Booked' ? 'New Draft Order' : 'New Invoice');
@@ -1242,9 +1262,10 @@ return (
 <div className="col-span-2 sm:col-span-1"><label className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider ml-1 mb-1 block">Driver Phone</label><input placeholder="03XX..." className={`${inputClass} !bg-white !border-indigo-200`} value={currentInvoice.driverPhone || ''} onChange={e => setCurrentInvoice({...currentInvoice, driverPhone: e.target.value})} /></div>
 </div>
 )}
-<div className="grid grid-cols-2 gap-3 mb-2">
-<div><label className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider ml-1 mb-1 block">Delivery Billed (+)</label><input type="number" className={inputClass} value={currentInvoice.deliveryBilled} onChange={e => setCurrentInvoice({...currentInvoice, deliveryBilled: e.target.value})} /></div>
+<div className="grid grid-cols-3 gap-2 mb-2">
+<div><label className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider ml-1 mb-1 block">Delivery (+)</label><input type="number" className={inputClass} value={currentInvoice.deliveryBilled} onChange={e => setCurrentInvoice({...currentInvoice, deliveryBilled: e.target.value})} /></div>
 <div><label className="text-[10px] font-bold text-rose-500 uppercase tracking-wider ml-1 mb-1 block">Driver Exp (-)</label><input type="number" className={inputClass} value={currentInvoice.transportExpense} onChange={e => setCurrentInvoice({...currentInvoice, transportExpense: e.target.value})} /></div>
+<div><label className="text-[10px] font-bold text-amber-600 uppercase tracking-wider ml-1 mb-1 block">Discount (-)</label><input type="number" className={inputClass} value={currentInvoice.discount || ''} placeholder="0" onChange={e => setCurrentInvoice({...currentInvoice, discount: Number(e.target.value) || 0})} /></div>
 </div>
 <div className="mt-4 bg-slate-50 p-3 rounded-xl border border-slate-200">
 <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 block mb-2">Payment Received</label>
@@ -1279,7 +1300,10 @@ return (
 <div className="p-4 flex flex-col h-full">
 <div className="flex gap-2 mb-4">
 <div className="relative flex-1"><Search className="absolute left-3.5 top-3.5 text-slate-400" size={18} /><input placeholder="Search Invoices..." className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl font-semibold outline-none shadow-sm text-sm" value={search} onChange={e => setSearch(e.target.value)} onKeyDown={e => { if (e.key === 'Escape' && search) { e.stopPropagation(); setSearch(''); } }} /></div>
-<button onClick={startNewInvoice} className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-3 rounded-xl shadow-md font-bold flex items-center gap-1.5 active:scale-95"><Plus size={18}/> New</button>
+{statusFilter === 'CreditNote'
+  ? <button onClick={() => { setEditingCreditNote({ customerId: '', id: '' }); setShowCreditNoteModal(true); }} className="bg-rose-600 hover:bg-rose-700 text-white px-4 py-3 rounded-xl shadow-md font-bold flex items-center gap-1.5 active:scale-95 whitespace-nowrap"><RotateCcw size={16}/> New Return</button>
+  : <button onClick={startNewInvoice} className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-3 rounded-xl shadow-md font-bold flex items-center gap-1.5 active:scale-95"><Plus size={18}/> New</button>
+}
 </div>
 <div className="flex items-center gap-2 mb-3"><Calendar size={18} className="text-slate-400" /><select value={dateFilter} onChange={e => setDateFilter(e.target.value)} className="bg-white border border-slate-200 px-3 py-2 rounded-lg font-bold text-sm text-slate-700 outline-none flex-1"><option>All Time</option><option>Today</option><option>This Week</option><option>This Month</option><option>This Year</option></select></div>
 <div className="flex gap-1.5 mb-4">
@@ -1432,36 +1456,90 @@ Bal: Rs. {bal.toLocaleString('en-US')} {bal > 0 ? '(Dr)' : bal < 0 ? '(Cr)' : ''
 
 // ─── Credit Note Modal ───
 const CreditNoteModal = () => {
-const { isAdmin, currentUser, products, customers, invoices, showToast, saveToFirebase, setShowCreditNoteModal, editingCreditNote, setEditingCreditNote, getCompanyName } = useContext(AppContext);
+const { currentUser, products, customers, invoices, showToast, saveToFirebase, setShowCreditNoteModal, editingCreditNote, setEditingCreditNote, getCompanyName } = useContext(AppContext);
 const inputClass = "w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all shadow-sm text-slate-800 placeholder-slate-400";
+
+// Editing an existing CN (id starts with 'CN-') vs new
+const existingCN = editingCreditNote?.id?.startsWith('CN-') ? invoices.find(o => o.id === editingCreditNote.id) : null;
+
 const [form, setForm] = useState({
-  customerId: editingCreditNote?.customerId || '',
-  originalInvoiceId: editingCreditNote?.id || '',
-  date: getLocalDateStr(),
-  reason: '',
-  items: [],
+  customerId: existingCN?.customerId || editingCreditNote?.customerId || '',
+  originalInvoiceId: existingCN ? (existingCN.originalInvoiceId || '') : (!editingCreditNote?.id?.startsWith('CN-') ? editingCreditNote?.id || '' : ''),
+  date: existingCN?.date || getLocalDateStr(),
+  reason: existingCN?.reason || '',
+  items: existingCN ? existingCN.items.map(i => ({ ...i, _soldQty: i.quantity })) : [],
 });
-const [prodSearch, setProdSearch] = useState('');
+const [custSearch, setCustSearch]   = useState('');
+const [showCustDrop, setShowCustDrop] = useState(false);
+const [hiCust, setHiCust]           = useState(-1);
+const [prodSearch, setProdSearch]   = useState('');
+const [hiProd, setHiProd]           = useState(-1);
+const custSearchRef = useRef(null);
+const prodSearchRef = useRef(null);
+const lastQtyRef    = useRef(null);
+
 const grandTotal = form.items.reduce((s, i) => s + (i.price * i.quantity), 0);
-const handleAddItem = (p) => {
-  const existing = form.items.find(i => i.productId === p.id);
-  if (existing) { setForm({...form, items: form.items.map(i => i.productId === p.id ? {...i, quantity: i.quantity + 1} : i)}); }
-  else { setForm({...form, items: [...form.items, { productId: p.id, name: p.name, price: p.sellingPrice, costPrice: p.costPrice, company: getCompanyName(p.companyId), quantity: 1, unit: p.unit, unitsInBox: p.unitsInBox, isBonus: false }]}); }
-  setProdSearch('');
+const custId = Number(form.customerId);
+
+// Customer's purchase history (most-recent price per product)
+const purchaseHistory = React.useMemo(() => {
+  if (!custId) return [];
+  const seen = new Map();
+  [...invoices]
+    .filter(o => o.customerId === custId && o.status === 'Billed')
+    .sort((a, b) => (b.date > a.date ? 1 : -1))
+    .forEach(inv => {
+      (inv.items || []).filter(i => !i.isBonus).forEach(item => {
+        const k = String(item.productId || item.uniqueId || item.name);
+        if (!seen.has(k)) seen.set(k, { ...item, _soldQty: item.quantity, _invId: inv.id });
+      });
+    });
+  return Array.from(seen.values());
+}, [custId, invoices]);
+
+const addedKeys = new Set(form.items.map(i => String(i.productId || i.uniqueId || i.name)));
+
+const itemKey = (i) => String(i.productId || i.uniqueId || i.name);
+
+const addHistoryItem = (item) => {
+  const k = itemKey(item);
+  if (addedKeys.has(k)) {
+    setForm(f => ({ ...f, items: f.items.map(i => itemKey(i) === k ? { ...i, quantity: i.quantity + 1 } : i) }));
+  } else {
+    setForm(f => ({ ...f, items: [...f.items, { ...item, quantity: 1 }] }));
+  }
+  setTimeout(() => prodSearchRef.current?.focus(), 50);
 };
+
+const addProduct = (p) => {
+  const k = String(p.id);
+  if (form.items.find(i => String(i.productId) === k)) {
+    setForm(f => ({ ...f, items: f.items.map(i => String(i.productId) === k ? { ...i, quantity: i.quantity + 1 } : i) }));
+  } else {
+    setForm(f => ({ ...f, items: [...f.items, { productId: p.id, name: p.name, price: p.sellingPrice, costPrice: p.costPrice, company: getCompanyName(p.companyId), quantity: 1, unit: p.unit, unitsInBox: p.unitsInBox }] }));
+  }
+  setProdSearch(''); setHiProd(-1);
+  setTimeout(() => lastQtyRef.current?.focus(), 50);
+};
+
+const pickCustomer = (c) => {
+  setForm(f => ({ ...f, customerId: c.id, items: [] }));
+  setShowCustDrop(false); setCustSearch(''); setHiCust(-1);
+  setTimeout(() => prodSearchRef.current?.focus(), 80);
+};
+
 const save = async () => {
   if (!form.customerId || form.items.length === 0) return showToast('Customer and at least one item required', 'error');
-  const total = grandTotal;
   const cust = customers.find(c => c.id === Number(form.customerId));
   const cn = {
-    id: `CN-${String(getNextSeqNum(invoices, 'CN')).padStart(4, '0')}`,
+    id: existingCN ? existingCN.id : `CN-${String(getNextSeqNum(invoices, 'CN')).padStart(4, '0')}`,
     date: form.date,
     customerId: Number(form.customerId),
     customerName: cust?.name || '',
     originalInvoiceId: form.originalInvoiceId || '',
-    items: form.items,
+    items: form.items.map(({ _soldQty, _invId, ...rest }) => rest),
     deliveryBilled: 0,
-    total,
+    total: grandTotal,
     reason: form.reason || '',
     status: 'CreditNote',
     salespersonId: currentUser.id,
@@ -1469,83 +1547,214 @@ const save = async () => {
     customerDetails: cust ? { contactPerson: cust.contactPerson || '', phone: cust.phone || '', address1: cust.address1 || cust.address || '' } : {},
   };
   await saveToFirebase('invoices', cn.id, cn);
-  showToast('Credit Note Saved!');
-  setEditingCreditNote(null);
-  setShowCreditNoteModal(false);
+  showToast(existingCN ? 'Credit Note Updated!' : 'Credit Note Saved!');
+  setEditingCreditNote(null); setShowCreditNoteModal(false);
 };
+
+// Filtered product list for search
+const filteredProds = prodSearch
+  ? products.filter(p => p.name.toLowerCase().includes(prodSearch.toLowerCase()))
+  : [];
+// History items filtered by search (when search active, show matching history; else show all)
+const historyList = prodSearch
+  ? purchaseHistory.filter(i => (i.name || '').toLowerCase().includes(prodSearch.toLowerCase()))
+  : purchaseHistory;
+
 return (
-<div className="h-full flex flex-col bg-slate-50 absolute inset-0 z-20 animate-slide-up">
+<div className="h-full flex flex-col bg-slate-50 absolute inset-0 z-20 animate-slide-up"
+  onKeyDown={e => { if (e.ctrlKey && e.key === 'Enter') { e.preventDefault(); save(); } }}>
+
+{/* Header */}
 <div className="bg-white/80 backdrop-blur-md p-4 border-b border-slate-200 flex justify-between items-center sticky top-0 z-30 shadow-sm">
-<div>
-  <h2 className="text-lg font-extrabold text-slate-800 tracking-tight">Credit Note / Sales Return</h2>
-  <p className="text-[10px] font-bold text-rose-500 uppercase tracking-widest">CN-{form.date}</p>
-</div>
-<button onClick={() => { setEditingCreditNote(null); setShowCreditNoteModal(false); }} className="p-2 bg-slate-100 rounded-full text-slate-600 hover:bg-slate-200 transition-colors"><X size={20}/></button>
-</div>
-<div className="flex-1 overflow-y-auto p-4 space-y-5 pb-32">
-<div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-  <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5"><Users size={12}/> Customer</h3>
-  <SearchableSelect className={inputClass} value={form.customerId} onChange={e => setForm({...form, customerId: e.target.value})} placeholder="— Select Customer —" options={customers.map(c=>({value:c.id,label:c.name}))} />
-</div>
-<div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-  <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Return Details</h3>
-  <div className="grid grid-cols-2 gap-3 mb-3">
-    <div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Date</label><input type="date" className={inputClass} value={form.date} onChange={e => setForm({...form, date: e.target.value})} /></div>
-    <div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Orig. Invoice (optional)</label><input placeholder="INV-XXXX" className={inputClass} value={form.originalInvoiceId} onChange={e => setForm({...form, originalInvoiceId: e.target.value})} /></div>
+  <div>
+    <h2 className="text-lg font-extrabold text-slate-800 tracking-tight">Sales Return / Credit Note</h2>
+    <input type="date" value={form.date} onChange={e => setForm(f=>({...f,date:e.target.value}))}
+      className="text-[11px] font-bold text-slate-500 bg-transparent border-0 outline-none cursor-pointer hover:text-rose-600 mt-0.5 p-0" />
   </div>
-  <div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Reason for Return</label><input placeholder="e.g. Expired goods, Wrong item, Excess stock..." className={inputClass} value={form.reason} onChange={e => setForm({...form, reason: e.target.value})} /></div>
+  <button onClick={() => { setEditingCreditNote(null); setShowCreditNoteModal(false); }} className="p-2 bg-slate-100 rounded-full text-slate-600 hover:bg-slate-200 transition-colors"><X size={20}/></button>
 </div>
-<div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-  <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5"><Package size={12}/> Returned Items</h3>
-  <div className="relative mb-4"><Search size={16} className="absolute left-3.5 top-3.5 text-slate-400"/><input placeholder="Search product to add..." className={`pl-10 ${inputClass}`} value={prodSearch} onChange={e => setProdSearch(e.target.value)} /></div>
-  {prodSearch && (
-    <div className="border border-rose-200 bg-rose-50/50 rounded-xl mb-4 max-h-48 overflow-y-auto p-2 space-y-1 shadow-inner">
-      {products.filter(p => p.name.toLowerCase().includes(prodSearch.toLowerCase())).map(p => (
-        <button type="button" key={p.id} className="w-full p-2 bg-white rounded-lg shadow-sm border border-rose-100 flex justify-between items-center hover:bg-rose-50 transition-colors text-left" onClick={() => handleAddItem(p)}>
-          <span className="font-semibold text-sm text-slate-800">{p.name}</span>
-          <span className="text-rose-600 font-bold ml-2">Rs.{p.sellingPrice}</span>
-        </button>
-      ))}
-    </div>
-  )}
-  <div className="space-y-3">
-    {form.items.map(item => (
-      <div key={item.productId} className="bg-slate-50 p-3 rounded-xl border border-slate-200 shadow-sm">
-        <div className="flex justify-between items-start mb-2">
-          <p className="font-bold text-sm text-slate-800 leading-tight">{item.name}</p>
-          <button onClick={() => setForm({...form, items: form.items.filter(i => i.productId !== item.productId)})} className="text-slate-400 hover:text-rose-500"><X size={16}/></button>
+
+<div className="flex-1 overflow-y-auto p-4 space-y-4 pb-32">
+
+  {/* ── Customer ── */}
+  <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+    <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5"><Users size={12}/> Customer</h3>
+    <div className="relative">
+      <Search size={16} className="absolute left-3.5 top-3.5 text-slate-400 pointer-events-none z-10"/>
+      <input ref={custSearchRef} autoFocus={!form.customerId}
+        className={`pl-10 ${inputClass}`} placeholder="Search customer…"
+        value={showCustDrop ? custSearch : (customers.find(c => c.id === custId)?.name || '')}
+        onFocus={() => { setShowCustDrop(true); setCustSearch(''); setHiCust(-1); }}
+        onChange={e => { setCustSearch(e.target.value); setHiCust(-1); }}
+        onBlur={() => setTimeout(() => { setShowCustDrop(false); setHiCust(-1); }, 150)}
+        onKeyDown={e => {
+          const fc = customers.filter(c => !custSearch || c.name.toLowerCase().includes(custSearch.toLowerCase()));
+          if (e.key === 'ArrowDown') { e.preventDefault(); setHiCust(h => Math.min(h+1, fc.length-1)); }
+          else if (e.key === 'ArrowUp') { e.preventDefault(); setHiCust(h => Math.max(h-1, 0)); }
+          else if (e.key === 'Enter') { e.preventDefault(); if (hiCust >= 0 && fc[hiCust]) pickCustomer(fc[hiCust]); else if (fc.length === 1) pickCustomer(fc[0]); }
+          else if (e.key === 'Escape') { setShowCustDrop(false); }
+        }}
+      />
+      {showCustDrop && (
+        <div className="absolute z-50 w-full mt-1 border border-rose-200 bg-white rounded-xl max-h-52 overflow-y-auto shadow-lg">
+          {customers.filter(c => !custSearch || c.name.toLowerCase().includes(custSearch.toLowerCase())).map((c, idx) => (
+            <button type="button" key={c.id}
+              className={`w-full text-left px-4 py-2.5 text-sm font-semibold transition-colors ${c.id === custId || idx === hiCust ? 'bg-rose-50 text-rose-700' : 'text-slate-800 hover:bg-rose-50'}`}
+              onMouseDown={e => { e.preventDefault(); pickCustomer(c); }}>{c.name}</button>
+          ))}
+          {customers.filter(c => !custSearch || c.name.toLowerCase().includes(custSearch.toLowerCase())).length === 0 && (
+            <p className="px-4 py-3 text-sm text-slate-400">No customers found</p>
+          )}
         </div>
-        <div className="flex items-center justify-between">
-          <div className="flex flex-col">
-            <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5 ml-1">Rate (Rs)</label>
-            <input type="number" className="w-24 p-1.5 text-sm font-extrabold text-rose-700 bg-white border border-rose-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-500 shadow-inner" value={item.price} onChange={e => setForm({...form, items: form.items.map(i => i.productId === item.productId ? {...i, price: Number(e.target.value)} : i)})} />
-          </div>
-          <div className="flex flex-col items-center">
-            <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Quantity</label>
-            <div className="flex items-center bg-white border border-slate-200 rounded-lg p-0.5 shadow-sm">
-              <button onClick={() => setForm({...form, items: form.items.map(i => i.productId === item.productId ? {...i, quantity: i.quantity - 1} : i).filter(i => i.quantity > 0)})} className="w-8 h-8 rounded-md bg-slate-50 text-slate-600 font-bold hover:bg-slate-100">-</button>
-              <input type="number" className="w-12 text-center text-sm font-bold bg-transparent outline-none appearance-none" value={item.quantity} onChange={e => setForm({...form, items: form.items.map(i => i.productId === item.productId ? {...i, quantity: Number(e.target.value)} : i)})} />
-              <button onClick={() => setForm({...form, items: form.items.map(i => i.productId === item.productId ? {...i, quantity: i.quantity + 1} : i)})} className="w-8 h-8 rounded-md bg-rose-50 text-rose-600 font-bold hover:bg-rose-100">+</button>
+      )}
+    </div>
+  </div>
+
+  {/* ── Items ── */}
+  <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+    <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+      <Package size={12}/> Returned Items
+      {form.items.length > 0 && <span className="ml-1 text-rose-600 font-bold normal-case tracking-normal">{form.items.length} SKU{form.items.length!==1?'s':''} · {form.items.reduce((s,i)=>s+(i.quantity||0),0)} units</span>}
+    </h3>
+
+    {/* Search input — shows history items when no query, all products when typing */}
+    <div className="relative mb-3">
+      <Search size={16} className="absolute left-3.5 top-3.5 text-slate-400"/>
+      <input ref={prodSearchRef}
+        placeholder={custId ? 'Search to add… (history shown below)' : 'Select a customer first…'}
+        disabled={!custId}
+        className={`pl-10 ${inputClass} ${!custId ? 'opacity-50 cursor-not-allowed' : ''}`}
+        value={prodSearch}
+        onChange={e => { setProdSearch(e.target.value); setHiProd(-1); }}
+        onKeyDown={e => {
+          // Arrow navigation over merged list: history items first (when no search), then products
+          const list = prodSearch ? filteredProds.map(p => ({ _type:'prod', p })) : historyList.slice(0,8).map(i => ({ _type:'hist', i }));
+          if (e.key === 'ArrowDown') { e.preventDefault(); setHiProd(h => Math.min(h+1, list.length-1)); }
+          else if (e.key === 'ArrowUp') { e.preventDefault(); setHiProd(h => Math.max(h-1, 0)); }
+          else if (e.key === 'Enter') {
+            e.preventDefault();
+            const entry = hiProd >= 0 ? list[hiProd] : list.length === 1 ? list[0] : null;
+            if (!entry) return;
+            if (entry._type === 'hist') addHistoryItem(entry.i);
+            else addProduct(entry.p);
+          }
+          else if (e.key === 'Escape') { setProdSearch(''); setHiProd(-1); }
+        }}
+      />
+    </div>
+
+    {/* Dropdown list: purchase history OR search results */}
+    {custId && (prodSearch ? filteredProds.length > 0 : historyList.length > 0) && (
+      <div className="border border-rose-200 bg-rose-50/30 rounded-xl mb-4 max-h-56 overflow-y-auto p-2 space-y-1 shadow-inner">
+        {prodSearch ? (
+          // Search results from all products
+          filteredProds.map((p, idx) => {
+            const inList = form.items.some(i => String(i.productId) === String(p.id));
+            return (
+              <div key={p.id} className={`p-2 rounded-lg border flex items-center justify-between ${idx === hiProd ? 'bg-rose-100 border-rose-300' : 'bg-white border-rose-100'}`}>
+                <button type="button" className="flex-1 text-left font-semibold text-sm text-slate-800 hover:text-rose-700" onClick={() => addProduct(p)}>
+                  {p.name}
+                  <span className="ml-2 text-[10px] font-bold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded">Rs.{p.sellingPrice}</span>
+                </button>
+                {inList && <span className="text-[10px] font-bold text-rose-500 ml-2">✓</span>}
+              </div>
+            );
+          })
+        ) : (
+          // Purchase history items (no search active)
+          historyList.map((item, idx) => {
+            const k = itemKey(item);
+            const inList = addedKeys.has(k);
+            return (
+              <div key={k} className={`p-2 rounded-lg border flex items-center justify-between gap-2 ${idx === hiProd ? 'bg-rose-100 border-rose-300' : 'bg-white border-rose-100'}`}>
+                <button type="button" className="flex-1 text-left" onClick={() => addHistoryItem(item)}>
+                  <span className="font-semibold text-sm text-slate-800">{item.name}</span>
+                  <span className="ml-2 text-[10px] font-bold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded">Rs.{item.price}</span>
+                  <span className="ml-1 text-[10px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">×{item._soldQty || item.quantity}</span>
+                  {item._invId && <span className="ml-1 text-[10px] text-slate-400">{item._invId}</span>}
+                </button>
+                {inList && <span className="text-[10px] font-bold text-rose-500 shrink-0">✓ Added</span>}
+              </div>
+            );
+          })
+        )}
+        {prodSearch && filteredProds.length === 0 && (
+          <p className="text-center text-slate-400 text-sm py-3">No products found</p>
+        )}
+      </div>
+    )}
+    {custId && !prodSearch && historyList.length === 0 && (
+      <p className="text-sm text-slate-400 text-center py-3 mb-3">No purchase history — type to search all products</p>
+    )}
+
+    {/* Added return items */}
+    <div className="space-y-3">
+      {form.items.map((item, idx) => {
+        const k = itemKey(item);
+        return (
+          <div key={k} data-item-row="1" className="bg-slate-50 p-3 rounded-xl border border-slate-200 shadow-sm">
+            <div className="flex justify-between items-start mb-2">
+              <div>
+                <p className="font-bold text-sm text-slate-800 leading-tight">{item.name}</p>
+                {item._soldQty && <span className="text-[10px] text-slate-400">Sold: ×{item._soldQty}</span>}
+              </div>
+              <button tabIndex={-1} onClick={() => setForm(f=>({...f, items: f.items.filter(i => itemKey(i) !== k)}))} className="text-slate-300 hover:text-rose-500 transition-colors"><X size={16}/></button>
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="flex flex-col">
+                <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5 ml-1">Rate (Rs)</label>
+                <input type="number" data-item-rate="1"
+                  className="w-24 p-1.5 text-sm font-extrabold text-rose-700 bg-white border border-rose-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-500 shadow-inner"
+                  value={item.price}
+                  onChange={e => setForm(f=>({...f, items: f.items.map(i => itemKey(i)===k ? {...i, price: Number(e.target.value)} : i)}))}
+                  onKeyDown={e => { if (e.key==='Enter') { e.preventDefault(); const q = e.target.closest('[data-item-row]')?.querySelector('[data-item-qty]'); q?.focus(); q?.select(); } }} />
+              </div>
+              <div className="flex flex-col items-center">
+                <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Qty</label>
+                <div className="flex items-center bg-white border border-slate-200 rounded-lg p-0.5 shadow-sm">
+                  <button tabIndex={-1} onClick={() => setForm(f=>({...f, items: f.items.map(i => itemKey(i)===k ? {...i, quantity: i.quantity-1} : i).filter(i=>i.quantity>0)}))} className="w-8 h-8 rounded-md bg-slate-50 text-slate-600 font-bold hover:bg-slate-100">-</button>
+                  <input data-item-qty="1" type="number" ref={idx === form.items.length-1 ? lastQtyRef : null}
+                    className="w-12 text-center text-sm font-bold bg-transparent outline-none appearance-none"
+                    value={item.quantity}
+                    onChange={e => setForm(f=>({...f, items: f.items.map(i => itemKey(i)===k ? {...i, quantity: Number(e.target.value)||1} : i)}))}
+                    onKeyDown={e => { if (e.key==='Enter') { e.preventDefault(); prodSearchRef.current?.focus(); } }} />
+                  <button tabIndex={-1} onClick={() => setForm(f=>({...f, items: f.items.map(i => itemKey(i)===k ? {...i, quantity: i.quantity+1} : i)}))} className="w-8 h-8 rounded-md bg-rose-50 text-rose-600 font-bold hover:bg-rose-100">+</button>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-[9px] text-slate-400 font-bold uppercase">Subtotal</p>
+                <p className="font-extrabold text-rose-700 text-sm">Rs.{(item.price * item.quantity).toLocaleString('en-US')}</p>
+              </div>
             </div>
           </div>
-          <div className="text-right">
-            <p className="text-[9px] text-slate-400 font-bold uppercase">Subtotal</p>
-            <p className="font-extrabold text-rose-700 text-sm">Rs.{(item.price * item.quantity).toLocaleString('en-US')}</p>
-          </div>
-        </div>
-      </div>
-    ))}
-    {form.items.length === 0 && <p className="text-center text-slate-400 text-sm py-4 font-medium">Search and add returned items above</p>}
+        );
+      })}
+      {form.items.length === 0 && custId && <p className="text-center text-slate-400 text-sm py-2">Pick items from the list above to return</p>}
+    </div>
   </div>
+
+  {/* ── Return details (reason + invoice ref) ── */}
+  <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+    <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Return Reason &amp; Reference</h3>
+    <div className="grid grid-cols-2 gap-3">
+      <div className="col-span-2"><input placeholder="Reason: Expired, Wrong item, Excess stock…" className={inputClass} value={form.reason} onChange={e=>setForm(f=>({...f,reason:e.target.value}))} /></div>
+      <div className="col-span-2"><input placeholder="Original Invoice (optional): INV-XXXX" className={inputClass} value={form.originalInvoiceId} onChange={e=>setForm(f=>({...f,originalInvoiceId:e.target.value}))} /></div>
+    </div>
+  </div>
+
+  {/* ── Total ── */}
+  {form.items.length > 0 && (
+    <div className="bg-gradient-to-br from-rose-50 to-pink-50 p-5 rounded-2xl border border-rose-100 text-center shadow-sm">
+      <p className="text-rose-600 font-bold uppercase text-[10px] tracking-widest mb-1">{form.items.length} SKU{form.items.length!==1?'s':''} · Total Credit</p>
+      <p className="text-4xl font-black text-rose-800 tracking-tight">Rs. {grandTotal.toLocaleString('en-US')}</p>
+    </div>
+  )}
 </div>
-<div className="bg-gradient-to-br from-rose-50 to-pink-50 p-6 rounded-2xl border border-rose-100 text-center shadow-sm">
-  <p className="text-rose-600 font-bold uppercase text-[10px] tracking-widest mb-1">Total Credit</p>
-  <p className="text-4xl font-black text-rose-800 tracking-tight">Rs. {grandTotal.toLocaleString('en-US')}</p>
-</div>
-</div>
+
+{/* Footer */}
 <div className="p-4 bg-white/80 backdrop-blur-md border-t border-slate-200 fixed bottom-0 w-full max-w-md flex gap-3 z-30">
-<button onClick={() => { setEditingCreditNote(null); setShowCreditNoteModal(false); }} className="flex-1 bg-white text-slate-700 border border-slate-300 py-3.5 rounded-xl font-bold shadow-sm flex justify-center items-center gap-2"><X size={18}/> Cancel</button>
-<button onClick={save} className="flex-[2] bg-rose-600 hover:bg-rose-700 text-white py-3.5 rounded-xl font-bold shadow-md flex justify-center items-center gap-2 active:scale-95 transition-all"><RotateCcw size={18}/> Save Credit Note</button>
+  <button onClick={() => { setEditingCreditNote(null); setShowCreditNoteModal(false); }} className="flex-1 bg-white text-slate-700 border border-slate-300 py-3.5 rounded-xl font-bold shadow-sm flex justify-center items-center gap-2"><X size={18}/> Cancel</button>
+  <button onClick={save} className="flex-[2] bg-rose-600 hover:bg-rose-700 text-white py-3.5 rounded-xl font-bold shadow-md flex justify-center items-center gap-2 active:scale-95 transition-all"><RotateCcw size={18}/> Save · Ctrl+↵</button>
 </div>
 </div>
 );
@@ -1904,6 +2113,20 @@ return (
 )
 };
 
+const uploadToGist = async (token, backupObj, existingGistId) => {
+  const filename = `AnimalHealthPK_Backup_${new Date().toISOString().slice(0,10)}.json`;
+  const method = existingGistId ? 'PATCH' : 'POST';
+  const url = existingGistId ? `https://api.github.com/gists/${existingGistId}` : 'https://api.github.com/gists';
+  const res = await fetch(url, {
+    method,
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', 'X-GitHub-Api-Version': '2022-11-28' },
+    body: JSON.stringify({ description: 'AnimalHealth.PK Auto Backup', public: false, files: { [filename]: { content: JSON.stringify(backupObj, null, 2) } } }),
+  });
+  if (!res.ok) { const err = await res.text(); throw new Error(`GitHub ${res.status}: ${err}`); }
+  const data = await res.json();
+  return data.id;
+};
+
 const AppSettingsView = () => {
 const { appSettings, saveToFirebase, showToast, showConfirm, appUsers, companies, products, customers, invoices, expenses, expenseCategories, payments, cities, areas, customerTypes, riders } = useContext(AppContext);
 const [form, setForm] = useState({
@@ -1916,8 +2139,11 @@ const [form, setForm] = useState({
   address: appSettings?.address || '',
   showBusinessNameOnDocs: appSettings?.showBusinessNameOnDocs !== false,
   showBusinessNameOnReports: appSettings?.showBusinessNameOnReports !== false,
+  githubToken: appSettings?.githubToken || '',
+  githubFreq: appSettings?.githubFreq || 'weekly',
 });
 const [restoring, setRestoring] = useState(false);
+const [githubBacking, setGithubBacking] = useState(false);
 React.useEffect(() => {
   if (appSettings?.id) setForm({
     id: 'main',
@@ -1929,14 +2155,28 @@ React.useEffect(() => {
     address: appSettings.address || '',
     showBusinessNameOnDocs: appSettings.showBusinessNameOnDocs !== false,
     showBusinessNameOnReports: appSettings.showBusinessNameOnReports !== false,
+    githubToken: appSettings.githubToken || '',
+    githubFreq: appSettings.githubFreq || 'weekly',
   });
-}, [appSettings?.id, appSettings?.businessName, appSettings?.showBusinessNameOnDocs, appSettings?.showBusinessNameOnReports]);
+}, [appSettings?.id, appSettings?.businessName, appSettings?.showBusinessNameOnDocs, appSettings?.showBusinessNameOnReports, appSettings?.githubToken, appSettings?.githubFreq]);
 const saveSettings = async () => { await saveToFirebase('appSettings', 'main', form); showToast('Settings saved!'); };
 const downloadBackup = async () => {
   const backup = { exportedAt: new Date().toISOString(), collections: { app_users: appUsers, appSettings: appSettings ? [appSettings] : [], companies, products, customers, invoices, expenses, expenseCategories, payments, riders, cities, areas, customerTypes } };
   const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
   await shareOrDownload(blob, `AnimalHealthPK_Backup_${new Date().toISOString().slice(0,10).replace(/-/g,'')}.json`);
   showToast('Backup downloaded!');
+};
+const buildBackupObj = () => ({ exportedAt: new Date().toISOString(), collections: { app_users: appUsers, appSettings: appSettings ? [appSettings] : [], companies, products, customers, invoices, expenses, expenseCategories, payments, riders, cities, areas, customerTypes } });
+const manualGistBackup = async () => {
+  const token = appSettings?.githubToken || form.githubToken;
+  if (!token) return showToast('Enter a GitHub token first', 'error');
+  setGithubBacking(true);
+  try {
+    const newId = await uploadToGist(token, buildBackupObj(), appSettings?.githubGistId);
+    await saveToFirebase('appSettings', 'main', { ...appSettings, ...form, githubGistId: newId, lastBackupAt: new Date().toISOString() });
+    showToast('Backup uploaded to GitHub Gist!');
+  } catch(e) { showToast(`GitHub backup failed: ${e.message}`, 'error'); }
+  finally { setGithubBacking(false); }
 };
 const handleRestoreFile = async (e) => {
   const file = e.target.files[0]; if (!file) return;
@@ -1955,7 +2195,7 @@ const inputCls = "w-full p-3 bg-white border border-slate-200 rounded-xl text-sm
 const labelCls = "block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5";
 const totalRecords = invoices.length + customers.length + products.length + payments.length + expenses.length;
 return (
-<div className="flex-1 overflow-y-auto p-4 space-y-5">
+<div className="flex-1 overflow-y-auto p-4 pb-28 space-y-5">
   <form onSubmit={e => { e.preventDefault(); saveSettings(); }} className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
     <h3 className="font-black text-slate-800 text-base mb-1">Business Profile</h3>
     <p className="text-xs text-slate-400 mb-5">Used on invoices, receipts, and all generated documents.</p>
@@ -2007,6 +2247,93 @@ return (
     </div>
     <div className="mt-4 p-3 bg-slate-50 rounded-xl border border-slate-100 text-[11px] text-slate-500">
       <strong className="text-slate-600">Also:</strong> Firebase Console → Firestore → Automated Backups for server-side backups (requires Blaze plan).
+    </div>
+  </div>
+  <FixInvoiceUnitsButton />
+
+  {/* ── GitHub Auto-Backup ── */}
+  <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
+    <h3 className="font-black text-slate-800 text-base mb-1 flex items-center gap-2"><Github size={16}/> GitHub Auto-Backup</h3>
+    <p className="text-xs text-slate-400 mb-4">Saves a JSON backup to a private GitHub Gist automatically. Requires a Personal Access Token with <strong className="text-slate-600">gist</strong> scope.</p>
+    <div className="space-y-3">
+      <div>
+        <label className={labelCls}>Personal Access Token</label>
+        <input type="password" className={inputCls} placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
+          value={form.githubToken} onChange={e => setForm(p=>({...p, githubToken: e.target.value}))} autoComplete="off"/>
+        <p className="text-[10px] text-slate-400 mt-1">Create at github.com → Settings → Developer settings → Personal access tokens → <strong>gist</strong> scope only</p>
+      </div>
+      <div>
+        <label className={labelCls}>Auto-Backup Frequency</label>
+        <select className={inputCls} value={form.githubFreq} onChange={e => setForm(p=>({...p, githubFreq: e.target.value}))}>
+          <option value="never">Never (manual only)</option>
+          <option value="daily">Daily</option>
+          <option value="weekly">Weekly</option>
+          <option value="monthly">Monthly</option>
+        </select>
+      </div>
+      {appSettings?.lastBackupAt && (
+        <div className="flex items-center justify-between text-[11px]">
+          <span className="text-emerald-600 font-bold">Last backup: {appSettings.lastBackupAt.slice(0,10)}</span>
+          {appSettings?.githubGistId && <a href={`https://gist.github.com/${appSettings.githubGistId}`} target="_blank" rel="noopener noreferrer" className="text-indigo-500 hover:underline font-semibold">View Gist ↗</a>}
+        </div>
+      )}
+    </div>
+    <div className="flex gap-2 mt-4">
+      <button type="button" onClick={saveSettings} className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5"><Save size={13}/> Save Settings</button>
+      <button type="button" onClick={manualGistBackup} disabled={!form.githubToken || githubBacking} className="flex-1 bg-slate-800 hover:bg-slate-700 text-white font-bold py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 disabled:opacity-40"><Upload size={13}/> {githubBacking ? 'Uploading…' : 'Backup Now'}</button>
+    </div>
+  </div>
+</div>
+);
+};
+
+const FixInvoiceUnitsButton = () => {
+const { products, invoices, saveToFirebase, showToast } = useContext(AppContext);
+const [running, setRunning] = useState(false);
+const run = async () => {
+  setRunning(true);
+  // Build lookup maps
+  const byId   = new Map(products.map(p => [String(p.id), p]));
+  const byName = new Map(products.map(p => [(p.name||'').toLowerCase().trim(), p]));
+  const byWord = new Map();
+  products.forEach(p => { const w=(p.name||'').toLowerCase().trim().split(/\s+/)[0]; if(w&&w.length>2&&!byWord.has(w)) byWord.set(w,p); });
+  const findProd = (item) => {
+    let prod = byId.get(String(item.productId||'')) || byId.get(String(item.uniqueId||'')) || null;
+    if (!prod) { const nl=(item.name||'').toLowerCase().trim(); prod=byName.get(nl)||null; }
+    if (!prod) { const nl=(item.name||'').toLowerCase().trim(); const fw=nl.split(/\s+/)[0]; if(fw&&fw.length>2) prod=byWord.get(fw)||null; }
+    if (!prod) { const nl=(item.name||'').toLowerCase().trim(); prod=products.find(p=>{const pn=(p.name||'').toLowerCase().trim();return pn&&(nl.startsWith(pn.slice(0,10))||pn.startsWith(nl.slice(0,10)));}) || null; }
+    return prod;
+  };
+  const isValidUnit = (u) => !!u && isNaN(u) && String(u).trim().length > 1;
+  let invoicesFixed=0, itemsFixed=0;
+  for (const inv of invoices) {
+    const updatedItems = inv.items?.map(item => {
+      if (isValidUnit(item.unit)) return item;
+      const prod = findProd(item);
+      if (!prod) return item;
+      itemsFixed++;
+      return { ...item, unit: prod.unit||'', unitsInBox: item.unitsInBox||prod.unitsInBox||1 };
+    });
+    if (!updatedItems) continue;
+    const changed = updatedItems.some((it,i) => it.unit !== (inv.items[i]?.unit||''));
+    if (changed) { await saveToFirebase('invoices', inv.id, {...inv, items: updatedItems}); invoicesFixed++; }
+  }
+  setRunning(false);
+  showToast(itemsFixed>0 ? `Fixed ${itemsFixed} items across ${invoicesFixed} invoices!` : 'All invoice items already have units — nothing to fix.', itemsFixed>0?'success':'info');
+};
+return (
+<div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
+  <h3 className="font-black text-slate-800 text-base mb-1">Fix Invoice Item Units</h3>
+  <p className="text-xs text-slate-400 mb-4">Re-enriches all saved invoice items that are missing unit labels (e.g. Vial, Bottle) from the current product master. Run this once to fix old invoices.</p>
+  <div className="bg-teal-50 border border-teal-200 rounded-xl p-4">
+    <div className="flex items-center justify-between gap-3">
+      <div>
+        <div className="font-black text-teal-900 text-sm">Scan & Fix All Invoices</div>
+        <div className="text-[11px] text-teal-700 mt-1">{invoices.length} invoices · {products.length} products in master</div>
+      </div>
+      <button onClick={run} disabled={running} className={`font-bold px-4 py-2 rounded-lg text-xs flex items-center gap-1.5 shrink-0 ${running?'bg-slate-200 text-slate-400':'bg-teal-600 hover:bg-teal-700 text-white'}`}>
+        {running?'Running…':'Run Fix'}
+      </button>
     </div>
   </div>
 </div>
@@ -2236,6 +2563,8 @@ const [filterSalespersons, setFilterSalespersons] = useState(new Set());
 const toggleFilter = (setter, id) => setter(prev => { const next = new Set(prev); next.has(String(id)) ? next.delete(String(id)) : next.add(String(id)); return next; });
 const clearFilter = (setter) => setter(new Set());
 const [sortBy, setSortBy] = useState('profit');
+const [itemProdFilter, setItemProdFilter] = useState('');
+const [itemCustFilter, setItemCustFilter] = useState('');
 
 const checkCustomFilter = (dateStr) => {
   if (dateFilter !== 'Custom') return checkDateFilter(dateStr, dateFilter);
@@ -2345,11 +2674,13 @@ const reportEngine = useMemo(() => {
   // Credit Note impact — subtract returned values from all metrics (after monthlyData is built)
   const creditNotes = invoices.filter(o => o.status === 'CreditNote' && checkCustomFilter(o.date) && (filterCustomers.size === 0 || filterCustomers.has(String(o.customerId))) && (filterSalespersons.size === 0 || filterSalespersons.has(String(o.salespersonId))));
   creditNotes.forEach(cn => {
+    let cnRev = 0, cnCost = 0;
     (cn.items || []).forEach(item => {
       if (item.isBonus) return;
       const rev = (item.price || 0) * (item.quantity || 0);
       const cost = (item.costPrice || 0) * (item.quantity || 0);
       const gp = rev - cost;
+      cnRev += rev; cnCost += cost;
       kpis.productRevenue -= rev; kpis.totalCOGS -= cost; kpis.grossMargin -= gp;
       kpis.netProfit -= gp;
       const pKey = item.name;
@@ -2357,12 +2688,30 @@ const reportEngine = useMemo(() => {
       byProduct[pKey].qty -= (item.quantity || 0); byProduct[pKey].revenue -= rev; byProduct[pKey].cost -= cost; byProduct[pKey].profit -= gp;
       const cmpKey = item.company || 'Unknown';
       if (!byCompany[cmpKey]) byCompany[cmpKey] = { qty: 0, revenue: 0, cost: 0, profit: 0 };
-      byCompany[cmpKey].revenue -= rev; byCompany[cmpKey].profit -= gp;
+      byCompany[cmpKey].revenue -= rev; byCompany[cmpKey].cost -= cost; byCompany[cmpKey].profit -= gp;
     });
+    const cnGP = cnRev - cnCost;
+    // Customer breakdown
     if (!byCustomer[cn.customerName]) byCustomer[cn.customerName] = { productRevenue: 0, cost: 0, profit: 0, orders: 0 };
-    byCustomer[cn.customerName].productRevenue -= cn.total; byCustomer[cn.customerName].profit -= cn.total;
+    byCustomer[cn.customerName].productRevenue -= cnRev;
+    byCustomer[cn.customerName].cost -= cnCost;
+    byCustomer[cn.customerName].profit -= cnGP;
+    // Salesperson breakdown
+    const cnSp = cn.salespersonName || 'Unknown';
+    if (!bySalesperson[cnSp]) bySalesperson[cnSp] = { revenue: 0, profit: 0, orders: 0 };
+    bySalesperson[cnSp].revenue -= cnRev; bySalesperson[cnSp].profit -= cnGP;
+    // Segment breakdowns
+    const cnSeg = custSegment[cn.customerName] || {};
+    ['city', 'area', 'type'].forEach(k => {
+      const val = cnSeg[k] || 'Unknown';
+      const map = k === 'city' ? byCity : k === 'area' ? byArea : byType;
+      if (map[val]) { map[val].revenue -= cnRev; map[val].profit -= cnGP; }
+    });
+    // Monthly trend
     const month = cn.date.slice(0, 7);
-    if (monthlyData[month]) { monthlyData[month].revenue -= cn.total; monthlyData[month].profit -= cn.total; }
+    if (monthlyData[month]) { monthlyData[month].revenue -= cnRev; monthlyData[month].cost -= cnCost; monthlyData[month].profit -= cnGP; }
+    // Daily breakdown
+    if (dailyBreakdown[cn.date]) { dailyBreakdown[cn.date].revenue -= cnRev; dailyBreakdown[cn.date].profit -= cnGP; }
   });
   kpis.creditNotesCount = creditNotes.length;
   kpis.creditNotesTotal = creditNotes.reduce((s, cn) => s + cn.total, 0);
@@ -2381,7 +2730,7 @@ const reportEngine = useMemo(() => {
 }, [invoices, expenses, payments, dateFilter, customStart, customEnd, ...[...filterCompanies], ...[...filterCustomers], ...[...filterSalespersons], products, customers]);
 
 const getSortedExportData = () => {
-   if (view === 'Overview') return null;
+   if (view === 'Overview' || view === 'Item Sales') return null;
    if (view === 'Receivables') return reportEngine.receivablesList.map(r => ({
      'Customer Name': r.name, 'Outstanding (Rs)': r.amount,
      'Days Since Last Invoice': r.daysSince || 0, 'Last Invoice Date': r.lastInvDate || ''
@@ -2554,7 +2903,11 @@ const renderTable = (dataObj, type) => {
                     <td className="p-3">
                       <div className="flex items-center gap-1.5">
                         <span className={`text-[9px] font-black px-1 py-0.5 rounded border ${tierColors[row.abcTier]}`}>{row.abcTier}</span>
-                        <div className="font-bold text-slate-800">{row.key}</div>
+                        {type === 'Customer' ? (
+                          <button className="font-bold text-slate-800 hover:text-indigo-600 text-left transition-colors" onClick={() => { const c = customers.find(c => c.name === row.key); if(c){ setSelectedLedgerId(c.id); setShowLedgerModal(true); } }}>{row.key}</button>
+                        ) : (
+                          <div className="font-bold text-slate-800">{row.key}</div>
+                        )}
                       </div>
                       {row.company && <div className="text-[9px] text-slate-400 uppercase tracking-widest mt-0.5">{row.company}</div>}
                       <div className="w-full bg-slate-100 rounded-full h-1 mt-1.5 max-w-[100px]"><div className="bg-emerald-400 h-1 rounded-full" style={{width:`${barW}%`}}></div></div>
@@ -2677,10 +3030,10 @@ return (
 
     {/* View Tabs */}
     <ScrollableTabBar className="pb-2 shrink-0">
-       {['Overview','Insights','Monthly Trend','By Product','By Company','By Customer','By City','By Area','By Type','By Salesperson','Receivables'].map(v => (
+       {['Overview','Insights','Monthly Trend','By Product','By Company','By Customer','By City','By Area','By Type','By Salesperson','Receivables','Item Sales'].map(v => (
          <button key={v} data-analytictab={v} tabIndex={view===v?0:-1}
            onClick={() => setView(v)}
-           onKeyDown={makeArrowNav(['Overview','Insights','Monthly Trend','By Product','By Company','By Customer','By City','By Area','By Type','By Salesperson','Receivables'],view,setView,'data-analytictab')}
+           onKeyDown={makeArrowNav(['Overview','Insights','Monthly Trend','By Product','By Company','By Customer','By City','By Area','By Type','By Salesperson','Receivables','Item Sales'],view,setView,'data-analytictab')}
            className={`px-3 py-1.5 rounded-xl font-bold text-[11px] whitespace-nowrap shadow-sm transition-colors ${view === v ? 'bg-slate-800 text-white' : 'bg-white text-slate-600 border border-slate-200'}`}>{v}</button>
        ))}
     </ScrollableTabBar>
@@ -2823,7 +3176,8 @@ return (
            <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white p-6 rounded-3xl shadow-xl border border-slate-800">
               <p className="text-[10px] uppercase font-bold text-slate-400 mb-5 tracking-widest flex justify-between"><span>P&L Dashboard</span><span className="text-indigo-300">{filterLabel}</span></p>
               <div className="space-y-3.5">
-                <div className="flex justify-between items-center text-sm font-medium"><span className="text-slate-300">Gross Product Sales</span><span className="font-bold text-white">Rs.{reportEngine.kpis.productRevenue.toLocaleString('en-US')}</span></div>
+                <div className="flex justify-between items-center text-sm font-medium"><span className="text-slate-300">Gross Product Sales</span><span className="font-bold text-white">Rs.{(reportEngine.kpis.productRevenue + reportEngine.kpis.creditNotesTotal).toLocaleString('en-US')}</span></div>
+                {reportEngine.kpis.creditNotesTotal > 0 && <div className="flex justify-between items-center text-xs"><span className="text-rose-300">Sales Returns ({reportEngine.kpis.creditNotesCount})</span><span className="font-bold text-rose-300">− Rs.{reportEngine.kpis.creditNotesTotal.toLocaleString('en-US')}</span></div>}
                 <div className="flex justify-between items-center text-sm font-medium"><span className="text-rose-300">Total COGS</span><span className="font-bold text-rose-300">- Rs.{reportEngine.kpis.totalCOGS.toLocaleString('en-US')}</span></div>
                 <div className="flex justify-between items-center text-sm font-medium"><span className="text-indigo-300">Product Margin</span><span className="font-bold text-indigo-300">Rs.{reportEngine.kpis.grossMargin.toLocaleString('en-US')}</span></div>
                 <div className="h-px bg-slate-700"></div>
@@ -2849,6 +3203,96 @@ return (
       {view === 'By City' && renderSegmentTable(reportEngine.byCity, 'City')}
       {view === 'By Area' && renderSegmentTable(reportEngine.byArea, 'Area')}
       {view === 'By Type' && renderSegmentTable(reportEngine.byType, 'Type')}
+
+      {view === 'Item Sales' && (() => {
+        const prodQ = itemProdFilter.toLowerCase().trim();
+        const custQ = itemCustFilter.toLowerCase().trim();
+        const hasFilter = prodQ || custQ;
+        const rows = hasFilter ? (() => {
+          const out = [];
+          invoices.filter(o => o.status === 'Billed' && checkCustomFilter(o.date)).forEach(inv => {
+            if (custQ && !inv.customerName.toLowerCase().includes(custQ)) return;
+            (inv.items || []).filter(i => !i.isBonus).forEach(item => {
+              if (prodQ && !(item.name || '').toLowerCase().includes(prodQ)) return;
+              out.push({ date: inv.date, customerId: inv.customerId, customerName: inv.customerName, invoiceId: inv.id, inv, name: item.name, qty: item.quantity || 0, rate: item.price || 0, sub: (item.price || 0) * (item.quantity || 0) });
+            });
+          });
+          return out.sort((a, b) => b.date.localeCompare(a.date));
+        })() : [];
+        const totalUnits = rows.reduce((s, r) => s + r.qty, 0);
+        const totalAmt = rows.reduce((s, r) => s + r.sub, 0);
+        return (
+          <div className="space-y-3 mt-3">
+            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5"><Search size={11}/> Filter</p>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="relative">
+                  <Search size={13} className="absolute left-2.5 top-2.5 text-slate-400 pointer-events-none"/>
+                  <input className="w-full pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-300" placeholder="Product name…" value={itemProdFilter} onChange={e => setItemProdFilter(e.target.value)}/>
+                </div>
+                <div className="relative">
+                  <Users size={13} className="absolute left-2.5 top-2.5 text-slate-400 pointer-events-none"/>
+                  <input className="w-full pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-300" placeholder="Customer name…" value={itemCustFilter} onChange={e => setItemCustFilter(e.target.value)}/>
+                </div>
+              </div>
+            </div>
+            {!hasFilter && (
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-8 text-center">
+                <Package size={28} className="mx-auto text-slate-300 mb-2"/>
+                <p className="text-slate-500 font-semibold text-sm">Search a product or customer to see invoice-level sales</p>
+              </div>
+            )}
+            {hasFilter && rows.length === 0 && (
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 text-center">
+                <p className="text-slate-400 font-semibold text-sm">No results found for the current filters</p>
+              </div>
+            )}
+            {hasFilter && rows.length > 0 && (
+              <>
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="bg-indigo-50 p-3 rounded-2xl border border-indigo-100 text-center">
+                    <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider">Invoices</p>
+                    <p className="text-xl font-black text-indigo-700">{new Set(rows.map(r=>r.invoiceId)).size}</p>
+                  </div>
+                  <div className="bg-teal-50 p-3 rounded-2xl border border-teal-100 text-center">
+                    <p className="text-[10px] font-bold text-teal-500 uppercase tracking-wider">Units</p>
+                    <p className="text-xl font-black text-teal-700">{totalUnits.toLocaleString('en-US')}</p>
+                  </div>
+                  <div className="bg-emerald-50 p-3 rounded-2xl border border-emerald-100 text-center">
+                    <p className="text-[10px] font-bold text-emerald-500 uppercase tracking-wider">Revenue</p>
+                    <p className="text-lg font-black text-emerald-700">Rs.{totalAmt.toLocaleString('en-US')}</p>
+                  </div>
+                </div>
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs whitespace-nowrap">
+                      <thead className="bg-slate-50 text-slate-500 uppercase font-bold tracking-wider border-b border-slate-200">
+                        <tr><th className="p-3">Date</th><th className="p-3">Customer</th><th className="p-3">Invoice</th><th className="p-3">Product</th><th className="p-3 text-center">Qty</th><th className="p-3 text-right">Rate</th><th className="p-3 text-right">Amount</th></tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {rows.map((r, i) => (
+                          <tr key={i} className="hover:bg-slate-50">
+                            <td className="p-3 text-slate-500 font-medium">{formatDateDisp(r.date)}</td>
+                            <td className="p-3"><button className="font-semibold text-slate-800 hover:text-indigo-600 transition-colors text-left" onClick={() => { setSelectedLedgerId(r.customerId); setShowLedgerModal(true); }}>{r.customerName}</button></td>
+                            <td className="p-3"><button className="font-bold text-indigo-600 hover:text-indigo-800 hover:underline transition-colors" onClick={() => setPrintConfig({ docType: 'invoice', format: 'thermal', data: r.inv })}>{r.invoiceId}</button></td>
+                            <td className="p-3 font-semibold text-slate-800">{r.name}</td>
+                            <td className="p-3 text-center font-bold text-slate-700">{r.qty}</td>
+                            <td className="p-3 text-right text-slate-600">Rs.{r.rate.toLocaleString('en-US')}</td>
+                            <td className="p-3 text-right font-bold text-emerald-700">Rs.{r.sub.toLocaleString('en-US')}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot className="bg-slate-50 border-t-2 border-slate-300 font-black text-xs">
+                        <tr><td colSpan={4} className="p-3 text-slate-600 uppercase tracking-wider">Totals</td><td className="p-3 text-center">{totalUnits.toLocaleString('en-US')}</td><td></td><td className="p-3 text-right text-emerald-700">Rs.{totalAmt.toLocaleString('en-US')}</td></tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        );
+      })()}
 
       {view === 'By Salesperson' && (
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mt-3">
@@ -2918,7 +3362,7 @@ return (
                     return (
                       <div key={i} className="flex justify-between items-center p-3">
                         <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-sm text-slate-800 truncate">{r.name}</p>
+                          <button className="font-semibold text-sm text-slate-800 truncate hover:text-indigo-600 transition-colors text-left w-full" onClick={() => { setSelectedLedgerId(r.id); setShowLedgerModal(true); }}>{r.name}</button>
                           <p className="text-[10px] text-slate-400">{r.daysSince} days since last invoice {r.lastInvDate ? `(${formatDateDisp(r.lastInvDate)})` : ''}</p>
                         </div>
                         <div className="flex items-center gap-2 ml-2 shrink-0">
@@ -2977,7 +3421,7 @@ return (
             <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
               <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5"><Zap size={12} className="text-amber-500"/> Smart Callouts</p>
               {topProduct && <div className="flex items-start gap-2 text-sm"><span className="text-emerald-600 font-black shrink-0">★</span><p className="text-slate-700"><span className="font-bold">{topProduct[0]}</span> is your most profitable product — Rs.{topProduct[1].profit.toLocaleString('en-US')} GP ({topProduct[1].qty} units sold)</p></div>}
-              {topCustomer && <div className="flex items-start gap-2 text-sm"><span className="text-indigo-600 font-black shrink-0">★</span><p className="text-slate-700"><span className="font-bold">{topCustomer[0]}</span> is your top customer — Rs.{(topCustomer[1].productRevenue||0).toLocaleString('en-US')} revenue in {topCustomer[1].orders} orders</p></div>}
+              {topCustomer && <div className="flex items-start gap-2 text-sm"><span className="text-indigo-600 font-black shrink-0">★</span><p className="text-slate-700"><button className="font-bold hover:text-indigo-600 transition-colors" onClick={() => { const c = customers.find(c => c.name === topCustomer[0]); if(c){ setSelectedLedgerId(c.id); setShowLedgerModal(true); } }}>{topCustomer[0]}</button> is your top customer — Rs.{(topCustomer[1].productRevenue||0).toLocaleString('en-US')} revenue in {topCustomer[1].orders} orders</p></div>}
               {reportEngine.agingBuckets.days90plus.length > 0 && <div className="flex items-start gap-2 text-sm"><span className="text-rose-600 font-black shrink-0">!</span><p className="text-slate-700"><span className="font-bold text-rose-600">{reportEngine.agingBuckets.days90plus.length} customer{reportEngine.agingBuckets.days90plus.length>1?'s':''}</span> overdue 90+ days — Rs.{reportEngine.agingBuckets.days90plus.reduce((s,r)=>s+r.amount,0).toLocaleString('en-US')} at risk</p></div>}
               {reportEngine.trends.revenue !== null && <div className="flex items-start gap-2 text-sm"><span className={`font-black shrink-0 ${Number(reportEngine.trends.revenue)>=0?'text-emerald-600':'text-rose-600'}`}>{Number(reportEngine.trends.revenue)>=0?'↑':'↓'}</span><p className="text-slate-700">Revenue is <span className="font-bold">{Number(reportEngine.trends.revenue)>=0?'up':'down'} {Math.abs(reportEngine.trends.revenue)}%</span> vs previous period</p></div>}
               {kpis.deliveryBilled > kpis.transportExpense && <div className="flex items-start gap-2 text-sm"><span className="text-emerald-600 font-black shrink-0">+</span><p className="text-slate-700">Delivery net contribution: <span className="font-bold text-emerald-700">Rs.{(kpis.deliveryBilled - kpis.transportExpense).toLocaleString('en-US')}</span></p></div>}
@@ -3525,6 +3969,22 @@ React.useEffect(() => {
   }
 }, [appSettings?.id, appSettings?.showBusinessNameOnDocs]);
 
+// Auto-backup to GitHub Gist (runs once per session when settings load)
+const autoBackupRan = React.useRef(false);
+React.useEffect(() => {
+  if (autoBackupRan.current) return;
+  if (!appSettings?.id || !appSettings?.githubToken || !appSettings?.githubFreq || appSettings.githubFreq === 'never') return;
+  const lastAt = appSettings.lastBackupAt ? new Date(appSettings.lastBackupAt) : new Date(0);
+  const dueAfterDays = appSettings.githubFreq === 'daily' ? 1 : appSettings.githubFreq === 'weekly' ? 7 : 30;
+  if ((Date.now() - lastAt.getTime()) / 86400000 < dueAfterDays) return;
+  autoBackupRan.current = true;
+  const backup = { exportedAt: new Date().toISOString(), collections: { app_users: appUsers, appSettings: [appSettings], companies, products, customers, invoices, expenses, expenseCategories, payments, riders, cities, areas, customerTypes } };
+  uploadToGist(appSettings.githubToken, backup, appSettings.githubGistId)
+    .then(newId => saveToFirebase('appSettings', 'main', { ...appSettings, githubGistId: newId, lastBackupAt: new Date().toISOString() }))
+    .then(() => showToast('Auto-backup uploaded to GitHub Gist'))
+    .catch(e => console.warn('Auto-backup failed:', e));
+}, [appSettings?.id, appSettings?.githubToken, appSettings?.githubFreq, appSettings?.lastBackupAt]);
+
 const deleteFromFirebase = async (collectionName, id) => {
 try {
 await deleteDoc(doc(db, collectionName, String(id)));
@@ -3552,7 +4012,9 @@ const cnLines = (cn.items || []).map(i => ({ name: i.name, qty: i.quantity, pric
 entries.push({ id: cn.id, date: cn.date, ref: cn.originalInvoiceId ? `Ref: ${cn.originalInvoiceId}` : cn.id, desc: `Credit Note / Sales Return${cn.reason ? ` \u2014 ${cn.reason}` : ''}`, debit: 0, credit: cn.total, lineItems: cnLines, isCreditNote: true, timestamp: new Date(cn.date).getTime() + 3 });
 });
 payments.filter(p => p.customerId === customerId).forEach(pay => {
-entries.push({ id: pay.id, date: pay.date, ref: pay.id, desc: pay.note || 'Payment Received', debit: 0, credit: Number(pay.amount), timestamp: new Date(pay.date).getTime() + 2 });
+const payDiscount = Number(pay.discount || 0);
+  const payDesc = (pay.note || 'Payment Received') + (payDiscount > 0 ? ` + Discount Rs.${payDiscount.toLocaleString('en-US')}` : '');
+  entries.push({ id: pay.id, date: pay.date, ref: pay.id, desc: payDesc, debit: 0, credit: Number(pay.amount) + payDiscount, discount: payDiscount, timestamp: new Date(pay.date).getTime() + 2 });
 });
 entries.sort((a, b) => a.timestamp === b.timestamp ? a.id.localeCompare(b.id) : a.timestamp - b.timestamp);
 let runningBal = openingBal;
@@ -3581,11 +4043,15 @@ const isInvoicePayment = row.id.endsWith('-PAY');
 const actualId = isInvoicePayment ? row.ref : row.id;
 const entryIndex = ledger.rows.findIndex(r => r.id === row.id);
 const prevBalance = entryIndex > 0 ? ledger.rows[entryIndex - 1].balance : ledger.openingBal;
+const payDiscount = row.discount || 0;
+const amountReceived = row.credit - payDiscount;
 return {
 id: actualId,
 date: row.date,
 customerName: ledger.customerName,
-receivedAmount: row.credit,
+receivedAmount: amountReceived,
+discount: payDiscount,
+totalCredit: row.credit,
 prevBalance: prevBalance,
 newBalance: row.balance,
 note: row.desc
@@ -3724,7 +4190,7 @@ return (
       <h2 className="text-base font-bold text-slate-800 capitalize">{TABS.find(t=>t.id===activeTab)?.label || ''}</h2>
       <div className="flex items-center gap-3">
         {activeTab === 'billing' && billingView === 'list' && (
-          <button onClick={() => { setCurrentInvoice({ id: null, customerId: '', customerName: '', customerDetails: {}, items: [], deliveryBilled: 0, transportExpense: 0, vehicle: VEHICLES[0], paymentStatus: 'Pending', receivedAmount: 0, transportCompany: '', biltyNumber: '', driverName: '', driverPhone: '', riderId: '', deliveryAddressKey: 'address1', notes: '' }); setBillingView('form'); }} className="flex items-center gap-1.5 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700 transition-colors shadow-sm"><Plus size={16}/> New Invoice <kbd className="ml-1 text-[9px] bg-indigo-500 px-1.5 py-0.5 rounded font-mono">Alt+B</kbd></button>
+          <button onClick={() => { setCurrentInvoice({ id: null, customerId: '', customerName: '', customerDetails: {}, items: [], deliveryBilled: 0, transportExpense: 0, discount: 0, vehicle: VEHICLES[0], paymentStatus: 'Pending', receivedAmount: 0, transportCompany: '', biltyNumber: '', driverName: '', driverPhone: '', riderId: '', deliveryAddressKey: 'address1', notes: '' }); setBillingView('form'); }} className="flex items-center gap-1.5 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700 transition-colors shadow-sm"><Plus size={16}/> New Invoice <kbd className="ml-1 text-[9px] bg-indigo-500 px-1.5 py-0.5 rounded font-mono">Alt+B</kbd></button>
         )}
         {activeTab === 'customers' && (
           <button onClick={() => { setSelectedCustomerForPayment(null); setShowPaymentModal(true); }} className="flex items-center gap-1.5 bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-emerald-600 transition-colors shadow-sm"><Wallet size={16}/> Receive Payment</button>
