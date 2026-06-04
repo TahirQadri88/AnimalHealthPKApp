@@ -2114,6 +2114,36 @@ return (
 };
 
 
+const uploadToDrive = async (scriptUrl, backupObj) => {
+  const filename = `AnimalHealthPK_Backup_${new Date().toISOString().slice(0,10)}.json`;
+  // mode: 'no-cors' is required — Apps Script redirects the request and browsers
+  // block reading the response, but the POST still goes through successfully.
+  await fetch(scriptUrl, {
+    method: 'POST',
+    mode: 'no-cors',
+    body: JSON.stringify({ filename, content: JSON.stringify(backupObj, null, 2) }),
+  });
+};
+
+const DRIVE_SCRIPT_TEMPLATE = `function doPost(e) {
+  try {
+    var payload = JSON.parse(e.postData.contents);
+    var folder = DriveApp.getRootFolder();
+    // To use a specific folder replace the line above with:
+    // var folder = DriveApp.getFolderById('PASTE_FOLDER_ID_HERE');
+    var existing = folder.getFilesByName(payload.filename);
+    while (existing.hasNext()) existing.next().setTrashed(true);
+    folder.createFile(payload.filename, payload.content, MimeType.PLAIN_TEXT);
+    return ContentService
+      .createTextOutput(JSON.stringify({ ok: true }))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService
+      .createTextOutput(JSON.stringify({ error: err.message }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}`;
+
 const AppSettingsView = () => {
 const { appSettings, saveToFirebase, showToast, showConfirm, appUsers, companies, products, customers, invoices, expenses, expenseCategories, payments, cities, areas, customerTypes, riders } = useContext(AppContext);
 const [form, setForm] = useState({
@@ -2127,9 +2157,13 @@ const [form, setForm] = useState({
   showBusinessNameOnDocs: appSettings?.showBusinessNameOnDocs !== false,
   showBusinessNameOnReports: appSettings?.showBusinessNameOnReports !== false,
   backupFreq: appSettings?.backupFreq || appSettings?.githubFreq || 'weekly',
+  driveScriptUrl: appSettings?.driveScriptUrl || '',
+  driveFreq: appSettings?.driveFreq || 'weekly',
 });
 const [restoring, setRestoring] = useState(false);
 const [firebaseBacking, setFirebaseBacking] = useState(false);
+const [driveBacking, setDriveBacking] = useState(false);
+const [showDriveSetup, setShowDriveSetup] = useState(false);
 React.useEffect(() => {
   if (appSettings?.id) setForm({
     id: 'main',
@@ -2142,8 +2176,10 @@ React.useEffect(() => {
     showBusinessNameOnDocs: appSettings.showBusinessNameOnDocs !== false,
     showBusinessNameOnReports: appSettings.showBusinessNameOnReports !== false,
     backupFreq: appSettings.backupFreq || appSettings.githubFreq || 'weekly',
+    driveScriptUrl: appSettings.driveScriptUrl || '',
+    driveFreq: appSettings.driveFreq || 'weekly',
   });
-}, [appSettings?.id, appSettings?.businessName, appSettings?.showBusinessNameOnDocs, appSettings?.showBusinessNameOnReports, appSettings?.backupFreq, appSettings?.githubFreq]);
+}, [appSettings?.id, appSettings?.businessName, appSettings?.showBusinessNameOnDocs, appSettings?.showBusinessNameOnReports, appSettings?.backupFreq, appSettings?.githubFreq, appSettings?.driveScriptUrl, appSettings?.driveFreq]);
 const saveSettings = async () => { await saveToFirebase('appSettings', 'main', form); showToast('Settings saved!'); };
 const downloadBackup = async () => {
   const backup = { exportedAt: new Date().toISOString(), collections: { app_users: appUsers, appSettings: appSettings ? [appSettings] : [], companies, products, customers, invoices, expenses, expenseCategories, payments, riders, cities, areas, customerTypes } };
@@ -2165,6 +2201,17 @@ const manualFirebaseBackup = async () => {
     showToast('Backup saved to Firebase!');
   } catch(e) { showToast(`Backup failed: ${e.message}`, 'error'); }
   finally { setFirebaseBacking(false); }
+};
+const manualDriveBackup = async () => {
+  const url = form.driveScriptUrl || appSettings?.driveScriptUrl;
+  if (!url) return showToast('Paste the Apps Script URL first', 'error');
+  setDriveBacking(true);
+  try {
+    await uploadToDrive(url, buildBackupObj());
+    await saveToFirebase('appSettings', 'main', { ...appSettings, ...form, lastDriveBackupAt: new Date().toISOString() });
+    showToast('Backup sent to Google Drive!');
+  } catch(e) { showToast(`Drive backup failed: ${e.message}`, 'error'); }
+  finally { setDriveBacking(false); }
 };
 const handleRestoreFile = async (e) => {
   const file = e.target.files[0]; if (!file) return;
@@ -2262,6 +2309,66 @@ return (
     <div className="flex gap-2 mt-4">
       <button type="button" onClick={saveSettings} className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5"><Save size={13}/> Save Settings</button>
       <button type="button" onClick={manualFirebaseBackup} disabled={firebaseBacking} className="flex-1 bg-slate-800 hover:bg-slate-700 text-white font-bold py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 disabled:opacity-40"><Upload size={13}/> {firebaseBacking ? 'Saving…' : 'Backup Now'}</button>
+    </div>
+  </div>
+
+  {/* ── Google Drive Backup ── */}
+  <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
+    <h3 className="font-black text-slate-800 text-base mb-1 flex items-center gap-2">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7.71 3.5L1.15 15l3.43 5.5h12.84L22 15 15.29 3.5H7.71z" fill="#34A853" opacity=".6"/><path d="M1.15 15l3.43 5.5H10.5L7.07 15H1.15z" fill="#0F9D58"/><path d="M22 15l-3.43 5.5H10.5l3.43-5.5H22z" fill="#4285F4"/><path d="M15.29 3.5H7.71L10.5 8.5h3l2.79-5z" fill="#FBBC05"/><path d="M7.71 3.5L1.15 15h6.07L13.5 8.5l-2.79-5H7.71z" fill="#34A853"/><path d="M15.29 3.5L22 15h-6.07L10.5 8.5l2.79-5h2z" fill="#4285F4"/></svg>
+      Google Drive Backup
+    </h3>
+    <p className="text-xs text-slate-400 mb-4">Saves a single JSON file to your Google Drive folder. No size limit. Requires a one-time Apps Script setup.</p>
+    <div className="space-y-3">
+      <div>
+        <label className={labelCls}>Apps Script URL</label>
+        <input type="password" className={inputCls} placeholder="https://script.google.com/macros/s/…/exec"
+          value={form.driveScriptUrl} onChange={e => setForm(p=>({...p, driveScriptUrl: e.target.value}))} autoComplete="off"/>
+      </div>
+      <div>
+        <label className={labelCls}>Auto-Backup Frequency</label>
+        <select className={inputCls} value={form.driveFreq} onChange={e => setForm(p=>({...p, driveFreq: e.target.value}))}>
+          <option value="never">Never (manual only)</option>
+          <option value="daily">Daily</option>
+          <option value="weekly">Weekly</option>
+          <option value="monthly">Monthly</option>
+        </select>
+      </div>
+      {appSettings?.lastDriveBackupAt && (
+        <div className="text-[11px]">
+          <span className="text-emerald-600 font-bold">Last backup: {appSettings.lastDriveBackupAt.slice(0,10)}</span>
+        </div>
+      )}
+      <div className="border border-slate-200 rounded-xl overflow-hidden">
+        <button type="button" onClick={() => setShowDriveSetup(p => !p)}
+          className="w-full flex items-center justify-between px-4 py-2.5 text-[11px] font-bold text-slate-600 hover:bg-slate-50">
+          <span>How to set up (one time, 2 minutes)</span>
+          <ChevronDown size={13} className={`transition-transform ${showDriveSetup ? 'rotate-180' : ''}`}/>
+        </button>
+        {showDriveSetup && (
+          <div className="px-4 pb-4 space-y-2 text-[11px] text-slate-600 border-t border-slate-100">
+            <ol className="list-decimal list-inside space-y-1 mt-3">
+              <li>Open <strong>script.google.com</strong> → New project</li>
+              <li>Delete the default code and paste the script below</li>
+              <li>Click <strong>Deploy → New deployment → Web app</strong></li>
+              <li>Set <strong>Execute as: Me</strong> and <strong>Who has access: Anyone</strong></li>
+              <li>Click Deploy → copy the URL → paste it above</li>
+              <li>To use a specific folder: open the folder in Drive, copy the ID from the URL and replace <code className="bg-slate-100 px-1 rounded">getRootFolder()</code> as shown in the script comment</li>
+            </ol>
+            <div className="relative mt-3">
+              <pre className="bg-slate-900 text-emerald-300 text-[10px] rounded-lg p-3 overflow-x-auto whitespace-pre-wrap break-all">{DRIVE_SCRIPT_TEMPLATE}</pre>
+              <button type="button" onClick={() => { navigator.clipboard?.writeText(DRIVE_SCRIPT_TEMPLATE); showToast('Script copied!'); }}
+                className="absolute top-2 right-2 bg-slate-700 hover:bg-slate-600 text-white text-[10px] font-bold px-2 py-1 rounded">
+                Copy
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+    <div className="flex gap-2 mt-4">
+      <button type="button" onClick={saveSettings} className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5"><Save size={13}/> Save Settings</button>
+      <button type="button" onClick={manualDriveBackup} disabled={!form.driveScriptUrl || driveBacking} className="flex-1 bg-green-700 hover:bg-green-800 text-white font-bold py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 disabled:opacity-40"><Upload size={13}/> {driveBacking ? 'Sending…' : 'Backup Now'}</button>
     </div>
   </div>
 </div>
@@ -3950,26 +4057,42 @@ React.useEffect(() => {
   }
 }, [appSettings?.id, appSettings?.showBusinessNameOnDocs]);
 
-// Auto-backup to Firebase (runs once per session when settings load)
+// Auto-backup (Firebase + Google Drive) — runs once per session when settings load
 const autoBackupRan = React.useRef(false);
 React.useEffect(() => {
-  if (autoBackupRan.current) return;
-  const freq = appSettings?.backupFreq || appSettings?.githubFreq;
-  if (!appSettings?.id || !freq || freq === 'never') return;
-  const lastAt = appSettings.lastBackupAt ? new Date(appSettings.lastBackupAt) : new Date(0);
-  const dueAfterDays = freq === 'daily' ? 1 : freq === 'weekly' ? 7 : 30;
-  if ((Date.now() - lastAt.getTime()) / 86400000 < dueAfterDays) return;
-  autoBackupRan.current = true;
+  if (autoBackupRan.current || !appSettings?.id) return;
   const exportedAt = new Date().toISOString();
   const date = exportedAt.slice(0, 10);
+  const isDue = (lastAt, freq) => {
+    if (!freq || freq === 'never') return false;
+    const days = freq === 'daily' ? 1 : freq === 'weekly' ? 7 : 30;
+    return (Date.now() - (lastAt ? new Date(lastAt) : new Date(0)).getTime()) / 86400000 >= days;
+  };
+
+  const firebaseDue = isDue(appSettings.lastBackupAt, appSettings.backupFreq || appSettings.githubFreq);
+  const driveDue = isDue(appSettings.lastDriveBackupAt, appSettings.driveFreq) && !!appSettings.driveScriptUrl;
+  if (!firebaseDue && !driveDue) return;
+
+  autoBackupRan.current = true;
   const cols = { app_users: appUsers, appSettings: [appSettings], companies, products, customers, invoices, expenses, expenseCategories, payments, riders, cities, areas, customerTypes };
-  Promise.all(Object.entries(cols).map(([col, items]) =>
-    saveToFirebase('backups', `${date}_${col}`, { items: items || [], backedUpAt: exportedAt })
-  ))
-    .then(() => saveToFirebase('appSettings', 'main', { ...appSettings, lastBackupAt: exportedAt }))
-    .then(() => showToast('Auto-backup saved to Firebase'))
-    .catch(e => console.warn('Auto-backup failed:', e));
-}, [appSettings?.id, appSettings?.backupFreq, appSettings?.githubFreq, appSettings?.lastBackupAt]);
+  const backupObj = { exportedAt, collections: cols };
+
+  if (firebaseDue) {
+    Promise.all(Object.entries(cols).map(([col, items]) =>
+      saveToFirebase('backups', `${date}_${col}`, { items: items || [], backedUpAt: exportedAt })
+    ))
+      .then(() => saveToFirebase('appSettings', 'main', { ...appSettings, lastBackupAt: exportedAt }))
+      .then(() => showToast('Auto-backup saved to Firebase'))
+      .catch(e => console.warn('Firebase auto-backup failed:', e));
+  }
+
+  if (driveDue) {
+    uploadToDrive(appSettings.driveScriptUrl, backupObj)
+      .then(() => saveToFirebase('appSettings', 'main', { ...appSettings, lastDriveBackupAt: exportedAt }))
+      .then(() => showToast('Auto-backup sent to Google Drive'))
+      .catch(e => console.warn('Drive auto-backup failed:', e));
+  }
+}, [appSettings?.id, appSettings?.backupFreq, appSettings?.githubFreq, appSettings?.lastBackupAt, appSettings?.driveFreq, appSettings?.driveScriptUrl, appSettings?.lastDriveBackupAt]);
 
 const deleteFromFirebase = async (collectionName, id) => {
 try {
