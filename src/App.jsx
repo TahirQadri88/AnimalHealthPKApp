@@ -2499,6 +2499,8 @@ const [filterSalespersons, setFilterSalespersons] = useState(new Set());
 const toggleFilter = (setter, id) => setter(prev => { const next = new Set(prev); next.has(String(id)) ? next.delete(String(id)) : next.add(String(id)); return next; });
 const clearFilter = (setter) => setter(new Set());
 const [sortBy, setSortBy] = useState('profit');
+const [itemProdFilter, setItemProdFilter] = useState('');
+const [itemCustFilter, setItemCustFilter] = useState('');
 
 const checkCustomFilter = (dateStr) => {
   if (dateFilter !== 'Custom') return checkDateFilter(dateStr, dateFilter);
@@ -2664,7 +2666,7 @@ const reportEngine = useMemo(() => {
 }, [invoices, expenses, payments, dateFilter, customStart, customEnd, ...[...filterCompanies], ...[...filterCustomers], ...[...filterSalespersons], products, customers]);
 
 const getSortedExportData = () => {
-   if (view === 'Overview') return null;
+   if (view === 'Overview' || view === 'Item Sales') return null;
    if (view === 'Receivables') return reportEngine.receivablesList.map(r => ({
      'Customer Name': r.name, 'Outstanding (Rs)': r.amount,
      'Days Since Last Invoice': r.daysSince || 0, 'Last Invoice Date': r.lastInvDate || ''
@@ -2837,7 +2839,11 @@ const renderTable = (dataObj, type) => {
                     <td className="p-3">
                       <div className="flex items-center gap-1.5">
                         <span className={`text-[9px] font-black px-1 py-0.5 rounded border ${tierColors[row.abcTier]}`}>{row.abcTier}</span>
-                        <div className="font-bold text-slate-800">{row.key}</div>
+                        {type === 'Customer' ? (
+                          <button className="font-bold text-slate-800 hover:text-indigo-600 text-left transition-colors" onClick={() => { const c = customers.find(c => c.name === row.key); if(c){ setSelectedLedgerId(c.id); setShowLedgerModal(true); } }}>{row.key}</button>
+                        ) : (
+                          <div className="font-bold text-slate-800">{row.key}</div>
+                        )}
                       </div>
                       {row.company && <div className="text-[9px] text-slate-400 uppercase tracking-widest mt-0.5">{row.company}</div>}
                       <div className="w-full bg-slate-100 rounded-full h-1 mt-1.5 max-w-[100px]"><div className="bg-emerald-400 h-1 rounded-full" style={{width:`${barW}%`}}></div></div>
@@ -2960,10 +2966,10 @@ return (
 
     {/* View Tabs */}
     <ScrollableTabBar className="pb-2 shrink-0">
-       {['Overview','Insights','Monthly Trend','By Product','By Company','By Customer','By City','By Area','By Type','By Salesperson','Receivables'].map(v => (
+       {['Overview','Insights','Monthly Trend','By Product','By Company','By Customer','By City','By Area','By Type','By Salesperson','Receivables','Item Sales'].map(v => (
          <button key={v} data-analytictab={v} tabIndex={view===v?0:-1}
            onClick={() => setView(v)}
-           onKeyDown={makeArrowNav(['Overview','Insights','Monthly Trend','By Product','By Company','By Customer','By City','By Area','By Type','By Salesperson','Receivables'],view,setView,'data-analytictab')}
+           onKeyDown={makeArrowNav(['Overview','Insights','Monthly Trend','By Product','By Company','By Customer','By City','By Area','By Type','By Salesperson','Receivables','Item Sales'],view,setView,'data-analytictab')}
            className={`px-3 py-1.5 rounded-xl font-bold text-[11px] whitespace-nowrap shadow-sm transition-colors ${view === v ? 'bg-slate-800 text-white' : 'bg-white text-slate-600 border border-slate-200'}`}>{v}</button>
        ))}
     </ScrollableTabBar>
@@ -3134,6 +3140,96 @@ return (
       {view === 'By Area' && renderSegmentTable(reportEngine.byArea, 'Area')}
       {view === 'By Type' && renderSegmentTable(reportEngine.byType, 'Type')}
 
+      {view === 'Item Sales' && (() => {
+        const prodQ = itemProdFilter.toLowerCase().trim();
+        const custQ = itemCustFilter.toLowerCase().trim();
+        const hasFilter = prodQ || custQ;
+        const rows = hasFilter ? (() => {
+          const out = [];
+          invoices.filter(o => o.status === 'Billed' && checkCustomFilter(o.date)).forEach(inv => {
+            if (custQ && !inv.customerName.toLowerCase().includes(custQ)) return;
+            (inv.items || []).filter(i => !i.isBonus).forEach(item => {
+              if (prodQ && !(item.name || '').toLowerCase().includes(prodQ)) return;
+              out.push({ date: inv.date, customerId: inv.customerId, customerName: inv.customerName, invoiceId: inv.id, inv, name: item.name, qty: item.quantity || 0, rate: item.price || 0, sub: (item.price || 0) * (item.quantity || 0) });
+            });
+          });
+          return out.sort((a, b) => b.date.localeCompare(a.date));
+        })() : [];
+        const totalUnits = rows.reduce((s, r) => s + r.qty, 0);
+        const totalAmt = rows.reduce((s, r) => s + r.sub, 0);
+        return (
+          <div className="space-y-3 mt-3">
+            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5"><Search size={11}/> Filter</p>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="relative">
+                  <Search size={13} className="absolute left-2.5 top-2.5 text-slate-400 pointer-events-none"/>
+                  <input className="w-full pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-300" placeholder="Product name…" value={itemProdFilter} onChange={e => setItemProdFilter(e.target.value)}/>
+                </div>
+                <div className="relative">
+                  <Users size={13} className="absolute left-2.5 top-2.5 text-slate-400 pointer-events-none"/>
+                  <input className="w-full pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-300" placeholder="Customer name…" value={itemCustFilter} onChange={e => setItemCustFilter(e.target.value)}/>
+                </div>
+              </div>
+            </div>
+            {!hasFilter && (
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-8 text-center">
+                <Package size={28} className="mx-auto text-slate-300 mb-2"/>
+                <p className="text-slate-500 font-semibold text-sm">Search a product or customer to see invoice-level sales</p>
+              </div>
+            )}
+            {hasFilter && rows.length === 0 && (
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 text-center">
+                <p className="text-slate-400 font-semibold text-sm">No results found for the current filters</p>
+              </div>
+            )}
+            {hasFilter && rows.length > 0 && (
+              <>
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="bg-indigo-50 p-3 rounded-2xl border border-indigo-100 text-center">
+                    <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider">Invoices</p>
+                    <p className="text-xl font-black text-indigo-700">{new Set(rows.map(r=>r.invoiceId)).size}</p>
+                  </div>
+                  <div className="bg-teal-50 p-3 rounded-2xl border border-teal-100 text-center">
+                    <p className="text-[10px] font-bold text-teal-500 uppercase tracking-wider">Units</p>
+                    <p className="text-xl font-black text-teal-700">{totalUnits.toLocaleString('en-US')}</p>
+                  </div>
+                  <div className="bg-emerald-50 p-3 rounded-2xl border border-emerald-100 text-center">
+                    <p className="text-[10px] font-bold text-emerald-500 uppercase tracking-wider">Revenue</p>
+                    <p className="text-lg font-black text-emerald-700">Rs.{totalAmt.toLocaleString('en-US')}</p>
+                  </div>
+                </div>
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs whitespace-nowrap">
+                      <thead className="bg-slate-50 text-slate-500 uppercase font-bold tracking-wider border-b border-slate-200">
+                        <tr><th className="p-3">Date</th><th className="p-3">Customer</th><th className="p-3">Invoice</th><th className="p-3">Product</th><th className="p-3 text-center">Qty</th><th className="p-3 text-right">Rate</th><th className="p-3 text-right">Amount</th></tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {rows.map((r, i) => (
+                          <tr key={i} className="hover:bg-slate-50">
+                            <td className="p-3 text-slate-500 font-medium">{formatDateDisp(r.date)}</td>
+                            <td className="p-3"><button className="font-semibold text-slate-800 hover:text-indigo-600 transition-colors text-left" onClick={() => { setSelectedLedgerId(r.customerId); setShowLedgerModal(true); }}>{r.customerName}</button></td>
+                            <td className="p-3"><button className="font-bold text-indigo-600 hover:text-indigo-800 hover:underline transition-colors" onClick={() => setPrintConfig({ docType: 'invoice', format: 'thermal', data: r.inv })}>{r.invoiceId}</button></td>
+                            <td className="p-3 font-semibold text-slate-800">{r.name}</td>
+                            <td className="p-3 text-center font-bold text-slate-700">{r.qty}</td>
+                            <td className="p-3 text-right text-slate-600">Rs.{r.rate.toLocaleString('en-US')}</td>
+                            <td className="p-3 text-right font-bold text-emerald-700">Rs.{r.sub.toLocaleString('en-US')}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot className="bg-slate-50 border-t-2 border-slate-300 font-black text-xs">
+                        <tr><td colSpan={4} className="p-3 text-slate-600 uppercase tracking-wider">Totals</td><td className="p-3 text-center">{totalUnits.toLocaleString('en-US')}</td><td></td><td className="p-3 text-right text-emerald-700">Rs.{totalAmt.toLocaleString('en-US')}</td></tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        );
+      })()}
+
       {view === 'By Salesperson' && (
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mt-3">
           <div className="bg-slate-50 border-b border-slate-200 p-3">
@@ -3202,7 +3298,7 @@ return (
                     return (
                       <div key={i} className="flex justify-between items-center p-3">
                         <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-sm text-slate-800 truncate">{r.name}</p>
+                          <button className="font-semibold text-sm text-slate-800 truncate hover:text-indigo-600 transition-colors text-left w-full" onClick={() => { setSelectedLedgerId(r.id); setShowLedgerModal(true); }}>{r.name}</button>
                           <p className="text-[10px] text-slate-400">{r.daysSince} days since last invoice {r.lastInvDate ? `(${formatDateDisp(r.lastInvDate)})` : ''}</p>
                         </div>
                         <div className="flex items-center gap-2 ml-2 shrink-0">
@@ -3261,7 +3357,7 @@ return (
             <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
               <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5"><Zap size={12} className="text-amber-500"/> Smart Callouts</p>
               {topProduct && <div className="flex items-start gap-2 text-sm"><span className="text-emerald-600 font-black shrink-0">★</span><p className="text-slate-700"><span className="font-bold">{topProduct[0]}</span> is your most profitable product — Rs.{topProduct[1].profit.toLocaleString('en-US')} GP ({topProduct[1].qty} units sold)</p></div>}
-              {topCustomer && <div className="flex items-start gap-2 text-sm"><span className="text-indigo-600 font-black shrink-0">★</span><p className="text-slate-700"><span className="font-bold">{topCustomer[0]}</span> is your top customer — Rs.{(topCustomer[1].productRevenue||0).toLocaleString('en-US')} revenue in {topCustomer[1].orders} orders</p></div>}
+              {topCustomer && <div className="flex items-start gap-2 text-sm"><span className="text-indigo-600 font-black shrink-0">★</span><p className="text-slate-700"><button className="font-bold hover:text-indigo-600 transition-colors" onClick={() => { const c = customers.find(c => c.name === topCustomer[0]); if(c){ setSelectedLedgerId(c.id); setShowLedgerModal(true); } }}>{topCustomer[0]}</button> is your top customer — Rs.{(topCustomer[1].productRevenue||0).toLocaleString('en-US')} revenue in {topCustomer[1].orders} orders</p></div>}
               {reportEngine.agingBuckets.days90plus.length > 0 && <div className="flex items-start gap-2 text-sm"><span className="text-rose-600 font-black shrink-0">!</span><p className="text-slate-700"><span className="font-bold text-rose-600">{reportEngine.agingBuckets.days90plus.length} customer{reportEngine.agingBuckets.days90plus.length>1?'s':''}</span> overdue 90+ days — Rs.{reportEngine.agingBuckets.days90plus.reduce((s,r)=>s+r.amount,0).toLocaleString('en-US')} at risk</p></div>}
               {reportEngine.trends.revenue !== null && <div className="flex items-start gap-2 text-sm"><span className={`font-black shrink-0 ${Number(reportEngine.trends.revenue)>=0?'text-emerald-600':'text-rose-600'}`}>{Number(reportEngine.trends.revenue)>=0?'↑':'↓'}</span><p className="text-slate-700">Revenue is <span className="font-bold">{Number(reportEngine.trends.revenue)>=0?'up':'down'} {Math.abs(reportEngine.trends.revenue)}%</span> vs previous period</p></div>}
               {kpis.deliveryBilled > kpis.transportExpense && <div className="flex items-start gap-2 text-sm"><span className="text-emerald-600 font-black shrink-0">+</span><p className="text-slate-700">Delivery net contribution: <span className="font-bold text-emerald-700">Rs.{(kpis.deliveryBilled - kpis.transportExpense).toLocaleString('en-US')}</span></p></div>}
