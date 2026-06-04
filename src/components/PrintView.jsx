@@ -338,59 +338,26 @@ const buildHtmlDoc = () => {
   return { html, docTitle };
 };
 
-// ── Thermal print: CSS injection → HTML print window ─────────────────────
-// Extracts the compiled app CSS (all Tailwind utilities + custom styles) from
-// the live page and injects it into the print popup alongside the buildHtmlDoc
-// HTML. Tailwind classes work exactly as on screen — no frozen pixel positions,
-// no image generation. The browser's native print engine rasterises at the
-// printer's own DPI, giving crisp, dark, native-resolution output.
-const handleThermalPrint = () => {
-  // Pull every CSS rule from the live document (same-origin sheets only)
+// ── Print — CSS injection for all formats → native browser print at full DPI ─
+const handlePrint = () => {
+  const result = buildHtmlDoc();
+  if (!result) { showToast('Document not found', 'error'); return; }
+  const { html, docTitle } = result;
+
   let appCss = '';
   try {
     appCss = Array.from(document.styleSheets)
-      .flatMap(sheet => {
-        try { return Array.from(sheet.cssRules).map(r => r.cssText); }
-        catch (e) { return []; } // skip cross-origin / unenumerable sheets
-      }).join('\n');
-  } catch (e) {}
-
-  const result = buildHtmlDoc();
-  if (!result) { showToast('Document not found', 'error'); return; }
-  const { html, docTitle } = result;
-
-  // Inject app CSS first so Tailwind classes resolve; buildHtmlDoc's print
-  // overrides (color:black!important, @page, etc.) follow and win cascade.
-  const augmented = html.replace('<title>', `<style>${appCss}</style>\n  <title>`);
+      .flatMap(sheet => { try { return Array.from(sheet.cssRules).map(r => r.cssText); } catch(e) { return []; } })
+      .join('\n');
+  } catch(e) {}
+  const augmented = appCss ? html.replace('<title>', `<style>${appCss}</style>\n  <title>`) : html;
 
   const newWin = window.open('', '_blank');
   if (!newWin) { showToast('Allow popups to enable printing', 'error'); return; }
-  newWin.document.open();
-  newWin.document.write(augmented);
-  newWin.document.close();
+  newWin.document.open(); newWin.document.write(augmented); newWin.document.close();
   newWin.document.title = docTitle;
   const tid = setTimeout(() => { try { newWin.focus(); newWin.print(); } catch(e){} }, 900);
   newWin.onload = () => { clearTimeout(tid); newWin.focus(); newWin.print(); };
-};
-
-// ── Print — opens clean new window and auto-triggers print dialog ─────────
-const handlePrint = () => {
-  // Thermal: render via html2canvas at 4× scale for dark, crisp output
-  if (isThermal) { handleThermalPrint(); return; }
-
-  const result = buildHtmlDoc();
-  if (!result) { showToast('Document not found', 'error'); return; }
-  const { html, docTitle } = result;
-  // about:blank window: no URL in address bar, @page{margin:0} removes header/footer space.
-  // Explicit document.title ensures iOS uses the invoice/receipt ID as the PDF filename.
-  const newWin = window.open('', '_blank');
-  if (!newWin) { showToast('Allow popups to enable printing', 'error'); return; }
-  newWin.document.open();
-  newWin.document.write(html);
-  newWin.document.close();
-  newWin.document.title = docTitle;
-  const tid2 = setTimeout(() => { try { newWin.focus(); newWin.print(); } catch(e){} }, 900);
-  newWin.onload = () => { clearTimeout(tid2); newWin.focus(); newWin.print(); };
 };
 
 // ── HTML Share / Download ─────────────────────────────────────────────────
@@ -495,7 +462,7 @@ const handlePDF = () => {
       html2pdf().set({
         margin: margins, filename: getFileName(),
         image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, logging: false, letterRendering: true, scrollY: 0, scrollX: 0, width: fixedW, windowWidth: fixedW },
+        html2canvas: { scale: 3, useCORS: true, logging: false, letterRendering: true, scrollY: 0, scrollX: 0, width: fixedW, windowWidth: fixedW },
         jsPDF: { unit: 'mm', format: [pdfW, pdfH], orientation: 'portrait' },
         // allow natural page breaks; .keep-together blocks (header, summary) won't be split
         pagebreak: { mode: ['css', 'legacy'], avoid: ['.keep-together'] },
@@ -563,7 +530,7 @@ const handleImageShare = async () => {
     // For thermal: single tall image (continuous paper — no pagination)
     if (isThermal) {
       const dataUrl = await withTimeout(window.htmlToImage.toJpeg(clone, {
-        quality: 0.95, pixelRatio: 2, backgroundColor: '#ffffff', height: clone.scrollHeight,
+        quality: 0.95, pixelRatio: 3, backgroundColor: '#ffffff', height: clone.scrollHeight,
       }), 30000);
       if (document.body.contains(clone)) document.body.removeChild(clone);
       shareBlob(await (await fetch(dataUrl)).blob());
@@ -573,7 +540,7 @@ const handleImageShare = async () => {
     // For A4/A5: capture to canvas then slice into page-sized sections.
     // Each slice is separated by a slate-200 gap so the output looks like
     // a stack of pages — matching what the PDF and print outputs produce.
-    const PIXEL_RATIO = 2;
+    const PIXEL_RATIO = 3;
     const GAP_PX = 20; // gap between pages (in output-canvas pixels)
 
     const srcCanvas = await withTimeout(window.htmlToImage.toCanvas(clone, {
