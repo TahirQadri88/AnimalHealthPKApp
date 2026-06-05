@@ -521,7 +521,10 @@ return (
 // ─────────────────────────────────────────────────────────────────────────────
 
 const RidersModal = () => {
-const { riders, saveToFirebase, deleteFromFirebase, showToast, setShowRidersModal, showConfirm } = useContext(AppContext);
+const { riders, vehicleTypes, saveToFirebase, deleteFromFirebase, showToast, setShowRidersModal, showConfirm } = useContext(AppContext);
+const riderVehicleTypes = vehicleTypes.filter(vt => vt.requiresRider).map(vt => vt.name);
+const fallbackRiderTypes = ['Rider', 'Rickshaw', 'Suzuki'];
+const riderTypeList = riderVehicleTypes.length ? riderVehicleTypes : fallbackRiderTypes;
 const inputCls = "w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:border-indigo-500 shadow-sm";
 const [form, setForm] = useState({ name: '', phone: '', vehicleType: 'Rider', vehicleNumber: '' });
 const [editingId, setEditingId] = useState(null);
@@ -547,7 +550,7 @@ return (
     <div className="col-span-2"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Name *</label><input className={inputCls} placeholder="e.g. Ali Raza" value={form.name} onChange={e=>setForm({...form,name:e.target.value})} /></div>
     <div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Phone</label><input className={inputCls} placeholder="03XX..." value={form.phone} onChange={e=>setForm({...form,phone:e.target.value})} /></div>
     <div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Vehicle No.</label><input className={inputCls} placeholder="e.g. ABC-123" value={form.vehicleNumber} onChange={e=>setForm({...form,vehicleNumber:e.target.value})} /></div>
-    <div className="col-span-2"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Vehicle Type *</label><select className={inputCls} value={form.vehicleType} onChange={e=>setForm({...form,vehicleType:e.target.value})}>{RIDER_VEHICLE_TYPES.map(t=><option key={t} value={t}>{t}</option>)}</select></div>
+    <div className="col-span-2"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Vehicle Type *</label><select className={inputCls} value={form.vehicleType} onChange={e=>setForm({...form,vehicleType:e.target.value})}>{riderTypeList.map(t=><option key={t} value={t}>{t}</option>)}</select></div>
   </div>
   <button type="submit" className="w-full bg-indigo-600 text-white font-bold py-2.5 rounded-xl hover:bg-indigo-700 transition-colors">Add Rider / Vehicle</button>
 </form>
@@ -562,7 +565,7 @@ return (
               <input autoFocus className="col-span-2 p-2 text-sm font-semibold border border-indigo-300 rounded-lg outline-none" value={editForm.name||''} onChange={e=>setEditForm({...editForm,name:e.target.value})} placeholder="Name" />
               <input className="p-2 text-sm font-semibold border border-slate-200 rounded-lg outline-none" value={editForm.phone||''} onChange={e=>setEditForm({...editForm,phone:e.target.value})} placeholder="Phone" />
               <input className="p-2 text-sm font-semibold border border-slate-200 rounded-lg outline-none" value={editForm.vehicleNumber||''} onChange={e=>setEditForm({...editForm,vehicleNumber:e.target.value})} placeholder="Vehicle No." />
-              <select className="col-span-2 p-2 text-sm font-semibold border border-slate-200 rounded-lg outline-none" value={editForm.vehicleType||'Rider'} onChange={e=>setEditForm({...editForm,vehicleType:e.target.value})}>{RIDER_VEHICLE_TYPES.map(t=><option key={t} value={t}>{t}</option>)}</select>
+              <select className="col-span-2 p-2 text-sm font-semibold border border-slate-200 rounded-lg outline-none" value={editForm.vehicleType||'Rider'} onChange={e=>setEditForm({...editForm,vehicleType:e.target.value})}>{riderTypeList.map(t=><option key={t} value={t}>{t}</option>)}</select>
             </div>
             <div className="flex gap-2">
               <button type="button" onClick={()=>saveEdit(rider)} className="text-xs font-bold text-indigo-600 px-3 py-1.5 bg-indigo-50 rounded-lg">Save</button>
@@ -994,7 +997,7 @@ return (
 };
 
 const BillingTab = () => {
-const { isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, productPreFill, setProductPreFill, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig, setShowCreditNoteModal, setEditingCreditNote, showConfirm, riders } = useContext(AppContext);
+const { isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, productPreFill, setProductPreFill, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig, setShowCreditNoteModal, setEditingCreditNote, showConfirm, riders, vehicleTypes } = useContext(AppContext);
 const [search, setSearch] = useState('');
 const [dateFilter, setDateFilter] = useState('All Time');
 const [statusFilter, setStatusFilter] = useState('All');
@@ -1212,14 +1215,14 @@ return (
 </div>
 <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
 <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5"><Truck size={12}/> Logistics</h3>
-<div className="mb-3"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Vehicle / Transport Method</label><select className={inputClass} value={currentInvoice.vehicle} onChange={e => setCurrentInvoice({...currentInvoice, vehicle: e.target.value})}>{VEHICLES.map(v => <option key={v} value={v}>{v}</option>)}</select></div>
-{currentInvoice.vehicle === 'Intercity Transport' && (
+<div className="mb-3"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Vehicle / Transport Method</label><select className={inputClass} value={currentInvoice.vehicle} onChange={e => setCurrentInvoice({...currentInvoice, vehicle: e.target.value})}>{(vehicleTypes.length ? vehicleTypes : [{name:'Rider'},{name:'Rickshaw'},{name:'Suzuki'},{name:'Intercity Transport'},{name:'Self-Pickup'}]).map(v => <option key={v.name} value={v.name}>{v.name}</option>)}</select></div>
+{(() => { const vt = vehicleTypes.find(v => v.name === currentInvoice.vehicle); return (vt ? !vt.requiresRider && currentInvoice.vehicle !== 'Self-Pickup' : currentInvoice.vehicle === 'Intercity Transport'); })() && (
 <div className="grid grid-cols-2 gap-3 mb-3 bg-amber-50 p-3 rounded-xl border border-amber-100">
 <div className="col-span-2"><label className="text-[10px] font-bold text-amber-700 uppercase tracking-wider ml-1 mb-1 block">Transport Company</label><input placeholder="e.g. Daewoo Express" className={`${inputClass} !bg-white !border-amber-200`} value={currentInvoice.transportCompany || ''} onChange={e => setCurrentInvoice({...currentInvoice, transportCompany: e.target.value})} /></div>
 <div className="col-span-2"><label className="text-[10px] font-bold text-amber-700 uppercase tracking-wider ml-1 mb-1 block">Bilty / Bill-T Number</label><input placeholder="Enter Bilty #" className={`${inputClass} !bg-white !border-amber-200`} value={currentInvoice.biltyNumber || ''} onChange={e => setCurrentInvoice({...currentInvoice, biltyNumber: e.target.value})} /></div>
 </div>
 )}
-{['Rider', 'Rickshaw', 'Suzuki'].includes(currentInvoice.vehicle) && (
+{(vehicleTypes.find(v => v.name === currentInvoice.vehicle)?.requiresRider ?? ['Rider','Rickshaw','Suzuki'].includes(currentInvoice.vehicle)) && (
 <div className="grid grid-cols-2 gap-3 mb-3 bg-indigo-50/50 p-3 rounded-xl border border-indigo-100">
 {riders.filter(r => r.vehicleType === currentInvoice.vehicle).length > 0 && (
   <div className="col-span-2">
@@ -2008,7 +2011,9 @@ return (
 };
 
 const RidersAdminView = () => {
-const { riders, saveToFirebase, deleteFromFirebase, showToast, showConfirm } = useContext(AppContext);
+const { riders, vehicleTypes, saveToFirebase, deleteFromFirebase, showToast, showConfirm } = useContext(AppContext);
+const riderVehicleTypes = vehicleTypes.filter(vt => vt.requiresRider).map(vt => vt.name);
+const riderTypeList = riderVehicleTypes.length ? riderVehicleTypes : ['Rider', 'Rickshaw', 'Suzuki'];
 const inputCls = "w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:border-indigo-500 shadow-sm";
 const [form, setForm] = useState({ name: '', phone: '', vehicleType: 'Rider', vehicleNumber: '' });
 const [editingId, setEditingId] = useState(null);
@@ -2035,7 +2040,7 @@ return (
     <div className="col-span-2"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Full Name *</label><input className={inputCls} placeholder="e.g. Ali Raza" value={form.name} onChange={e=>setForm({...form,name:e.target.value})} /></div>
     <div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Phone</label><input className={inputCls} placeholder="03XX..." value={form.phone} onChange={e=>setForm({...form,phone:e.target.value})} /></div>
     <div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Vehicle Number</label><input className={inputCls} placeholder="e.g. ABC-123" value={form.vehicleNumber} onChange={e=>setForm({...form,vehicleNumber:e.target.value})} /></div>
-    <div className="col-span-2"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Vehicle Type *</label><select className={inputCls} value={form.vehicleType} onChange={e=>setForm({...form,vehicleType:e.target.value})}>{RIDER_VEHICLE_TYPES.map(t=><option key={t} value={t}>{t}</option>)}</select></div>
+    <div className="col-span-2"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Vehicle Type *</label><select className={inputCls} value={form.vehicleType} onChange={e=>setForm({...form,vehicleType:e.target.value})}>{riderTypeList.map(t=><option key={t} value={t}>{t}</option>)}</select></div>
   </div>
   <button type="submit" className="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl hover:bg-indigo-700 transition-colors">Add Rider / Vehicle</button>
 </form>
@@ -2052,7 +2057,7 @@ return (
               <input autoFocus className="col-span-2 p-2 text-sm font-semibold border border-indigo-300 rounded-lg outline-none" value={editForm.name||''} onChange={e=>setEditForm({...editForm,name:e.target.value})} placeholder="Name" onKeyDown={e=>{if(e.key==='Escape')setEditingId(null);if(e.key==='Enter'){e.preventDefault();saveEdit(rider);}}} />
               <input className="p-2 text-sm font-semibold border border-slate-200 rounded-lg outline-none" value={editForm.phone||''} onChange={e=>setEditForm({...editForm,phone:e.target.value})} placeholder="Phone" />
               <input className="p-2 text-sm font-semibold border border-slate-200 rounded-lg outline-none" value={editForm.vehicleNumber||''} onChange={e=>setEditForm({...editForm,vehicleNumber:e.target.value})} placeholder="Vehicle No." />
-              <select className="col-span-2 p-2 text-sm font-semibold border border-slate-200 rounded-lg outline-none" value={editForm.vehicleType||'Rider'} onChange={e=>setEditForm({...editForm,vehicleType:e.target.value})}>{RIDER_VEHICLE_TYPES.map(t=><option key={t} value={t}>{t}</option>)}</select>
+              <select className="col-span-2 p-2 text-sm font-semibold border border-slate-200 rounded-lg outline-none" value={editForm.vehicleType||'Rider'} onChange={e=>setEditForm({...editForm,vehicleType:e.target.value})}>{riderTypeList.map(t=><option key={t} value={t}>{t}</option>)}</select>
             </div>
             <div className="flex gap-2">
               <button type="button" onClick={()=>saveEdit(rider)} className="text-xs font-bold text-indigo-600 px-3 py-1.5 bg-indigo-50 rounded-lg hover:bg-indigo-100">Save</button>
@@ -2214,12 +2219,12 @@ React.useEffect(() => {
 }, [appSettings?.id, appSettings?.businessName, appSettings?.showBusinessNameOnDocs, appSettings?.showBusinessNameOnReports, appSettings?.backupFreq, appSettings?.githubFreq, appSettings?.driveScriptUrl, appSettings?.driveFolderId, appSettings?.driveFreq]);
 const saveSettings = async () => { await saveToFirebase('appSettings', 'main', form); showToast('Settings saved!'); };
 const downloadBackup = async () => {
-  const backup = { exportedAt: new Date().toISOString(), collections: { app_users: appUsers, appSettings: appSettings ? [appSettings] : [], companies, products, customers, invoices, expenses, expenseCategories, payments, riders, cities, areas, customerTypes } };
+  const backup = { exportedAt: new Date().toISOString(), collections: { app_users: appUsers, appSettings: appSettings ? [appSettings] : [], companies, products, customers, invoices, expenses, expenseCategories, payments, riders, cities, areas, customerTypes, vehicleTypes } };
   const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
   await shareOrDownload(blob, `AnimalHealthPK_Backup_${new Date().toISOString().slice(0,10).replace(/-/g,'')}.json`);
   showToast('Backup downloaded!');
 };
-const buildBackupObj = () => ({ exportedAt: new Date().toISOString(), collections: { app_users: appUsers, appSettings: appSettings ? [appSettings] : [], companies, products, customers, invoices, expenses, expenseCategories, payments, riders, cities, areas, customerTypes } });
+const buildBackupObj = () => ({ exportedAt: new Date().toISOString(), collections: { app_users: appUsers, appSettings: appSettings ? [appSettings] : [], companies, products, customers, invoices, expenses, expenseCategories, payments, riders, cities, areas, customerTypes, vehicleTypes } });
 const manualFirebaseBackup = async () => {
   setFirebaseBacking(true);
   try {
@@ -2527,22 +2532,26 @@ return (
 };
 
 const SegmentsAdminView = () => {
-const { cities, areas, customerTypes, customers, invoices, saveToFirebase, deleteFromFirebase, showToast, getCustomerBalance, setShowSegmentsModal, showConfirm } = useContext(AppContext);
+const { cities, areas, customerTypes, vehicleTypes, customers, invoices, saveToFirebase, deleteFromFirebase, showToast, getCustomerBalance, setShowSegmentsModal, showConfirm } = useContext(AppContext);
 const [tab, setTab] = useState('cities');
 const [newVal, setNewVal] = useState('');
+const [newVtRequiresRider, setNewVtRequiresRider] = useState(false);
 const [editingId, setEditingId] = useState(null);
 const [editVal, setEditVal] = useState('');
 const [segSearch, setSegSearch] = useState('');
-const colMap = { cities: cities, areas: areas, customerTypes: customerTypes };
-const fireMap = { cities: 'cities', areas: 'areas', customerTypes: 'customerTypes' };
-const labelMap = { cities: 'City', areas: 'Area', customerTypes: 'Type' };
+const colMap = { cities, areas, customerTypes, vehicleTypes };
+const fireMap = { cities: 'cities', areas: 'areas', customerTypes: 'customerTypes', vehicleTypes: 'vehicleTypes' };
+const labelMap = { cities: 'City', areas: 'Area', customerTypes: 'Type', vehicleTypes: 'Vehicle / Transport Method' };
 const list = colMap[tab]; const col = fireMap[tab];
 const add = async () => {
   if (!newVal.trim()) return;
   if (list.some(i => i.name.toLowerCase() === newVal.toLowerCase())) return showToast('Already exists', 'error');
   const id = Date.now();
-  await saveToFirebase(col, id, { id, name: newVal.trim() });
-  setNewVal('');
+  const item = tab === 'vehicleTypes'
+    ? { id, name: newVal.trim(), requiresRider: newVtRequiresRider }
+    : { id, name: newVal.trim() };
+  await saveToFirebase(col, id, item);
+  setNewVal(''); setNewVtRequiresRider(false);
 };
 const saveEdit = async (item) => {
   if (!editVal.trim()) return;
@@ -2568,15 +2577,22 @@ return (
 </div>
 <div className="bg-slate-200 p-1 rounded-xl">
 <ScrollableTabBar bgClass="bg-slate-200">
-{['cities','areas','customerTypes'].map(t => (
-<button key={t} onClick={() => { setTab(t); setNewVal(''); setEditingId(null); setSegSearch(''); }} className={`py-2 px-3 rounded-lg font-bold text-xs whitespace-nowrap transition-colors ${tab===t?'bg-white text-purple-700 shadow-sm':'text-slate-500'}`}>{labelMap[t]}s</button>
+{['cities','areas','customerTypes','vehicleTypes'].map(t => (
+<button key={t} onClick={() => { setTab(t); setNewVal(''); setEditingId(null); setSegSearch(''); setNewVtRequiresRider(false); }} className={`py-2 px-3 rounded-lg font-bold text-xs whitespace-nowrap transition-colors ${tab===t?'bg-white text-purple-700 shadow-sm':'text-slate-500'}`}>{t==='vehicleTypes'?'Transport':labelMap[t]+'s'}</button>
 ))}
 </ScrollableTabBar>
 </div>
-<div className="flex gap-2">
+<div className="flex gap-2 items-center">
 <input type="text" placeholder={`New ${labelMap[tab]}...`} className="flex-1 p-3 bg-white border border-slate-200 rounded-xl font-semibold outline-none focus:border-indigo-500 text-sm" value={newVal} onChange={e=>setNewVal(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')add();}} />
-<button onClick={add} className="bg-indigo-600 text-white px-4 rounded-xl font-bold hover:bg-indigo-700 transition-colors">Add</button>
+{tab === 'vehicleTypes' && (
+  <button type="button" onClick={() => setNewVtRequiresRider(p => !p)} title="Requires Rider Assignment"
+    className={`shrink-0 px-3 py-3 rounded-xl font-bold text-xs border transition-colors ${newVtRequiresRider ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-500 border-slate-200'}`}>
+    <Truck size={14}/>
+  </button>
+)}
+<button onClick={add} className="bg-indigo-600 text-white px-4 rounded-xl font-bold hover:bg-indigo-700 transition-colors shrink-0">Add</button>
 </div>
+{tab === 'vehicleTypes' && <p className="text-[10px] text-slate-400 -mt-2">Tap <span className="font-bold">🚛</span> before adding if riders should be assignable (local delivery). Leave off for intercity/self-pickup types.</p>}
 <div className="relative"><Search className="absolute left-3 top-2.5 text-slate-400" size={14}/><input placeholder={`Search ${labelMap[tab]}s...`} className="w-full pl-8 pr-3 py-2 bg-white border border-slate-200 rounded-xl font-semibold outline-none text-sm focus:border-indigo-400" value={segSearch} onChange={e=>setSegSearch(e.target.value)} /></div>
 <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
 {list.length === 0 && <p className="text-center py-6 text-sm text-slate-400">No {labelMap[tab]}s yet.</p>}
@@ -2586,16 +2602,17 @@ return (
   return (
   <li key={item.id} className="p-3 hover:bg-slate-50">
   {editingId === item.id ? (
-  <div className="flex gap-2 items-center">
-  <input autoFocus className="flex-1 p-2 text-sm font-semibold border border-indigo-300 rounded-lg outline-none" value={editVal} onChange={e=>setEditVal(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')saveEdit(item);if(e.key==='Escape')setEditingId(null);}} />
-  <button onClick={()=>saveEdit(item)} className="text-xs font-bold text-indigo-600 px-3 py-1.5 bg-indigo-50 rounded-lg">Save</button>
-  <button onClick={()=>setEditingId(null)} className="text-xs font-bold text-slate-500 px-2 py-1.5 bg-slate-100 rounded-lg">Cancel</button>
+  <div className="flex gap-2 items-center flex-wrap">
+  <input autoFocus className="flex-1 min-w-0 p-2 text-sm font-semibold border border-indigo-300 rounded-lg outline-none" value={editVal} onChange={e=>setEditVal(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')saveEdit(item);if(e.key==='Escape')setEditingId(null);}} />
+  {tab === 'vehicleTypes' && <button type="button" onClick={() => saveToFirebase(col, item.id, { ...item, requiresRider: !item.requiresRider })} className={`shrink-0 px-2 py-1.5 rounded-lg text-[10px] font-bold border transition-colors ${item.requiresRider ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-500 border-slate-200'}`}><Truck size={12}/></button>}
+  <button onClick={()=>saveEdit(item)} className="text-xs font-bold text-indigo-600 px-3 py-1.5 bg-indigo-50 rounded-lg shrink-0">Save</button>
+  <button onClick={()=>setEditingId(null)} className="text-xs font-bold text-slate-500 px-2 py-1.5 bg-slate-100 rounded-lg shrink-0">Cancel</button>
   </div>
   ) : (
   <div className="flex items-center gap-2">
   <div className="flex-1">
-  <div className="flex items-center gap-2"><span className="font-bold text-slate-800 text-sm">{item.name}</span>{stats.orders > 0 && <span className="text-[9px] font-bold bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded border border-indigo-100">{stats.orders} orders</span>}</div>
-  {stats.orders > 0 && <p className="text-[10px] text-slate-400 mt-0.5">{stats.customers.size} clients · Rs.{stats.revenue.toLocaleString('en-US')} revenue</p>}
+  <div className="flex items-center gap-2"><span className="font-bold text-slate-800 text-sm">{item.name}</span>{tab==='vehicleTypes' ? <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${item.requiresRider ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>{item.requiresRider ? 'Rider' : 'No Rider'}</span> : stats.orders > 0 && <span className="text-[9px] font-bold bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded border border-indigo-100">{stats.orders} orders</span>}</div>
+  {tab !== 'vehicleTypes' && stats.orders > 0 && <p className="text-[10px] text-slate-400 mt-0.5">{stats.customers.size} clients · Rs.{stats.revenue.toLocaleString('en-US')} revenue</p>}
   </div>
   <button onClick={()=>{setEditingId(item.id);setEditVal(item.name);}} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg"><Edit size={14}/></button>
   <button onClick={async()=>{if(await showConfirm(`Delete "${item.name}"?`))await deleteFromFirebase(col,item.id);}} className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg"><Trash2 size={14}/></button>
@@ -4016,6 +4033,7 @@ const payments = useLiveCollection('payments');
 const cities = useLiveCollection('cities');
 const areas = useLiveCollection('areas');
 const customerTypes = useLiveCollection('customerTypes');
+const vehicleTypes = useLiveCollection('vehicleTypes');
 const appSettingsRaw = useLiveCollection('appSettings');
 const riders = useLiveCollection('riders');
 const appSettings = appSettingsRaw.find(s => s.id === 'main') || { businessName: 'Khyber Traders', appName: 'AnimalHealth.PK', tagline: 'Wholesale Veterinary Pharmacy · Karachi', showBusinessNameOnDocs: true, showBusinessNameOnReports: true };
@@ -4088,6 +4106,25 @@ showToast("Network Error - Could not save", "error");
 }
 };
 
+const vehicleTypesSeeded = React.useRef(false);
+React.useEffect(() => {
+  // Seed default vehicle types — only when Firestore has responded (appSettings loaded)
+  // and the collection is genuinely empty. Predictable string IDs prevent duplicates.
+  if (!appSettings?.id || vehicleTypes.length > 0 || vehicleTypesSeeded.current) return;
+  vehicleTypesSeeded.current = true;
+  const defaults = [
+    { name: 'Rider',               requiresRider: true  },
+    { name: 'Rickshaw',            requiresRider: true  },
+    { name: 'Suzuki',              requiresRider: true  },
+    { name: 'Intercity Transport', requiresRider: false },
+    { name: 'Self-Pickup',         requiresRider: false },
+  ];
+  defaults.forEach(d => {
+    const id = 'vt_' + d.name.replace(/\s+/g, '_');
+    saveToFirebase('vehicleTypes', id, { id, name: d.name, requiresRider: d.requiresRider });
+  });
+}, [appSettings?.id, vehicleTypes.length]);
+
 React.useEffect(() => {
   if (appSettings?.id === 'main' && appSettings.showBusinessNameOnDocs === undefined) {
     saveToFirebase('appSettings', 'main', { ...appSettings, showBusinessNameOnDocs: true, showBusinessNameOnReports: true });
@@ -4111,7 +4148,7 @@ React.useEffect(() => {
   if (!firebaseDue && !driveDue) return;
 
   autoBackupRan.current = true;
-  const cols = { app_users: appUsers, appSettings: [appSettings], companies, products, customers, invoices, expenses, expenseCategories, payments, riders, cities, areas, customerTypes };
+  const cols = { app_users: appUsers, appSettings: [appSettings], companies, products, customers, invoices, expenses, expenseCategories, payments, riders, cities, areas, customerTypes, vehicleTypes };
   const backupObj = { exportedAt, collections: cols };
 
   if (firebaseDue) {
@@ -4266,7 +4303,7 @@ const TABS = [
 ];
 const ctx = {
 isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers,
-cities, areas, customerTypes,
+cities, areas, customerTypes, vehicleTypes,
 showToast, showConfirm, confirmDialog, setConfirmDialog, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData,
 billingView, setBillingView, currentInvoice, setCurrentInvoice,
 activeTab, setActiveTab, adminView, setAdminView, analyticsView, setAnalyticsView,
