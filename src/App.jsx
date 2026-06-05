@@ -2116,17 +2116,22 @@ return (
 
 const uploadToDrive = async (scriptUrl, backupObj) => {
   const filename = `AnimalHealthPK_Backup_${new Date().toISOString().slice(0,10)}.json`;
-  // mode: 'no-cors' is required — Apps Script redirects the request and browsers
-  // block reading the response, but the POST still goes through successfully.
-  await fetch(scriptUrl, {
+  // text/plain avoids a CORS preflight; Apps Script public web apps return
+  // Access-Control-Allow-Origin:* so we can read the response without no-cors.
+  const res = await fetch(scriptUrl, {
     method: 'POST',
-    mode: 'no-cors',
-    body: JSON.stringify({ filename, content: JSON.stringify(backupObj, null, 2) }),
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({ filename, content: JSON.stringify(backupObj) }),
+    redirect: 'follow',
   });
+  if (!res.ok) throw new Error(`Script error ${res.status}`);
+  const data = await res.json().catch(() => ({}));
+  if (data.error) throw new Error(data.error);
 };
 
 const getDriveScript = (folderId) => `function doPost(e) {
   try {
+    if (!e || !e.postData) throw new Error('No POST data received');
     var payload = JSON.parse(e.postData.contents);
     var folder = ${folderId ? `DriveApp.getFolderById('${folderId}')` : 'DriveApp.getRootFolder()'};
     var existing = folder.getFilesByName(payload.filename);
@@ -2140,6 +2145,11 @@ const getDriveScript = (folderId) => `function doPost(e) {
       .createTextOutput(JSON.stringify({ error: err.message }))
       .setMimeType(ContentService.MimeType.JSON);
   }
+}
+
+function doGet(e) {
+  return ContentService.createTextOutput(JSON.stringify({ status: 'ready' }))
+    .setMimeType(ContentService.MimeType.JSON);
 }`;
 
 const AppSettingsView = () => {
