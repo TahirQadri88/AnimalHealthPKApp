@@ -2114,14 +2114,14 @@ return (
 };
 
 
-const uploadToDrive = async (scriptUrl, backupObj) => {
+const uploadToDrive = async (scriptUrl, backupObj, folderId) => {
   const filename = `AnimalHealthPK_Backup_${new Date().toISOString().slice(0,10)}.json`;
-  // text/plain avoids a CORS preflight; Apps Script public web apps return
-  // Access-Control-Allow-Origin:* so we can read the response without no-cors.
+  // folderId is sent in the body — the script uses it dynamically so you never
+  // need to redeploy just because the folder changes.
   const res = await fetch(scriptUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify({ filename, content: JSON.stringify(backupObj) }),
+    body: JSON.stringify({ filename, folderId: folderId || '', content: JSON.stringify(backupObj) }),
     redirect: 'follow',
   });
   if (!res.ok) throw new Error(`Script error ${res.status}`);
@@ -2129,11 +2129,13 @@ const uploadToDrive = async (scriptUrl, backupObj) => {
   if (data.error) throw new Error(data.error);
 };
 
-const getDriveScript = (folderId) => `function doPost(e) {
+const DRIVE_SCRIPT = `function doPost(e) {
   try {
     if (!e || !e.postData) throw new Error('No POST data received');
     var payload = JSON.parse(e.postData.contents);
-    var folder = ${folderId ? `DriveApp.getFolderById('${folderId}')` : 'DriveApp.getRootFolder()'};
+    var folder = payload.folderId
+      ? DriveApp.getFolderById(payload.folderId)
+      : DriveApp.getRootFolder();
     var existing = folder.getFilesByName(payload.filename);
     while (existing.hasNext()) existing.next().setTrashed(true);
     folder.createFile(payload.filename, payload.content, MimeType.PLAIN_TEXT);
@@ -2151,6 +2153,8 @@ function doGet(e) {
   return ContentService.createTextOutput(JSON.stringify({ status: 'ready' }))
     .setMimeType(ContentService.MimeType.JSON);
 }`;
+
+const getDriveScript = () => DRIVE_SCRIPT;
 
 const AppSettingsView = () => {
 const { appSettings, saveToFirebase, showToast, showConfirm, appUsers, companies, products, customers, invoices, expenses, expenseCategories, payments, cities, areas, customerTypes, riders } = useContext(AppContext);
@@ -2217,7 +2221,7 @@ const manualDriveBackup = async () => {
   if (!url) return showToast('Paste the Apps Script URL first', 'error');
   setDriveBacking(true);
   try {
-    await uploadToDrive(url, buildBackupObj());
+    await uploadToDrive(url, buildBackupObj(), form.driveFolderId || appSettings?.driveFolderId);
     await saveToFirebase('appSettings', 'main', { ...appSettings, ...form, lastDriveBackupAt: new Date().toISOString() });
     showToast('Backup sent to Google Drive!');
   } catch(e) { showToast(`Drive backup failed: ${e.message}`, 'error'); }
@@ -2365,7 +2369,7 @@ return (
           <div className="px-4 pb-4 space-y-2 text-[11px] text-slate-600 border-t border-slate-100">
             <ol className="list-decimal list-inside space-y-1 mt-3">
               <li>Open <strong>script.google.com</strong> → New project</li>
-              <li>Delete the default code and paste the script below{form.driveFolderId ? <span className="text-emerald-700 font-bold"> (your folder ID is already in it)</span> : ''}</li>
+              <li>Delete the default code and paste the script below</li>
               <li>Click <strong>Deploy → New deployment → Web app</strong></li>
               <li>Set <strong>Execute as: Me</strong> and <strong>Who has access: Anyone</strong></li>
               <li>Click Deploy → copy the deployment URL → paste it in the field above</li>
@@ -4102,7 +4106,7 @@ React.useEffect(() => {
   }
 
   if (driveDue) {
-    uploadToDrive(appSettings.driveScriptUrl, backupObj)
+    uploadToDrive(appSettings.driveScriptUrl, backupObj, appSettings.driveFolderId)
       .then(() => saveToFirebase('appSettings', 'main', { ...appSettings, lastDriveBackupAt: exportedAt }))
       .then(() => showToast('Auto-backup sent to Google Drive'))
       .catch(e => console.warn('Drive auto-backup failed:', e));
