@@ -2125,12 +2125,10 @@ const uploadToDrive = async (scriptUrl, backupObj) => {
   });
 };
 
-const DRIVE_SCRIPT_TEMPLATE = `function doPost(e) {
+const getDriveScript = (folderId) => `function doPost(e) {
   try {
     var payload = JSON.parse(e.postData.contents);
-    var folder = DriveApp.getRootFolder();
-    // To use a specific folder replace the line above with:
-    // var folder = DriveApp.getFolderById('PASTE_FOLDER_ID_HERE');
+    var folder = ${folderId ? `DriveApp.getFolderById('${folderId}')` : 'DriveApp.getRootFolder()'};
     var existing = folder.getFilesByName(payload.filename);
     while (existing.hasNext()) existing.next().setTrashed(true);
     folder.createFile(payload.filename, payload.content, MimeType.PLAIN_TEXT);
@@ -2158,6 +2156,7 @@ const [form, setForm] = useState({
   showBusinessNameOnReports: appSettings?.showBusinessNameOnReports !== false,
   backupFreq: appSettings?.backupFreq || appSettings?.githubFreq || 'weekly',
   driveScriptUrl: appSettings?.driveScriptUrl || '',
+  driveFolderId: appSettings?.driveFolderId || '',
   driveFreq: appSettings?.driveFreq || 'weekly',
 });
 const [restoring, setRestoring] = useState(false);
@@ -2177,9 +2176,10 @@ React.useEffect(() => {
     showBusinessNameOnReports: appSettings.showBusinessNameOnReports !== false,
     backupFreq: appSettings.backupFreq || appSettings.githubFreq || 'weekly',
     driveScriptUrl: appSettings.driveScriptUrl || '',
+    driveFolderId: appSettings.driveFolderId || '',
     driveFreq: appSettings.driveFreq || 'weekly',
   });
-}, [appSettings?.id, appSettings?.businessName, appSettings?.showBusinessNameOnDocs, appSettings?.showBusinessNameOnReports, appSettings?.backupFreq, appSettings?.githubFreq, appSettings?.driveScriptUrl, appSettings?.driveFreq]);
+}, [appSettings?.id, appSettings?.businessName, appSettings?.showBusinessNameOnDocs, appSettings?.showBusinessNameOnReports, appSettings?.backupFreq, appSettings?.githubFreq, appSettings?.driveScriptUrl, appSettings?.driveFolderId, appSettings?.driveFreq]);
 const saveSettings = async () => { await saveToFirebase('appSettings', 'main', form); showToast('Settings saved!'); };
 const downloadBackup = async () => {
   const backup = { exportedAt: new Date().toISOString(), collections: { app_users: appUsers, appSettings: appSettings ? [appSettings] : [], companies, products, customers, invoices, expenses, expenseCategories, payments, riders, cities, areas, customerTypes } };
@@ -2321,6 +2321,12 @@ return (
     <p className="text-xs text-slate-400 mb-4">Saves a single JSON file to your Google Drive folder. No size limit. Requires a one-time Apps Script setup.</p>
     <div className="space-y-3">
       <div>
+        <label className={labelCls}>Drive Folder ID</label>
+        <input className={inputCls} placeholder="e.g. 1vIGbDIEcbVw8Ocz3Dve63mDyCB4rFSJN"
+          value={form.driveFolderId} onChange={e => setForm(p=>({...p, driveFolderId: e.target.value.trim()}))}/>
+        <p className="text-[10px] text-slate-400 mt-1">Copy the long ID from your Drive folder's URL. The generated script below will use it automatically.</p>
+      </div>
+      <div>
         <label className={labelCls}>Apps Script URL</label>
         <input type="password" className={inputCls} placeholder="https://script.google.com/macros/s/…/exec"
           value={form.driveScriptUrl} onChange={e => setForm(p=>({...p, driveScriptUrl: e.target.value}))} autoComplete="off"/>
@@ -2349,15 +2355,14 @@ return (
           <div className="px-4 pb-4 space-y-2 text-[11px] text-slate-600 border-t border-slate-100">
             <ol className="list-decimal list-inside space-y-1 mt-3">
               <li>Open <strong>script.google.com</strong> → New project</li>
-              <li>Delete the default code and paste the script below</li>
+              <li>Delete the default code and paste the script below{form.driveFolderId ? <span className="text-emerald-700 font-bold"> (your folder ID is already in it)</span> : ''}</li>
               <li>Click <strong>Deploy → New deployment → Web app</strong></li>
               <li>Set <strong>Execute as: Me</strong> and <strong>Who has access: Anyone</strong></li>
-              <li>Click Deploy → copy the URL → paste it above</li>
-              <li>To use a specific folder: open the folder in Drive, copy the ID from the URL and replace <code className="bg-slate-100 px-1 rounded">getRootFolder()</code> as shown in the script comment</li>
+              <li>Click Deploy → copy the deployment URL → paste it in the field above</li>
             </ol>
             <div className="relative mt-3">
-              <pre className="bg-slate-900 text-emerald-300 text-[10px] rounded-lg p-3 overflow-x-auto whitespace-pre-wrap break-all">{DRIVE_SCRIPT_TEMPLATE}</pre>
-              <button type="button" onClick={() => { navigator.clipboard?.writeText(DRIVE_SCRIPT_TEMPLATE); showToast('Script copied!'); }}
+              <pre className="bg-slate-900 text-emerald-300 text-[10px] rounded-lg p-3 overflow-x-auto whitespace-pre-wrap break-all">{getDriveScript(form.driveFolderId)}</pre>
+              <button type="button" onClick={() => { navigator.clipboard?.writeText(getDriveScript(form.driveFolderId)); showToast('Script copied!'); }}
                 className="absolute top-2 right-2 bg-slate-700 hover:bg-slate-600 text-white text-[10px] font-bold px-2 py-1 rounded">
                 Copy
               </button>
