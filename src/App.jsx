@@ -2180,7 +2180,7 @@ function doGet(e) {
 const getDriveScript = () => DRIVE_SCRIPT;
 
 const AppSettingsView = () => {
-const { appSettings, saveToFirebase, showToast, showConfirm, appUsers, companies, products, customers, invoices, expenses, expenseCategories, payments, cities, areas, customerTypes, riders } = useContext(AppContext);
+const { appSettings, saveToFirebase, showToast, showConfirm, appUsers, companies, products, customers, invoices, expenses, expenseCategories, payments, cities, areas, customerTypes, vehicleTypes, riders } = useContext(AppContext);
 const [form, setForm] = useState({
   id: 'main',
   businessName: appSettings?.businessName || 'Khyber Traders',
