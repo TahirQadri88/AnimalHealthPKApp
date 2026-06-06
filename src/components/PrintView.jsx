@@ -102,9 +102,12 @@ const getShareCaption = () => {
     const _key = data.deliveryAddressKey || 'address1';
     const _addr = _key === 'address2' ? data.customerDetails?.address2 : data.customerDetails?.address1;
     const _map  = _key === 'address2' ? data.customerDetails?.map2   : data.customerDetails?.map1;
+    const _contact = data.customerDetails?.contactPerson;
+    const _phone   = data.customerDetails?.phone;
     let caption = `Dispatch Note #${data.id} for ${data.customerName} | ${formatDateDisp(data.date)}`;
-    if (_addr) caption += `\n📍 ${_addr}`;
-    if (_map)  caption += `\n🗺 ${_map}`;
+    if (_contact || _phone) caption += `\n👤 ${[_contact, _phone].filter(Boolean).join(' · ')}`;
+    if (_addr) caption += `\nAddress: ${_addr.replace(/[\r\n]+/g, ', ').trim()}`;
+    if (_map)  caption += `\nMap: ${_map}`;
     return caption;
   }
   if (docType === 'receipt') return `Payment Receipt ${data.id} — Rs. ${(data.receivedAmount || 0).toLocaleString('en-US')} received from ${data.customerName}`;
