@@ -23,8 +23,8 @@ useEffect(() => {
   const links = [data?.customerDetails?.map1, data?.customerDetails?.map2].filter(Boolean);
   if (!links.length) return;
   links.forEach(link => {
-    QRCode.toDataURL(link, { width: 128, margin: 1 })
-      .then(url => setQrDataUrls(prev => ({ ...prev, [link]: url })))
+    QRCode.toString(link, { type: 'svg', margin: 1, width: 128 })
+      .then(svg => setQrDataUrls(prev => ({ ...prev, [link]: svg })))
       .catch(() => {});
   });
 }, [data?.customerDetails?.map1, data?.customerDetails?.map2]);
@@ -821,10 +821,9 @@ return (
                   {mapLink && (
                     <div style={{ marginTop: '6px', display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
                       {qrDataUrls[mapLink] && (
-                        <img
-                          src={qrDataUrls[mapLink]}
-                          alt="Map QR"
-                          style={{ width: sz('48px','56px','64px'), height: sz('48px','56px','64px'), flexShrink: 0, border: '1px solid #e2e8f0', borderRadius: '4px' }}
+                        <div
+                          dangerouslySetInnerHTML={{ __html: qrDataUrls[mapLink] }}
+                          style={{ width: sz('48px','56px','64px'), height: sz('48px','56px','64px'), flexShrink: 0, border: '1px solid #e2e8f0', borderRadius: '4px', overflow: 'hidden' }}
                         />
                       )}
                       <div style={{ fontSize: sz('7px','7.5px','8px'), color: '#6366f1', wordBreak: 'break-all', lineHeight: 1.5, minWidth: 0 }}>
