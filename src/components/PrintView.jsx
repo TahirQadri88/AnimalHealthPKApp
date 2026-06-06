@@ -15,6 +15,23 @@ const isThermal = format === 'thermal';
 const isA5 = format === 'a5';
 const printRef = useRef(null);
 const [showPrevBal, setShowPrevBal] = useState(true);
+const [qrDataUrls, setQrDataUrls] = useState({});
+
+// Generate QR codes locally for any map links on this document
+useEffect(() => {
+  const links = [
+    data?.customerDetails?.map1,
+    data?.customerDetails?.map2,
+  ].filter(Boolean);
+  if (!links.length) return;
+  import('qrcode').then(mod => {
+    const QRCode = mod.default || mod;
+    links.forEach(link => {
+      QRCode.toDataURL(link, { width: 128, margin: 1, color: { dark: '#000000', light: '#ffffff' } })
+        .then(url => setQrDataUrls(prev => ({ ...prev, [link]: url })));
+    });
+  });
+}, [data?.customerDetails?.map1, data?.customerDetails?.map2]);
 
 // Keyboard: Escape closes the print view
 useEffect(() => {
@@ -807,12 +824,13 @@ return (
                   {addr && <div style={{ marginTop: '2px' }}>{addr}</div>}
                   {mapLink && (
                     <div style={{ marginTop: '6px', display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
-                      <img
-                        src={`https://api.qrserver.com/v1/create-qr-code/?size=64x64&data=${encodeURIComponent(mapLink)}&bgcolor=ffffff&color=000000&margin=2`}
-                        alt="Map QR"
-                        crossOrigin="anonymous"
-                        style={{ width: sz('48px','56px','64px'), height: sz('48px','56px','64px'), flexShrink: 0, border: '1px solid #e2e8f0', borderRadius: '4px' }}
-                      />
+                      {qrDataUrls[mapLink] && (
+                        <img
+                          src={qrDataUrls[mapLink]}
+                          alt="Map QR"
+                          style={{ width: sz('48px','56px','64px'), height: sz('48px','56px','64px'), flexShrink: 0, border: '1px solid #e2e8f0', borderRadius: '4px' }}
+                        />
+                      )}
                       <div style={{ fontSize: sz('7px','7.5px','8px'), color: '#6366f1', wordBreak: 'break-all', lineHeight: 1.5, minWidth: 0 }}>
                         <div style={{ fontWeight: 800, color: '#4f46e5', marginBottom: '2px', fontSize: sz('7.5px','8px','8.5px') }}>Scan for Location</div>
                         {mapLink}
