@@ -104,7 +104,10 @@ const getShareCaption = () => {
     const _map     = _key === 'address2' ? data.customerDetails?.map2   : data.customerDetails?.map1;
     const _contact = data.customerDetails?.contactPerson;
     const _phone   = data.customerDetails?.phone;
-    // Strip any URLs embedded in the address field, collapse newlines to ", "
+    // Extract URL from address text if map field not stored separately
+    const embeddedUrl = _addr ? (_addr.match(/https?:\/\/\S+/i) || [])[0] : null;
+    const mapLink = _map || embeddedUrl || null;
+    // Strip URLs from address, collapse newlines to ", ", clean trailing punctuation
     const addrClean = _addr
       ? _addr.replace(/https?:\/\/\S+/gi, '').replace(/[\r\n]+/g, ', ').replace(/,\s*,/g, ',').replace(/,\s*$/, '').trim()
       : '';
@@ -113,7 +116,7 @@ const getShareCaption = () => {
     else if (_contact)      caption += `\n\n👤 ${_contact}`;
     else if (_phone)        caption += `\n\n👤 ${_phone}`;
     if (addrClean) caption += `\n\nAddress: ${addrClean}.`;
-    if (_map)      caption += `\n\nLocation: ${_map}`;
+    if (mapLink)   caption += `\n\nLocation: ${mapLink}`;
     return caption;
   }
   if (docType === 'receipt') return `Payment Receipt ${data.id} — Rs. ${(data.receivedAmount || 0).toLocaleString('en-US')} received from ${data.customerName}`;
