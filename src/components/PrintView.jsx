@@ -761,7 +761,7 @@ return (
       {showOnDocs && <div style={{ fontSize: sz('15px','18px','22px'), fontWeight: 900, letterSpacing: '-0.5px', textTransform: 'uppercase', color: '#0f172a', lineHeight: 1.2 }}>
         {bizName}
       </div>}
-      {bizTagline && showOnDocs && <div style={{ fontSize: sz('7px','7.5px','8px'), textTransform: 'uppercase', letterSpacing: '2px', fontWeight: 700, color: '#94a3b8', marginTop: '2px' }}>
+      {bizTagline && showOnDocs && <div style={{ fontSize: sz('7px','8px','9px'), textTransform: 'uppercase', letterSpacing: '2px', fontWeight: 700, color: '#94a3b8', marginTop: '2px' }}>
         {bizTagline}
       </div>}
       <div style={{
@@ -772,7 +772,7 @@ return (
         fontWeight: 800,
         textTransform: 'uppercase',
         letterSpacing: '2px',
-        fontSize: sz('7px','8px','9px'),
+        fontSize: sz('7px','9px','10px'),
         textAlign: 'center',
         color: '#1e293b',
         lineHeight: 1.4,
@@ -786,14 +786,14 @@ return (
       <div className="keep-together" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: sz('14px','16px','20px'), gap: '8px' }}>
         {/* Left: customer */}
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: '7px', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '1.2px', color: '#94a3b8', marginBottom: '3px' }}>
+          <div style={{ fontSize: sz('7px','8.5px','9px'), textTransform: 'uppercase', fontWeight: 700, letterSpacing: '1.2px', color: '#94a3b8', marginBottom: '3px' }}>
             {docType === 'ledger' ? 'Account Holder' : 'Customer'}
           </div>
           <div style={{ fontSize: sz('12px','15px','18px'), fontWeight: 900, lineHeight: 1.2, wordBreak: 'break-word', color: '#0f172a' }}>
             {data.customerName || 'Unknown'}
           </div>
           {docType === 'dispatch' && data.customerDetails && (
-            <div style={{ marginTop: '6px', fontSize: sz('7.5px','8.5px','9px'), color: '#334155', background: '#f8fafc', padding: '6px 8px', borderRadius: '6px', border: '1px solid #e2e8f0', lineHeight: 1.6 }}>
+            <div style={{ marginTop: '6px', fontSize: sz('8.5px','10px','11px'), color: '#334155', background: '#f8fafc', padding: '6px 8px', borderRadius: '6px', border: '1px solid #e2e8f0', lineHeight: 1.6 }}>
               {(data.customerDetails.contactPerson || data.customerDetails.phone) && (
                 <div><strong>{data.customerDetails.contactPerson || 'N/A'}</strong>
                   {data.customerDetails.phone ? ` · ${data.customerDetails.phone}` : ''}
@@ -805,7 +805,20 @@ return (
                 const mapLink = useKey === 'address2' ? data.customerDetails.map2 : data.customerDetails.map1;
                 return (<>
                   {addr && <div style={{ marginTop: '2px' }}>{addr}</div>}
-                  {mapLink && <div style={{ fontSize: '7px', color: '#6366f1', marginTop: '2px', wordBreak: 'break-all' }}>Map: {mapLink}</div>}
+                  {mapLink && (
+                    <div style={{ marginTop: '6px', display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
+                      <img
+                        src={`https://api.qrserver.com/v1/create-qr-code/?size=64x64&data=${encodeURIComponent(mapLink)}&bgcolor=ffffff&color=000000&margin=2`}
+                        alt="Map QR"
+                        crossOrigin="anonymous"
+                        style={{ width: sz('48px','56px','64px'), height: sz('48px','56px','64px'), flexShrink: 0, border: '1px solid #e2e8f0', borderRadius: '4px' }}
+                      />
+                      <div style={{ fontSize: sz('7px','7.5px','8px'), color: '#6366f1', wordBreak: 'break-all', lineHeight: 1.5, minWidth: 0 }}>
+                        <div style={{ fontWeight: 800, color: '#4f46e5', marginBottom: '2px', fontSize: sz('7.5px','8px','8.5px') }}>Scan for Location</div>
+                        {mapLink}
+                      </div>
+                    </div>
+                  )}
                 </>);
               })()}
             </div>
@@ -819,11 +832,11 @@ return (
         <div style={{ textAlign: 'right', flexShrink: 0, paddingLeft: '6px', minWidth: 0 }}>
           {docType !== 'ledger' && (
             <>
-              <div style={{ fontSize: '7px', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '1px', color: '#94a3b8', marginBottom: '2px' }}>Ref #</div>
-              <div style={{ fontWeight: 800, fontSize: sz('11px','11px','12px'), color: '#1e293b', lineHeight: 1.2, fontFamily: 'monospace', wordBreak: 'break-all' }}>{data.id || '—'}</div>
-              <div style={{ color: '#64748b', fontSize: sz('8.5px','9px','10px'), marginTop: '2px', fontWeight: 600 }}>{formatDateDisp(data.date)}</div>
+              <div style={{ fontSize: sz('7px','8.5px','9px'), textTransform: 'uppercase', fontWeight: 700, letterSpacing: '1px', color: '#94a3b8', marginBottom: '2px' }}>Ref #</div>
+              <div style={{ fontWeight: 800, fontSize: sz('11px','12px','13px'), color: '#1e293b', lineHeight: 1.2, fontFamily: 'monospace', wordBreak: 'break-all' }}>{data.id || '—'}</div>
+              <div style={{ color: '#64748b', fontSize: sz('9px','10px','11px'), marginTop: '2px', fontWeight: 600 }}>{formatDateDisp(data.date)}</div>
               {docType === 'invoice' && data.salespersonName && (
-                <div style={{ fontSize: sz('7.5px','8px','9px'), color: '#94a3b8', marginTop: '2px', wordBreak: 'break-word' }}>by {data.salespersonName}</div>
+                <div style={{ fontSize: sz('8px','9px','10px'), color: '#94a3b8', marginTop: '2px', wordBreak: 'break-word' }}>by {data.salespersonName}</div>
               )}
             </>
           )}
@@ -842,19 +855,19 @@ return (
 
     {/* ── Dispatch Logistics ── */}
     {docType === 'dispatch' && data && (
-      <div className="keep-together" style={{ marginBottom: sz('14px','18px','22px'), background: '#fffbeb', padding: sz('8px','10px','12px'), borderRadius: '8px', border: '1px solid #fcd34d', fontSize: sz('8.5px','9px','9.5px'), color: '#78350f' }}>
-        <div style={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '5px', fontSize: '7.5px', color: '#92400e' }}>
+      <div className="keep-together" style={{ marginBottom: sz('14px','18px','22px'), background: '#fffbeb', padding: sz('8px','12px','14px'), borderRadius: '8px', border: '1px solid #fcd34d', fontSize: sz('9.5px','11px','11.5px'), color: '#78350f' }}>
+        <div style={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '5px', fontSize: sz('7.5px','9.5px','10px'), color: '#92400e' }}>
           Logistics / Delivery
         </div>
         <div><strong>Method:</strong> {data.vehicle || 'N/A'}</div>
-        {data.vehicle === 'Intercity Transport' && (
+        {data.transportCompany && (
           <div style={{ marginTop: '3px' }}>
-            <strong>Transport Co:</strong> {data.transportCompany || '—'} &nbsp; <strong>Bilty No:</strong> {data.biltyNumber || '—'}
+            <strong>Transport Co:</strong> {data.transportCompany} &nbsp; {data.biltyNumber && <><strong>Bilty No:</strong> {data.biltyNumber}</>}
           </div>
         )}
-        {['Rider', 'Rickshaw', 'Suzuki'].includes(data.vehicle) && (
+        {data.driverName && (
           <div style={{ marginTop: '3px' }}>
-            <strong>Driver:</strong> {data.driverName || '—'} &nbsp; <strong>Phone:</strong> {data.driverPhone || '—'}
+            <strong>Driver:</strong> {data.driverName} &nbsp; {data.driverPhone && <><strong>Phone:</strong> {data.driverPhone}</>}
           </div>
         )}
       </div>
@@ -986,22 +999,22 @@ return (
     {/* ── Invoice / Dispatch / Credit Note Items Table ── */}
     {(docType === 'invoice' || docType === 'dispatch' || docType === 'estimate' || docType === 'creditnote') && (
       <>
-        <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', marginBottom: sz('16px','20px','24px'), fontSize: sz('9.5px','10px','11px') }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', marginBottom: sz('16px','20px','24px'), fontSize: sz('9.5px','11px','12px') }}>
           <thead>
             <tr style={{ borderBottom: '2px solid #1e293b', background: '#f8fafc' }}>
-              <th style={{ padding: sz('6px 2px 6px 0','8px 4px 8px 0','9px 6px 9px 0'), textAlign: 'left', fontWeight: 800, color: '#475569', textTransform: 'uppercase', fontSize: sz('7.5px','7.5px','8px'), letterSpacing: '0.5px', width: isThermal ? (docType === 'dispatch' ? '65%' : '48%') : (docType === 'dispatch' ? '65%' : '50%') }}>
+              <th style={{ padding: sz('6px 2px 6px 0','8px 4px 8px 0','9px 6px 9px 0'), textAlign: 'left', fontWeight: 800, color: '#475569', textTransform: 'uppercase', fontSize: sz('7.5px','8.5px','9px'), letterSpacing: '0.5px', width: isThermal ? (docType === 'dispatch' ? '65%' : '48%') : (docType === 'dispatch' ? '65%' : '50%') }}>
                 Description
               </th>
-              <th style={{ padding: sz('6px 2px','8px 4px','9px 6px'), textAlign: 'center', fontWeight: 800, color: '#475569', textTransform: 'uppercase', fontSize: sz('7.5px','7.5px','8px'), letterSpacing: '0.5px', whiteSpace: 'nowrap', width: isThermal ? (docType === 'dispatch' ? '35%' : '10%') : (docType === 'dispatch' ? '35%' : '9%') }}>
+              <th style={{ padding: sz('6px 2px','8px 4px','9px 6px'), textAlign: 'center', fontWeight: 800, color: '#475569', textTransform: 'uppercase', fontSize: sz('7.5px','8.5px','9px'), letterSpacing: '0.5px', whiteSpace: 'nowrap', width: isThermal ? (docType === 'dispatch' ? '35%' : '10%') : (docType === 'dispatch' ? '35%' : '9%') }}>
                 {docType === 'dispatch' ? 'Qty / Pack' : 'Qty'}
               </th>
               {(docType === 'invoice' || docType === 'estimate') && (
-                <th style={{ padding: sz('6px 2px','8px 4px','9px 6px'), textAlign: 'right', fontWeight: 800, color: '#475569', textTransform: 'uppercase', fontSize: sz('7.5px','7.5px','8px'), letterSpacing: '0.5px', whiteSpace: 'nowrap', width: isThermal ? '42%' : '17%' }}>
+                <th style={{ padding: sz('6px 2px','8px 4px','9px 6px'), textAlign: 'right', fontWeight: 800, color: '#475569', textTransform: 'uppercase', fontSize: sz('7.5px','8.5px','9px'), letterSpacing: '0.5px', whiteSpace: 'nowrap', width: isThermal ? '42%' : '17%' }}>
                   Rate
                 </th>
               )}
               {(docType === 'invoice' || docType === 'estimate') && !isThermal && (
-                <th style={{ padding: sz('','8px 4px 8px 0','9px 0 9px 4px'), textAlign: 'right', fontWeight: 800, color: '#475569', textTransform: 'uppercase', fontSize: '8px', letterSpacing: '0.5px', whiteSpace: 'nowrap', width: '24%' }}>
+                <th style={{ padding: sz('','8px 4px 8px 0','9px 0 9px 4px'), textAlign: 'right', fontWeight: 800, color: '#475569', textTransform: 'uppercase', fontSize: sz('','8.5px','9px'), letterSpacing: '0.5px', whiteSpace: 'nowrap', width: '24%' }}>
                   Amount
                 </th>
               )}

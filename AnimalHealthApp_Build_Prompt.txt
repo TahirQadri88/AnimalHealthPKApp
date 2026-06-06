@@ -1,0 +1,913 @@
+================================================================================
+  COMPREHENSIVE BUILD PROMPT — WHOLESALE BUSINESS MANAGEMENT PWA
+  For use with any AI coding assistant (Gemini, Grok, ChatGPT, Claude, etc.)
+================================================================================
+
+BEFORE YOU BEGIN — ASK THE USER THESE QUESTIONS FIRST:
+-------------------------------------------------------
+1. Organisation / Business Name (e.g. "Khyber Traders")
+2. App Display Name (e.g. "AnimalHealth.PK")
+3. Tagline shown on documents (e.g. "Wholesale Veterinary Pharmacy · Karachi")
+4. Business Phone Number
+5. Business Email Address
+6. Business Address (city, country)
+7. Primary business type — what do you sell? (e.g. veterinary medicine, groceries, electronics)
+8. Do you need multi-user login with roles? (Yes / No)
+9. Currency symbol and locale (e.g. Rs. / PKR / USD)
+10. Do you want the app deployed to GitHub Pages? If yes, what is your GitHub username and repo name?
+11. Firebase project details — or should the prompt include instructions for creating a new Firebase project?
+
+Use the answers to replace all placeholder values throughout the generated code.
+
+================================================================================
+  PROJECT OVERVIEW
+================================================================================
+
+Build a full-featured, mobile-first Progressive Web App (PWA) for managing a
+wholesale/retail business. The app handles invoicing, customer ledgers, payments,
+expenses, analytics, inventory, logistics, and automatic cloud backup.
+
+The app must work entirely in the browser with no custom backend. All data is
+stored in Firebase Firestore (real-time). The app must be installable on Android
+and iOS as a PWA.
+
+================================================================================
+  TECH STACK — DO NOT DEVIATE
+================================================================================
+
+- Framework:       React 18 (Vite build tool)
+- Styling:         Tailwind CSS v3 (JIT mode, all classes must work at runtime)
+- Database:        Firebase Firestore (real-time onSnapshot listeners)
+- Icons:           lucide-react
+- PDF generation:  html2pdf.js (loaded via CDN script tag in index.html)
+- Image capture:   html-to-image (loaded from CDN at runtime, NOT bundled)
+- Deployment:      GitHub Pages (vite.config.js base: '/repo-name/')
+- No TypeScript. Plain JavaScript only.
+- No Redux. All state via React useState/useContext.
+- Single AppContext passed to all components via useContext.
+
+FIREBASE SETUP:
+  - Create a firebase.js file that exports: db, collection, onSnapshot, doc, setDoc, deleteDoc
+  - All Firestore writes use setDoc (upsert by id) — never addDoc
+  - All ids are Date.now() (number) unless otherwise specified
+  - Real-time listeners use onSnapshot wrapped in a useLiveCollection hook
+
+useLiveCollection HOOK (copy exactly):
+  function useLiveCollection(collectionName) {
+    const [data, setData] = React.useState([]);
+    useEffect(() => {
+      const unsubscribe = onSnapshot(collection(db, collectionName), (snapshot) => {
+        const items = [];
+        snapshot.forEach((d) => items.push(d.data()));
+        setData(items.sort((a, b) => (a.id > b.id ? 1 : -1)));
+      }, (error) => { console.error('Error fetching ' + collectionName + ':', error); });
+      return () => unsubscribe();
+    }, [collectionName]);
+    return data;
+  }
+
+================================================================================
+  FIRESTORE COLLECTIONS (DATA MODELS)
+================================================================================
+
+--- appSettings (single document id: 'main') ---
+{
+  id: 'main',
+  businessName: string,
+  appName: string,
+  tagline: string,
+  phone: string,
+  email: string,
+  address: string,
+  showBusinessNameOnDocs: boolean,   // default true
+  showBusinessNameOnReports: boolean, // default true
+  backupFreq: 'never'|'daily'|'weekly'|'monthly',  // Firebase auto-backup
+  lastBackupAt: ISO string,
+  driveScriptUrl: string,   // Google Apps Script deployment URL
+  driveFolderId: string,    // Google Drive folder ID
+  driveFreq: 'never'|'daily'|'weekly'|'monthly',
+  lastDriveBackupAt: ISO string
+}
+
+--- app_users ---
+{ id: number, name: string, password: string, role: 'Admin'|'Staff' }
+  NOTE: This is NOT Firebase Auth. Login is username+password checked against
+  this collection. Store passwords as plain text (small internal app).
+
+--- companies ---
+{ id: number, name: string }
+  Suppliers / manufacturers. Referenced by products.
+
+--- products ---
+{
+  id: number,
+  name: string,
+  company: string,        // company name (denormalized)
+  companyId: number,
+  costPrice: number,
+  salePrice: number,
+  unit: string,           // e.g. 'Box', 'Bottle', 'Strip'
+  description: string
+}
+
+--- customers ---
+{
+  id: number,
+  name: string,
+  phone: string,
+  email: string,
+  city: string,
+  area: string,
+  customerType: string,
+  address1: string,       // primary delivery address
+  address2: string,       // optional secondary address
+  salesperson: string,    // name of assigned salesperson
+  openingBalance: number  // initial debit balance (positive = customer owes money)
+}
+
+--- invoices ---
+  IMPORTANT: This collection stores FOUR document types identified by id prefix and status:
+
+  Regular invoices (id: number):
+  {
+    id: number,
+    customerId: number,
+    customerName: string,
+    customerDetails: { phone, city, area, address1, address2, customerType, salesperson },
+    items: [{ productId, name, unit, qty, rate, costPrice, total, uniqueId }],
+    discount: number,
+    deliveryBilled: number,     // delivery charge added to invoice
+    transportExpense: number,   // driver cost deducted from profit
+    total: number,              // sum of items - discount + deliveryBilled
+    paymentStatus: 'Pending'|'Partial'|'Paid',
+    receivedAmount: number,
+    vehicle: string,            // transport method name
+    transportCompany: string,
+    biltyNumber: string,
+    driverName: string,
+    driverPhone: string,
+    riderId: number|null,
+    riderName: string,
+    deliveryAddressKey: 'address1'|'address2',
+    notes: string,
+    status: 'Billed'|'Dispatched',
+    date: 'YYYY-MM-DD' string,
+    seqNum: number              // sequential invoice number
+  }
+
+  Dispatch notes (id: 'DN-' + timestamp):
+  { ...same as invoice, status: 'Dispatched', id starts with 'DN-' }
+
+  Credit notes / Sales Returns (id: 'CN-' + timestamp):
+  {
+    id: string,  // 'CN-' + timestamp
+    status: 'CreditNote',
+    customerId, customerName, customerDetails,
+    items: [...],   // returned items (negative impact on revenue)
+    total: number,  // total credit amount
+    date: string,
+    notes: string,
+    seqNum: number
+  }
+
+--- payments ---
+{
+  id: number,
+  customerId: number,
+  customerName: string,
+  amount: number,
+  date: 'YYYY-MM-DD' string,
+  method: string,   // e.g. 'Cash', 'Bank Transfer', 'Cheque'
+  notes: string,
+  receivedBy: string
+}
+
+--- expenses ---
+{
+  id: number,
+  description: string,
+  amount: number,
+  category: string,
+  date: 'YYYY-MM-DD' string,
+  notes: string
+}
+
+--- expenseCategories ---
+{ id: number, name: string }
+
+--- riders ---
+{
+  id: number,
+  name: string,
+  phone: string,
+  vehicleType: string,   // must match a vehicleType.name where requiresRider===true
+  vehicleNumber: string
+}
+
+--- cities ---
+{ id: number, name: string }
+
+--- areas ---
+{ id: number, name: string }
+
+--- customerTypes ---
+{ id: number, name: string }
+
+--- vehicleTypes ---
+{
+  id: string,            // 'vt_' + name with spaces replaced by underscores
+  name: string,          // e.g. 'Rider', 'Rickshaw', 'Suzuki', 'Intercity Transport', 'Self-Pickup'
+  requiresRider: boolean // true = show rider assignment + appear in rider registry dropdown
+                         // false = show transport company/bilty fields (unless Self-Pickup)
+}
+
+  DEFAULT SEED (insert if collection is empty, use predictable string IDs):
+  { id:'vt_Rider',               name:'Rider',               requiresRider:true  }
+  { id:'vt_Rickshaw',            name:'Rickshaw',            requiresRider:true  }
+  { id:'vt_Suzuki',              name:'Suzuki',              requiresRider:true  }
+  { id:'vt_Intercity_Transport', name:'Intercity Transport', requiresRider:false }
+  { id:'vt_Self-Pickup',         name:'Self-Pickup',         requiresRider:false }
+
+--- backups ---
+  Auto-created by the Firebase backup feature.
+  Document IDs: '{YYYY-MM-DD}_{collectionName}'  e.g. '2026-06-04_invoices'
+  { items: [...], backedUpAt: ISO string }
+
+================================================================================
+  AUTHENTICATION
+================================================================================
+
+- No Firebase Auth. Username + password checked against app_users collection.
+- On login success store currentUser in React state (not localStorage).
+- Roles: 'Admin' sees all tabs including Admin panel. 'Staff' sees limited tabs.
+- Admin-only: Admin tab, deleting records, user management, bulk operations.
+- Show user name in header. Logout button clears currentUser state.
+- Default first user: seed one Admin user on clean database.
+
+================================================================================
+  APP LAYOUT
+================================================================================
+
+- Fixed bottom navigation bar with 5-6 tab icons (mobile style).
+- Desktop: side navigation. Mobile: bottom tab bar.
+- Tabs: Dashboard | Products/Items | Billing | Customers | Payments | Admin (admin only)
+- Within Admin: sub-navigation (horizontal scrollable tab bar) for:
+    Masters | Customers | Expenses | Bulk Ops | Segments | Users | Settings | Riders
+- All modals are full-screen on mobile, centered card on desktop.
+- Toast notifications (top-center, 3 second auto-dismiss, green/red/neutral).
+- Confirm dialogs before any destructive action.
+- All lists have search bars. All date-range filters applied consistently.
+
+================================================================================
+  FEATURE 1 — DASHBOARD
+================================================================================
+
+Show summary cards for TODAY:
+- Total Sales (sum of Billed invoices today)
+- Total Collections (sum of payments received today)
+- Total Expenses (sum of expenses today)
+- Outstanding Receivables (all-time unpaid balance across all customers)
+
+Show a recent invoices list (last 10, clickable to open invoice).
+Quick-action buttons: New Invoice, Record Payment, New Expense.
+
+================================================================================
+  FEATURE 2 — BILLING / INVOICING
+================================================================================
+
+LIST VIEW:
+- Show all invoices in descending date order.
+- Status filter tabs: All | Invoices | Pending | Returns | Dispatched
+  - "Returns" tab shows credit notes (status: CreditNote)
+  - "Returns" tab has a "New Return" button (opens CreditNoteModal)
+  - Other tabs have "New Invoice" button
+- Search by customer name or invoice ID.
+- Date filter dropdown (Today / This Week / This Month / Last Month / This Year / All Time / Custom Range).
+- Each row shows: Invoice ID, customer, date, total, status badge, print/action buttons.
+- Clicking a row opens the invoice detail / edit form.
+
+INVOICE FORM:
+- Customer selector (searchable dropdown).
+- After customer selected: show their city, area, delivery addresses, outstanding balance.
+- Items section: search products by name or company. Add rows dynamically.
+  Each item row: product name, unit (auto-filled from product), qty (number input),
+  rate (pre-filled from salePrice, editable), total (auto calculated), delete button.
+- Summary section: Subtotal, Discount (input), Delivery Charge (input),
+  Transport Expense (input, shown separately — deducted from profit only, not shown on invoice to customer),
+  Total, Payment Status (Pending/Partial/Paid), Received Amount.
+- Logistics section:
+  - Vehicle / Transport Method (dropdown from vehicleTypes collection)
+  - If selected type has requiresRider=true: show Rider search/assign from riders collection filtered by vehicleType
+  - If selected type has requiresRider=false AND name != 'Self-Pickup': show Transport Company and Bilty Number fields
+  - Driver Name, Driver Phone fields (manual entry)
+  - Delivery Address selector (address1 / address2 from customer)
+  - Notes field
+- Save as Invoice (status: Billed) or Save as Dispatch Note (status: Dispatched, id starts with DN-)
+- Sequential invoice numbering (seqNum auto-incremented from max existing)
+- Print / Share buttons open PrintView component
+
+CREDIT NOTE / SALES RETURN MODAL:
+- Invoice-style form (same layout as invoice)
+- ID starts with 'CN-' + timestamp
+- Customer selector with purchase history shown as clickable tags (tap to pre-fill items from that invoice)
+- Items ALWAYS start empty — never pre-filled automatically
+- Previous balance and credit impact shown in print
+- Save reuses existing CN id when editing an existing credit note
+- Credit notes reduce revenue, profit, and cost in all analytics
+
+================================================================================
+  FEATURE 3 — CUSTOMER MANAGEMENT
+================================================================================
+
+LIST:
+- Customer cards showing name, city, area, type, phone, outstanding balance.
+- Search, filter by city/area/type.
+- Add / Edit customer button.
+- Click customer name anywhere in app → opens Customer Ledger modal.
+
+CUSTOMER FORM:
+- Name, phone, email, city (from cities collection), area (from areas collection),
+  customer type (from customerTypes collection), salesperson,
+  address1, address2, opening balance.
+
+CUSTOMER LEDGER MODAL:
+- Shows chronological list of all transactions:
+  - Invoices (debit = amount owed)
+  - Credit Notes (credit = deduction)
+  - Payments (credit = amount paid)
+- Running balance column (right side)
+- Previous balance displayed at top
+- Print as Account Statement button (A4/A5 format)
+- For credit note rows: show Edit and Delete buttons (in addition to Print)
+- For invoice rows: invoice ID is clickable → opens that invoice in print view
+
+================================================================================
+  FEATURE 4 — PAYMENTS / RECEIPTS
+================================================================================
+
+- Record a payment received from a customer.
+- Fields: Customer (searchable), Amount, Date, Method, Notes, Received By.
+- List all payments with date filter and search.
+- Print receipt.
+- Edit/Delete payments (admin only).
+- Customer's outstanding balance updates in real-time from ledger calculation.
+
+================================================================================
+  FEATURE 5 — EXPENSES
+================================================================================
+
+- Log business expenses: Description, Amount, Category, Date, Notes.
+- Expense category management (add/delete categories from Admin → Expenses).
+- List with date filter, search, category filter.
+- Total expenses shown in analytics P&L.
+
+================================================================================
+  FEATURE 6 — PRODUCTS / INVENTORY
+================================================================================
+
+- Product list: Name, Company, Cost Price, Sale Price, Unit, stock (calculated from invoices).
+- Stock = sum of all invoice item quantities for that product (status: Billed or Dispatched),
+  minus returned quantities from credit notes.
+- Add / Edit product. Delete if not used in any invoice.
+- Filter by company. Search by name.
+- When adding a product, allow creating a new company inline.
+- When cost price changes, offer to update cost price on all existing unpaid invoices.
+
+================================================================================
+  FEATURE 7 — ANALYTICS / REPORTS
+================================================================================
+
+DATE FILTER (applies to all analytics):
+  Today | This Week | This Month | Last Month | This Year | All Time | Custom Range
+
+TABS (horizontal scrollable):
+
+1. Overview
+   - KPI cards: Gross Revenue, Sales Returns, Net Revenue, COGS, Gross Profit,
+     Gross Margin %, Total Expenses, Net Profit, Collections, Receivables
+   - Show "Sales Returns (N)" line only when credit notes exist in period
+   - "Gross Product Sales" shows pre-return figure
+
+2. By Company (supplier/manufacturer breakdown)
+   - Table: Company | Revenue | Cost | Profit | Margin% | Orders
+   - Sorted by revenue descending
+
+3. By Customer
+   - Table: Customer | Revenue | Cost | Profit | Margin% | Orders | Balance
+   - Customer name clickable → opens ledger modal
+
+4. By Salesperson
+   - Table: Salesperson | Revenue | Profit | Orders
+
+5-7. By City / By Area / By Type
+   - Table: Segment | Revenue | Profit | Orders | Customers
+
+8. Monthly Breakdown
+   - Table: Month | Revenue | Cost | Profit | Expenses | Net Profit | Collections
+
+9. Daily Breakdown
+   - Table: Date | Revenue | Profit | Collections | Expenses
+
+10. P&L Summary
+    - Formatted profit & loss statement card
+
+11. Receivables Aging
+    - Outstanding balances bucketed: Current | 30 days | 60 days | 90 days | 90+ days
+    - Customer names clickable → opens ledger modal
+
+12. Insights
+    - Top customer by revenue (name clickable → ledger)
+    - Best selling product
+    - Best margin product
+    - Busiest day/month
+
+13. Item Sales (drilldown)
+    - Filter by product name (multi-select or search)
+    - Filter by customer name (search)
+    - Invoice-level table: Invoice ID (clickable → print view) | Customer (clickable → ledger) | Date | Qty | Rate | Total
+    - Summary row at bottom
+
+IMPORTANT ACCOUNTING RULES FOR CREDIT NOTES:
+  When computing analytics, credit notes must be subtracted from:
+  - byCompany: revenue, cost, profit
+  - byCustomer: revenue, cost, profit
+  - bySalesperson: revenue, profit
+  - byCity/Area/Type: revenue, profit
+  - monthlyData: revenue, cost, profit
+  - dailyBreakdown: revenue, profit
+  - topline KPI cards: all figures
+  Credit note items have a costPrice — subtract actual cost, not just revenue.
+
+EXPORT:
+  - Export current tab data to CSV (skip Overview and Item Sales tabs).
+
+================================================================================
+  FEATURE 8 — ADMIN PANEL
+================================================================================
+
+Sub-sections accessible via horizontal tab bar:
+
+8a. MASTERS
+  - Companies list: Add / Edit / Delete. Name only.
+  - Used as supplier filter on products.
+
+8b. SEGMENTS (Admin → Segments)
+  - Horizontal tabs: Cities | Areas | Types | Transport
+  - Each tab: add new item (text input + Add button), list with edit/delete.
+  - Transport tab also has a "Requires Rider" toggle button (truck icon) per item.
+    Toggle controls whether that vehicle type shows rider assignment in invoices
+    and appears in the rider registration vehicle type dropdown.
+  - Segments (Cities/Areas/Types) show usage stats: order count and revenue.
+
+8c. RIDERS (Admin → Riders)
+  - Register riders/drivers: Name, Phone, Vehicle Number, Vehicle Type.
+  - Vehicle Type dropdown sourced from vehicleTypes where requiresRider=true.
+  - List existing riders with edit/delete.
+  - Also accessible as a modal from the invoice form when assigning a rider.
+
+8d. USERS (Admin → Users)
+  - List all app_users.
+  - Add new user: Name, Password, Role (Admin/Staff).
+  - Edit/Delete users. Cannot delete yourself.
+
+8e. BULK OPERATIONS
+  - Useful data-fix utilities.
+  - "Fix Invoice Units" — scans all invoices and fills in missing unit values
+    by matching items to products by name/id.
+
+8f. SETTINGS (Admin → Settings)
+  - Business Profile form: BusinessName, AppName, Tagline, Phone, Email, Address.
+  - Toggles: Show Business Name on Documents / Show on Reports.
+  - Save button.
+  - Container must have pb-28 so content is scrollable above the mobile bottom nav.
+
+  Backup & Data Safety card:
+  - Download full JSON backup button (all collections in one file).
+  - Restore from JSON backup button (file picker, overwrites all data, shows confirmation).
+  - Note about Firebase Console automated backups for Blaze plan users.
+
+  Firebase Auto-Backup card:
+  - Frequency selector: Never / Daily / Weekly / Monthly.
+  - Backup Now button — splits each collection into a separate Firestore document
+    under 'backups' collection with ID '{date}_{collectionName}' to avoid 1MB limit.
+  - Updates lastBackupAt in appSettings.
+  - Shows "Last backup: YYYY-MM-DD" when lastBackupAt exists.
+  - Auto-backup runs once per session on app load if frequency is due.
+
+  Google Drive Backup card:
+  - Drive Folder ID field (user pastes ID from their Drive folder URL).
+  - Apps Script URL field (password type — user pastes deployment URL).
+  - Frequency selector: Never / Daily / Weekly / Monthly.
+  - Expandable "How to set up" section with:
+      Step-by-step instructions (5 steps)
+      Copyable Apps Script code (shown in dark code block with Copy button)
+  - Backup Now button (green). Disabled if no URL entered.
+  - Shows "Last backup: YYYY-MM-DD" when lastDriveBackupAt exists.
+
+  The Apps Script code to display (COPY EXACTLY):
+  -------
+  function doPost(e) {
+    try {
+      if (!e || !e.postData) throw new Error('No POST data received');
+      var payload = JSON.parse(e.postData.contents);
+      var folder = payload.folderId
+        ? DriveApp.getFolderById(payload.folderId)
+        : DriveApp.getRootFolder();
+      var existing = folder.getFilesByName(payload.filename);
+      while (existing.hasNext()) existing.next().setTrashed(true);
+      folder.createFile(payload.filename, payload.content, MimeType.PLAIN_TEXT);
+      var keep = payload.keepCount || 4;
+      var files = [];
+      var iter = folder.searchFiles('title contains "Backup_"');
+      while (iter.hasNext()) files.push(iter.next());
+      files.sort(function(a, b) { return a.getDateCreated() - b.getDateCreated(); });
+      while (files.length > keep) files.shift().setTrashed(true);
+      return ContentService
+        .createTextOutput(JSON.stringify({ ok: true }))
+        .setMimeType(ContentService.MimeType.JSON);
+    } catch (err) {
+      return ContentService
+        .createTextOutput(JSON.stringify({ error: err.message }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+  }
+  function doGet(e) {
+    return ContentService.createTextOutput(JSON.stringify({ status: 'ready' }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+  -------
+
+  Drive backup filename format: '{AppName}_Backup_{YYYY}-W{NN}.json'
+  (ISO week number — creates new file each week, keeps last 4)
+
+  Drive backup fetch call (use Content-Type: text/plain to avoid CORS preflight):
+    fetch(scriptUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ filename, folderId, keepCount: 4, content: JSON.stringify(backupObj) }),
+      redirect: 'follow'
+    })
+  DO NOT use mode:'no-cors' — use normal fetch so errors can be read from response.
+
+================================================================================
+  FEATURE 9 — PRINT / SHARE SYSTEM
+================================================================================
+
+Build a PrintView component that receives a config object:
+  { docType: 'invoice'|'dispatch'|'creditNote'|'ledger', format: 'thermal'|'a4'|'a5', data: {...} }
+
+ACTION BUTTONS (shown in a fixed bottom bar over the document):
+  Print | Share as Image | Share as PDF | Share as HTML | Close
+
+DOCUMENT FORMATS:
+
+  THERMAL (80mm = 302px wide):
+  - Black and white, compact layout.
+  - Business name, tagline, phone at top.
+  - Customer name, date, invoice number.
+  - Items table: Name | Qty | Rate | Total (text-xs).
+  - Summary: Subtotal, Discount, Delivery, Total, Paid, Balance.
+  - Footer: thank you message.
+  - @media print { * { color: black !important; } }
+
+  A4 / A5:
+  - Full colour layout with business branding header.
+  - Professional table with product columns including unit.
+  - Logistics section at bottom if vehicle/rider info exists.
+  - Footer with business contact details.
+  - For account statements / ledger: running balance column.
+  - Credit note print: show Items Subtotal → Credit Note (−) → Previous Balance →
+    Balance After Return → Net Balance (all computed from ledger).
+
+PRINT FUNCTION (all formats — NOT just thermal):
+  Inject live CSS from all document.styleSheets into the print window so Tailwind
+  classes resolve. Pattern:
+    let appCss = Array.from(document.styleSheets)
+      .flatMap(sheet => { try { return Array.from(sheet.cssRules).map(r => r.cssText); } catch(e) { return []; } })
+      .join('\n');
+    const augmented = html.replace('<title>', `<style>${appCss}</style>\n  <title>`);
+  Open in new window, write augmented HTML, call window.print() after 900ms timeout
+  (or onload if faster).
+
+IMAGE SHARE:
+  - Use html-to-image library loaded from CDN (check window.htmlToImage before loading).
+  - Capture at pixelRatio: 3 for high-res output.
+  - For thermal: toJpeg with quality: 0.95.
+  - For A4/A5: use html2canvas via PIXEL_RATIO=3, paginate into multi-page composite
+    with a slate-200 gap between pages.
+  - Clone element to position:fixed top:0 left:0 z-index:-1 at exact target width
+    before capturing (html-to-image requires element to be in viewport).
+  - Use navigator.share({ files: [jpgFile] }) on mobile, fallback to download.
+
+PDF SHARE:
+  - Use html2pdf.js (loaded via script tag in index.html).
+  - Thermal: 80mm wide, auto-height, scale: 3.
+  - A4/A5: standard sizes, scale: 3 (NOT 2 — 2 produces blurry output).
+  - Clone element to position:fixed left:-9999px before capture.
+  - Allow natural page breaks with pagebreak: { mode: ['css', 'legacy'] }.
+
+================================================================================
+  FEATURE 10 — CUSTOMER LEDGER CALCULATIONS
+================================================================================
+
+getCustomerLedger(customerId) function must:
+1. Start with openingBalance from customer record (positive = they owe money).
+2. Sort all transactions (invoices, creditNotes, payments) by date ascending.
+3. For each invoice (status Billed or Dispatched): add total to running balance (debit).
+4. For each credit note (status CreditNote): subtract total from running balance (credit).
+5. For each payment: subtract amount from running balance (credit).
+6. Return array of ledger rows with: { type, id, date, description, debit, credit, balance }.
+
+getCustomerBalance(customerId):
+  Returns final balance (positive = customer owes, negative = credit).
+
+================================================================================
+  FEATURE 11 — SEQUENTIAL NUMBERING
+================================================================================
+
+- Invoices get a seqNum: find max seqNum across all invoices (excluding CN- and DN- ids) + 1.
+- Dispatch notes use same seqNum sequence.
+- Credit notes get their own sequence: find max seqNum across CN- invoices + 1.
+- Display format: INV-0042, DN-0017, CN-0005 (zero-padded to 4 digits).
+
+================================================================================
+  CRITICAL BUSINESS LOGIC RULES
+================================================================================
+
+1. PROFIT CALCULATION:
+   Gross Profit = (salePrice - costPrice) × qty, summed per item.
+   Delivery charge (deliveryBilled) is revenue but NOT included in profit.
+   Transport expense is deducted from profit but NOT shown to customer on invoice.
+   Formula: grossProfit = items.reduce((sum, item) => sum + (item.rate - item.costPrice) * item.qty, 0)
+
+2. CREDIT NOTES IN ANALYTICS:
+   When a credit note exists, subtract from BOTH revenue AND cost AND profit.
+   Use actual item costPrice from credit note — not a revenue-based estimate.
+   Adjust: byCompany, byCustomer, bySalesperson, byCity, byArea, byType,
+           monthlyData, dailyBreakdown, and top-line KPIs.
+
+3. RECEIVABLES:
+   Outstanding = sum of all customer balances where balance > 0.
+   Do NOT include customers with credit (negative) balance in receivables total.
+
+4. VEHICLE TYPES AND RIDERS:
+   When a vehicleType with requiresRider=true is selected on an invoice:
+     - Show rider search/selection filtered by that vehicleType.
+   When a vehicleType with requiresRider=false is selected (and name != 'Self-Pickup'):
+     - Show transport company + bilty number fields.
+   Rider forms only show vehicleTypes where requiresRider=true.
+
+5. INVOICE TOTAL:
+   total = sum(item.qty * item.rate) - discount + deliveryBilled
+   transportExpense is stored but NOT added to total (internal cost only).
+
+================================================================================
+  UI / UX REQUIREMENTS
+================================================================================
+
+COLOR SCHEME:
+  Primary: indigo-600 (#4F46E5)
+  Success/Paid: green / emerald
+  Warning/Pending: amber / orange
+  Danger/Delete: rose / red
+  Background: slate-50 / slate-100
+  Cards: white with border border-slate-100 shadow-sm rounded-2xl
+
+TYPOGRAPHY:
+  Font: Inter (Google Fonts or system-ui fallback)
+  Weights used: 400 (normal), 600 (semibold), 700 (bold), 900 (black)
+  Labels: text-[10px] or text-[11px] font-bold text-slate-500 uppercase tracking-wider
+
+COMPONENT PATTERNS:
+  - All inputs: p-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold
+    outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100
+  - Primary buttons: bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl
+  - Danger buttons: bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl
+  - Cards: bg-white rounded-2xl p-5 shadow-sm border border-slate-100
+  - Status badges: text-[9px] font-black px-2 py-0.5 rounded-full
+    Paid=emerald, Pending=amber, Partial=orange, CreditNote=rose, Dispatched=blue
+  - Modals: fixed inset-0 z-50, backdrop bg-black/40, content bg-white rounded-t-3xl
+    on mobile (slides up), centered rounded-2xl on desktop.
+
+RESPONSIVE:
+  - Mobile-first (320px min-width).
+  - All touch targets min 44px height.
+  - Bottom padding on scrollable containers: pb-24 or pb-28 to clear bottom nav.
+  - Horizontal tab bars must be scrollable on small screens (overflow-x-auto, no wrap).
+
+TOAST NOTIFICATIONS:
+  - Fixed top-center position, z-50.
+  - Green background for success, red for error, slate for neutral.
+  - Auto-dismiss after 3 seconds.
+  - showToast(message, type='success'|'error'|'info')
+
+CONFIRM DIALOGS:
+  - showConfirm(message) returns Promise<boolean>.
+  - Used before all deletes and destructive operations.
+  - Custom dialog component (not browser alert).
+
+================================================================================
+  CONTEXT PATTERN — CRITICAL
+================================================================================
+
+All state and functions are defined in the main App() function and passed via
+a single AppContext. Components access what they need via useContext(AppContext).
+
+Every component that uses a collection from Firestore must destructure it from
+useContext(AppContext). If you add a new collection, you MUST:
+  1. Add useLiveCollection('newCollection') in App()
+  2. Add it to the ctx object passed to AppContext.Provider
+  3. Add it to every component's useContext destructure that needs it
+  4. Add it to buildBackupObj()
+  5. Add it to the auto-backup useEffect cols object
+  6. Add it to the downloadBackup function
+
+Failing any of these steps causes "X is not defined" runtime errors.
+
+================================================================================
+  BACKUP SYSTEM — COMPLETE IMPLEMENTATION
+================================================================================
+
+buildBackupObj() returns:
+{
+  exportedAt: new Date().toISOString(),
+  collections: {
+    app_users, appSettings: [appSettings], companies, products,
+    customers, invoices, expenses, expenseCategories, payments,
+    riders, cities, areas, customerTypes, vehicleTypes
+  }
+}
+
+Firebase backup: splits into documents '{date}_{col}' in 'backups' collection.
+  (Avoids Firestore 1MB per-document limit by keeping collections separate.)
+
+Google Drive backup: sends full JSON in ONE file (no size limit on Drive).
+  Filename: '{AppName}_Backup_{YYYY}-W{NN}.json' (ISO week number).
+  Keeps last 4 weekly files (Apps Script handles rotation).
+
+Auto-backup: runs once per session using a React.useRef flag.
+  Checks lastBackupAt / lastDriveBackupAt against configured frequency.
+  Runs both Firebase and Drive backups independently if each is due.
+
+Restore: reads backup JSON, loops collections, writes each doc via saveToFirebase.
+  Shows confirmation dialog before overwriting. Shows progress count on completion.
+
+================================================================================
+  PWA CONFIGURATION
+================================================================================
+
+vite.config.js:
+  import { defineConfig } from 'vite'
+  import react from '@vitejs/plugin-react'
+  export default defineConfig({
+    plugins: [react()],
+    base: '/YOUR-REPO-NAME/',
+  })
+
+index.html must include:
+  <link rel="manifest" href="/repo-name/manifest.json">
+  <meta name="theme-color" content="#4F46E5">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+manifest.json:
+  {
+    "name": "YOUR APP NAME",
+    "short_name": "SHORT NAME",
+    "start_url": "/repo-name/",
+    "display": "standalone",
+    "background_color": "#f8fafc",
+    "theme_color": "#4F46E5",
+    "icons": [
+      { "src": "/repo-name/icon-192.png", "sizes": "192x192", "type": "image/png" },
+      { "src": "/repo-name/icon-512.png", "sizes": "512x512", "type": "image/png" }
+    ]
+  }
+
+GitHub Pages deployment:
+  .github/workflows/deploy.yml — use actions/checkout, setup-node, npm install,
+  npm run build, then deploy dist/ to gh-pages branch using peaceiris/actions-gh-pages.
+
+================================================================================
+  KNOWN PITFALLS — READ BEFORE BUILDING
+================================================================================
+
+1. TAILWIND IN PRINT WINDOWS:
+   Never use buildHtmlDoc() without injecting live CSS. The print window has no
+   access to Tailwind's compiled CSS unless you inject it from document.styleSheets.
+   ALL formats (not just thermal) need CSS injection.
+
+2. HTML-TO-IMAGE VIEWPORT REQUIREMENT:
+   html-to-image uses SVG foreignObject and CANNOT render elements at left:-9999px.
+   Always clone the element and position it at top:0 left:0 with z-index:-1 (behind
+   the app UI) before capturing. Remove after capture.
+
+3. PDF SCALE:
+   Always use scale:3 for html2canvas in html2pdf. scale:2 produces noticeably
+   blurry output on high-DPI screens. scale:3 gives crisp text.
+
+4. APPS SCRIPT CORS:
+   Do NOT use fetch with mode:'no-cors' for the Google Drive relay.
+   Apps Script public web apps return Access-Control-Allow-Origin:*.
+   Using no-cors makes it impossible to read errors from the response.
+   Use Content-Type:'text/plain' (a "simple" header) to avoid preflight,
+   then read the JSON response normally.
+
+5. VEHICLETYPE SEEDING RACE CONDITION:
+   vehicleTypes starts as [] before Firestore responds (same as genuinely empty).
+   Only seed when BOTH: appSettings.id exists (proves Firestore responded) AND
+   vehicleTypes.length === 0. Use a React.useRef flag to prevent re-seeding.
+
+6. CREDIT NOTE ANALYTICS:
+   A common bug is subtracting only revenue from credit notes but not adjusting
+   cost and profit independently. You must subtract the actual costPrice * qty
+   for each returned item, separately from the revenue subtraction.
+
+7. CONTEXT DESTRUCTURING:
+   Every time you add a new collection, audit ALL useContext(AppContext) calls in
+   ALL components and add the new collection to every component that needs it.
+   Missing even one causes a "X is not defined" crash in that component.
+
+8. FIRESTORE DOCUMENT SIZE:
+   Firestore has a 1MB per-document limit. The backup system avoids this by
+   storing each collection as a separate document. Never try to store all
+   collections in one Firestore document.
+
+9. SEQUENTIAL NUMBERS:
+   Calculate seqNum at save time from max existing — never store a counter.
+   Separate sequences for invoices and credit notes (CN-).
+
+10. MOBILE SCROLL:
+    Admin Settings and any long scrollable views must have pb-28 (padding-bottom)
+    so content is reachable above the fixed bottom navigation bar.
+
+================================================================================
+  FILE STRUCTURE
+================================================================================
+
+src/
+  App.jsx          — entire app in one file (all components, all state, all logic)
+  firebase.js      — Firebase init and exports
+  helpers.js       — Pure utility functions (date formatting, CSV export, etc.)
+  components/
+    PrintView.jsx  — All print/image/PDF generation logic
+    SearchableSelect.jsx — Reusable searchable dropdown component
+public/
+  manifest.json
+  icon-192.png
+  icon-512.png
+index.html
+vite.config.js
+.github/
+  workflows/
+    deploy.yml
+
+================================================================================
+  HELPERS.JS UTILITIES TO INCLUDE
+================================================================================
+
+getPKTDate()        — returns current date as 'YYYY-MM-DD' in PKT timezone (UTC+5)
+getLocalDateStr()   — returns today's date in local timezone as 'YYYY-MM-DD'
+formatDateDisp(str) — formats 'YYYY-MM-DD' to 'DD MMM YYYY' for display
+checkDateFilter(dateStr, filter, customFrom, customTo) — returns boolean
+  filters: 'Today'|'This Week'|'This Month'|'Last Month'|'This Year'|'All Time'|'Custom Range'
+exportToCSV(rows, filename) — converts array of objects to CSV and triggers download
+shareOrDownload(blob, filename) — uses navigator.share if available, falls back to download
+
+================================================================================
+  SEARCHABLESELECT COMPONENT
+================================================================================
+
+Props: { options: [{value, label}], value, onChange, placeholder, className }
+- Shows a text input that filters options in a dropdown below.
+- Keyboard navigable (arrow keys, enter to select, escape to close).
+- On mobile: full-width dropdown with large touch targets.
+- Closes on outside click.
+
+================================================================================
+  FINAL CHECKLIST BEFORE DELIVERY
+================================================================================
+
+[ ] All Firestore collections listed above are implemented with useLiveCollection
+[ ] All collections included in buildBackupObj and auto-backup
+[ ] vehicleTypes seeded with defaults on first run (predictable string IDs)
+[ ] vehicleTypes in AppContext.Provider value AND in all relevant useContext destructures
+[ ] All print formats use CSS injection (not raw HTML without styles)
+[ ] Image capture uses pixelRatio:3, PDF uses scale:3
+[ ] Google Drive backup uses text/plain Content-Type, no mode:'no-cors'
+[ ] Credit notes correctly reduce revenue + cost + profit in all analytics tabs
+[ ] Customer name is clickable everywhere in analytics → opens ledger modal
+[ ] Admin Settings container has pb-28 for mobile scroll
+[ ] seqNum calculated correctly (separate for invoices and CN-)
+[ ] Confirm dialog before all deletes and data overwrites
+[ ] Toast notifications working (success green, error red)
+[ ] PWA manifest and icons in place
+[ ] GitHub Pages deploy workflow configured
+[ ] vite.config.js base path set to '/repo-name/'
+[ ] html2pdf CDN script in index.html
+
+================================================================================
+  END OF PROMPT
+================================================================================

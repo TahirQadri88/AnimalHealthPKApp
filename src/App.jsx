@@ -9,7 +9,7 @@ Wallet, Download, Upload, TrendingDown, Filter, ArrowUpDown, Award, CreditCard,
 FileDown, BookOpen, ShoppingCart, Tag, Building2, BarChart2, PieChart, Activity,
 Percent, Hash, Zap, Archive, RefreshCw, Eye, EyeOff, ChevronDown, ChevronUp,
 AlignLeft, Bell, Star, Layers, Globe, PhoneCall, MapPin, Briefcase, ClipboardList, Copy,
-RotateCcw, FileText, Github
+RotateCcw, FileText, Database
 } from 'lucide-react';
 import { db, collection, onSnapshot, doc, setDoc, deleteDoc } from './firebase';
 import { APP_NAME, VEHICLES, getPKTDate, getLocalDateStr, formatDateDisp, checkDateFilter, exportToCSV, shareOrDownload } from './helpers';
@@ -521,7 +521,10 @@ return (
 // ─────────────────────────────────────────────────────────────────────────────
 
 const RidersModal = () => {
-const { riders, saveToFirebase, deleteFromFirebase, showToast, setShowRidersModal, showConfirm } = useContext(AppContext);
+const { riders, vehicleTypes, saveToFirebase, deleteFromFirebase, showToast, setShowRidersModal, showConfirm } = useContext(AppContext);
+const riderVehicleTypes = vehicleTypes.filter(vt => vt.requiresRider).map(vt => vt.name);
+const fallbackRiderTypes = ['Rider', 'Rickshaw', 'Suzuki'];
+const riderTypeList = riderVehicleTypes.length ? riderVehicleTypes : fallbackRiderTypes;
 const inputCls = "w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:border-indigo-500 shadow-sm";
 const [form, setForm] = useState({ name: '', phone: '', vehicleType: 'Rider', vehicleNumber: '' });
 const [editingId, setEditingId] = useState(null);
@@ -547,7 +550,7 @@ return (
     <div className="col-span-2"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Name *</label><input className={inputCls} placeholder="e.g. Ali Raza" value={form.name} onChange={e=>setForm({...form,name:e.target.value})} /></div>
     <div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Phone</label><input className={inputCls} placeholder="03XX..." value={form.phone} onChange={e=>setForm({...form,phone:e.target.value})} /></div>
     <div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Vehicle No.</label><input className={inputCls} placeholder="e.g. ABC-123" value={form.vehicleNumber} onChange={e=>setForm({...form,vehicleNumber:e.target.value})} /></div>
-    <div className="col-span-2"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Vehicle Type *</label><select className={inputCls} value={form.vehicleType} onChange={e=>setForm({...form,vehicleType:e.target.value})}>{RIDER_VEHICLE_TYPES.map(t=><option key={t} value={t}>{t}</option>)}</select></div>
+    <div className="col-span-2"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Vehicle Type *</label><select className={inputCls} value={form.vehicleType} onChange={e=>setForm({...form,vehicleType:e.target.value})}>{riderTypeList.map(t=><option key={t} value={t}>{t}</option>)}</select></div>
   </div>
   <button type="submit" className="w-full bg-indigo-600 text-white font-bold py-2.5 rounded-xl hover:bg-indigo-700 transition-colors">Add Rider / Vehicle</button>
 </form>
@@ -562,7 +565,7 @@ return (
               <input autoFocus className="col-span-2 p-2 text-sm font-semibold border border-indigo-300 rounded-lg outline-none" value={editForm.name||''} onChange={e=>setEditForm({...editForm,name:e.target.value})} placeholder="Name" />
               <input className="p-2 text-sm font-semibold border border-slate-200 rounded-lg outline-none" value={editForm.phone||''} onChange={e=>setEditForm({...editForm,phone:e.target.value})} placeholder="Phone" />
               <input className="p-2 text-sm font-semibold border border-slate-200 rounded-lg outline-none" value={editForm.vehicleNumber||''} onChange={e=>setEditForm({...editForm,vehicleNumber:e.target.value})} placeholder="Vehicle No." />
-              <select className="col-span-2 p-2 text-sm font-semibold border border-slate-200 rounded-lg outline-none" value={editForm.vehicleType||'Rider'} onChange={e=>setEditForm({...editForm,vehicleType:e.target.value})}>{RIDER_VEHICLE_TYPES.map(t=><option key={t} value={t}>{t}</option>)}</select>
+              <select className="col-span-2 p-2 text-sm font-semibold border border-slate-200 rounded-lg outline-none" value={editForm.vehicleType||'Rider'} onChange={e=>setEditForm({...editForm,vehicleType:e.target.value})}>{riderTypeList.map(t=><option key={t} value={t}>{t}</option>)}</select>
             </div>
             <div className="flex gap-2">
               <button type="button" onClick={()=>saveEdit(rider)} className="text-xs font-bold text-indigo-600 px-3 py-1.5 bg-indigo-50 rounded-lg">Save</button>
@@ -994,7 +997,7 @@ return (
 };
 
 const BillingTab = () => {
-const { isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, productPreFill, setProductPreFill, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig, setShowCreditNoteModal, setEditingCreditNote, showConfirm, riders } = useContext(AppContext);
+const { isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, productPreFill, setProductPreFill, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig, setShowCreditNoteModal, setEditingCreditNote, showConfirm, riders, vehicleTypes } = useContext(AppContext);
 const [search, setSearch] = useState('');
 const [dateFilter, setDateFilter] = useState('All Time');
 const [statusFilter, setStatusFilter] = useState('All');
@@ -1212,14 +1215,14 @@ return (
 </div>
 <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
 <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5"><Truck size={12}/> Logistics</h3>
-<div className="mb-3"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Vehicle / Transport Method</label><select className={inputClass} value={currentInvoice.vehicle} onChange={e => setCurrentInvoice({...currentInvoice, vehicle: e.target.value})}>{VEHICLES.map(v => <option key={v} value={v}>{v}</option>)}</select></div>
-{currentInvoice.vehicle === 'Intercity Transport' && (
+<div className="mb-3"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Vehicle / Transport Method</label><select className={inputClass} value={currentInvoice.vehicle} onChange={e => setCurrentInvoice({...currentInvoice, vehicle: e.target.value})}>{(vehicleTypes.length ? vehicleTypes : [{name:'Rider'},{name:'Rickshaw'},{name:'Suzuki'},{name:'Intercity Transport'},{name:'Self-Pickup'}]).map(v => <option key={v.name} value={v.name}>{v.name}</option>)}</select></div>
+{(() => { const vt = vehicleTypes.find(v => v.name === currentInvoice.vehicle); return (vt ? !vt.requiresRider && currentInvoice.vehicle !== 'Self-Pickup' : currentInvoice.vehicle === 'Intercity Transport'); })() && (
 <div className="grid grid-cols-2 gap-3 mb-3 bg-amber-50 p-3 rounded-xl border border-amber-100">
 <div className="col-span-2"><label className="text-[10px] font-bold text-amber-700 uppercase tracking-wider ml-1 mb-1 block">Transport Company</label><input placeholder="e.g. Daewoo Express" className={`${inputClass} !bg-white !border-amber-200`} value={currentInvoice.transportCompany || ''} onChange={e => setCurrentInvoice({...currentInvoice, transportCompany: e.target.value})} /></div>
 <div className="col-span-2"><label className="text-[10px] font-bold text-amber-700 uppercase tracking-wider ml-1 mb-1 block">Bilty / Bill-T Number</label><input placeholder="Enter Bilty #" className={`${inputClass} !bg-white !border-amber-200`} value={currentInvoice.biltyNumber || ''} onChange={e => setCurrentInvoice({...currentInvoice, biltyNumber: e.target.value})} /></div>
 </div>
 )}
-{['Rider', 'Rickshaw', 'Suzuki'].includes(currentInvoice.vehicle) && (
+{(vehicleTypes.find(v => v.name === currentInvoice.vehicle)?.requiresRider ?? ['Rider','Rickshaw','Suzuki'].includes(currentInvoice.vehicle)) && (
 <div className="grid grid-cols-2 gap-3 mb-3 bg-indigo-50/50 p-3 rounded-xl border border-indigo-100">
 {riders.filter(r => r.vehicleType === currentInvoice.vehicle).length > 0 && (
   <div className="col-span-2">
@@ -2008,7 +2011,9 @@ return (
 };
 
 const RidersAdminView = () => {
-const { riders, saveToFirebase, deleteFromFirebase, showToast, showConfirm } = useContext(AppContext);
+const { riders, vehicleTypes, saveToFirebase, deleteFromFirebase, showToast, showConfirm } = useContext(AppContext);
+const riderVehicleTypes = vehicleTypes.filter(vt => vt.requiresRider).map(vt => vt.name);
+const riderTypeList = riderVehicleTypes.length ? riderVehicleTypes : ['Rider', 'Rickshaw', 'Suzuki'];
 const inputCls = "w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:border-indigo-500 shadow-sm";
 const [form, setForm] = useState({ name: '', phone: '', vehicleType: 'Rider', vehicleNumber: '' });
 const [editingId, setEditingId] = useState(null);
@@ -2035,7 +2040,7 @@ return (
     <div className="col-span-2"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Full Name *</label><input className={inputCls} placeholder="e.g. Ali Raza" value={form.name} onChange={e=>setForm({...form,name:e.target.value})} /></div>
     <div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Phone</label><input className={inputCls} placeholder="03XX..." value={form.phone} onChange={e=>setForm({...form,phone:e.target.value})} /></div>
     <div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Vehicle Number</label><input className={inputCls} placeholder="e.g. ABC-123" value={form.vehicleNumber} onChange={e=>setForm({...form,vehicleNumber:e.target.value})} /></div>
-    <div className="col-span-2"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Vehicle Type *</label><select className={inputCls} value={form.vehicleType} onChange={e=>setForm({...form,vehicleType:e.target.value})}>{RIDER_VEHICLE_TYPES.map(t=><option key={t} value={t}>{t}</option>)}</select></div>
+    <div className="col-span-2"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Vehicle Type *</label><select className={inputCls} value={form.vehicleType} onChange={e=>setForm({...form,vehicleType:e.target.value})}>{riderTypeList.map(t=><option key={t} value={t}>{t}</option>)}</select></div>
   </div>
   <button type="submit" className="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl hover:bg-indigo-700 transition-colors">Add Rider / Vehicle</button>
 </form>
@@ -2052,7 +2057,7 @@ return (
               <input autoFocus className="col-span-2 p-2 text-sm font-semibold border border-indigo-300 rounded-lg outline-none" value={editForm.name||''} onChange={e=>setEditForm({...editForm,name:e.target.value})} placeholder="Name" onKeyDown={e=>{if(e.key==='Escape')setEditingId(null);if(e.key==='Enter'){e.preventDefault();saveEdit(rider);}}} />
               <input className="p-2 text-sm font-semibold border border-slate-200 rounded-lg outline-none" value={editForm.phone||''} onChange={e=>setEditForm({...editForm,phone:e.target.value})} placeholder="Phone" />
               <input className="p-2 text-sm font-semibold border border-slate-200 rounded-lg outline-none" value={editForm.vehicleNumber||''} onChange={e=>setEditForm({...editForm,vehicleNumber:e.target.value})} placeholder="Vehicle No." />
-              <select className="col-span-2 p-2 text-sm font-semibold border border-slate-200 rounded-lg outline-none" value={editForm.vehicleType||'Rider'} onChange={e=>setEditForm({...editForm,vehicleType:e.target.value})}>{RIDER_VEHICLE_TYPES.map(t=><option key={t} value={t}>{t}</option>)}</select>
+              <select className="col-span-2 p-2 text-sm font-semibold border border-slate-200 rounded-lg outline-none" value={editForm.vehicleType||'Rider'} onChange={e=>setEditForm({...editForm,vehicleType:e.target.value})}>{riderTypeList.map(t=><option key={t} value={t}>{t}</option>)}</select>
             </div>
             <div className="flex gap-2">
               <button type="button" onClick={()=>saveEdit(rider)} className="text-xs font-bold text-indigo-600 px-3 py-1.5 bg-indigo-50 rounded-lg hover:bg-indigo-100">Save</button>
@@ -2113,22 +2118,69 @@ return (
 )
 };
 
-const uploadToGist = async (token, backupObj, existingGistId) => {
-  const filename = `AnimalHealthPK_Backup_${new Date().toISOString().slice(0,10)}.json`;
-  const method = existingGistId ? 'PATCH' : 'POST';
-  const url = existingGistId ? `https://api.github.com/gists/${existingGistId}` : 'https://api.github.com/gists';
-  const res = await fetch(url, {
-    method,
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', 'X-GitHub-Api-Version': '2022-11-28' },
-    body: JSON.stringify({ description: 'AnimalHealth.PK Auto Backup', public: false, files: { [filename]: { content: JSON.stringify(backupObj, null, 2) } } }),
-  });
-  if (!res.ok) { const err = await res.text(); throw new Error(`GitHub ${res.status}: ${err}`); }
-  const data = await res.json();
-  return data.id;
+
+const getISOWeekFilename = () => {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() + 3 - (d.getDay() + 6) % 7);
+  const week1 = new Date(d.getFullYear(), 0, 4);
+  const wk = 1 + Math.round(((d - week1) / 86400000 - 3 + (week1.getDay() + 6) % 7) / 7);
+  return `AnimalHealthPK_Backup_${d.getFullYear()}-W${String(wk).padStart(2,'0')}.json`;
 };
 
+const uploadToDrive = async (scriptUrl, backupObj, folderId) => {
+  const filename = getISOWeekFilename();
+  const res = await fetch(scriptUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({ filename, folderId: folderId || '', keepCount: 4, content: JSON.stringify(backupObj) }),
+    redirect: 'follow',
+  });
+  if (!res.ok) throw new Error(`Script error ${res.status}`);
+  const data = await res.json().catch(() => ({}));
+  if (data.error) throw new Error(data.error);
+};
+
+const DRIVE_SCRIPT = `function doPost(e) {
+  try {
+    if (!e || !e.postData) throw new Error('No POST data received');
+    var payload = JSON.parse(e.postData.contents);
+    var folder = payload.folderId
+      ? DriveApp.getFolderById(payload.folderId)
+      : DriveApp.getRootFolder();
+
+    // Overwrite same-week file if it exists
+    var existing = folder.getFilesByName(payload.filename);
+    while (existing.hasNext()) existing.next().setTrashed(true);
+    folder.createFile(payload.filename, payload.content, MimeType.PLAIN_TEXT);
+
+    // Keep only the most recent N backups (oldest go to trash)
+    var keep = payload.keepCount || 4;
+    var files = [];
+    var iter = folder.searchFiles('title contains "AnimalHealthPK_Backup_"');
+    while (iter.hasNext()) files.push(iter.next());
+    files.sort(function(a, b) { return a.getDateCreated() - b.getDateCreated(); });
+    while (files.length > keep) files.shift().setTrashed(true);
+
+    return ContentService
+      .createTextOutput(JSON.stringify({ ok: true, backupsKept: Math.min(files.length, keep) }))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService
+      .createTextOutput(JSON.stringify({ error: err.message }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function doGet(e) {
+  return ContentService.createTextOutput(JSON.stringify({ status: 'ready' }))
+    .setMimeType(ContentService.MimeType.JSON);
+}`;
+
+const getDriveScript = () => DRIVE_SCRIPT;
+
 const AppSettingsView = () => {
-const { appSettings, saveToFirebase, showToast, showConfirm, appUsers, companies, products, customers, invoices, expenses, expenseCategories, payments, cities, areas, customerTypes, riders } = useContext(AppContext);
+const { appSettings, saveToFirebase, showToast, showConfirm, appUsers, companies, products, customers, invoices, expenses, expenseCategories, payments, cities, areas, customerTypes, vehicleTypes, riders } = useContext(AppContext);
 const [form, setForm] = useState({
   id: 'main',
   businessName: appSettings?.businessName || 'Khyber Traders',
@@ -2139,11 +2191,15 @@ const [form, setForm] = useState({
   address: appSettings?.address || '',
   showBusinessNameOnDocs: appSettings?.showBusinessNameOnDocs !== false,
   showBusinessNameOnReports: appSettings?.showBusinessNameOnReports !== false,
-  githubToken: appSettings?.githubToken || '',
-  githubFreq: appSettings?.githubFreq || 'weekly',
+  backupFreq: appSettings?.backupFreq || appSettings?.githubFreq || 'weekly',
+  driveScriptUrl: appSettings?.driveScriptUrl || '',
+  driveFolderId: appSettings?.driveFolderId || '',
+  driveFreq: appSettings?.driveFreq || 'weekly',
 });
 const [restoring, setRestoring] = useState(false);
-const [githubBacking, setGithubBacking] = useState(false);
+const [firebaseBacking, setFirebaseBacking] = useState(false);
+const [driveBacking, setDriveBacking] = useState(false);
+const [showDriveSetup, setShowDriveSetup] = useState(false);
 React.useEffect(() => {
   if (appSettings?.id) setForm({
     id: 'main',
@@ -2155,28 +2211,44 @@ React.useEffect(() => {
     address: appSettings.address || '',
     showBusinessNameOnDocs: appSettings.showBusinessNameOnDocs !== false,
     showBusinessNameOnReports: appSettings.showBusinessNameOnReports !== false,
-    githubToken: appSettings.githubToken || '',
-    githubFreq: appSettings.githubFreq || 'weekly',
+    backupFreq: appSettings.backupFreq || appSettings.githubFreq || 'weekly',
+    driveScriptUrl: appSettings.driveScriptUrl || '',
+    driveFolderId: appSettings.driveFolderId || '',
+    driveFreq: appSettings.driveFreq || 'weekly',
   });
-}, [appSettings?.id, appSettings?.businessName, appSettings?.showBusinessNameOnDocs, appSettings?.showBusinessNameOnReports, appSettings?.githubToken, appSettings?.githubFreq]);
+}, [appSettings?.id, appSettings?.businessName, appSettings?.showBusinessNameOnDocs, appSettings?.showBusinessNameOnReports, appSettings?.backupFreq, appSettings?.githubFreq, appSettings?.driveScriptUrl, appSettings?.driveFolderId, appSettings?.driveFreq]);
 const saveSettings = async () => { await saveToFirebase('appSettings', 'main', form); showToast('Settings saved!'); };
 const downloadBackup = async () => {
-  const backup = { exportedAt: new Date().toISOString(), collections: { app_users: appUsers, appSettings: appSettings ? [appSettings] : [], companies, products, customers, invoices, expenses, expenseCategories, payments, riders, cities, areas, customerTypes } };
+  const backup = { exportedAt: new Date().toISOString(), collections: { app_users: appUsers, appSettings: appSettings ? [appSettings] : [], companies, products, customers, invoices, expenses, expenseCategories, payments, riders, cities, areas, customerTypes, vehicleTypes } };
   const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
   await shareOrDownload(blob, `AnimalHealthPK_Backup_${new Date().toISOString().slice(0,10).replace(/-/g,'')}.json`);
   showToast('Backup downloaded!');
 };
-const buildBackupObj = () => ({ exportedAt: new Date().toISOString(), collections: { app_users: appUsers, appSettings: appSettings ? [appSettings] : [], companies, products, customers, invoices, expenses, expenseCategories, payments, riders, cities, areas, customerTypes } });
-const manualGistBackup = async () => {
-  const token = appSettings?.githubToken || form.githubToken;
-  if (!token) return showToast('Enter a GitHub token first', 'error');
-  setGithubBacking(true);
+const buildBackupObj = () => ({ exportedAt: new Date().toISOString(), collections: { app_users: appUsers, appSettings: appSettings ? [appSettings] : [], companies, products, customers, invoices, expenses, expenseCategories, payments, riders, cities, areas, customerTypes, vehicleTypes } });
+const manualFirebaseBackup = async () => {
+  setFirebaseBacking(true);
   try {
-    const newId = await uploadToGist(token, buildBackupObj(), appSettings?.githubGistId);
-    await saveToFirebase('appSettings', 'main', { ...appSettings, ...form, githubGistId: newId, lastBackupAt: new Date().toISOString() });
-    showToast('Backup uploaded to GitHub Gist!');
-  } catch(e) { showToast(`GitHub backup failed: ${e.message}`, 'error'); }
-  finally { setGithubBacking(false); }
+    const backup = buildBackupObj();
+    const date = new Date().toISOString().slice(0, 10);
+    const cols = ['app_users', 'appSettings', 'companies', 'products', 'customers', 'invoices', 'expenses', 'expenseCategories', 'payments', 'riders', 'cities', 'areas', 'customerTypes'];
+    for (const col of cols) {
+      await saveToFirebase('backups', `${date}_${col}`, { items: backup.collections[col] || [], backedUpAt: backup.exportedAt });
+    }
+    await saveToFirebase('appSettings', 'main', { ...appSettings, ...form, lastBackupAt: new Date().toISOString() });
+    showToast('Backup saved to Firebase!');
+  } catch(e) { showToast(`Backup failed: ${e.message}`, 'error'); }
+  finally { setFirebaseBacking(false); }
+};
+const manualDriveBackup = async () => {
+  const url = form.driveScriptUrl || appSettings?.driveScriptUrl;
+  if (!url) return showToast('Paste the Apps Script URL first', 'error');
+  setDriveBacking(true);
+  try {
+    await uploadToDrive(url, buildBackupObj(), form.driveFolderId || appSettings?.driveFolderId);
+    await saveToFirebase('appSettings', 'main', { ...appSettings, ...form, lastDriveBackupAt: new Date().toISOString() });
+    showToast('Backup sent to Google Drive!');
+  } catch(e) { showToast(`Drive backup failed: ${e.message}`, 'error'); }
+  finally { setDriveBacking(false); }
 };
 const handleRestoreFile = async (e) => {
   const file = e.target.files[0]; if (!file) return;
@@ -2251,20 +2323,14 @@ return (
   </div>
   <FixInvoiceUnitsButton />
 
-  {/* ── GitHub Auto-Backup ── */}
+  {/* ── Firebase Auto-Backup ── */}
   <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
-    <h3 className="font-black text-slate-800 text-base mb-1 flex items-center gap-2"><Github size={16}/> GitHub Auto-Backup</h3>
-    <p className="text-xs text-slate-400 mb-4">Saves a JSON backup to a private GitHub Gist automatically. Requires a Personal Access Token with <strong className="text-slate-600">gist</strong> scope.</p>
+    <h3 className="font-black text-slate-800 text-base mb-1 flex items-center gap-2"><Database size={16}/> Firebase Auto-Backup</h3>
+    <p className="text-xs text-slate-400 mb-4">Saves a full backup to your Firebase database automatically. No token needed — uses your existing login.</p>
     <div className="space-y-3">
       <div>
-        <label className={labelCls}>Personal Access Token</label>
-        <input type="password" className={inputCls} placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
-          value={form.githubToken} onChange={e => setForm(p=>({...p, githubToken: e.target.value}))} autoComplete="off"/>
-        <p className="text-[10px] text-slate-400 mt-1">Create at github.com → Settings → Developer settings → Personal access tokens → <strong>gist</strong> scope only</p>
-      </div>
-      <div>
         <label className={labelCls}>Auto-Backup Frequency</label>
-        <select className={inputCls} value={form.githubFreq} onChange={e => setForm(p=>({...p, githubFreq: e.target.value}))}>
+        <select className={inputCls} value={form.backupFreq} onChange={e => setForm(p=>({...p, backupFreq: e.target.value}))}>
           <option value="never">Never (manual only)</option>
           <option value="daily">Daily</option>
           <option value="weekly">Weekly</option>
@@ -2272,15 +2338,79 @@ return (
         </select>
       </div>
       {appSettings?.lastBackupAt && (
-        <div className="flex items-center justify-between text-[11px]">
+        <div className="text-[11px]">
           <span className="text-emerald-600 font-bold">Last backup: {appSettings.lastBackupAt.slice(0,10)}</span>
-          {appSettings?.githubGistId && <a href={`https://gist.github.com/${appSettings.githubGistId}`} target="_blank" rel="noopener noreferrer" className="text-indigo-500 hover:underline font-semibold">View Gist ↗</a>}
         </div>
       )}
     </div>
     <div className="flex gap-2 mt-4">
       <button type="button" onClick={saveSettings} className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5"><Save size={13}/> Save Settings</button>
-      <button type="button" onClick={manualGistBackup} disabled={!form.githubToken || githubBacking} className="flex-1 bg-slate-800 hover:bg-slate-700 text-white font-bold py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 disabled:opacity-40"><Upload size={13}/> {githubBacking ? 'Uploading…' : 'Backup Now'}</button>
+      <button type="button" onClick={manualFirebaseBackup} disabled={firebaseBacking} className="flex-1 bg-slate-800 hover:bg-slate-700 text-white font-bold py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 disabled:opacity-40"><Upload size={13}/> {firebaseBacking ? 'Saving…' : 'Backup Now'}</button>
+    </div>
+  </div>
+
+  {/* ── Google Drive Backup ── */}
+  <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
+    <h3 className="font-black text-slate-800 text-base mb-1 flex items-center gap-2">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7.71 3.5L1.15 15l3.43 5.5h12.84L22 15 15.29 3.5H7.71z" fill="#34A853" opacity=".6"/><path d="M1.15 15l3.43 5.5H10.5L7.07 15H1.15z" fill="#0F9D58"/><path d="M22 15l-3.43 5.5H10.5l3.43-5.5H22z" fill="#4285F4"/><path d="M15.29 3.5H7.71L10.5 8.5h3l2.79-5z" fill="#FBBC05"/><path d="M7.71 3.5L1.15 15h6.07L13.5 8.5l-2.79-5H7.71z" fill="#34A853"/><path d="M15.29 3.5L22 15h-6.07L10.5 8.5l2.79-5h2z" fill="#4285F4"/></svg>
+      Google Drive Backup
+    </h3>
+    <p className="text-xs text-slate-400 mb-4">Saves a single JSON file to your Google Drive folder. No size limit. Requires a one-time Apps Script setup.</p>
+    <div className="space-y-3">
+      <div>
+        <label className={labelCls}>Drive Folder ID</label>
+        <input className={inputCls} placeholder="e.g. 1vIGbDIEcbVw8Ocz3Dve63mDyCB4rFSJN"
+          value={form.driveFolderId} onChange={e => setForm(p=>({...p, driveFolderId: e.target.value.trim()}))}/>
+        <p className="text-[10px] text-slate-400 mt-1">Copy the long ID from your Drive folder's URL. The generated script below will use it automatically.</p>
+      </div>
+      <div>
+        <label className={labelCls}>Apps Script URL</label>
+        <input type="password" className={inputCls} placeholder="https://script.google.com/macros/s/…/exec"
+          value={form.driveScriptUrl} onChange={e => setForm(p=>({...p, driveScriptUrl: e.target.value}))} autoComplete="off"/>
+      </div>
+      <div>
+        <label className={labelCls}>Auto-Backup Frequency</label>
+        <select className={inputCls} value={form.driveFreq} onChange={e => setForm(p=>({...p, driveFreq: e.target.value}))}>
+          <option value="never">Never (manual only)</option>
+          <option value="daily">Daily</option>
+          <option value="weekly">Weekly</option>
+          <option value="monthly">Monthly</option>
+        </select>
+      </div>
+      {appSettings?.lastDriveBackupAt && (
+        <div className="text-[11px]">
+          <span className="text-emerald-600 font-bold">Last backup: {appSettings.lastDriveBackupAt.slice(0,10)}</span>
+        </div>
+      )}
+      <div className="border border-slate-200 rounded-xl overflow-hidden">
+        <button type="button" onClick={() => setShowDriveSetup(p => !p)}
+          className="w-full flex items-center justify-between px-4 py-2.5 text-[11px] font-bold text-slate-600 hover:bg-slate-50">
+          <span>How to set up (one time, 2 minutes)</span>
+          <ChevronDown size={13} className={`transition-transform ${showDriveSetup ? 'rotate-180' : ''}`}/>
+        </button>
+        {showDriveSetup && (
+          <div className="px-4 pb-4 space-y-2 text-[11px] text-slate-600 border-t border-slate-100">
+            <ol className="list-decimal list-inside space-y-1 mt-3">
+              <li>Open <strong>script.google.com</strong> → New project</li>
+              <li>Delete the default code and paste the script below</li>
+              <li>Click <strong>Deploy → New deployment → Web app</strong></li>
+              <li>Set <strong>Execute as: Me</strong> and <strong>Who has access: Anyone</strong></li>
+              <li>Click Deploy → copy the deployment URL → paste it in the field above</li>
+            </ol>
+            <div className="relative mt-3">
+              <pre className="bg-slate-900 text-emerald-300 text-[10px] rounded-lg p-3 overflow-x-auto whitespace-pre-wrap break-all">{getDriveScript(form.driveFolderId)}</pre>
+              <button type="button" onClick={() => { navigator.clipboard?.writeText(getDriveScript(form.driveFolderId)); showToast('Script copied!'); }}
+                className="absolute top-2 right-2 bg-slate-700 hover:bg-slate-600 text-white text-[10px] font-bold px-2 py-1 rounded">
+                Copy
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+    <div className="flex gap-2 mt-4">
+      <button type="button" onClick={saveSettings} className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5"><Save size={13}/> Save Settings</button>
+      <button type="button" onClick={manualDriveBackup} disabled={!form.driveScriptUrl || driveBacking} className="flex-1 bg-green-700 hover:bg-green-800 text-white font-bold py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 disabled:opacity-40"><Upload size={13}/> {driveBacking ? 'Sending…' : 'Backup Now'}</button>
     </div>
   </div>
 </div>
@@ -2402,22 +2532,26 @@ return (
 };
 
 const SegmentsAdminView = () => {
-const { cities, areas, customerTypes, customers, invoices, saveToFirebase, deleteFromFirebase, showToast, getCustomerBalance, setShowSegmentsModal, showConfirm } = useContext(AppContext);
+const { cities, areas, customerTypes, vehicleTypes, customers, invoices, saveToFirebase, deleteFromFirebase, showToast, getCustomerBalance, setShowSegmentsModal, showConfirm } = useContext(AppContext);
 const [tab, setTab] = useState('cities');
 const [newVal, setNewVal] = useState('');
+const [newVtRequiresRider, setNewVtRequiresRider] = useState(false);
 const [editingId, setEditingId] = useState(null);
 const [editVal, setEditVal] = useState('');
 const [segSearch, setSegSearch] = useState('');
-const colMap = { cities: cities, areas: areas, customerTypes: customerTypes };
-const fireMap = { cities: 'cities', areas: 'areas', customerTypes: 'customerTypes' };
-const labelMap = { cities: 'City', areas: 'Area', customerTypes: 'Type' };
+const colMap = { cities, areas, customerTypes, vehicleTypes };
+const fireMap = { cities: 'cities', areas: 'areas', customerTypes: 'customerTypes', vehicleTypes: 'vehicleTypes' };
+const labelMap = { cities: 'City', areas: 'Area', customerTypes: 'Type', vehicleTypes: 'Vehicle / Transport Method' };
 const list = colMap[tab]; const col = fireMap[tab];
 const add = async () => {
   if (!newVal.trim()) return;
   if (list.some(i => i.name.toLowerCase() === newVal.toLowerCase())) return showToast('Already exists', 'error');
   const id = Date.now();
-  await saveToFirebase(col, id, { id, name: newVal.trim() });
-  setNewVal('');
+  const item = tab === 'vehicleTypes'
+    ? { id, name: newVal.trim(), requiresRider: newVtRequiresRider }
+    : { id, name: newVal.trim() };
+  await saveToFirebase(col, id, item);
+  setNewVal(''); setNewVtRequiresRider(false);
 };
 const saveEdit = async (item) => {
   if (!editVal.trim()) return;
@@ -2443,15 +2577,22 @@ return (
 </div>
 <div className="bg-slate-200 p-1 rounded-xl">
 <ScrollableTabBar bgClass="bg-slate-200">
-{['cities','areas','customerTypes'].map(t => (
-<button key={t} onClick={() => { setTab(t); setNewVal(''); setEditingId(null); setSegSearch(''); }} className={`py-2 px-3 rounded-lg font-bold text-xs whitespace-nowrap transition-colors ${tab===t?'bg-white text-purple-700 shadow-sm':'text-slate-500'}`}>{labelMap[t]}s</button>
+{['cities','areas','customerTypes','vehicleTypes'].map(t => (
+<button key={t} onClick={() => { setTab(t); setNewVal(''); setEditingId(null); setSegSearch(''); setNewVtRequiresRider(false); }} className={`py-2 px-3 rounded-lg font-bold text-xs whitespace-nowrap transition-colors ${tab===t?'bg-white text-purple-700 shadow-sm':'text-slate-500'}`}>{t==='vehicleTypes'?'Transport':labelMap[t]+'s'}</button>
 ))}
 </ScrollableTabBar>
 </div>
-<div className="flex gap-2">
+<div className="flex gap-2 items-center">
 <input type="text" placeholder={`New ${labelMap[tab]}...`} className="flex-1 p-3 bg-white border border-slate-200 rounded-xl font-semibold outline-none focus:border-indigo-500 text-sm" value={newVal} onChange={e=>setNewVal(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')add();}} />
-<button onClick={add} className="bg-indigo-600 text-white px-4 rounded-xl font-bold hover:bg-indigo-700 transition-colors">Add</button>
+{tab === 'vehicleTypes' && (
+  <button type="button" onClick={() => setNewVtRequiresRider(p => !p)} title="Requires Rider Assignment"
+    className={`shrink-0 px-3 py-3 rounded-xl font-bold text-xs border transition-colors ${newVtRequiresRider ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-500 border-slate-200'}`}>
+    <Truck size={14}/>
+  </button>
+)}
+<button onClick={add} className="bg-indigo-600 text-white px-4 rounded-xl font-bold hover:bg-indigo-700 transition-colors shrink-0">Add</button>
 </div>
+{tab === 'vehicleTypes' && <p className="text-[10px] text-slate-400 -mt-2">Tap <span className="font-bold">🚛</span> before adding if riders should be assignable (local delivery). Leave off for intercity/self-pickup types.</p>}
 <div className="relative"><Search className="absolute left-3 top-2.5 text-slate-400" size={14}/><input placeholder={`Search ${labelMap[tab]}s...`} className="w-full pl-8 pr-3 py-2 bg-white border border-slate-200 rounded-xl font-semibold outline-none text-sm focus:border-indigo-400" value={segSearch} onChange={e=>setSegSearch(e.target.value)} /></div>
 <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
 {list.length === 0 && <p className="text-center py-6 text-sm text-slate-400">No {labelMap[tab]}s yet.</p>}
@@ -2461,16 +2602,17 @@ return (
   return (
   <li key={item.id} className="p-3 hover:bg-slate-50">
   {editingId === item.id ? (
-  <div className="flex gap-2 items-center">
-  <input autoFocus className="flex-1 p-2 text-sm font-semibold border border-indigo-300 rounded-lg outline-none" value={editVal} onChange={e=>setEditVal(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')saveEdit(item);if(e.key==='Escape')setEditingId(null);}} />
-  <button onClick={()=>saveEdit(item)} className="text-xs font-bold text-indigo-600 px-3 py-1.5 bg-indigo-50 rounded-lg">Save</button>
-  <button onClick={()=>setEditingId(null)} className="text-xs font-bold text-slate-500 px-2 py-1.5 bg-slate-100 rounded-lg">Cancel</button>
+  <div className="flex gap-2 items-center flex-wrap">
+  <input autoFocus className="flex-1 min-w-0 p-2 text-sm font-semibold border border-indigo-300 rounded-lg outline-none" value={editVal} onChange={e=>setEditVal(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')saveEdit(item);if(e.key==='Escape')setEditingId(null);}} />
+  {tab === 'vehicleTypes' && <button type="button" onClick={() => saveToFirebase(col, item.id, { ...item, requiresRider: !item.requiresRider })} className={`shrink-0 px-2 py-1.5 rounded-lg text-[10px] font-bold border transition-colors ${item.requiresRider ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-500 border-slate-200'}`}><Truck size={12}/></button>}
+  <button onClick={()=>saveEdit(item)} className="text-xs font-bold text-indigo-600 px-3 py-1.5 bg-indigo-50 rounded-lg shrink-0">Save</button>
+  <button onClick={()=>setEditingId(null)} className="text-xs font-bold text-slate-500 px-2 py-1.5 bg-slate-100 rounded-lg shrink-0">Cancel</button>
   </div>
   ) : (
   <div className="flex items-center gap-2">
   <div className="flex-1">
-  <div className="flex items-center gap-2"><span className="font-bold text-slate-800 text-sm">{item.name}</span>{stats.orders > 0 && <span className="text-[9px] font-bold bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded border border-indigo-100">{stats.orders} orders</span>}</div>
-  {stats.orders > 0 && <p className="text-[10px] text-slate-400 mt-0.5">{stats.customers.size} clients · Rs.{stats.revenue.toLocaleString('en-US')} revenue</p>}
+  <div className="flex items-center gap-2"><span className="font-bold text-slate-800 text-sm">{item.name}</span>{tab==='vehicleTypes' ? <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${item.requiresRider ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>{item.requiresRider ? 'Rider' : 'No Rider'}</span> : stats.orders > 0 && <span className="text-[9px] font-bold bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded border border-indigo-100">{stats.orders} orders</span>}</div>
+  {tab !== 'vehicleTypes' && stats.orders > 0 && <p className="text-[10px] text-slate-400 mt-0.5">{stats.customers.size} clients · Rs.{stats.revenue.toLocaleString('en-US')} revenue</p>}
   </div>
   <button onClick={()=>{setEditingId(item.id);setEditVal(item.name);}} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg"><Edit size={14}/></button>
   <button onClick={async()=>{if(await showConfirm(`Delete "${item.name}"?`))await deleteFromFirebase(col,item.id);}} className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg"><Trash2 size={14}/></button>
@@ -3891,6 +4033,7 @@ const payments = useLiveCollection('payments');
 const cities = useLiveCollection('cities');
 const areas = useLiveCollection('areas');
 const customerTypes = useLiveCollection('customerTypes');
+const vehicleTypes = useLiveCollection('vehicleTypes');
 const appSettingsRaw = useLiveCollection('appSettings');
 const riders = useLiveCollection('riders');
 const appSettings = appSettingsRaw.find(s => s.id === 'main') || { businessName: 'Khyber Traders', appName: 'AnimalHealth.PK', tagline: 'Wholesale Veterinary Pharmacy · Karachi', showBusinessNameOnDocs: true, showBusinessNameOnReports: true };
@@ -3963,27 +4106,67 @@ showToast("Network Error - Could not save", "error");
 }
 };
 
+const vehicleTypesSeeded = React.useRef(false);
+React.useEffect(() => {
+  // Seed default vehicle types — only when Firestore has responded (appSettings loaded)
+  // and the collection is genuinely empty. Predictable string IDs prevent duplicates.
+  if (!appSettings?.id || vehicleTypes.length > 0 || vehicleTypesSeeded.current) return;
+  vehicleTypesSeeded.current = true;
+  const defaults = [
+    { name: 'Rider',               requiresRider: true  },
+    { name: 'Rickshaw',            requiresRider: true  },
+    { name: 'Suzuki',              requiresRider: true  },
+    { name: 'Intercity Transport', requiresRider: false },
+    { name: 'Self-Pickup',         requiresRider: false },
+  ];
+  defaults.forEach(d => {
+    const id = 'vt_' + d.name.replace(/\s+/g, '_');
+    saveToFirebase('vehicleTypes', id, { id, name: d.name, requiresRider: d.requiresRider });
+  });
+}, [appSettings?.id, vehicleTypes.length]);
+
 React.useEffect(() => {
   if (appSettings?.id === 'main' && appSettings.showBusinessNameOnDocs === undefined) {
     saveToFirebase('appSettings', 'main', { ...appSettings, showBusinessNameOnDocs: true, showBusinessNameOnReports: true });
   }
 }, [appSettings?.id, appSettings?.showBusinessNameOnDocs]);
 
-// Auto-backup to GitHub Gist (runs once per session when settings load)
+// Auto-backup (Firebase + Google Drive) — runs once per session when settings load
 const autoBackupRan = React.useRef(false);
 React.useEffect(() => {
-  if (autoBackupRan.current) return;
-  if (!appSettings?.id || !appSettings?.githubToken || !appSettings?.githubFreq || appSettings.githubFreq === 'never') return;
-  const lastAt = appSettings.lastBackupAt ? new Date(appSettings.lastBackupAt) : new Date(0);
-  const dueAfterDays = appSettings.githubFreq === 'daily' ? 1 : appSettings.githubFreq === 'weekly' ? 7 : 30;
-  if ((Date.now() - lastAt.getTime()) / 86400000 < dueAfterDays) return;
+  if (autoBackupRan.current || !appSettings?.id) return;
+  const exportedAt = new Date().toISOString();
+  const date = exportedAt.slice(0, 10);
+  const isDue = (lastAt, freq) => {
+    if (!freq || freq === 'never') return false;
+    const days = freq === 'daily' ? 1 : freq === 'weekly' ? 7 : 30;
+    return (Date.now() - (lastAt ? new Date(lastAt) : new Date(0)).getTime()) / 86400000 >= days;
+  };
+
+  const firebaseDue = isDue(appSettings.lastBackupAt, appSettings.backupFreq || appSettings.githubFreq);
+  const driveDue = isDue(appSettings.lastDriveBackupAt, appSettings.driveFreq) && !!appSettings.driveScriptUrl;
+  if (!firebaseDue && !driveDue) return;
+
   autoBackupRan.current = true;
-  const backup = { exportedAt: new Date().toISOString(), collections: { app_users: appUsers, appSettings: [appSettings], companies, products, customers, invoices, expenses, expenseCategories, payments, riders, cities, areas, customerTypes } };
-  uploadToGist(appSettings.githubToken, backup, appSettings.githubGistId)
-    .then(newId => saveToFirebase('appSettings', 'main', { ...appSettings, githubGistId: newId, lastBackupAt: new Date().toISOString() }))
-    .then(() => showToast('Auto-backup uploaded to GitHub Gist'))
-    .catch(e => console.warn('Auto-backup failed:', e));
-}, [appSettings?.id, appSettings?.githubToken, appSettings?.githubFreq, appSettings?.lastBackupAt]);
+  const cols = { app_users: appUsers, appSettings: [appSettings], companies, products, customers, invoices, expenses, expenseCategories, payments, riders, cities, areas, customerTypes, vehicleTypes };
+  const backupObj = { exportedAt, collections: cols };
+
+  if (firebaseDue) {
+    Promise.all(Object.entries(cols).map(([col, items]) =>
+      saveToFirebase('backups', `${date}_${col}`, { items: items || [], backedUpAt: exportedAt })
+    ))
+      .then(() => saveToFirebase('appSettings', 'main', { ...appSettings, lastBackupAt: exportedAt }))
+      .then(() => showToast('Auto-backup saved to Firebase'))
+      .catch(e => console.warn('Firebase auto-backup failed:', e));
+  }
+
+  if (driveDue) {
+    uploadToDrive(appSettings.driveScriptUrl, backupObj, appSettings.driveFolderId)
+      .then(() => saveToFirebase('appSettings', 'main', { ...appSettings, lastDriveBackupAt: exportedAt }))
+      .then(() => showToast('Auto-backup sent to Google Drive'))
+      .catch(e => console.warn('Drive auto-backup failed:', e));
+  }
+}, [appSettings?.id, appSettings?.backupFreq, appSettings?.githubFreq, appSettings?.lastBackupAt, appSettings?.driveFreq, appSettings?.driveScriptUrl, appSettings?.lastDriveBackupAt]);
 
 const deleteFromFirebase = async (collectionName, id) => {
 try {
@@ -4120,7 +4303,7 @@ const TABS = [
 ];
 const ctx = {
 isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers,
-cities, areas, customerTypes,
+cities, areas, customerTypes, vehicleTypes,
 showToast, showConfirm, confirmDialog, setConfirmDialog, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData,
 billingView, setBillingView, currentInvoice, setCurrentInvoice,
 activeTab, setActiveTab, adminView, setAdminView, analyticsView, setAnalyticsView,
