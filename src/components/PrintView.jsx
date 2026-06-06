@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { FileDown, Printer, Share2, X, MessageCircle, Image } from 'lucide-react';
 import { formatDateDisp, getLocalDateStr, APP_NAME } from '../helpers';
-import QRCode from 'qrcode';
 
 // Format: 'thermal' | 'a5' | 'a4'
 function PrintView({ printConfig, setPrintConfig, products, customers, getCustomerLedger, getCustomerBalance, showToast, appSettings }) {
@@ -16,19 +15,6 @@ const isThermal = format === 'thermal';
 const isA5 = format === 'a5';
 const printRef = useRef(null);
 const [showPrevBal, setShowPrevBal] = useState(true);
-const [qrDataUrls, setQrDataUrls] = useState({});
-
-// Generate QR codes locally for any map links on this document
-useEffect(() => {
-  const links = [data?.customerDetails?.map1, data?.customerDetails?.map2].filter(Boolean);
-  if (!links.length) return;
-  links.forEach(link => {
-    QRCode.toString(link, { type: 'svg', margin: 1, width: 128 })
-      .then(svg => setQrDataUrls(prev => ({ ...prev, [link]: svg })))
-      .catch(() => {});
-  });
-}, [data?.customerDetails?.map1, data?.customerDetails?.map2]);
-
 // Keyboard: Escape closes the print view
 useEffect(() => {
   const onKey = (e) => { if (e.key === 'Escape') setPrintConfig(null); };
@@ -112,7 +98,15 @@ const getShareCaption = () => {
   if (!data) return getFileName().replace(/\.[^.]+$/, '');
   if (docType === 'invoice') return `Invoice #${data.id} for ${data.customerName} — Rs. ${(data.total || 0).toLocaleString('en-US')} | ${formatDateDisp(data.date)}`;
   if (docType === 'estimate') return `Price Estimate ${data.id} for ${data.customerName} | ${formatDateDisp(data.date)}`;
-  if (docType === 'dispatch') return `Dispatch Note #${data.id} for ${data.customerName} | ${formatDateDisp(data.date)}`;
+  if (docType === 'dispatch') {
+    const _key = data.deliveryAddressKey || 'address1';
+    const _addr = _key === 'address2' ? data.customerDetails?.address2 : data.customerDetails?.address1;
+    const _map  = _key === 'address2' ? data.customerDetails?.map2   : data.customerDetails?.map1;
+    let caption = `Dispatch Note #${data.id} for ${data.customerName} | ${formatDateDisp(data.date)}`;
+    if (_addr) caption += `\n📍 ${_addr}`;
+    if (_map)  caption += `\n🗺 ${_map}`;
+    return caption;
+  }
   if (docType === 'receipt') return `Payment Receipt ${data.id} — Rs. ${(data.receivedAmount || 0).toLocaleString('en-US')} received from ${data.customerName}`;
   if (docType === 'creditnote') return `Credit Note ${data.id} for ${data.customerName} — Rs. ${(data.total || 0).toLocaleString('en-US')}`;
   if (docType === 'ledger') return `Account Statement: ${data.customerName} | ${formatDateDisp(data.dateRange?.start)} – ${formatDateDisp(data.dateRange?.end)}`;
@@ -819,17 +813,8 @@ return (
                 return (<>
                   {addr && <div style={{ marginTop: '2px' }}>{addr}</div>}
                   {mapLink && (
-                    <div style={{ marginTop: '6px', display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
-                      {qrDataUrls[mapLink] && (
-                        <div
-                          dangerouslySetInnerHTML={{ __html: qrDataUrls[mapLink] }}
-                          style={{ width: sz('48px','56px','64px'), height: sz('48px','56px','64px'), flexShrink: 0, border: '1px solid #e2e8f0', borderRadius: '4px', overflow: 'hidden' }}
-                        />
-                      )}
-                      <div style={{ fontSize: sz('7px','7.5px','8px'), color: '#6366f1', wordBreak: 'break-all', lineHeight: 1.5, minWidth: 0 }}>
-                        <div style={{ fontWeight: 800, color: '#4f46e5', marginBottom: '2px', fontSize: sz('7.5px','8px','8.5px') }}>Scan for Location</div>
-                        {mapLink}
-                      </div>
+                    <div style={{ marginTop: '3px', fontSize: sz('7.5px','8.5px','9px'), color: '#6366f1', wordBreak: 'break-all', lineHeight: 1.5 }}>
+                      🗺 {mapLink}
                     </div>
                   )}
                 </>);
