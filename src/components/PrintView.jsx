@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { FileDown, Printer, Share2, X, MessageCircle, Image } from 'lucide-react';
 import { formatDateDisp, getLocalDateStr, APP_NAME } from '../helpers';
+import QRCode from 'qrcode';
 
 // Format: 'thermal' | 'a5' | 'a4'
 function PrintView({ printConfig, setPrintConfig, products, customers, getCustomerLedger, getCustomerBalance, showToast, appSettings }) {
@@ -19,17 +20,12 @@ const [qrDataUrls, setQrDataUrls] = useState({});
 
 // Generate QR codes locally for any map links on this document
 useEffect(() => {
-  const links = [
-    data?.customerDetails?.map1,
-    data?.customerDetails?.map2,
-  ].filter(Boolean);
+  const links = [data?.customerDetails?.map1, data?.customerDetails?.map2].filter(Boolean);
   if (!links.length) return;
-  import('qrcode').then(mod => {
-    const QRCode = mod.default || mod;
-    links.forEach(link => {
-      QRCode.toDataURL(link, { width: 128, margin: 1, color: { dark: '#000000', light: '#ffffff' } })
-        .then(url => setQrDataUrls(prev => ({ ...prev, [link]: url })));
-    });
+  links.forEach(link => {
+    QRCode.toDataURL(link, { width: 128, margin: 1 })
+      .then(url => setQrDataUrls(prev => ({ ...prev, [link]: url })))
+      .catch(() => {});
   });
 }, [data?.customerDetails?.map1, data?.customerDetails?.map2]);
 
