@@ -806,9 +806,17 @@ return (
                 return (<>
                   {addr && <div style={{ marginTop: '2px' }}>{addr}</div>}
                   {mapLink && (
-                    <div style={{ fontSize: sz('8px','9px','9.5px'), color: '#6366f1', marginTop: '2px', overflow: 'hidden' }}>
-                      <span style={{ fontWeight: 700 }}>Map: </span>
-                      <span style={{ display: 'inline-block', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', verticalAlign: 'bottom', wordBreak: 'normal' }}>{mapLink}</span>
+                    <div style={{ marginTop: '6px', display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
+                      <img
+                        src={`https://api.qrserver.com/v1/create-qr-code/?size=64x64&data=${encodeURIComponent(mapLink)}&bgcolor=ffffff&color=000000&margin=2`}
+                        alt="Map QR"
+                        crossOrigin="anonymous"
+                        style={{ width: sz('48px','56px','64px'), height: sz('48px','56px','64px'), flexShrink: 0, border: '1px solid #e2e8f0', borderRadius: '4px' }}
+                      />
+                      <div style={{ fontSize: sz('7px','7.5px','8px'), color: '#6366f1', wordBreak: 'break-all', lineHeight: 1.5, minWidth: 0 }}>
+                        <div style={{ fontWeight: 800, color: '#4f46e5', marginBottom: '2px', fontSize: sz('7.5px','8px','8.5px') }}>Scan for Location</div>
+                        {mapLink}
+                      </div>
                     </div>
                   )}
                 </>);
