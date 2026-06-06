@@ -805,7 +805,12 @@ return (
                 const mapLink = useKey === 'address2' ? data.customerDetails.map2 : data.customerDetails.map1;
                 return (<>
                   {addr && <div style={{ marginTop: '2px' }}>{addr}</div>}
-                  {mapLink && <div style={{ fontSize: sz('8px','9px','9.5px'), color: '#6366f1', marginTop: '2px', wordBreak: 'break-all' }}>Map: {mapLink}</div>}
+                  {mapLink && (
+                    <div style={{ fontSize: sz('8px','9px','9.5px'), color: '#6366f1', marginTop: '2px', overflow: 'hidden' }}>
+                      <span style={{ fontWeight: 700 }}>Map: </span>
+                      <span style={{ display: 'inline-block', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', verticalAlign: 'bottom', wordBreak: 'normal' }}>{mapLink}</span>
+                    </div>
+                  )}
                 </>);
               })()}
             </div>
