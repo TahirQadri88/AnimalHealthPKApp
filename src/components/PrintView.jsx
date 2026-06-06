@@ -99,15 +99,21 @@ const getShareCaption = () => {
   if (docType === 'invoice') return `Invoice #${data.id} for ${data.customerName} — Rs. ${(data.total || 0).toLocaleString('en-US')} | ${formatDateDisp(data.date)}`;
   if (docType === 'estimate') return `Price Estimate ${data.id} for ${data.customerName} | ${formatDateDisp(data.date)}`;
   if (docType === 'dispatch') {
-    const _key = data.deliveryAddressKey || 'address1';
-    const _addr = _key === 'address2' ? data.customerDetails?.address2 : data.customerDetails?.address1;
-    const _map  = _key === 'address2' ? data.customerDetails?.map2   : data.customerDetails?.map1;
+    const _key     = data.deliveryAddressKey || 'address1';
+    const _addr    = _key === 'address2' ? data.customerDetails?.address2 : data.customerDetails?.address1;
+    const _map     = _key === 'address2' ? data.customerDetails?.map2   : data.customerDetails?.map1;
     const _contact = data.customerDetails?.contactPerson;
     const _phone   = data.customerDetails?.phone;
+    // Strip any URLs embedded in the address field, collapse newlines to ", "
+    const addrClean = _addr
+      ? _addr.replace(/https?:\/\/\S+/gi, '').replace(/[\r\n]+/g, ', ').replace(/,\s*,/g, ',').replace(/,\s*$/, '').trim()
+      : '';
     let caption = `Dispatch Note #${data.id} for ${data.customerName} | ${formatDateDisp(data.date)}`;
-    if (_contact || _phone) caption += `\n👤 ${[_contact, _phone].filter(Boolean).join(' · ')}`;
-    if (_addr) caption += `\nAddress: ${_addr.replace(/[\r\n]+/g, ', ').trim()}`;
-    if (_map)  caption += `\nMap: ${_map}`;
+    if (_contact && _phone) caption += `\n\n👤 ${_contact}: ${_phone}`;
+    else if (_contact)      caption += `\n\n👤 ${_contact}`;
+    else if (_phone)        caption += `\n\n👤 ${_phone}`;
+    if (addrClean) caption += `\n\nAddress: ${addrClean}.`;
+    if (_map)      caption += `\n\nLocation: ${_map}`;
     return caption;
   }
   if (docType === 'receipt') return `Payment Receipt ${data.id} — Rs. ${(data.receivedAmount || 0).toLocaleString('en-US')} received from ${data.customerName}`;
