@@ -800,10 +800,11 @@ return (
             {data.customerName || 'Unknown'}
           </div>
           {docType === 'dispatch' && data.customerDetails && (
-            <div style={{ marginTop: '6px', fontSize: sz('8.5px','10px','11px'), color: '#334155', background: '#f8fafc', padding: '6px 8px', borderRadius: '6px', border: '1px solid #e2e8f0', lineHeight: 1.6 }}>
+            <div style={{ marginTop: '6px', fontSize: sz('8.5px','10px','11px'), color: '#334155', background: '#f8fafc', padding: '8px 10px', borderRadius: '6px', border: '1px solid #e2e8f0', lineHeight: 1.7, display: 'flex', flexDirection: 'column', gap: sz('4px','5px','6px') }}>
               {(data.customerDetails.contactPerson || data.customerDetails.phone) && (
-                <div><strong>{data.customerDetails.contactPerson || 'N/A'}</strong>
-                  {data.customerDetails.phone ? ` · ${data.customerDetails.phone}` : ''}
+                <div style={{ fontWeight: 700 }}>
+                  {data.customerDetails.contactPerson || 'N/A'}
+                  {data.customerDetails.phone && <span style={{ fontWeight: 400, color: '#64748b' }}> · {data.customerDetails.phone}</span>}
                 </div>
               )}
               {(() => {
@@ -811,9 +812,9 @@ return (
                 const addr = useKey === 'address2' ? data.customerDetails.address2 : data.customerDetails.address1;
                 const mapLink = useKey === 'address2' ? data.customerDetails.map2 : data.customerDetails.map1;
                 return (<>
-                  {addr && <div style={{ marginTop: '2px' }}>{addr}</div>}
+                  {addr && <div style={{ color: '#334155' }}>{addr}</div>}
                   {mapLink && (
-                    <div style={{ marginTop: '3px', fontSize: sz('7.5px','8.5px','9px'), color: '#6366f1', wordBreak: 'break-all', lineHeight: 1.5 }}>
+                    <div style={{ fontSize: sz('7.5px','8.5px','9px'), color: '#6366f1', wordBreak: 'break-all', lineHeight: 1.6 }}>
                       🗺 {mapLink}
                     </div>
                   )}
