@@ -1172,12 +1172,12 @@ return (
 <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
 <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5"><Package size={12}/> Products{currentInvoice.items.length > 0 && <span className="ml-1 text-indigo-600 font-bold normal-case tracking-normal">{currentInvoice.items.length} SKU{currentInvoice.items.length !== 1 ? 's' : ''} · {currentInvoice.items.reduce((s,i)=>s+(i.quantity||0),0)} units</span>}</h3>
 <div className="flex gap-2 items-center mb-4">
-  <div className="relative flex-1"><Search size={16} className="absolute left-3.5 top-3.5 text-slate-400"/><input ref={prodSearchRef} placeholder="Search to add..." className={`pl-10 ${inputClass}`} value={prodSearch} onChange={e=>{ setProdSearch(e.target.value); setHiProduct(-1); }} onKeyDown={e => { const filtP = products.filter(p => p.available && p.name.toLowerCase().includes(prodSearch.toLowerCase())); if (e.key === 'ArrowDown') { e.preventDefault(); setHiProduct(h => Math.min(h + 1, filtP.length - 1)); } else if (e.key === 'ArrowUp') { e.preventDefault(); setHiProduct(h => Math.max(h - 1, 0)); } else if (e.key === 'Enter') { e.preventDefault(); const p = hiProduct >= 0 ? filtP[hiProduct] : filtP.length === 1 ? filtP[0] : null; if (p) { justAddedRef.current = true; handleAddItem(p, false); setProdSearch(''); setHiProduct(-1); } } else if (e.key === 'Escape') { setProdSearch(''); setHiProduct(-1); } }} /></div>
+  <div className="relative flex-1"><Search size={16} className="absolute left-3.5 top-3.5 text-slate-400"/><input ref={prodSearchRef} placeholder="Search to add..." className={`pl-10 ${inputClass}`} value={prodSearch} onChange={e=>{ setProdSearch(e.target.value); setHiProduct(-1); }} onKeyDown={e => { const filtP = products.filter(p => p.available && !p.archived && p.name.toLowerCase().includes(prodSearch.toLowerCase())); if (e.key === 'ArrowDown') { e.preventDefault(); setHiProduct(h => Math.min(h + 1, filtP.length - 1)); } else if (e.key === 'ArrowUp') { e.preventDefault(); setHiProduct(h => Math.max(h - 1, 0)); } else if (e.key === 'Enter') { e.preventDefault(); const p = hiProduct >= 0 ? filtP[hiProduct] : filtP.length === 1 ? filtP[0] : null; if (p) { justAddedRef.current = true; handleAddItem(p, false); setProdSearch(''); setHiProduct(-1); } } else if (e.key === 'Escape') { setProdSearch(''); setHiProduct(-1); } }} /></div>
   {isAdmin && <button type="button" onClick={() => { setProductPreFill(prodSearch.trim()); setEditingProduct(null); setShowProductModal(true); }} className="flex-shrink-0 flex items-center gap-1 px-3 py-2.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-bold hover:bg-indigo-100 active:scale-95 transition-all" title="Register a new product"><Plus size={14}/> New</button>}
 </div>
 {prodSearch && (
 <div className="border border-indigo-200 bg-indigo-50/50 rounded-xl mb-4 max-h-48 overflow-y-auto p-2 space-y-1 shadow-inner">
-{products.filter(p => p.available && p.name.toLowerCase().includes(prodSearch.toLowerCase())).map((p, idx) => (
+{products.filter(p => p.available && !p.archived && p.name.toLowerCase().includes(prodSearch.toLowerCase())).map((p, idx) => (
 <div key={p.id} className={`p-2 rounded-lg shadow-sm border flex justify-between items-center group ${idx === hiProduct ? 'bg-indigo-100 border-indigo-300' : 'bg-white border-indigo-100'}`}>
 <button type="button" className="flex-1 font-semibold text-sm text-slate-800 text-left hover:text-indigo-600 transition-colors" onClick={() => { justAddedRef.current = true; handleAddItem(p, false); setProdSearch(''); setHiProduct(-1); }}><span>{p.name}</span><span className="text-indigo-600 font-bold ml-2">Rs.{p.sellingPrice}</span></button>
 <button onClick={() => handleAddItem(p, true)} className="px-2.5 py-1 text-[10px] bg-emerald-50 text-emerald-600 border border-emerald-100 rounded font-bold hover:bg-emerald-100 transition-colors ml-2">🎁 Bonus</button>
@@ -1355,10 +1355,22 @@ return (
 </div>
 <div className="flex-1 overflow-y-auto space-y-3 pb-24 pr-1">
 {products.filter(p => p.name.toLowerCase().includes(search.toLowerCase())).map(p => (
-<div key={p.id} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+<div key={p.id} className={`p-4 rounded-2xl border shadow-sm ${p.archived ? 'bg-amber-50/40 border-amber-200 opacity-75' : 'bg-white border-slate-200'}`}>
 <div className="flex justify-between items-start mb-3">
-<div><h4 className="font-bold text-slate-800 text-base leading-tight">{p.name}</h4><p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mt-1">{getCompanyName(p.companyId)} • {p.unit} ({p.unitsInBox})</p></div>
-{isAdmin && (<div className="flex gap-1.5"><button onClick={() => { setEditingProduct(p); setShowProductModal(true); }} className="p-2 bg-slate-50 text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"><Edit size={16}/></button><button onClick={async () => { if(await showConfirm(`Permanently delete ${p.name}?`)) await deleteFromFirebase('products', p.id); }} className="p-2 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-100 transition-colors"><Trash2 size={16}/></button></div>)}
+<div><h4 className="font-bold text-slate-800 text-base leading-tight">{p.name}{p.archived && <span className="ml-2 px-1.5 py-0.5 text-[9px] font-bold bg-amber-100 text-amber-700 rounded-full uppercase align-middle">Archived</span>}</h4><p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mt-1">{getCompanyName(p.companyId)} • {p.unit} ({p.unitsInBox})</p></div>
+{isAdmin && (<div className="flex gap-1.5"><button onClick={() => { setEditingProduct(p); setShowProductModal(true); }} className="p-2 bg-slate-50 text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"><Edit size={16}/></button>
+{p.archived
+  ? <button onClick={async () => { await saveToFirebase('products', p.id, { ...p, archived: false }); }} className="p-2 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition-colors" title="Unarchive"><RotateCcw size={16}/></button>
+  : <button onClick={async () => {
+      const billCount = invoices.filter(inv => inv.items?.some(it => String(it.productId||it.uniqueId||'') === String(p.id))).length;
+      if (billCount > 0) {
+        const doArchive = await showConfirm(`"${p.name}" is used in ${billCount} bill${billCount>1?'s':''}.\n\nArchive instead? (Hidden from new sales, preserved in history)`);
+        if (doArchive) { await saveToFirebase('products', p.id, { ...p, archived: true, available: false }); return; }
+        if (!await showConfirm(`Permanently delete "${p.name}"? Cannot be undone.`)) return;
+      } else { if (!await showConfirm(`Delete ${p.name}?`)) return; }
+      await deleteFromFirebase('products', p.id);
+    }} className="p-2 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-100 transition-colors"><Trash2 size={16}/></button>
+}</div>)}
 </div>
 <div className="flex justify-between items-end border-t border-slate-100 pt-3 mt-1">
 <div className="flex flex-col"><span className="text-indigo-700 font-extrabold text-lg">Rs. {p.sellingPrice.toLocaleString('en-US')}</span>{isAdmin && <span className="text-slate-400 text-[9px] font-bold uppercase mt-0.5">Cost: Rs. {p.costPrice}</span>}</div>
@@ -1908,7 +1920,7 @@ return (
 
 // ─── Master Records View ───
 const MastersView = () => {
-const { products, customers, invoices, payments, expenseCategories, getCompanyName, deleteFromFirebase, showToast, setEditingProduct, setShowProductModal, setEditingCustomer, setShowCustomerModal, setShowExpenseCatModal, showConfirm } = useContext(AppContext);
+const { products, customers, invoices, payments, expenseCategories, getCompanyName, saveToFirebase, deleteFromFirebase, showToast, setEditingProduct, setShowProductModal, setEditingCustomer, setShowCustomerModal, setShowExpenseCatModal, showConfirm } = useContext(AppContext);
 const [tab, setTab] = useState('products');
 const [search, setSearch] = useState('');
 const tabConfig = [
@@ -1947,15 +1959,26 @@ return (
   {tab === 'products' && (
     <div className="space-y-2 pb-10">
       {products.filter(p=>p.name.toLowerCase().includes(search.toLowerCase())).map(p=>(
-        <div key={p.id} className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex justify-between items-center">
+        <div key={p.id} className={`p-3 rounded-xl border shadow-sm flex justify-between items-center ${p.archived?'bg-amber-50/40 border-amber-200 opacity-75':'bg-white border-slate-200'}`}>
           <div className="flex-1 min-w-0 mr-2">
-            <p className="font-bold text-slate-800 text-sm truncate">{p.name}</p>
+            <p className="font-bold text-slate-800 text-sm truncate">{p.name}{p.archived&&<span className="ml-2 px-1.5 py-0.5 text-[9px] font-bold bg-amber-100 text-amber-700 rounded-full uppercase align-middle">Archived</span>}</p>
             <p className="text-[10px] text-slate-400 font-medium mt-0.5 uppercase tracking-wider">{getCompanyName(p.companyId)} &bull; {p.unit} &bull; Cost: {p.costPrice} &bull; Sell: {p.sellingPrice}</p>
             <span className={`text-[9px] font-bold mt-1 inline-block px-1.5 py-0.5 rounded uppercase ${p.available?'bg-emerald-50 text-emerald-600 border border-emerald-100':'bg-rose-50 text-rose-500 border border-rose-100'}`}>{p.available?'In Stock':'Out of Stock'}</span>
           </div>
           <div className="flex gap-1.5 shrink-0">
             <button onClick={()=>{setEditingProduct(p);setShowProductModal(true);}} className="p-2 bg-slate-50 text-slate-600 rounded-lg hover:bg-indigo-50 hover:text-indigo-600 transition-colors"><Edit size={14}/></button>
-            <button onClick={async()=>{if(await showConfirm(`Delete ${p.name}?`))await deleteFromFirebase('products',p.id);}} className="p-2 bg-rose-50 text-rose-500 rounded-lg hover:bg-rose-100 transition-colors"><Trash2 size={14}/></button>
+            {p.archived
+              ? <button onClick={async()=>{await saveToFirebase('products',p.id,{...p,archived:false});}} className="p-2 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition-colors" title="Unarchive"><RotateCcw size={14}/></button>
+              : <button onClick={async()=>{
+                  const billCount=invoices.filter(inv=>inv.items?.some(it=>String(it.productId||it.uniqueId||'')===String(p.id))).length;
+                  if(billCount>0){
+                    const doArchive=await showConfirm(`"${p.name}" is used in ${billCount} bill${billCount>1?'s':''}.\n\nArchive instead? (Hidden from new sales, preserved in history)`);
+                    if(doArchive){await saveToFirebase('products',p.id,{...p,archived:true,available:false});return;}
+                    if(!await showConfirm(`Permanently delete "${p.name}"? Cannot be undone.`))return;
+                  }else{if(!await showConfirm(`Delete ${p.name}?`))return;}
+                  await deleteFromFirebase('products',p.id);
+                }} className="p-2 bg-rose-50 text-rose-500 rounded-lg hover:bg-rose-100 transition-colors"><Trash2 size={14}/></button>
+            }
           </div>
         </div>
       ))}
@@ -2435,21 +2458,33 @@ const run = async () => {
     return prod;
   };
   const isValidUnit = (u) => !!u && isNaN(u) && String(u).trim().length > 1;
-  let invoicesFixed=0, itemsFixed=0;
+  let invoicesFixed=0, unitsFixed=0, namesFixed=0;
   for (const inv of invoices) {
     const updatedItems = inv.items?.map(item => {
-      if (isValidUnit(item.unit)) return item;
       const prod = findProd(item);
       if (!prod) return item;
-      itemsFixed++;
-      return { ...item, unit: prod.unit||'', unitsInBox: item.unitsInBox||prod.unitsInBox||1 };
+      let updated = { ...item };
+      let anyChange = false;
+      if (!isValidUnit(item.unit)) {
+        updated.unit = prod.unit || '';
+        updated.unitsInBox = item.unitsInBox || prod.unitsInBox || 1;
+        unitsFixed++; anyChange = true;
+      }
+      // Only sync name when matched by ID — safe to update
+      const idMatch = byId.get(String(item.productId||'')) === prod || byId.get(String(item.uniqueId||'')) === prod;
+      if (idMatch && prod.name && item.name !== prod.name) {
+        updated.name = prod.name;
+        namesFixed++; anyChange = true;
+      }
+      return anyChange ? updated : item;
     });
     if (!updatedItems) continue;
-    const changed = updatedItems.some((it,i) => it.unit !== (inv.items[i]?.unit||''));
+    const changed = updatedItems.some((it,i) => JSON.stringify(it) !== JSON.stringify(inv.items[i]));
     if (changed) { await saveToFirebase('invoices', inv.id, {...inv, items: updatedItems}); invoicesFixed++; }
   }
   setRunning(false);
-  showToast(itemsFixed>0 ? `Fixed ${itemsFixed} items across ${invoicesFixed} invoices!` : 'All invoice items already have units — nothing to fix.', itemsFixed>0?'success':'info');
+  const total = unitsFixed + namesFixed;
+  showToast(total>0 ? `Updated ${invoicesFixed} invoice${invoicesFixed>1?'s':''}: ${namesFixed} name${namesFixed!==1?'s':''} + ${unitsFixed} unit${unitsFixed!==1?'s':''} fixed!` : 'All items already up to date — nothing to fix.', total>0?'success':'info');
 };
 return (
 <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
