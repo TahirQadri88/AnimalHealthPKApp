@@ -9,7 +9,7 @@ Wallet, Download, Upload, TrendingDown, Filter, ArrowUpDown, Award, CreditCard,
 FileDown, BookOpen, ShoppingCart, Tag, Building2, BarChart2, PieChart, Activity,
 Percent, Hash, Zap, Archive, RefreshCw, Eye, EyeOff, ChevronDown, ChevronUp,
 AlignLeft, Bell, Star, Layers, Globe, PhoneCall, MapPin, Briefcase, ClipboardList, Copy,
-RotateCcw, FileText, Database
+RotateCcw, FileText, Database, Clock
 } from 'lucide-react';
 import { db, collection, onSnapshot, doc, setDoc, deleteDoc } from './firebase';
 import { APP_NAME, VEHICLES, getPKTDate, getLocalDateStr, formatDateDisp, checkDateFilter, exportToCSV, shareOrDownload } from './helpers';
@@ -835,6 +835,16 @@ const filteredExpenses = expenses.filter(e => checkDateFilter(e.date, dateFilter
 const revenue = filteredInvoices.reduce((sum, o) => sum + o.total, 0);
 const totalReceivables = customers.reduce((sum, c) => sum + getCustomerBalance(c.id), 0);
 const totalExpenses = filteredExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
+const todayStr = getLocalDateStr();
+const todayInvoices = invoices.filter(o => o.status === 'Billed' && o.date === todayStr);
+const todayRevenue = todayInvoices.reduce((s,o)=>s+o.total,0);
+const todayCollected = payments.filter(p => p.date === todayStr).reduce((s,p)=>s+Number(p.amount||0),0);
+const thisMonth = todayStr.slice(0,7);
+const mo = parseInt(thisMonth.slice(5,7)), yr = parseInt(thisMonth.slice(0,4));
+const lastMonth = mo === 1 ? `${yr-1}-12` : `${yr}-${String(mo-1).padStart(2,'0')}`;
+const thisMonthRevenue = invoices.filter(o=>o.status==='Billed'&&o.date.startsWith(thisMonth)).reduce((s,o)=>s+o.total,0);
+const lastMonthRevenue = invoices.filter(o=>o.status==='Billed'&&o.date.startsWith(lastMonth)).reduce((s,o)=>s+o.total,0);
+const momChange = lastMonthRevenue > 0 ? ((thisMonthRevenue - lastMonthRevenue)/lastMonthRevenue*100).toFixed(1) : null;
 const topStats = useMemo(() => {
 const byProduct = {};
 filteredInvoices.forEach(o => {
@@ -887,10 +897,28 @@ return (
 <select value={dateFilter} onChange={e => setDateFilter(e.target.value)} className="bg-transparent font-bold text-xs text-slate-700 outline-none cursor-pointer"><option>Today</option><option>This Week</option><option>This Month</option><option>This Year</option><option>All Time</option></select>
 </div>
 </div>
+
+{/* Today's Summary Bar */}
+<div className="bg-slate-800 text-white rounded-2xl px-4 py-3 flex justify-between items-center gap-3 flex-wrap shadow-sm">
+  <div className="flex items-center gap-1.5">
+    <ReceiptText size={14} className="text-indigo-300 shrink-0"/>
+    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Today</span>
+    <span className="text-sm font-extrabold text-white ml-1">{todayInvoices.length} bill{todayInvoices.length!==1?'s':''}</span>
+    {todayRevenue > 0 && <span className="text-sm font-bold text-indigo-300">· Rs.{todayRevenue.toLocaleString('en-US')}</span>}
+  </div>
+  <div className="w-px h-5 bg-slate-600 shrink-0 hidden sm:block"/>
+  <div className="flex items-center gap-1.5">
+    <Wallet size={14} className="text-emerald-300 shrink-0"/>
+    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Collected today</span>
+    <span className={`text-sm font-extrabold ml-1 ${todayCollected > 0 ? 'text-emerald-300' : 'text-slate-500'}`}>Rs.{todayCollected.toLocaleString('en-US')}</span>
+  </div>
+</div>
+
 <div className="grid grid-cols-2 gap-4">
 <div className="bg-gradient-to-br from-indigo-600 to-indigo-800 text-white p-5 rounded-2xl shadow-lg shadow-indigo-600/20">
 <p className="text-[10px] uppercase font-bold text-indigo-100 flex items-center gap-1.5 tracking-wider"><TrendingUp size={14}/> {dateFilter} Sales</p>
 <p className="text-xl sm:text-2xl font-black mt-2 tracking-tight">Rs. {revenue.toLocaleString('en-US')}</p>
+{momChange !== null && <p className={`text-[10px] font-bold mt-1 ${Number(momChange)>=0?'text-emerald-300':'text-rose-300'}`}>{Number(momChange)>=0?'▲':'▼'} {Math.abs(momChange)}% vs last month</p>}
 </div>
 <button onClick={() => { setSelectedLedgerId(null); setShowLedgerModal(false); setActiveTab('customers'); }} className="bg-gradient-to-br from-rose-500 to-rose-600 text-white p-5 rounded-2xl shadow-lg shadow-rose-500/20 text-left w-full">
 <p className="text-[10px] uppercase font-bold text-rose-100 flex items-center gap-1.5 tracking-wider">
@@ -1318,7 +1346,11 @@ return (
 ))}
 </div>
 <div className="flex-1 overflow-y-auto space-y-3 pb-24 pr-1">
-{filtered.slice().sort((a, b) => (b.date || '').localeCompare(a.date || '')).map(o => (
+{filtered.slice().sort((a, b) => {
+  const d = (b.date||'').localeCompare(a.date||'');
+  if (d !== 0) return d;
+  return (parseInt((b.id||'').replace(/\D/g,''))||0) - (parseInt((a.id||'').replace(/\D/g,''))||0);
+}).map(o => (
 <div key={o.id} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden group hover:border-indigo-200">
 <div className={`absolute top-0 left-0 w-1.5 h-full ${o.status==='CreditNote'?'bg-rose-500':o.status==='Estimate'?'bg-violet-400':o.status==='Billed'?(o.paymentStatus==='Paid'?'bg-emerald-500':'bg-amber-500'):'bg-slate-300'}`}></div>
 <div className="flex justify-between border-b border-slate-100 pb-3 mb-3 pl-3">
@@ -2892,18 +2924,27 @@ const reportEngine = useMemo(() => {
   });
   kpis.creditNotesCount = creditNotes.length;
   kpis.creditNotesTotal = creditNotes.reduce((s, cn) => s + cn.total, 0);
-  // Payment collection rate for filtered period
+  // All-time collection rate: (total ever billed − currently outstanding) / total ever billed
+  // Period-filtered billing vs period-filtered payments is misleading (cross-period collections inflate to 100%)
+  const allTimeBilled = invoices.filter(o => o.status === 'Billed').reduce((s, o) => s + o.total, 0);
+  const allTimeOutstanding = receivablesList.reduce((s, r) => s + r.amount, 0);
+  const collectionRate = allTimeBilled > 0 ? Math.max(0, Math.min(((allTimeBilled - allTimeOutstanding) / allTimeBilled) * 100, 100)).toFixed(1) : '0.0';
   const totalBilledAmt = billedForPnL.reduce((s, o) => s + o.total, 0);
-  const invoiceCollected = billedForPnL.reduce((s, o) => s + Number(o.receivedAmount||0), 0);
-  const standaloneCollectedAmt = payments.filter(p => checkCustomFilter(p.date)).reduce((s, p) => s + Number(p.amount), 0);
-  const collectionRate = totalBilledAmt > 0 ? Math.min(((invoiceCollected + standaloneCollectedAmt) / totalBilledAmt) * 100, 100).toFixed(1) : '0.0';
+  // Payment velocity: avg days from invoice date to first payment received for that customer
+  let velDays = 0, velCount = 0;
+  invoices.filter(o => o.status === 'Billed' && o.paymentStatus === 'Paid').forEach(inv => {
+    const pmt = payments.filter(p => String(p.customerId) === String(inv.customerId) && p.date >= inv.date)
+      .sort((a, b) => a.date.localeCompare(b.date))[0];
+    if (pmt) { const d = Math.floor((new Date(pmt.date) - new Date(inv.date)) / 86400000); if (d >= 0) { velDays += d; velCount++; } }
+  });
+  const avgDaysToPay = velCount > 0 ? Math.round(velDays / velCount) : null;
   // New vs repeat customers in period
   const custFirstOrderDate = {};
   invoices.filter(o => o.status === 'Billed').sort((a,b)=>a.date.localeCompare(b.date)).forEach(o => { if (!custFirstOrderDate[o.customerId]) custFirstOrderDate[o.customerId] = o.date; });
   const periodCustIds = [...new Set(billedForPnL.map(o => o.customerId))];
   let newCustCount = 0, repeatCustCount = 0;
   periodCustIds.forEach(id => { if (billedForPnL.some(o => o.customerId === id && o.date === custFirstOrderDate[id])) newCustCount++; else repeatCustCount++; });
-  return { kpis, byProduct, byCompany, byCustomer, bySalesperson, byCity, byArea, byType, receivablesList: receivablesList.sort((a,b)=>b.amount-a.amount), trends, dailyBreakdown, byExpenseCategory, agingBuckets, monthlyData, collectionRate, newCustCount, repeatCustCount, totalBilledAmt };
+  return { kpis, byProduct, byCompany, byCustomer, bySalesperson, byCity, byArea, byType, receivablesList: receivablesList.sort((a,b)=>b.amount-a.amount), trends, dailyBreakdown, byExpenseCategory, agingBuckets, monthlyData, collectionRate, newCustCount, repeatCustCount, totalBilledAmt, avgDaysToPay };
 }, [invoices, expenses, payments, dateFilter, customStart, customEnd, ...[...filterCompanies], ...[...filterCustomers], ...[...filterSalespersons], products, customers]);
 
 const getSortedExportData = () => {
@@ -3508,9 +3549,9 @@ return (
           {/* Collection rate summary */}
           <div className="grid grid-cols-2 gap-3">
             <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Collection Rate</p>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Collection Rate <span className="text-slate-300">(All-time)</span></p>
               <p className={`text-2xl font-black mt-1 ${Number(reportEngine.collectionRate) >= 80 ? 'text-emerald-600' : Number(reportEngine.collectionRate) >= 50 ? 'text-amber-600' : 'text-rose-600'}`}>{reportEngine.collectionRate}%</p>
-              <p className="text-[10px] text-slate-400 mt-1">of billed amount collected</p>
+              <p className="text-[10px] text-slate-400 mt-1">of all-time billed amount recovered</p>
             </div>
             <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Outstanding</p>
@@ -3518,6 +3559,33 @@ return (
               <p className="text-[10px] text-slate-400 mt-1">{reportEngine.receivablesList.length} customers with balance</p>
             </div>
           </div>
+          {/* Top Overdue Balances */}
+          {(() => {
+            const overdue = [...reportEngine.agingBuckets.days30, ...reportEngine.agingBuckets.days60, ...reportEngine.agingBuckets.days90plus].sort((a,b)=>b.amount-a.amount).slice(0,5);
+            if (!overdue.length) return null;
+            return (
+              <div className="bg-white rounded-2xl shadow-sm border border-rose-300 overflow-hidden">
+                <div className="bg-rose-600 p-3 flex justify-between items-center">
+                  <span className="text-xs font-bold text-white uppercase tracking-widest flex items-center gap-1.5"><AlertCircle size={13}/> Top Overdue Balances</span>
+                  <span className="text-[10px] font-black text-rose-200">{overdue.length} accounts · 31+ days</span>
+                </div>
+                <div className="divide-y divide-slate-100">
+                  {overdue.map((r,i) => (
+                    <div key={i} className="flex justify-between items-center p-3">
+                      <div className="flex-1 min-w-0">
+                        <button className="font-semibold text-sm text-slate-800 truncate hover:text-indigo-600 text-left w-full" onClick={()=>{setSelectedLedgerId(r.id);setShowLedgerModal(true);}}>{r.name}</button>
+                        <p className="text-[10px] text-rose-400 font-semibold">{r.daysSince} days overdue</p>
+                      </div>
+                      <div className="flex items-center gap-2 ml-2 shrink-0">
+                        <span className="font-extrabold text-rose-600 text-sm">Rs.{r.amount.toLocaleString('en-US')}</span>
+                        {r.phone && <a href={`https://wa.me/92${r.phone.replace(/^0/,'').replace(/\D/g,'')}?text=${encodeURIComponent(`Assalam o Alaikum ${r.name},\n\nYour outstanding balance is *Rs. ${r.amount.toLocaleString('en-US')}*. Kindly process payment at earliest.\n\nJazakAllah Khair`)}`} target="_blank" rel="noopener noreferrer" className="p-1.5 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 border border-green-100"><PhoneCall size={13}/></a>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
           {[
             { label: '0–30 days', key: 'current', color: 'emerald' },
             { label: '31–60 days', key: 'days30', color: 'amber' },
@@ -3580,8 +3648,9 @@ return (
         const insightCards = [
           { label: 'Gross Margin', value: `${gpMargin}%`, sub: `Rs.${kpis.grossMargin.toLocaleString('en-US')} on Rs.${kpis.productRevenue.toLocaleString('en-US')} sales`, color: Number(gpMargin) >= 25 ? 'emerald' : Number(gpMargin) >= 15 ? 'amber' : 'rose', icon: TrendingUp },
           { label: 'Net Profit Margin', value: `${netMargin}%`, sub: `Rs.${kpis.netProfit.toLocaleString('en-US')} after all expenses`, color: Number(netMargin) >= 15 ? 'emerald' : Number(netMargin) >= 5 ? 'amber' : 'rose', icon: DollarSign },
-          { label: 'Collection Rate', value: `${reportEngine.collectionRate}%`, sub: `of billed amount recovered`, color: Number(reportEngine.collectionRate) >= 80 ? 'emerald' : Number(reportEngine.collectionRate) >= 50 ? 'amber' : 'rose', icon: Wallet },
+          { label: 'Collection Rate', value: `${reportEngine.collectionRate}%`, sub: `all-time billed vs outstanding`, color: Number(reportEngine.collectionRate) >= 80 ? 'emerald' : Number(reportEngine.collectionRate) >= 50 ? 'amber' : 'rose', icon: Wallet },
           { label: 'Active Customers', value: `${reportEngine.newCustCount + reportEngine.repeatCustCount}`, sub: `${reportEngine.newCustCount} new · ${reportEngine.repeatCustCount} repeat`, color: 'indigo', icon: Users },
+          ...(reportEngine.avgDaysToPay !== null ? [{ label: 'Avg Days to Pay', value: `${reportEngine.avgDaysToPay}d`, sub: reportEngine.avgDaysToPay <= 7 ? 'Excellent payment speed' : reportEngine.avgDaysToPay <= 21 ? 'Acceptable turnaround' : 'Slow — follow up needed', color: reportEngine.avgDaysToPay <= 7 ? 'emerald' : reportEngine.avgDaysToPay <= 21 ? 'amber' : 'rose', icon: Clock }] : []),
         ];
         return (
           <div className="space-y-4 mt-2">
