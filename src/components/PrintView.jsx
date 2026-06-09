@@ -950,6 +950,45 @@ return (
               </div>
             </div>
           </div>
+        ) : data.view === 'Insights' ? (
+          <div className="keep-together" style={{ border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden' }}>
+            <div style={{ background: '#1e293b', color: 'white', padding: sz('8px 12px','10px 16px','12px 20px'), fontSize: sz('9px','10px','11px'), fontWeight: 800, letterSpacing: '1px', textTransform: 'uppercase' }}>
+              P&L Insights Report
+            </div>
+            <div style={{ padding: sz('12px','16px','20px') }}>
+              {(data.rows || []).map((row, i) => {
+                const item = row['P&L Item'] || '';
+                const amt = row['Amount (Rs)'];
+                const note = row['Notes'] || '';
+                const isNetProfit = item === 'Net Profit';
+                const isGrossProfit = item === 'Gross Profit';
+                const isHeader = isNetProfit || isGrossProfit;
+                const hasAmt = amt !== '' && amt !== undefined && amt !== null;
+                return (
+                  <div key={i} style={{
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    padding: sz('4px 0','5px 0','6px 0'),
+                    borderTop: isNetProfit ? '2.5px solid #1e293b' : isGrossProfit ? '1px solid #e2e8f0' : 'none',
+                    marginTop: isHeader ? sz('4px','6px','8px') : 0,
+                    paddingTop: isHeader ? sz('6px','8px','10px') : sz('4px','5px','6px'),
+                    fontWeight: isHeader ? 800 : 500,
+                    fontSize: isNetProfit ? sz('11px','13px','15px') : sz('8.5px','9.5px','10.5px'),
+                    borderBottom: '1px solid #f8fafc',
+                  }}>
+                    <span style={{ color: '#475569' }}>{item}</span>
+                    <div style={{ textAlign: 'right' }}>
+                      {hasAmt && (
+                        <span style={{ color: isNetProfit ? (Number(amt) >= 0 ? '#059669' : '#dc2626') : isGrossProfit ? '#4f46e5' : Number(amt) < 0 ? '#dc2626' : '#1e293b', fontWeight: isHeader ? 900 : 600 }}>
+                          {Number(amt) < 0 ? '− ' : ''}Rs.{Math.abs(Number(amt)).toLocaleString('en-US')}
+                        </span>
+                      )}
+                      {note && <span style={{ fontSize: sz('7px','7.5px','8px'), color: '#94a3b8', marginLeft: '6px' }}>{note}</span>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         ) : (
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: sz('8px','9px','10px') }}>
             <thead>
