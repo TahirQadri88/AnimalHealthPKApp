@@ -136,10 +136,17 @@ setShowUserModal(false);
 };
 const inputClass = "w-full p-3.5 bg-white border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-sm text-slate-800 placeholder-slate-400";
 const PERMS = [
-  { key: 'viewAllInvoices', label: 'View All Invoices',    desc: 'See invoices from all staff (default: own only)' },
-  { key: 'viewDashboard',   label: 'Home Dashboard',       desc: 'Revenue summary & business overview' },
-  { key: 'viewCustomers',   label: 'Customer List',        desc: 'Browse all customers & outstanding balances' },
-  { key: 'receivePayments', label: 'Receive Payments',     desc: 'Record new customer payments' },
+  { key: 'viewAllInvoices',  label: 'View All Invoices',     desc: 'See invoices from all staff (default: own only)' },
+  { key: 'viewDashboard',    label: 'Home Dashboard',        desc: 'Revenue summary & business overview' },
+  { key: 'viewCustomers',    label: 'Customer List',         desc: 'Browse all customers & outstanding balances' },
+  { key: 'receivePayments',  label: 'Receive Payments',      desc: 'Record new customer payments in Receipts tab' },
+  { key: 'collectOnBill',    label: 'Collect on Invoice',    desc: 'Record payment received while creating an invoice' },
+  { key: 'editOwnInvoices',  label: 'Edit Own Invoices',     desc: 'Edit or delete invoices they personally created' },
+  { key: 'issueInvoices',    label: 'Issue / Convert Docs',  desc: 'Convert estimates to orders or finalize as invoices' },
+  { key: 'salesReturns',     label: 'Sales Returns',         desc: 'Issue credit notes and process product returns' },
+  { key: 'viewLedger',       label: 'Customer Ledger',       desc: 'View full account statement for any customer' },
+  { key: 'addCustomers',     label: 'Add Customers',         desc: 'Register new customers while billing' },
+  { key: 'addEditProducts',  label: 'Add / Edit Products',   desc: 'Quick-register products from the billing screen' },
 ];
 return (
 <ModalWrapper title={isEdit ? "Edit Team Member" : "Add Team Member"} onClose={() => setShowUserModal(false)}>
@@ -1186,8 +1193,8 @@ return (
     </div>
   )}
 </div>
-<button onClick={() => { setEditingCustomer(null); setShowCustomerModal(true); }} className="p-3 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-xl font-black shrink-0 transition-colors"><Plus size={18}/></button>
-{currentInvoice.customerId && <button type="button" onClick={() => { setSelectedLedgerId(currentInvoice.customerId); setShowLedgerModal(true); }} className="p-3 bg-slate-100 text-slate-600 hover:bg-slate-200 rounded-xl shrink-0 transition-colors" title="View Customer Ledger"><BookOpen size={18}/></button>}
+{hasPermission('addCustomers') && <button onClick={() => { setEditingCustomer(null); setShowCustomerModal(true); }} className="p-3 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-xl font-black shrink-0 transition-colors"><Plus size={18}/></button>}
+{currentInvoice.customerId && hasPermission('viewLedger') && <button type="button" onClick={() => { setSelectedLedgerId(currentInvoice.customerId); setShowLedgerModal(true); }} className="p-3 bg-slate-100 text-slate-600 hover:bg-slate-200 rounded-xl shrink-0 transition-colors" title="View Customer Ledger"><BookOpen size={18}/></button>}
 </div>
 {currentInvoice.customerId && (() => {
   const cust = customers.find(c => c.id === currentInvoice.customerId);
@@ -1226,7 +1233,7 @@ return (
 <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5"><Package size={12}/> Products{currentInvoice.items.length > 0 && <span className="ml-1 text-indigo-600 font-bold normal-case tracking-normal">{currentInvoice.items.length} SKU{currentInvoice.items.length !== 1 ? 's' : ''} · {currentInvoice.items.reduce((s,i)=>s+(i.quantity||0),0)} units</span>}</h3>
 <div className="flex gap-2 items-center mb-4">
   <div className="relative flex-1"><Search size={16} className="absolute left-3.5 top-3.5 text-slate-400"/><input ref={prodSearchRef} placeholder="Search to add..." className={`pl-10 ${inputClass}`} value={prodSearch} onChange={e=>{ setProdSearch(e.target.value); setHiProduct(-1); }} onKeyDown={e => { const filtP = products.filter(p => p.available && !p.archived && p.name.toLowerCase().includes(prodSearch.toLowerCase())); if (e.key === 'ArrowDown') { e.preventDefault(); setHiProduct(h => Math.min(h + 1, filtP.length - 1)); } else if (e.key === 'ArrowUp') { e.preventDefault(); setHiProduct(h => Math.max(h - 1, 0)); } else if (e.key === 'Enter') { e.preventDefault(); const p = hiProduct >= 0 ? filtP[hiProduct] : filtP.length === 1 ? filtP[0] : null; if (p) { justAddedRef.current = true; handleAddItem(p, false); setProdSearch(''); setHiProduct(-1); } } else if (e.key === 'Escape') { setProdSearch(''); setHiProduct(-1); } }} /></div>
-  {isAdmin && <button type="button" onClick={() => { setProductPreFill(prodSearch.trim()); setEditingProduct(null); setShowProductModal(true); }} className="flex-shrink-0 flex items-center gap-1 px-3 py-2.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-bold hover:bg-indigo-100 active:scale-95 transition-all" title="Register a new product"><Plus size={14}/> New</button>}
+  {hasPermission('addEditProducts') && <button type="button" onClick={() => { setProductPreFill(prodSearch.trim()); setEditingProduct(null); setShowProductModal(true); }} className="flex-shrink-0 flex items-center gap-1 px-3 py-2.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-bold hover:bg-indigo-100 active:scale-95 transition-all" title="Register a new product"><Plus size={14}/> New</button>}
 </div>
 {prodSearch && (
 <div className="border border-indigo-200 bg-indigo-50/50 rounded-xl mb-4 max-h-48 overflow-y-auto p-2 space-y-1 shadow-inner">
@@ -1323,6 +1330,7 @@ return (
 <div><label className="text-[10px] font-bold text-rose-500 uppercase tracking-wider ml-1 mb-1 block">Driver Exp (-)</label><input type="number" className={inputClass} value={currentInvoice.transportExpense} onChange={e => setCurrentInvoice({...currentInvoice, transportExpense: e.target.value})} /></div>
 <div><label className="text-[10px] font-bold text-amber-600 uppercase tracking-wider ml-1 mb-1 block">Discount (-)</label><input type="number" className={inputClass} value={currentInvoice.discount || ''} placeholder="0" onChange={e => setCurrentInvoice({...currentInvoice, discount: Number(e.target.value) || 0})} /></div>
 </div>
+{hasPermission('collectOnBill') && (
 <div className="mt-4 bg-slate-50 p-3 rounded-xl border border-slate-200">
 <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 block mb-2">Payment Received</label>
 <div className="flex items-center gap-2">
@@ -1330,6 +1338,7 @@ return (
 <button onClick={() => setCurrentInvoice({...currentInvoice, receivedAmount: grandTotal, paymentStatus: 'Paid'})} className="px-4 py-3 bg-indigo-50 text-indigo-700 font-bold rounded-xl text-xs whitespace-nowrap border border-indigo-100">Full Pay</button>
 </div>
 </div>
+)}
 </div>
 <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
 <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5"><AlignLeft size={12}/> Notes / Remarks</h3>
@@ -1363,7 +1372,7 @@ return (
 <div className="flex gap-2 mb-4">
 <div className="relative flex-1"><Search className="absolute left-3.5 top-3.5 text-slate-400" size={18} /><input placeholder="Search Invoices..." className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl font-semibold outline-none shadow-sm text-sm" value={search} onChange={e => setSearch(e.target.value)} onKeyDown={e => { if (e.key === 'Escape' && search) { e.stopPropagation(); setSearch(''); } }} /></div>
 {statusFilter === 'CreditNote'
-  ? <button onClick={() => { setEditingCreditNote({ customerId: '', id: '' }); setShowCreditNoteModal(true); }} className="bg-rose-600 hover:bg-rose-700 text-white px-4 py-3 rounded-xl shadow-md font-bold flex items-center gap-1.5 active:scale-95 whitespace-nowrap"><RotateCcw size={16}/> New Return</button>
+  ? hasPermission('salesReturns') && <button onClick={() => { setEditingCreditNote({ customerId: '', id: '' }); setShowCreditNoteModal(true); }} className="bg-rose-600 hover:bg-rose-700 text-white px-4 py-3 rounded-xl shadow-md font-bold flex items-center gap-1.5 active:scale-95 whitespace-nowrap"><RotateCcw size={16}/> New Return</button>
   : <button onClick={startNewInvoice} className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-3 rounded-xl shadow-md font-bold flex items-center gap-1.5 active:scale-95"><Plus size={18}/> New</button>
 }
 </div>
@@ -1391,11 +1400,11 @@ return (
 <div className="flex justify-between items-center pl-3">
 <div className="flex items-center gap-2"><span className={`text-[9px] px-2 py-0.5 rounded font-bold uppercase tracking-wider ${o.paymentStatus==='Paid'?'bg-emerald-100 text-emerald-700':o.paymentStatus==='Partial'?'bg-amber-100 text-amber-700':'bg-rose-100 text-rose-700'}`}>{o.paymentStatus}</span></div>
 <div className="flex gap-1.5">
-{o.status === 'Estimate' && isAdmin && <button onClick={async () => { await saveToFirebase('invoices', o.id, {...o, status: 'Booked'}); showToast('Converted to Draft Order'); }} title="Convert to Draft Order" className="p-2 bg-amber-50 text-amber-600 hover:bg-amber-100 border border-amber-200 rounded-lg"><Save size={14}/></button>}
-{(o.status === 'Estimate' || o.status === 'Booked') && isAdmin && <button onClick={async () => { const newId = `INV-${String(getNextSeqNum(invoices, 'INV')).padStart(4, '0')}`; await saveToFirebase('invoices', newId, {...o, id: newId, status: 'Billed', date: getLocalDateStr()}); await deleteFromFirebase('invoices', o.id); showToast(`Converted to Invoice: ${newId}`); }} title="Issue as Invoice" className="p-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-200 rounded-lg"><ReceiptText size={14}/></button>}
-{o.status === 'Billed' && isAdmin && <button onClick={() => { setEditingCreditNote({customerId: o.customerId, id: o.id}); setShowCreditNoteModal(true); }} title="Issue Credit Note / Return" className="p-2 bg-rose-50 text-rose-500 hover:bg-rose-100 border border-rose-200 rounded-lg"><RotateCcw size={14}/></button>}
-<button onClick={() => { setSelectedLedgerId(o.customerId); setShowLedgerModal(true); }} title="Customer Ledger" className="p-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-500 rounded-lg"><BookOpen size={14}/></button>
-{isAdmin && o.status !== 'CreditNote' && <button onClick={() => { setCurrentInvoice(o); setBillingView('form'); }} className="p-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 rounded-lg"><Edit size={16}/></button>}
+{o.status === 'Estimate' && hasPermission('issueInvoices') && <button onClick={async () => { await saveToFirebase('invoices', o.id, {...o, status: 'Booked'}); showToast('Converted to Draft Order'); }} title="Convert to Draft Order" className="p-2 bg-amber-50 text-amber-600 hover:bg-amber-100 border border-amber-200 rounded-lg"><Save size={14}/></button>}
+{(o.status === 'Estimate' || o.status === 'Booked') && hasPermission('issueInvoices') && <button onClick={async () => { const newId = `INV-${String(getNextSeqNum(invoices, 'INV')).padStart(4, '0')}`; await saveToFirebase('invoices', newId, {...o, id: newId, status: 'Billed', date: getLocalDateStr()}); await deleteFromFirebase('invoices', o.id); showToast(`Converted to Invoice: ${newId}`); }} title="Issue as Invoice" className="p-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-200 rounded-lg"><ReceiptText size={14}/></button>}
+{o.status === 'Billed' && hasPermission('salesReturns') && <button onClick={() => { setEditingCreditNote({customerId: o.customerId, id: o.id}); setShowCreditNoteModal(true); }} title="Issue Credit Note / Return" className="p-2 bg-rose-50 text-rose-500 hover:bg-rose-100 border border-rose-200 rounded-lg"><RotateCcw size={14}/></button>}
+{hasPermission('viewLedger') && <button onClick={() => { setSelectedLedgerId(o.customerId); setShowLedgerModal(true); }} title="Customer Ledger" className="p-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-500 rounded-lg"><BookOpen size={14}/></button>}
+{(isAdmin || (hasPermission('editOwnInvoices') && String(o.salespersonId) === String(currentUser?.id))) && o.status !== 'CreditNote' && <button onClick={() => { setCurrentInvoice(o); setBillingView('form'); }} className="p-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 rounded-lg"><Edit size={16}/></button>}
 {isAdmin && <button onClick={async () => { if(await showConfirm(`Delete ${o.id}?`)) await deleteFromFirebase('invoices', o.id); }} title="Delete" className="p-2 bg-rose-50 text-rose-500 hover:bg-rose-100 rounded-lg"><Trash2 size={16}/></button>}
 {o.status === 'Estimate' ? <button onClick={() => setPrintConfig({docType: 'estimate', format: 'a4', data: o})} title="View Estimate" className="p-2 bg-violet-50 text-violet-600 hover:bg-violet-100 rounded-lg"><FileText size={16}/></button> : o.status === 'Booked' ? <><button onClick={() => setPrintConfig({docType: 'dispatch', format: 'thermal', data: o})} title="Dispatch Note" className="p-2 bg-amber-50 text-amber-600 rounded-lg"><Truck size={16}/></button><button onClick={() => setPrintConfig({docType: 'estimate', format: 'a4', data: o})} title="View Order" className="p-2 bg-slate-50 text-slate-600 rounded-lg"><FileText size={16}/></button></> : o.status === 'CreditNote' ? <button onClick={() => setPrintConfig({docType: 'creditnote', format: 'a4', data: o})} title="Print Credit Note" className="p-2 bg-rose-50 text-rose-600 rounded-lg"><FileText size={16}/></button> : <><button onClick={() => setPrintConfig({docType: 'dispatch', format: 'thermal', data: o})} title="Dispatch" className="p-2 bg-amber-50 text-amber-600 rounded-lg"><Truck size={16}/></button><button onClick={() => setPrintConfig({docType: 'invoice', format: 'thermal', data: o})} title="Print" className="p-2 bg-indigo-50 text-indigo-600 rounded-lg"><ReceiptText size={16}/></button></>}
 </div>
@@ -2611,10 +2620,22 @@ return (
 <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded mt-1 inline-block border ${u.role === 'admin' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>{u.role === 'admin' ? 'Administrator' : 'Sales Staff'}</span>
 {u.role === 'staff' && (() => {
   const p = u.permissions || {};
-  const grants = [p.viewAllInvoices && 'All Invoices', p.viewDashboard && 'Dashboard', p.viewCustomers && 'Customers', p.receivePayments && 'Payments'].filter(Boolean);
+  const grants = [
+    p.viewAllInvoices  && 'All Invoices',
+    p.viewDashboard    && 'Dashboard',
+    p.viewCustomers    && 'Customers',
+    p.receivePayments  && 'Receipts',
+    p.collectOnBill    && 'Collect on Bill',
+    p.editOwnInvoices  && 'Edit Own',
+    p.issueInvoices    && 'Issue Docs',
+    p.salesReturns     && 'Returns',
+    p.viewLedger       && 'Ledger',
+    p.addCustomers     && 'Add Customers',
+    p.addEditProducts  && 'Add Products',
+  ].filter(Boolean);
   return grants.length > 0
     ? <div className="flex flex-wrap gap-1 mt-1.5">{grants.map(g => <span key={g} className="text-[8px] font-bold bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded border border-indigo-100">{g}</span>)}</div>
-    : <p className="text-[9px] text-slate-400 italic mt-1">Own invoices & receipts only</p>;
+    : <p className="text-[9px] text-slate-400 italic mt-1">Own invoices only</p>;
 })()}
 </div>
 <div className="flex gap-1.5">
