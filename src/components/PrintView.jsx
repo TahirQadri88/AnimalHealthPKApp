@@ -490,51 +490,20 @@ const handlePDF = () => {
   }, 300);
 };
 
-// ── Image (PNG) Share — uses html2canvas, no pdf library needed ───────────
+// ── Image Share ───────────────────────────────────────────────────────────
 const handleImageShare = async () => {
   const element = document.getElementById('print-document');
   if (!element) { showToast('Document not found', 'error'); return; }
   showToast('Generating image…');
 
-  // Load html-to-image — uses browser-native SVG foreignObject rendering,
-  // not a JS CSS reimplementation, so all CSS properties work correctly.
-  if (!window.htmlToImage) {
-    await new Promise((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error('CDN timeout')), 10000);
-      const s = document.createElement('script');
-      s.src = 'https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.js';
-      s.onload = () => { clearTimeout(timer); resolve(); };
-      s.onerror = () => { clearTimeout(timer); reject(new Error('CDN error')); };
-      document.head.appendChild(s);
-    }).catch(() => { showToast('Image library failed to load. Check internet connection.', 'error'); });
-    if (!window.htmlToImage) return;
-  }
+  const targetW    = isThermal ? 302 : isA5 ? 559 : 794;
+  const imgFileName = getFileName().replace(/\.pdf$/, isThermal ? '.png' : '.jpg');
+  const imgMime    = isThermal ? 'image/png' : 'image/jpeg';
+
   const withTimeout = (promise, ms) => Promise.race([
     promise,
     new Promise((_, reject) => setTimeout(() => reject(new Error('Rendering timed out')), ms)),
   ]);
-  const toBlob = (canvas) => new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error('toBlob timeout')), 20000);
-    canvas.toBlob(blob => { clearTimeout(timer); blob ? resolve(blob) : reject(new Error('toBlob null')); }, 'image/jpeg', 0.95);
-  });
-
-  // Clone the element and position it within the viewport at z-index:-1.
-  // html-to-image uses SVG foreignObject and cannot render elements at left:-9999px;
-  // position:fixed at top:0 left:0 keeps it in-viewport while hidden behind the app UI.
-  const targetW = isThermal ? 302 : isA5 ? 559 : 794;
-  const clone = element.cloneNode(true);
-  Object.assign(clone.style, {
-    position: 'fixed', top: '0', left: '0',
-    width: targetW + 'px', maxWidth: targetW + 'px', minWidth: targetW + 'px',
-    margin: '0', boxShadow: 'none', zIndex: '-1', background: 'white', overflow: 'visible',
-  });
-  document.body.appendChild(clone);
-  await new Promise(r => setTimeout(r, 200));
-
-  // Thermal uses PNG (lossless) so text edges stay pixel-perfect.
-  // A4/A5 use JPEG because the multi-page canvas is much larger.
-  const imgFileName = getFileName().replace(/\.pdf$/, isThermal ? '.png' : '.jpg');
-  const imgMime     = isThermal ? 'image/png' : 'image/jpeg';
 
   const shareBlob = async (blob) => {
     const file = new File([blob], imgFileName, { type: imgMime });
@@ -546,39 +515,80 @@ const handleImageShare = async () => {
     }
   };
 
-  try {
-    // For thermal: single tall PNG (lossless — no JPEG text blur)
-    if (isThermal) {
-      const dataUrl = await withTimeout(window.htmlToImage.toPng(clone, {
-        pixelRatio: 4, backgroundColor: '#ffffff', height: clone.scrollHeight,
-      }), 30000);
-      if (document.body.contains(clone)) document.body.removeChild(clone);
-      shareBlob(await (await fetch(dataUrl)).blob());
-      return;
+  // ── Thermal: html2canvas (bundled inside html2pdf) at scale:4 ────────────
+  // html-to-image serialises to SVG then scales the canvas — fonts are only
+  // rendered at CSS pixel size and bicubic-upscaled (blurry text).
+  // html2canvas runs its layout engine at scale:4 so characters are genuinely
+  // rasterised at 4× CSS pixel size → crisp, sharp text in the output PNG.
+  if (isThermal) {
+    const clone = element.cloneNode(true);
+    Object.assign(clone.style, {
+      width: targetW + 'px', maxWidth: targetW + 'px', minWidth: targetW + 'px',
+      margin: '0', boxShadow: 'none', background: 'white', overflow: 'visible',
+    });
+    try {
+      const canvas = await withTimeout(
+        html2pdf()
+          .set({ html2canvas: { scale: 4, useCORS: true, backgroundColor: '#ffffff', scrollY: 0, scrollX: 0, width: targetW, windowWidth: targetW, logging: false, letterRendering: true } })
+          .from(clone)
+          .toCanvas()
+          .get('canvas'),
+        30000
+      );
+      const blob = await new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('toBlob timeout')), 20000);
+        canvas.toBlob(b => { clearTimeout(timer); b ? resolve(b) : reject(new Error('toBlob null')); }, 'image/png');
+      });
+      shareBlob(blob);
+    } catch (e) {
+      showToast('Image failed — use Print instead', 'error');
     }
+    return;
+  }
 
-    // For A4/A5: capture to canvas then slice into page-sized sections.
-    // Each slice is separated by a slate-200 gap so the output looks like
-    // a stack of pages — matching what the PDF and print outputs produce.
+  // ── A4/A5: html-to-image (SVG foreignObject) with page slicing ───────────
+  // html-to-image must see the element at position:fixed in-viewport;
+  // position:left:-9999px causes blank output in foreignObject rendering.
+  if (!window.htmlToImage) {
+    await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('CDN timeout')), 10000);
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.js';
+      s.onload = () => { clearTimeout(timer); resolve(); };
+      s.onerror = () => { clearTimeout(timer); reject(new Error('CDN error')); };
+      document.head.appendChild(s);
+    }).catch(() => { showToast('Image library failed to load. Check internet connection.', 'error'); });
+    if (!window.htmlToImage) return;
+  }
+
+  const toBlob = (canvas) => new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('toBlob timeout')), 20000);
+    canvas.toBlob(blob => { clearTimeout(timer); blob ? resolve(blob) : reject(new Error('toBlob null')); }, 'image/jpeg', 0.95);
+  });
+
+  const clone = element.cloneNode(true);
+  Object.assign(clone.style, {
+    position: 'fixed', top: '0', left: '0',
+    width: targetW + 'px', maxWidth: targetW + 'px', minWidth: targetW + 'px',
+    margin: '0', boxShadow: 'none', zIndex: '-1', background: 'white', overflow: 'visible',
+  });
+  document.body.appendChild(clone);
+  await new Promise(r => setTimeout(r, 200));
+
+  try {
     const PIXEL_RATIO = 3;
-    const GAP_PX = 20; // gap between pages (in output-canvas pixels)
+    const GAP_PX = 20;
 
     const srcCanvas = await withTimeout(window.htmlToImage.toCanvas(clone, {
-      pixelRatio: PIXEL_RATIO,
-      backgroundColor: '#ffffff',
-      height: clone.scrollHeight,
+      pixelRatio: PIXEL_RATIO, backgroundColor: '#ffffff', height: clone.scrollHeight,
     }), 30000);
     if (document.body.contains(clone)) document.body.removeChild(clone);
 
-    // Page height in output-canvas pixels (aspect ratio of A5 or A4)
-    const pageHeightPx = Math.round(
-      (isA5 ? (210 / 148) : (297 / 210)) * srcCanvas.width
-    );
+    const pageHeightPx = Math.round((isA5 ? (210 / 148) : (297 / 210)) * srcCanvas.width);
     const totalH = srcCanvas.height;
     const pageCount = Math.ceil(totalH / pageHeightPx);
 
     if (pageCount <= 1) {
-      // Single page — convert directly (no gap needed)
       const out = document.createElement('canvas');
       out.width = srcCanvas.width; out.height = totalH;
       out.getContext('2d').drawImage(srcCanvas, 0, 0);
@@ -586,24 +596,20 @@ const handleImageShare = async () => {
       return;
     }
 
-    // Multi-page: stitch slices with a visible gap
     const compositeH = totalH + (pageCount - 1) * GAP_PX;
     const out = document.createElement('canvas');
-    out.width = srcCanvas.width;
-    out.height = compositeH;
+    out.width = srcCanvas.width; out.height = compositeH;
     const ctx = out.getContext('2d');
-    ctx.fillStyle = '#e2e8f0'; // slate-200 page-gap colour
+    ctx.fillStyle = '#e2e8f0';
     ctx.fillRect(0, 0, out.width, compositeH);
-
     for (let i = 0; i < pageCount; i++) {
       const srcY = i * pageHeightPx;
       const sliceH = Math.min(pageHeightPx, totalH - srcY);
-      const dstY  = i * (pageHeightPx + GAP_PX);
+      const dstY = i * (pageHeightPx + GAP_PX);
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, dstY, out.width, sliceH);
       ctx.drawImage(srcCanvas, 0, srcY, srcCanvas.width, sliceH, 0, dstY, out.width, sliceH);
     }
-
     shareBlob(await toBlob(out));
 
   } catch (e) {
