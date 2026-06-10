@@ -343,8 +343,6 @@ const buildHtmlDoc = () => {
         border-color:#000!important;
         box-shadow:none!important;
         text-shadow:none!important;
-        -webkit-font-smoothing:none!important;
-        font-smooth:never!important;
       }
       [data-dk],[data-dk] *{color:white!important;}
     }` : ''}
@@ -533,12 +531,15 @@ const handleImageShare = async () => {
   document.body.appendChild(clone);
   await new Promise(r => setTimeout(r, 200));
 
-  const imgFileName = getFileName().replace(/\.pdf$/, '.jpg');
+  // Thermal uses PNG (lossless) so text edges stay pixel-perfect.
+  // A4/A5 use JPEG because the multi-page canvas is much larger.
+  const imgFileName = getFileName().replace(/\.pdf$/, isThermal ? '.png' : '.jpg');
+  const imgMime     = isThermal ? 'image/png' : 'image/jpeg';
 
   const shareBlob = async (blob) => {
-    const file = new File([blob], imgFileName, { type: 'image/jpeg' });
+    const file = new File([blob], imgFileName, { type: imgMime });
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      navigator.share({ files: [file], title: imgFileName.replace(/\.jpg$/, ''), text: getShareCaption() })
+      navigator.share({ files: [file], title: imgFileName.replace(/\.[^.]+$/, ''), text: getShareCaption() })
         .catch(e => { if (e.name !== 'AbortError') downloadImageFallback(blob, imgFileName); });
     } else {
       downloadImageFallback(blob, imgFileName);
@@ -546,10 +547,10 @@ const handleImageShare = async () => {
   };
 
   try {
-    // For thermal: single tall image (continuous paper — no pagination)
+    // For thermal: single tall PNG (lossless — no JPEG text blur)
     if (isThermal) {
-      const dataUrl = await withTimeout(window.htmlToImage.toJpeg(clone, {
-        quality: 0.95, pixelRatio: 3, backgroundColor: '#ffffff', height: clone.scrollHeight,
+      const dataUrl = await withTimeout(window.htmlToImage.toPng(clone, {
+        pixelRatio: 4, backgroundColor: '#ffffff', height: clone.scrollHeight,
       }), 30000);
       if (document.body.contains(clone)) document.body.removeChild(clone);
       shareBlob(await (await fetch(dataUrl)).blob());
