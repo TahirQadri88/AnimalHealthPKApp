@@ -122,22 +122,47 @@ return (
 const UserModal = () => {
 const { editingUser, appUsers, checkDuplicate, saveToFirebase, showToast, setShowUserModal } = useContext(AppContext);
 const isEdit = !!editingUser;
-const [form, setForm] = useState(isEdit ? editingUser : { name: '', password: '', role: 'staff' });
+const [form, setForm] = useState(isEdit ? editingUser : { name: '', password: '', role: 'staff', permissions: {} });
+const setPermission = (key, val) => setForm(f => ({ ...f, permissions: { ...(f.permissions || {}), [key]: val } }));
 const save = async () => {
 if (!form.name || !form.password) return showToast("Name and Password are required", "error");
 if (checkDuplicate(appUsers, form.name, form.id)) return showToast("Username already exists", "error");
 const id = isEdit ? form.id : Date.now().toString();
-await saveToFirebase('app_users', id, { ...form, id });
+// Admin role gets no permissions object (full access via role check)
+const toSave = form.role === 'admin' ? { ...form, id, permissions: {} } : { ...form, id };
+await saveToFirebase('app_users', id, toSave);
 showToast(isEdit ? "User Updated" : "User Added");
 setShowUserModal(false);
 };
 const inputClass = "w-full p-3.5 bg-white border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-sm text-slate-800 placeholder-slate-400";
+const PERMS = [
+  { key: 'viewAllInvoices', label: 'View All Invoices',    desc: 'See invoices from all staff (default: own only)' },
+  { key: 'viewDashboard',   label: 'Home Dashboard',       desc: 'Revenue summary & business overview' },
+  { key: 'viewCustomers',   label: 'Customer List',        desc: 'Browse all customers & outstanding balances' },
+  { key: 'receivePayments', label: 'Receive Payments',     desc: 'Record new customer payments' },
+];
 return (
 <ModalWrapper title={isEdit ? "Edit Team Member" : "Add Team Member"} onClose={() => setShowUserModal(false)}>
 <form onSubmit={e => { e.preventDefault(); save(); }} className="space-y-4">
 <div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Full Name / Username</label><input className={inputClass} value={form.name} onChange={e=>setForm({...form, name: e.target.value})} placeholder="e.g. Ali Raza" /></div>
 <div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Login Password</label><input type="text" className={inputClass} value={form.password} onChange={e=>setForm({...form, password: e.target.value})} placeholder="Set Password" /></div>
-<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">System Permissions</label><select className={inputClass} value={form.role} onChange={e=>setForm({...form, role: e.target.value})}><option value="staff">Sales Staff (Hidden Costs & Profits)</option><option value="admin">Administrator (Full Access)</option></select></div>
+<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Role</label><select className={inputClass} value={form.role} onChange={e=>setForm({...form, role: e.target.value})}><option value="staff">Sales Staff (Restricted)</option><option value="admin">Administrator (Full Access)</option></select></div>
+{form.role === 'staff' && (
+<div>
+  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-2 block">Additional Access <span className="text-slate-400 normal-case font-medium">(all off = invoices & receipts only)</span></label>
+  <div className="space-y-2">
+    {PERMS.map(({ key, label, desc }) => (
+      <label key={key} className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors border border-slate-100">
+        <input type="checkbox" checked={!!(form.permissions?.[key])} onChange={e => setPermission(key, e.target.checked)} className="w-4 h-4 accent-indigo-600 shrink-0" />
+        <div>
+          <p className="text-sm font-semibold text-slate-700 leading-tight">{label}</p>
+          <p className="text-[10px] text-slate-400 mt-0.5">{desc}</p>
+        </div>
+      </label>
+    ))}
+  </div>
+</div>
+)}
 <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 rounded-xl mt-4 shadow-md shadow-indigo-600/20 active:scale-[0.98] transition-all">Save User Record</button>
 </form>
 </ModalWrapper>
@@ -1326,7 +1351,13 @@ return (
 </div>
 );
 }
-const filtered = invoices.filter(o => (o.customerName.toLowerCase().includes(search.toLowerCase()) || o.id.includes(search)) && checkDateFilter(o.date, dateFilter) && (statusFilter === 'All' || o.status === statusFilter));
+const ownOnly = !isAdmin && !currentUser?.permissions?.viewAllInvoices;
+const filtered = invoices.filter(o =>
+  (!ownOnly || String(o.salespersonId) === String(currentUser?.id)) &&
+  (o.customerName.toLowerCase().includes(search.toLowerCase()) || o.id.includes(search)) &&
+  checkDateFilter(o.date, dateFilter) &&
+  (statusFilter === 'All' || o.status === statusFilter)
+);
 return (
 <div className="p-4 flex flex-col h-full">
 <div className="flex gap-2 mb-4">
@@ -1809,23 +1840,32 @@ return (
 
 // ─── Payments / Receipts Tab ───
 const PaymentsTab = () => {
-const { isAdmin, customers, payments, invoices, deleteFromFirebase, saveToFirebase, showToast, setShowPaymentModal, setSelectedCustomerForPayment, setEditingPayment, showConfirm, setPrintConfig, getCustomerLedger, generateReceiptData } = useContext(AppContext);
+const { isAdmin, hasPermission, currentUser, customers, payments, invoices, deleteFromFirebase, saveToFirebase, showToast, setShowPaymentModal, setSelectedCustomerForPayment, setEditingPayment, showConfirm, setPrintConfig, getCustomerLedger, generateReceiptData } = useContext(AppContext);
+const canReceive = hasPermission('receivePayments');
+// Staff without viewAllInvoices only see payments from their own customers
+const myCustomerIds = (!isAdmin && !currentUser?.permissions?.viewAllInvoices)
+  ? new Set(invoices.filter(inv => String(inv.salespersonId) === String(currentUser?.id)).map(inv => String(inv.customerId)))
+  : null;
 const [search, setSearch] = useState('');
 const [dateFilter, setDateFilter] = useState('This Month');
 const [customerFilter, setCustomerFilter] = useState('');
 const allPayments = useMemo(() => {
-  const standalone = payments.map(p => ({
-    id: p.id, date: p.date, customerId: p.customerId,
-    customerName: customers.find(c => c.id === p.customerId)?.name || 'Unknown',
-    amount: Number(p.amount), note: p.note || 'Payment', type: 'receipt', raw: p
-  }));
-  const invPays = invoices.filter(inv => Number(inv.receivedAmount) > 0).map(inv => ({
-    id: `${inv.id}-PAY`, date: inv.date, customerId: inv.customerId,
-    customerName: inv.customerName, amount: Number(inv.receivedAmount),
-    note: `On Invoice ${inv.id}`, type: 'invoice', raw: inv
-  }));
+  const standalone = payments
+    .filter(p => !myCustomerIds || myCustomerIds.has(String(p.customerId)))
+    .map(p => ({
+      id: p.id, date: p.date, customerId: p.customerId,
+      customerName: customers.find(c => c.id === p.customerId)?.name || 'Unknown',
+      amount: Number(p.amount), note: p.note || 'Payment', type: 'receipt', raw: p
+    }));
+  const invPays = invoices
+    .filter(inv => Number(inv.receivedAmount) > 0 && (!myCustomerIds || myCustomerIds.has(String(inv.customerId))))
+    .map(inv => ({
+      id: `${inv.id}-PAY`, date: inv.date, customerId: inv.customerId,
+      customerName: inv.customerName, amount: Number(inv.receivedAmount),
+      note: `On Invoice ${inv.id}`, type: 'invoice', raw: inv
+    }));
   return [...standalone, ...invPays].sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
-}, [payments, invoices, customers]);
+}, [payments, invoices, customers, myCustomerIds]);
 const filtered = allPayments.filter(p => {
   const matchSearch = !search || p.customerName.toLowerCase().includes(search.toLowerCase()) || p.id.toLowerCase().includes(search.toLowerCase());
   const matchCustomer = !customerFilter || String(p.customerId) === customerFilter;
@@ -1837,7 +1877,7 @@ return (
 <div className="p-4 flex flex-col h-full">
   <div className="flex justify-between items-center mb-4">
     <h2 className="text-2xl font-extrabold text-slate-800 tracking-tight">Receipts</h2>
-    {isAdmin && (
+    {canReceive && (
       <button onClick={() => { setEditingPayment(null); setSelectedCustomerForPayment(null); setShowPaymentModal(true); }}
         className="bg-emerald-500 text-white px-3 py-2.5 rounded-xl shadow-md font-bold flex items-center gap-1.5 text-xs active:scale-95 transition-all">
         <Plus size={16}/> New Receipt
@@ -2566,9 +2606,16 @@ const avgOrder = userInvoices.length > 0 ? Math.round(totalSales / userInvoices.
 return (
 <div key={u.id} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
 <div className="flex justify-between items-start mb-3">
-<div>
+<div className="min-w-0 flex-1">
 <h4 className="font-bold text-slate-800 text-base">{u.name}</h4>
-<span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded mt-1 inline-block border ${u.role === 'admin' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'}`}>{u.role}</span>
+<span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded mt-1 inline-block border ${u.role === 'admin' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>{u.role === 'admin' ? 'Administrator' : 'Sales Staff'}</span>
+{u.role === 'staff' && (() => {
+  const p = u.permissions || {};
+  const grants = [p.viewAllInvoices && 'All Invoices', p.viewDashboard && 'Dashboard', p.viewCustomers && 'Customers', p.receivePayments && 'Payments'].filter(Boolean);
+  return grants.length > 0
+    ? <div className="flex flex-wrap gap-1 mt-1.5">{grants.map(g => <span key={g} className="text-[8px] font-bold bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded border border-indigo-100">{g}</span>)}</div>
+    : <p className="text-[9px] text-slate-400 italic mt-1">Own invoices & receipts only</p>;
+})()}
 </div>
 <div className="flex gap-1.5">
 <button onClick={() => { setEditingUser(u); setShowUserModal(true); }} className="p-2 bg-slate-50 text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"><Edit size={16}/></button>
@@ -4222,6 +4269,7 @@ const [confirmDialog, setConfirmDialog] = useState(null);
 const showConfirm = (message) => new Promise(resolve => setConfirmDialog({ message, resolve }));
 
 const isAdmin = currentUser?.role === 'admin';
+const hasPermission = (key) => isAdmin || !!(currentUser?.permissions?.[key]);
 
 const showToast = (msg, type = 'success') => {
 setToast({ msg, type });
@@ -4453,15 +4501,25 @@ return (
 
 // — Main Render —
 const TABS = [
-  { id: 'dashboard', icon: LayoutDashboard, label: 'Home' },
-  { id: 'products', icon: Package, label: 'Items' },
-  { id: 'billing', icon: ReceiptText, label: 'Billing' },
-  { id: 'customers', icon: Users, label: 'Clients' },
-  { id: 'payments', icon: Wallet, label: 'Receipts' },
-  { id: 'admin', icon: Settings, label: 'Admin', adminOnly: true },
+  { id: 'dashboard', icon: LayoutDashboard, label: 'Home',     perm: 'viewDashboard' },
+  { id: 'products',  icon: Package,         label: 'Items',    adminOnly: true },
+  { id: 'billing',   icon: ReceiptText,     label: 'Billing' },
+  { id: 'customers', icon: Users,           label: 'Clients',  perm: 'viewCustomers' },
+  { id: 'payments',  icon: Wallet,          label: 'Receipts' },
+  { id: 'admin',     icon: Settings,        label: 'Admin',    adminOnly: true },
 ];
+const canSeeTab = (tab) => {
+  if (tab.adminOnly) return isAdmin;
+  if (tab.perm) return hasPermission(tab.perm);
+  return true;
+};
+// Auto-redirect staff away from tabs they can't access
+useEffect(() => {
+  const cur = TABS.find(t => t.id === activeTab);
+  if (cur && !canSeeTab(cur)) setActiveTab('billing');
+}, [activeTab, currentUser]);  // eslint-disable-line react-hooks/exhaustive-deps
 const ctx = {
-isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers,
+isAdmin, hasPermission, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers,
 cities, areas, customerTypes, vehicleTypes,
 showToast, showConfirm, confirmDialog, setConfirmDialog, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData,
 billingView, setBillingView, currentInvoice, setCurrentInvoice,
@@ -4493,12 +4551,12 @@ return (
     </div>
     <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
       {TABS.map(tab => {
-        if (tab.adminOnly && !isAdmin) return null;
+        if (!canSeeTab(tab)) return null;
         const active = activeTab === tab.id;
         const draftCount = tab.id === 'billing' ? invoices.filter(o => o.status === 'Booked' || o.status === 'Estimate').length : 0;
         return (
           <button key={tab.id} data-sidenav={tab.id} tabIndex={active ? 0 : -1} onClick={() => setActiveTab(tab.id)} title={`Alt+${tab.label[0].toLowerCase()}`}
-            onKeyDown={makeArrowNav(TABS.filter(t=>!t.adminOnly||isAdmin).map(t=>t.id), activeTab, setActiveTab, 'data-sidenav')}
+            onKeyDown={makeArrowNav(TABS.filter(t=>canSeeTab(t)).map(t=>t.id), activeTab, setActiveTab, 'data-sidenav')}
             className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-semibold text-sm transition-all ${active ? 'bg-indigo-50 text-indigo-700 shadow-sm' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'}`}>
             <div className="relative shrink-0">
               <tab.icon size={18} strokeWidth={active ? 2.5 : 2} />
@@ -4555,12 +4613,12 @@ return (
     {/* Mobile bottom nav */}
     <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md border-t border-slate-200 flex items-center justify-between pb-6 pt-3 px-2 z-10 shadow-[0_-10px_20px_rgba(0,0,0,0.03)]">
       {TABS.map(tab => {
-        if (tab.adminOnly && !isAdmin) return null;
+        if (!canSeeTab(tab)) return null;
         const active = activeTab === tab.id;
         const draftCount = tab.id === 'billing' ? invoices.filter(o => o.status === 'Booked' || o.status === 'Estimate').length : 0;
         return (
           <button key={tab.id} data-sidenav={tab.id} tabIndex={active ? 0 : -1} onClick={() => setActiveTab(tab.id)}
-            onKeyDown={makeArrowNav(TABS.filter(t=>!t.adminOnly||isAdmin).map(t=>t.id), activeTab, setActiveTab, 'data-sidenav')}
+            onKeyDown={makeArrowNav(TABS.filter(t=>canSeeTab(t)).map(t=>t.id), activeTab, setActiveTab, 'data-sidenav')}
             className={`flex flex-col items-center justify-center w-full transition-all ${active ? 'text-indigo-600' : 'text-slate-400'}`}>
             <div className={`relative p-1.5 rounded-xl transition-all ${active ? 'bg-indigo-50 shadow-sm' : ''}`}>
               <tab.icon size={22} strokeWidth={active ? 2.5 : 2} />
