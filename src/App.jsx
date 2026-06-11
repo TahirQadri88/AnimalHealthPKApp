@@ -859,16 +859,19 @@ return (
 
 // — Tabs —
 const DashboardTab = () => {
-const { isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, analyticsView, setAnalyticsView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, productPreFill, setProductPreFill, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig, showConfirm } = useContext(AppContext);
+const { isAdmin, hasPermission, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, analyticsView, setAnalyticsView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, productPreFill, setProductPreFill, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig, showConfirm } = useContext(AppContext);
 const [dateFilter, setDateFilter] = useState('This Month');
 const [activitySearch, setActivitySearch] = useState('');
-const filteredInvoices = invoices.filter(o => o.status === 'Billed' && checkDateFilter(o.date, dateFilter));
+// Staff without viewAllInvoices only see their own invoices on the dashboard
+const ownOnly = !isAdmin && !currentUser?.permissions?.viewAllInvoices;
+const visibleInvoices = ownOnly ? invoices.filter(o => String(o.salespersonId) === String(currentUser?.id)) : invoices;
+const filteredInvoices = visibleInvoices.filter(o => o.status === 'Billed' && checkDateFilter(o.date, dateFilter));
 const filteredExpenses = expenses.filter(e => checkDateFilter(e.date, dateFilter));
 const revenue = filteredInvoices.reduce((sum, o) => sum + o.total, 0);
 const totalReceivables = customers.reduce((sum, c) => sum + getCustomerBalance(c.id), 0);
 const totalExpenses = filteredExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
 const todayStr = getLocalDateStr();
-const todayInvoices = invoices.filter(o => o.status === 'Billed' && o.date === todayStr);
+const todayInvoices = visibleInvoices.filter(o => o.status === 'Billed' && o.date === todayStr);
 const todayRevenue = todayInvoices.reduce((s,o)=>s+o.total,0);
 const todayCollected = payments.filter(p => p.date === todayStr).reduce((s,p)=>s+Number(p.amount||0),0);
 const thisMonth = todayStr.slice(0,7);
@@ -903,13 +906,14 @@ const topReceivables = useMemo(() => {
 }, [customers, invoices, payments]);
 
 // Recent activity: merge invoices + payments, sort by date desc, take 8
+// Uses visibleInvoices so staff only see their own activity
 const recentActivity = useMemo(() => {
-  const invEntries = invoices.filter(o => checkDateFilter(o.date, dateFilter)).map(o => ({
+  const invEntries = visibleInvoices.filter(o => checkDateFilter(o.date, dateFilter)).map(o => ({
     id: o.id, date: o.date, customerName: o.customerName, amount: o.total,
     kind: o.status === 'Billed' ? 'invoice' : o.status === 'Estimate' ? 'estimate' : o.status === 'CreditNote' ? 'creditnote' : 'draft',
     paymentStatus: o.paymentStatus, raw: o
   }));
-  const payEntries = payments.filter(p => checkDateFilter(p.date, dateFilter)).map(p => ({
+  const payEntries = (ownOnly ? [] : payments).filter(p => checkDateFilter(p.date, dateFilter)).map(p => ({
     id: p.id, date: p.date,
     customerName: customers.find(c => c.id === p.customerId)?.name || 'Unknown',
     amount: Number(p.amount), kind: 'payment', note: p.note, raw: p
@@ -917,7 +921,7 @@ const recentActivity = useMemo(() => {
   return [...invEntries, ...payEntries]
     .sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id))
     .slice(0, 8);
-}, [invoices, payments, customers, dateFilter]);
+}, [visibleInvoices, payments, customers, dateFilter, ownOnly]);
 
 return (
 <div className="h-full overflow-y-auto">
@@ -946,12 +950,13 @@ return (
   </div>
 </div>
 
-<div className="grid grid-cols-2 gap-4">
+<div className={`grid gap-4 ${isAdmin ? 'grid-cols-2' : 'grid-cols-1'}`}>
 <div className="bg-gradient-to-br from-indigo-600 to-indigo-800 text-white p-5 rounded-2xl shadow-lg shadow-indigo-600/20">
-<p className="text-[10px] uppercase font-bold text-indigo-100 flex items-center gap-1.5 tracking-wider"><TrendingUp size={14}/> {dateFilter} Sales</p>
+<p className="text-[10px] uppercase font-bold text-indigo-100 flex items-center gap-1.5 tracking-wider"><TrendingUp size={14}/> {dateFilter} {ownOnly ? 'My Sales' : 'Sales'}</p>
 <p className="text-xl sm:text-2xl font-black mt-2 tracking-tight">Rs. {revenue.toLocaleString('en-US')}</p>
 {momChange !== null && <p className={`text-[10px] font-bold mt-1 ${Number(momChange)>=0?'text-emerald-300':'text-rose-300'}`}>{Number(momChange)>=0?'▲':'▼'} {Math.abs(momChange)}% vs last month</p>}
 </div>
+{isAdmin && (
 <button onClick={() => { setSelectedLedgerId(null); setShowLedgerModal(false); setActiveTab('customers'); }} className="bg-gradient-to-br from-rose-500 to-rose-600 text-white p-5 rounded-2xl shadow-lg shadow-rose-500/20 text-left w-full">
 <p className="text-[10px] uppercase font-bold text-rose-100 flex items-center gap-1.5 tracking-wider">
   <DollarSign size={14}/> Receivables
@@ -959,10 +964,11 @@ return (
 </p>
 <p className="text-xl sm:text-2xl font-black mt-2 tracking-tight">Rs. {totalReceivables.toLocaleString('en-US')}</p>
 </button>
+)}
 </div>
 
-{/* Receivables Quick View */}
-{topReceivables.length > 0 && (
+{/* Receivables Quick View — admin only (shows all customers' balances) */}
+{isAdmin && topReceivables.length > 0 && (
 <div className="bg-white border border-rose-100 rounded-2xl shadow-sm overflow-hidden">
   <div className="flex justify-between items-center px-4 pt-4 pb-2">
     <h3 className="text-[11px] font-bold text-rose-700 uppercase tracking-widest flex items-center gap-1.5">
@@ -973,7 +979,7 @@ return (
   </div>
   <div className="divide-y divide-rose-50">
     {topReceivables.map(c => (
-      <button key={c.id} onClick={() => { setSelectedLedgerId(c.id); setShowLedgerModal(true); }} className="w-full flex justify-between items-center px-4 py-3 hover:bg-rose-50 transition-colors text-left">
+      <button key={c.id} onClick={() => hasPermission('viewLedger') && (setSelectedLedgerId(c.id), setShowLedgerModal(true))} className={`w-full flex justify-between items-center px-4 py-3 transition-colors text-left ${hasPermission('viewLedger') ? 'hover:bg-rose-50 cursor-pointer' : 'cursor-default'}`}>
         <div className="flex-1 min-w-0">
           <p className="font-bold text-slate-800 text-sm truncate">{c.name}</p>
           {c.phone && <p className="text-[10px] text-slate-400 mt-0.5">{c.phone}</p>}
@@ -982,7 +988,7 @@ return (
           <p className={`font-extrabold text-sm ${c.balance >= 100000 ? 'text-rose-600' : c.balance >= 50000 ? 'text-amber-600' : 'text-slate-700'}`}>Rs. {c.balance.toLocaleString('en-US')}</p>
           {c.balance >= 100000 && <span className="text-[9px] font-bold text-rose-500 uppercase tracking-wider">High</span>}
         </div>
-        <ChevronRight size={14} className="text-slate-300 ml-2 shrink-0"/>
+        {hasPermission('viewLedger') && <ChevronRight size={14} className="text-slate-300 ml-2 shrink-0"/>}
       </button>
     ))}
   </div>
@@ -1851,10 +1857,13 @@ return (
 const PaymentsTab = () => {
 const { isAdmin, hasPermission, currentUser, customers, payments, invoices, deleteFromFirebase, saveToFirebase, showToast, setShowPaymentModal, setSelectedCustomerForPayment, setEditingPayment, showConfirm, setPrintConfig, getCustomerLedger, generateReceiptData } = useContext(AppContext);
 const canReceive = hasPermission('receivePayments');
-// Staff without viewAllInvoices only see payments from their own customers
-const myCustomerIds = (!isAdmin && !currentUser?.permissions?.viewAllInvoices)
-  ? new Set(invoices.filter(inv => String(inv.salespersonId) === String(currentUser?.id)).map(inv => String(inv.customerId)))
-  : null;
+// Staff without viewAllInvoices only see payments from their own customers.
+// Wrapped in useMemo so the Set reference is stable between renders —
+// allPayments useMemo depends on it and would re-run on every render otherwise.
+const myCustomerIds = useMemo(() => {
+  if (isAdmin || currentUser?.permissions?.viewAllInvoices) return null;
+  return new Set(invoices.filter(inv => String(inv.salespersonId) === String(currentUser?.id)).map(inv => String(inv.customerId)));
+}, [isAdmin, currentUser, invoices]);
 const [search, setSearch] = useState('');
 const [dateFilter, setDateFilter] = useState('This Month');
 const [customerFilter, setCustomerFilter] = useState('');
