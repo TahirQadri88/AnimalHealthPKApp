@@ -4562,6 +4562,27 @@ useEffect(() => {
   return () => window.removeEventListener('keydown', handler);
 }, [currentUser, printConfig, showProductModal, showCustomerModal, showPaymentModal, showCreditNoteModal, showLedgerModal, showUserModal, showExpenseCatModal, showSegmentsModal, showRidersModal, billingView]);
 
+// Tab list & permission helpers — defined here so the redirect effect below can use them
+// while still being BEFORE any conditional return (Rules of Hooks)
+const TABS = [
+  { id: 'dashboard', icon: LayoutDashboard, label: 'Home',     perm: 'viewDashboard' },
+  { id: 'products',  icon: Package,         label: 'Items',    adminOnly: true },
+  { id: 'billing',   icon: ReceiptText,     label: 'Billing' },
+  { id: 'customers', icon: Users,           label: 'Clients',  perm: 'viewCustomers' },
+  { id: 'payments',  icon: Wallet,          label: 'Receipts' },
+  { id: 'admin',     icon: Settings,        label: 'Admin',    adminOnly: true },
+];
+const canSeeTab = (tab) => {
+  if (tab.adminOnly) return isAdmin;
+  if (tab.perm) return hasPermission(tab.perm);
+  return true;
+};
+// Auto-redirect away from restricted tabs — must be BEFORE conditional return
+useEffect(() => {
+  const cur = TABS.find(t => t.id === activeTab);
+  if (cur && !canSeeTab(cur)) setActiveTab('billing');
+}, [activeTab, currentUser]);  // eslint-disable-line react-hooks/exhaustive-deps
+
 // — Auth Screen —
 if (!currentUser) {
 return (
@@ -4588,24 +4609,6 @@ return (
 }
 
 // — Main Render —
-const TABS = [
-  { id: 'dashboard', icon: LayoutDashboard, label: 'Home',     perm: 'viewDashboard' },
-  { id: 'products',  icon: Package,         label: 'Items',    adminOnly: true },
-  { id: 'billing',   icon: ReceiptText,     label: 'Billing' },
-  { id: 'customers', icon: Users,           label: 'Clients',  perm: 'viewCustomers' },
-  { id: 'payments',  icon: Wallet,          label: 'Receipts' },
-  { id: 'admin',     icon: Settings,        label: 'Admin',    adminOnly: true },
-];
-const canSeeTab = (tab) => {
-  if (tab.adminOnly) return isAdmin;
-  if (tab.perm) return hasPermission(tab.perm);
-  return true;
-};
-// Auto-redirect staff away from tabs they can't access
-useEffect(() => {
-  const cur = TABS.find(t => t.id === activeTab);
-  if (cur && !canSeeTab(cur)) setActiveTab('billing');
-}, [activeTab, currentUser]);  // eslint-disable-line react-hooks/exhaustive-deps
 const ctx = {
 isAdmin, hasPermission, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers,
 cities, areas, customerTypes, vehicleTypes,
