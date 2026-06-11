@@ -497,8 +497,8 @@ const handleImageShare = async () => {
   showToast('Generating image…');
 
   const targetW    = isThermal ? 302 : isA5 ? 559 : 794;
-  const imgFileName = getFileName().replace(/\.pdf$/, isThermal ? '.png' : '.jpg');
-  const imgMime    = isThermal ? 'image/png' : 'image/jpeg';
+  const imgFileName = getFileName().replace(/\.pdf$/, '.jpg');
+  const imgMime    = 'image/jpeg';
 
   const withTimeout = (promise, ms) => Promise.race([
     promise,
@@ -515,40 +515,11 @@ const handleImageShare = async () => {
     }
   };
 
-  // ── Thermal: html2canvas (bundled inside html2pdf) at scale:4 ────────────
-  // html-to-image serialises to SVG then scales the canvas — fonts are only
-  // rendered at CSS pixel size and bicubic-upscaled (blurry text).
-  // html2canvas runs its layout engine at scale:4 so characters are genuinely
-  // rasterised at 4× CSS pixel size → crisp, sharp text in the output PNG.
-  if (isThermal) {
-    const clone = element.cloneNode(true);
-    Object.assign(clone.style, {
-      width: targetW + 'px', maxWidth: targetW + 'px', minWidth: targetW + 'px',
-      margin: '0', boxShadow: 'none', background: 'white', overflow: 'visible',
-    });
-    try {
-      const canvas = await withTimeout(
-        html2pdf()
-          .set({ html2canvas: { scale: 4, useCORS: true, backgroundColor: '#ffffff', scrollY: 0, scrollX: 0, width: targetW, windowWidth: targetW, logging: false, letterRendering: true } })
-          .from(clone)
-          .toCanvas()
-          .get('canvas'),
-        30000
-      );
-      const blob = await new Promise((resolve, reject) => {
-        const timer = setTimeout(() => reject(new Error('toBlob timeout')), 20000);
-        canvas.toBlob(b => { clearTimeout(timer); b ? resolve(b) : reject(new Error('toBlob null')); }, 'image/png');
-      });
-      shareBlob(blob);
-    } catch (e) {
-      showToast('Image failed — use Print instead', 'error');
-    }
-    return;
-  }
-
-  // ── A4/A5: html-to-image (SVG foreignObject) with page slicing ───────────
+  // ── html-to-image (SVG foreignObject) — ALL formats ──────────────────────
   // html-to-image must see the element at position:fixed in-viewport;
-  // position:left:-9999px causes blank output in foreignObject rendering.
+  // position:left:-9999px causes blank output in SVG foreignObject rendering.
+  // html2canvas/html2pdf was tried for thermal but produced blank canvases on
+  // mobile — this in-viewport approach is the verified working solution.
   if (!window.htmlToImage) {
     await new Promise((resolve, reject) => {
       const timer = setTimeout(() => reject(new Error('CDN timeout')), 10000);
@@ -566,6 +537,9 @@ const handleImageShare = async () => {
     canvas.toBlob(blob => { clearTimeout(timer); blob ? resolve(blob) : reject(new Error('toBlob null')); }, 'image/jpeg', 0.95);
   });
 
+  // Read height from the already-rendered original BEFORE cloning.
+  // clone.scrollHeight can be 0 when the clone hasn't finished layout yet.
+  const originalH = element.scrollHeight;
   const clone = element.cloneNode(true);
   Object.assign(clone.style, {
     position: 'fixed', top: '0', left: '0',
@@ -573,14 +547,25 @@ const handleImageShare = async () => {
     margin: '0', boxShadow: 'none', zIndex: '-1', background: 'white', overflow: 'visible',
   });
   document.body.appendChild(clone);
-  await new Promise(r => setTimeout(r, 200));
+  await new Promise(r => setTimeout(r, 400));
+  const captureH = clone.scrollHeight > 0 ? clone.scrollHeight : originalH;
 
   try {
+    // Thermal: single tall JPEG — continuous roll, no page slicing needed
+    if (isThermal) {
+      const dataUrl = await withTimeout(window.htmlToImage.toJpeg(clone, {
+        quality: 0.95, pixelRatio: 2, backgroundColor: '#ffffff', height: captureH,
+      }), 30000);
+      if (document.body.contains(clone)) document.body.removeChild(clone);
+      shareBlob(await (await fetch(dataUrl)).blob());
+      return;
+    }
+
     const PIXEL_RATIO = 3;
     const GAP_PX = 20;
 
     const srcCanvas = await withTimeout(window.htmlToImage.toCanvas(clone, {
-      pixelRatio: PIXEL_RATIO, backgroundColor: '#ffffff', height: clone.scrollHeight,
+      pixelRatio: PIXEL_RATIO, backgroundColor: '#ffffff', height: captureH,
     }), 30000);
     if (document.body.contains(clone)) document.body.removeChild(clone);
 
