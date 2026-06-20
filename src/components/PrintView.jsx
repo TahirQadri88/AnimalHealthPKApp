@@ -554,7 +554,7 @@ const handleImageShare = async () => {
     // Thermal: single tall JPEG — continuous roll, no page slicing needed
     if (isThermal) {
       const dataUrl = await withTimeout(window.htmlToImage.toJpeg(clone, {
-        quality: 0.95, pixelRatio: 2, backgroundColor: '#ffffff', height: captureH,
+        quality: 0.95, pixelRatio: 3, backgroundColor: '#ffffff', height: captureH,
       }), 30000);
       if (document.body.contains(clone)) document.body.removeChild(clone);
       shareBlob(await (await fetch(dataUrl)).blob());
