@@ -2,13 +2,13 @@ import { initializeApp } from "firebase/app";
 import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc } from "firebase/firestore";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCT_q3KuVKaQZ_42xYtRa2zhwbw5TZ1DAQ",
-  authDomain: "animalhealthpkapp.firebaseapp.com",
-  projectId: "animalhealthpkapp",
-  storageBucket: "animalhealthpkapp.firebasestorage.app",
-  messagingSenderId: "467600105250",
-  appId: "1:467600105250:web:12e44e1c8d294911a58f7b",
-  measurementId: "G-RS28EF3TKW"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 };
 
 const app = initializeApp(firebaseConfig);

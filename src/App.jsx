@@ -4381,15 +4381,16 @@ return list.some(item => item.name.toLowerCase() === name.toLowerCase() && item.
 
 const handleLogin = async (e) => {
 e.preventDefault();
-if (appUsers.length === 0 && loginForm.name.toLowerCase() === 'tahir' && loginForm.password === '7869') {
-const initUser = { id: Date.now().toString(), name: 'Tahir', password: '7869', role: 'admin' };
+if (appUsers.length === 0) {
+// First run: whoever logs in first becomes the admin — no hardcoded credentials
+const initUser = { id: Date.now().toString(), name: loginForm.name, password: loginForm.password, role: 'admin' };
 await saveToFirebase('app_users', initUser.id, initUser);
 if (expenseCategories.length === 0) {
 const defaultCats = ['Transport', 'Utility Bill', 'Staff Food/Tea', 'Maintenance', 'Other'];
 defaultCats.forEach((cat, i) => saveToFirebase('expenseCategories', Date.now()+i, { id: Date.now()+i, name: cat }));
 }
 setCurrentUser(initUser);
-showToast("Welcome! Clean Database Initialized.");
+showToast("Welcome! Admin account created.");
 return;
 }
 const user = appUsers.find(u => u.name.toLowerCase() === loginForm.name.toLowerCase() && u.password === loginForm.password);
