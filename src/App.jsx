@@ -4382,7 +4382,13 @@ return list.some(item => item.name.toLowerCase() === name.toLowerCase() && item.
 const handleLogin = async (e) => {
 e.preventDefault();
 if (appUsers.length === 0) {
-// First run: whoever logs in first becomes the admin — no hardcoded credentials
+// First run: only allowed if the password matches the setup secret from .env
+// This prevents anyone who copies the code from bootstrapping their own instance
+const setupSecret = import.meta.env.VITE_SETUP_SECRET;
+if (!setupSecret || loginForm.password !== setupSecret) {
+showToast("Invalid Credentials", "error");
+return;
+}
 const initUser = { id: Date.now().toString(), name: loginForm.name, password: loginForm.password, role: 'admin' };
 await saveToFirebase('app_users', initUser.id, initUser);
 if (expenseCategories.length === 0) {
