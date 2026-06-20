@@ -1,0 +1,24 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── CURRENT STATE (custom auth — no Firebase Auth yet) ────────────────
+    // The app manages login itself (username/password stored in Firestore).
+    // Firestore rules cannot verify custom logins, so the database must stay
+    // readable/writable by anyone who has the API key.
+    //
+    // WHAT PROTECTS YOU RIGHT NOW:
+    //   • Restrict your Firebase API key to your domain only (Google Cloud Console)
+    //     so the key only works on animalhealthpkapp.web.app — not from curl/Postman.
+    //   • See: https://console.cloud.google.com/apis/credentials
+    //
+    // FUTURE (when Firebase Authentication is added):
+    //   Replace the rule below with:
+    //     allow read, write: if request.auth != null;
+    //   That will lock the DB to authenticated users only.
+
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}

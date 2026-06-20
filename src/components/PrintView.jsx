@@ -15,24 +15,6 @@ const isThermal = format === 'thermal';
 const isA5 = format === 'a5';
 const printRef = useRef(null);
 const [showPrevBal, setShowPrevBal] = useState(true);
-const [qrDataUrls, setQrDataUrls] = useState({});
-
-// Generate QR codes locally for any map links on this document
-useEffect(() => {
-  const links = [
-    data?.customerDetails?.map1,
-    data?.customerDetails?.map2,
-  ].filter(Boolean);
-  if (!links.length) return;
-  import('qrcode').then(mod => {
-    const QRCode = mod.default || mod;
-    links.forEach(link => {
-      QRCode.toDataURL(link, { width: 128, margin: 1, color: { dark: '#000000', light: '#ffffff' } })
-        .then(url => setQrDataUrls(prev => ({ ...prev, [link]: url })));
-    });
-  });
-}, [data?.customerDetails?.map1, data?.customerDetails?.map2]);
-
 // Keyboard: Escape closes the print view
 useEffect(() => {
   const onKey = (e) => { if (e.key === 'Escape') setPrintConfig(null); };
@@ -116,7 +98,27 @@ const getShareCaption = () => {
   if (!data) return getFileName().replace(/\.[^.]+$/, '');
   if (docType === 'invoice') return `Invoice #${data.id} for ${data.customerName} — Rs. ${(data.total || 0).toLocaleString('en-US')} | ${formatDateDisp(data.date)}`;
   if (docType === 'estimate') return `Price Estimate ${data.id} for ${data.customerName} | ${formatDateDisp(data.date)}`;
-  if (docType === 'dispatch') return `Dispatch Note #${data.id} for ${data.customerName} | ${formatDateDisp(data.date)}`;
+  if (docType === 'dispatch') {
+    const _key     = data.deliveryAddressKey || 'address1';
+    const _addr    = _key === 'address2' ? data.customerDetails?.address2 : data.customerDetails?.address1;
+    const _map     = _key === 'address2' ? data.customerDetails?.map2   : data.customerDetails?.map1;
+    const _contact = data.customerDetails?.contactPerson;
+    const _phone   = data.customerDetails?.phone;
+    // Extract URL from address text if map field not stored separately
+    const embeddedUrl = _addr ? (_addr.match(/https?:\/\/\S+/i) || [])[0] : null;
+    const mapLink = _map || embeddedUrl || null;
+    // Strip URLs from address, collapse newlines to ", ", clean trailing punctuation
+    const addrClean = _addr
+      ? _addr.replace(/https?:\/\/\S+/gi, '').replace(/[\r\n]+/g, ', ').replace(/,\s*,/g, ',').replace(/,\s*$/, '').trim()
+      : '';
+    let caption = `Dispatch Note #${data.id} for ${data.customerName} | ${formatDateDisp(data.date)}`;
+    if (_contact && _phone) caption += `\n\n👤 ${_contact}: ${_phone}`;
+    else if (_contact)      caption += `\n\n👤 ${_contact}`;
+    else if (_phone)        caption += `\n\n👤 ${_phone}`;
+    if (addrClean) caption += `\n\nAddress: ${addrClean}.`;
+    if (mapLink)   caption += `\n\nLocation: ${mapLink}`;
+    return caption;
+  }
   if (docType === 'receipt') return `Payment Receipt ${data.id} — Rs. ${(data.receivedAmount || 0).toLocaleString('en-US')} received from ${data.customerName}`;
   if (docType === 'creditnote') return `Credit Note ${data.id} for ${data.customerName} — Rs. ${(data.total || 0).toLocaleString('en-US')}`;
   if (docType === 'ledger') return `Account Statement: ${data.customerName} | ${formatDateDisp(data.dateRange?.start)} – ${formatDateDisp(data.dateRange?.end)}`;
@@ -341,8 +343,6 @@ const buildHtmlDoc = () => {
         border-color:#000!important;
         box-shadow:none!important;
         text-shadow:none!important;
-        -webkit-font-smoothing:none!important;
-        font-smooth:never!important;
       }
       [data-dk],[data-dk] *{color:white!important;}
     }` : ''}
@@ -490,14 +490,36 @@ const handlePDF = () => {
   }, 300);
 };
 
-// ── Image (PNG) Share — uses html2canvas, no pdf library needed ───────────
+// ── Image Share ───────────────────────────────────────────────────────────
 const handleImageShare = async () => {
   const element = document.getElementById('print-document');
   if (!element) { showToast('Document not found', 'error'); return; }
   showToast('Generating image…');
 
-  // Load html-to-image — uses browser-native SVG foreignObject rendering,
-  // not a JS CSS reimplementation, so all CSS properties work correctly.
+  const targetW    = isThermal ? 302 : isA5 ? 559 : 794;
+  const imgFileName = getFileName().replace(/\.pdf$/, '.jpg');
+  const imgMime    = 'image/jpeg';
+
+  const withTimeout = (promise, ms) => Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error('Rendering timed out')), ms)),
+  ]);
+
+  const shareBlob = async (blob) => {
+    const file = new File([blob], imgFileName, { type: imgMime });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      navigator.share({ files: [file], title: imgFileName.replace(/\.[^.]+$/, ''), text: getShareCaption() })
+        .catch(e => { if (e.name !== 'AbortError') downloadImageFallback(blob, imgFileName); });
+    } else {
+      downloadImageFallback(blob, imgFileName);
+    }
+  };
+
+  // ── html-to-image (SVG foreignObject) — ALL formats ──────────────────────
+  // html-to-image must see the element at position:fixed in-viewport;
+  // position:left:-9999px causes blank output in SVG foreignObject rendering.
+  // html2canvas/html2pdf was tried for thermal but produced blank canvases on
+  // mobile — this in-viewport approach is the verified working solution.
   if (!window.htmlToImage) {
     await new Promise((resolve, reject) => {
       const timer = setTimeout(() => reject(new Error('CDN timeout')), 10000);
@@ -509,19 +531,15 @@ const handleImageShare = async () => {
     }).catch(() => { showToast('Image library failed to load. Check internet connection.', 'error'); });
     if (!window.htmlToImage) return;
   }
-  const withTimeout = (promise, ms) => Promise.race([
-    promise,
-    new Promise((_, reject) => setTimeout(() => reject(new Error('Rendering timed out')), ms)),
-  ]);
+
   const toBlob = (canvas) => new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('toBlob timeout')), 20000);
     canvas.toBlob(blob => { clearTimeout(timer); blob ? resolve(blob) : reject(new Error('toBlob null')); }, 'image/jpeg', 0.95);
   });
 
-  // Clone the element and position it within the viewport at z-index:-1.
-  // html-to-image uses SVG foreignObject and cannot render elements at left:-9999px;
-  // position:fixed at top:0 left:0 keeps it in-viewport while hidden behind the app UI.
-  const targetW = isThermal ? 302 : isA5 ? 559 : 794;
+  // Read height from the already-rendered original BEFORE cloning.
+  // clone.scrollHeight can be 0 when the clone hasn't finished layout yet.
+  const originalH = element.scrollHeight;
   const clone = element.cloneNode(true);
   Object.assign(clone.style, {
     position: 'fixed', top: '0', left: '0',
@@ -529,53 +547,33 @@ const handleImageShare = async () => {
     margin: '0', boxShadow: 'none', zIndex: '-1', background: 'white', overflow: 'visible',
   });
   document.body.appendChild(clone);
-  await new Promise(r => setTimeout(r, 200));
-
-  const imgFileName = getFileName().replace(/\.pdf$/, '.jpg');
-
-  const shareBlob = async (blob) => {
-    const file = new File([blob], imgFileName, { type: 'image/jpeg' });
-    if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      navigator.share({ files: [file], title: imgFileName.replace(/\.jpg$/, ''), text: getShareCaption() })
-        .catch(e => { if (e.name !== 'AbortError') downloadImageFallback(blob, imgFileName); });
-    } else {
-      downloadImageFallback(blob, imgFileName);
-    }
-  };
+  await new Promise(r => setTimeout(r, 400));
+  const captureH = clone.scrollHeight > 0 ? clone.scrollHeight : originalH;
 
   try {
-    // For thermal: single tall image (continuous paper — no pagination)
+    // Thermal: single tall JPEG — continuous roll, no page slicing needed
     if (isThermal) {
       const dataUrl = await withTimeout(window.htmlToImage.toJpeg(clone, {
-        quality: 0.95, pixelRatio: 3, backgroundColor: '#ffffff', height: clone.scrollHeight,
+        quality: 0.95, pixelRatio: 3, backgroundColor: '#ffffff', height: captureH,
       }), 30000);
       if (document.body.contains(clone)) document.body.removeChild(clone);
       shareBlob(await (await fetch(dataUrl)).blob());
       return;
     }
 
-    // For A4/A5: capture to canvas then slice into page-sized sections.
-    // Each slice is separated by a slate-200 gap so the output looks like
-    // a stack of pages — matching what the PDF and print outputs produce.
     const PIXEL_RATIO = 3;
-    const GAP_PX = 20; // gap between pages (in output-canvas pixels)
+    const GAP_PX = 20;
 
     const srcCanvas = await withTimeout(window.htmlToImage.toCanvas(clone, {
-      pixelRatio: PIXEL_RATIO,
-      backgroundColor: '#ffffff',
-      height: clone.scrollHeight,
+      pixelRatio: PIXEL_RATIO, backgroundColor: '#ffffff', height: captureH,
     }), 30000);
     if (document.body.contains(clone)) document.body.removeChild(clone);
 
-    // Page height in output-canvas pixels (aspect ratio of A5 or A4)
-    const pageHeightPx = Math.round(
-      (isA5 ? (210 / 148) : (297 / 210)) * srcCanvas.width
-    );
+    const pageHeightPx = Math.round((isA5 ? (210 / 148) : (297 / 210)) * srcCanvas.width);
     const totalH = srcCanvas.height;
     const pageCount = Math.ceil(totalH / pageHeightPx);
 
     if (pageCount <= 1) {
-      // Single page — convert directly (no gap needed)
       const out = document.createElement('canvas');
       out.width = srcCanvas.width; out.height = totalH;
       out.getContext('2d').drawImage(srcCanvas, 0, 0);
@@ -583,24 +581,20 @@ const handleImageShare = async () => {
       return;
     }
 
-    // Multi-page: stitch slices with a visible gap
     const compositeH = totalH + (pageCount - 1) * GAP_PX;
     const out = document.createElement('canvas');
-    out.width = srcCanvas.width;
-    out.height = compositeH;
+    out.width = srcCanvas.width; out.height = compositeH;
     const ctx = out.getContext('2d');
-    ctx.fillStyle = '#e2e8f0'; // slate-200 page-gap colour
+    ctx.fillStyle = '#e2e8f0';
     ctx.fillRect(0, 0, out.width, compositeH);
-
     for (let i = 0; i < pageCount; i++) {
       const srcY = i * pageHeightPx;
       const sliceH = Math.min(pageHeightPx, totalH - srcY);
-      const dstY  = i * (pageHeightPx + GAP_PX);
+      const dstY = i * (pageHeightPx + GAP_PX);
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, dstY, out.width, sliceH);
       ctx.drawImage(srcCanvas, 0, srcY, srcCanvas.width, sliceH, 0, dstY, out.width, sliceH);
     }
-
     shareBlob(await toBlob(out));
 
   } catch (e) {
@@ -810,10 +804,11 @@ return (
             {data.customerName || 'Unknown'}
           </div>
           {docType === 'dispatch' && data.customerDetails && (
-            <div style={{ marginTop: '6px', fontSize: sz('8.5px','10px','11px'), color: '#334155', background: '#f8fafc', padding: '6px 8px', borderRadius: '6px', border: '1px solid #e2e8f0', lineHeight: 1.6 }}>
+            <div style={{ marginTop: '6px', fontSize: sz('8.5px','10px','11px'), color: '#334155', background: '#f8fafc', padding: '8px 10px', borderRadius: '6px', border: '1px solid #e2e8f0', lineHeight: 1.7, display: 'flex', flexDirection: 'column', gap: sz('4px','5px','6px') }}>
               {(data.customerDetails.contactPerson || data.customerDetails.phone) && (
-                <div><strong>{data.customerDetails.contactPerson || 'N/A'}</strong>
-                  {data.customerDetails.phone ? ` · ${data.customerDetails.phone}` : ''}
+                <div style={{ fontWeight: 700 }}>
+                  {data.customerDetails.contactPerson || 'N/A'}
+                  {data.customerDetails.phone && <span style={{ fontWeight: 400, color: '#64748b' }}> · {data.customerDetails.phone}</span>}
                 </div>
               )}
               {(() => {
@@ -821,20 +816,10 @@ return (
                 const addr = useKey === 'address2' ? data.customerDetails.address2 : data.customerDetails.address1;
                 const mapLink = useKey === 'address2' ? data.customerDetails.map2 : data.customerDetails.map1;
                 return (<>
-                  {addr && <div style={{ marginTop: '2px' }}>{addr}</div>}
+                  {addr && <div style={{ color: '#334155' }}>{addr}</div>}
                   {mapLink && (
-                    <div style={{ marginTop: '6px', display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
-                      {qrDataUrls[mapLink] && (
-                        <img
-                          src={qrDataUrls[mapLink]}
-                          alt="Map QR"
-                          style={{ width: sz('48px','56px','64px'), height: sz('48px','56px','64px'), flexShrink: 0, border: '1px solid #e2e8f0', borderRadius: '4px' }}
-                        />
-                      )}
-                      <div style={{ fontSize: sz('7px','7.5px','8px'), color: '#6366f1', wordBreak: 'break-all', lineHeight: 1.5, minWidth: 0 }}>
-                        <div style={{ fontWeight: 800, color: '#4f46e5', marginBottom: '2px', fontSize: sz('7.5px','8px','8.5px') }}>Scan for Location</div>
-                        {mapLink}
-                      </div>
+                    <div style={{ fontSize: sz('7.5px','8.5px','9px'), color: '#6366f1', wordBreak: 'break-all', lineHeight: 1.6 }}>
+                      🗺 {mapLink}
                     </div>
                   )}
                 </>);
@@ -955,6 +940,45 @@ return (
                   Rs. {(data.stats?.netProfit || 0).toLocaleString('en-US')}
                 </span>
               </div>
+            </div>
+          </div>
+        ) : data.view === 'Insights' ? (
+          <div className="keep-together" style={{ border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden' }}>
+            <div style={{ background: '#1e293b', color: 'white', padding: sz('8px 12px','10px 16px','12px 20px'), fontSize: sz('9px','10px','11px'), fontWeight: 800, letterSpacing: '1px', textTransform: 'uppercase' }}>
+              P&L Insights Report
+            </div>
+            <div style={{ padding: sz('12px','16px','20px') }}>
+              {(data.rows || []).map((row, i) => {
+                const item = row['P&L Item'] || '';
+                const amt = row['Amount (Rs)'];
+                const note = row['Notes'] || '';
+                const isNetProfit = item === 'Net Profit';
+                const isGrossProfit = item === 'Gross Profit';
+                const isHeader = isNetProfit || isGrossProfit;
+                const hasAmt = amt !== '' && amt !== undefined && amt !== null;
+                return (
+                  <div key={i} style={{
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    padding: sz('4px 0','5px 0','6px 0'),
+                    borderTop: isNetProfit ? '2.5px solid #1e293b' : isGrossProfit ? '1px solid #e2e8f0' : 'none',
+                    marginTop: isHeader ? sz('4px','6px','8px') : 0,
+                    paddingTop: isHeader ? sz('6px','8px','10px') : sz('4px','5px','6px'),
+                    fontWeight: isHeader ? 800 : 500,
+                    fontSize: isNetProfit ? sz('11px','13px','15px') : sz('8.5px','9.5px','10.5px'),
+                    borderBottom: '1px solid #f8fafc',
+                  }}>
+                    <span style={{ color: '#475569' }}>{item}</span>
+                    <div style={{ textAlign: 'right' }}>
+                      {hasAmt && (
+                        <span style={{ color: isNetProfit ? (Number(amt) >= 0 ? '#059669' : '#dc2626') : isGrossProfit ? '#4f46e5' : Number(amt) < 0 ? '#dc2626' : '#1e293b', fontWeight: isHeader ? 900 : 600 }}>
+                          {Number(amt) < 0 ? '− ' : ''}Rs.{Math.abs(Number(amt)).toLocaleString('en-US')}
+                        </span>
+                      )}
+                      {note && <span style={{ fontSize: sz('7px','7.5px','8px'), color: '#94a3b8', marginLeft: '6px' }}>{note}</span>}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         ) : (

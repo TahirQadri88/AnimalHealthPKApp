@@ -9,7 +9,7 @@ Wallet, Download, Upload, TrendingDown, Filter, ArrowUpDown, Award, CreditCard,
 FileDown, BookOpen, ShoppingCart, Tag, Building2, BarChart2, PieChart, Activity,
 Percent, Hash, Zap, Archive, RefreshCw, Eye, EyeOff, ChevronDown, ChevronUp,
 AlignLeft, Bell, Star, Layers, Globe, PhoneCall, MapPin, Briefcase, ClipboardList, Copy,
-RotateCcw, FileText, Database
+RotateCcw, FileText, Database, Clock
 } from 'lucide-react';
 import { db, collection, onSnapshot, doc, setDoc, deleteDoc } from './firebase';
 import { APP_NAME, VEHICLES, getPKTDate, getLocalDateStr, formatDateDisp, checkDateFilter, exportToCSV, shareOrDownload } from './helpers';
@@ -122,22 +122,54 @@ return (
 const UserModal = () => {
 const { editingUser, appUsers, checkDuplicate, saveToFirebase, showToast, setShowUserModal } = useContext(AppContext);
 const isEdit = !!editingUser;
-const [form, setForm] = useState(isEdit ? editingUser : { name: '', password: '', role: 'staff' });
+const [form, setForm] = useState(isEdit ? editingUser : { name: '', password: '', role: 'staff', permissions: {} });
+const setPermission = (key, val) => setForm(f => ({ ...f, permissions: { ...(f.permissions || {}), [key]: val } }));
 const save = async () => {
 if (!form.name || !form.password) return showToast("Name and Password are required", "error");
 if (checkDuplicate(appUsers, form.name, form.id)) return showToast("Username already exists", "error");
 const id = isEdit ? form.id : Date.now().toString();
-await saveToFirebase('app_users', id, { ...form, id });
+// Admin role gets no permissions object (full access via role check)
+const toSave = form.role === 'admin' ? { ...form, id, permissions: {} } : { ...form, id };
+await saveToFirebase('app_users', id, toSave);
 showToast(isEdit ? "User Updated" : "User Added");
 setShowUserModal(false);
 };
 const inputClass = "w-full p-3.5 bg-white border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-sm text-slate-800 placeholder-slate-400";
+const PERMS = [
+  { key: 'viewAllInvoices',  label: 'View All Invoices',     desc: 'See invoices from all staff (default: own only)' },
+  { key: 'viewDashboard',    label: 'Home Dashboard',        desc: 'Revenue summary & business overview' },
+  { key: 'viewCustomers',    label: 'Customer List',         desc: 'Browse all customers & outstanding balances' },
+  { key: 'receivePayments',  label: 'Receive Payments',      desc: 'Record new customer payments in Receipts tab' },
+  { key: 'collectOnBill',    label: 'Collect on Invoice',    desc: 'Record payment received while creating an invoice' },
+  { key: 'editOwnInvoices',  label: 'Edit Own Invoices',     desc: 'Edit or delete invoices they personally created' },
+  { key: 'issueInvoices',    label: 'Issue / Convert Docs',  desc: 'Convert estimates to orders or finalize as invoices' },
+  { key: 'salesReturns',     label: 'Sales Returns',         desc: 'Issue credit notes and process product returns' },
+  { key: 'viewLedger',       label: 'Customer Ledger',       desc: 'View full account statement for any customer' },
+  { key: 'addCustomers',     label: 'Add Customers',         desc: 'Register new customers while billing' },
+  { key: 'addEditProducts',  label: 'Add / Edit Products',   desc: 'Quick-register products from the billing screen' },
+];
 return (
 <ModalWrapper title={isEdit ? "Edit Team Member" : "Add Team Member"} onClose={() => setShowUserModal(false)}>
 <form onSubmit={e => { e.preventDefault(); save(); }} className="space-y-4">
 <div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Full Name / Username</label><input className={inputClass} value={form.name} onChange={e=>setForm({...form, name: e.target.value})} placeholder="e.g. Ali Raza" /></div>
 <div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Login Password</label><input type="text" className={inputClass} value={form.password} onChange={e=>setForm({...form, password: e.target.value})} placeholder="Set Password" /></div>
-<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">System Permissions</label><select className={inputClass} value={form.role} onChange={e=>setForm({...form, role: e.target.value})}><option value="staff">Sales Staff (Hidden Costs & Profits)</option><option value="admin">Administrator (Full Access)</option></select></div>
+<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Role</label><select className={inputClass} value={form.role} onChange={e=>setForm({...form, role: e.target.value})}><option value="staff">Sales Staff (Restricted)</option><option value="admin">Administrator (Full Access)</option></select></div>
+{form.role === 'staff' && (
+<div>
+  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-2 block">Additional Access <span className="text-slate-400 normal-case font-medium">(all off = invoices & receipts only)</span></label>
+  <div className="space-y-2">
+    {PERMS.map(({ key, label, desc }) => (
+      <label key={key} className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors border border-slate-100">
+        <input type="checkbox" checked={!!(form.permissions?.[key])} onChange={e => setPermission(key, e.target.checked)} className="w-4 h-4 accent-indigo-600 shrink-0" />
+        <div>
+          <p className="text-sm font-semibold text-slate-700 leading-tight">{label}</p>
+          <p className="text-[10px] text-slate-400 mt-0.5">{desc}</p>
+        </div>
+      </label>
+    ))}
+  </div>
+</div>
+)}
 <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 rounded-xl mt-4 shadow-md shadow-indigo-600/20 active:scale-[0.98] transition-all">Save User Record</button>
 </form>
 </ModalWrapper>
@@ -827,14 +859,27 @@ return (
 
 // — Tabs —
 const DashboardTab = () => {
-const { isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, analyticsView, setAnalyticsView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, productPreFill, setProductPreFill, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig, showConfirm } = useContext(AppContext);
+const { isAdmin, hasPermission, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, analyticsView, setAnalyticsView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, productPreFill, setProductPreFill, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig, showConfirm } = useContext(AppContext);
 const [dateFilter, setDateFilter] = useState('This Month');
 const [activitySearch, setActivitySearch] = useState('');
-const filteredInvoices = invoices.filter(o => o.status === 'Billed' && checkDateFilter(o.date, dateFilter));
+// Staff without viewAllInvoices only see their own invoices on the dashboard
+const ownOnly = !isAdmin && !currentUser?.permissions?.viewAllInvoices;
+const visibleInvoices = ownOnly ? invoices.filter(o => String(o.salespersonId) === String(currentUser?.id)) : invoices;
+const filteredInvoices = visibleInvoices.filter(o => o.status === 'Billed' && checkDateFilter(o.date, dateFilter));
 const filteredExpenses = expenses.filter(e => checkDateFilter(e.date, dateFilter));
 const revenue = filteredInvoices.reduce((sum, o) => sum + o.total, 0);
 const totalReceivables = customers.reduce((sum, c) => sum + getCustomerBalance(c.id), 0);
 const totalExpenses = filteredExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
+const todayStr = getLocalDateStr();
+const todayInvoices = visibleInvoices.filter(o => o.status === 'Billed' && o.date === todayStr);
+const todayRevenue = todayInvoices.reduce((s,o)=>s+o.total,0);
+const todayCollected = payments.filter(p => p.date === todayStr).reduce((s,p)=>s+Number(p.amount||0),0);
+const thisMonth = todayStr.slice(0,7);
+const mo = parseInt(thisMonth.slice(5,7)), yr = parseInt(thisMonth.slice(0,4));
+const lastMonth = mo === 1 ? `${yr-1}-12` : `${yr}-${String(mo-1).padStart(2,'0')}`;
+const thisMonthRevenue = invoices.filter(o=>o.status==='Billed'&&o.date.startsWith(thisMonth)).reduce((s,o)=>s+o.total,0);
+const lastMonthRevenue = invoices.filter(o=>o.status==='Billed'&&o.date.startsWith(lastMonth)).reduce((s,o)=>s+o.total,0);
+const momChange = lastMonthRevenue > 0 ? ((thisMonthRevenue - lastMonthRevenue)/lastMonthRevenue*100).toFixed(1) : null;
 const topStats = useMemo(() => {
 const byProduct = {};
 filteredInvoices.forEach(o => {
@@ -861,13 +906,14 @@ const topReceivables = useMemo(() => {
 }, [customers, invoices, payments]);
 
 // Recent activity: merge invoices + payments, sort by date desc, take 8
+// Uses visibleInvoices so staff only see their own activity
 const recentActivity = useMemo(() => {
-  const invEntries = invoices.filter(o => checkDateFilter(o.date, dateFilter)).map(o => ({
+  const invEntries = visibleInvoices.filter(o => checkDateFilter(o.date, dateFilter)).map(o => ({
     id: o.id, date: o.date, customerName: o.customerName, amount: o.total,
     kind: o.status === 'Billed' ? 'invoice' : o.status === 'Estimate' ? 'estimate' : o.status === 'CreditNote' ? 'creditnote' : 'draft',
     paymentStatus: o.paymentStatus, raw: o
   }));
-  const payEntries = payments.filter(p => checkDateFilter(p.date, dateFilter)).map(p => ({
+  const payEntries = (ownOnly ? [] : payments).filter(p => checkDateFilter(p.date, dateFilter)).map(p => ({
     id: p.id, date: p.date,
     customerName: customers.find(c => c.id === p.customerId)?.name || 'Unknown',
     amount: Number(p.amount), kind: 'payment', note: p.note, raw: p
@@ -875,7 +921,7 @@ const recentActivity = useMemo(() => {
   return [...invEntries, ...payEntries]
     .sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id))
     .slice(0, 8);
-}, [invoices, payments, customers, dateFilter]);
+}, [visibleInvoices, payments, customers, dateFilter, ownOnly]);
 
 return (
 <div className="h-full overflow-y-auto">
@@ -887,11 +933,30 @@ return (
 <select value={dateFilter} onChange={e => setDateFilter(e.target.value)} className="bg-transparent font-bold text-xs text-slate-700 outline-none cursor-pointer"><option>Today</option><option>This Week</option><option>This Month</option><option>This Year</option><option>All Time</option></select>
 </div>
 </div>
-<div className="grid grid-cols-2 gap-4">
-<div className="bg-gradient-to-br from-indigo-600 to-indigo-800 text-white p-5 rounded-2xl shadow-lg shadow-indigo-600/20">
-<p className="text-[10px] uppercase font-bold text-indigo-100 flex items-center gap-1.5 tracking-wider"><TrendingUp size={14}/> {dateFilter} Sales</p>
-<p className="text-xl sm:text-2xl font-black mt-2 tracking-tight">Rs. {revenue.toLocaleString('en-US')}</p>
+
+{/* Today's Summary Bar */}
+<div className="bg-slate-800 text-white rounded-2xl px-4 py-3 flex justify-between items-center gap-3 flex-wrap shadow-sm">
+  <div className="flex items-center gap-1.5">
+    <ReceiptText size={14} className="text-indigo-300 shrink-0"/>
+    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Today</span>
+    <span className="text-sm font-extrabold text-white ml-1">{todayInvoices.length} bill{todayInvoices.length!==1?'s':''}</span>
+    {todayRevenue > 0 && <span className="text-sm font-bold text-indigo-300">· Rs.{todayRevenue.toLocaleString('en-US')}</span>}
+  </div>
+  <div className="w-px h-5 bg-slate-600 shrink-0 hidden sm:block"/>
+  <div className="flex items-center gap-1.5">
+    <Wallet size={14} className="text-emerald-300 shrink-0"/>
+    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Collected today</span>
+    <span className={`text-sm font-extrabold ml-1 ${todayCollected > 0 ? 'text-emerald-300' : 'text-slate-500'}`}>Rs.{todayCollected.toLocaleString('en-US')}</span>
+  </div>
 </div>
+
+<div className={`grid gap-4 ${isAdmin ? 'grid-cols-2' : 'grid-cols-1'}`}>
+<div className="bg-gradient-to-br from-indigo-600 to-indigo-800 text-white p-5 rounded-2xl shadow-lg shadow-indigo-600/20">
+<p className="text-[10px] uppercase font-bold text-indigo-100 flex items-center gap-1.5 tracking-wider"><TrendingUp size={14}/> {dateFilter} {ownOnly ? 'My Sales' : 'Sales'}</p>
+<p className="text-xl sm:text-2xl font-black mt-2 tracking-tight">Rs. {revenue.toLocaleString('en-US')}</p>
+{momChange !== null && <p className={`text-[10px] font-bold mt-1 ${Number(momChange)>=0?'text-emerald-300':'text-rose-300'}`}>{Number(momChange)>=0?'▲':'▼'} {Math.abs(momChange)}% vs last month</p>}
+</div>
+{isAdmin && (
 <button onClick={() => { setSelectedLedgerId(null); setShowLedgerModal(false); setActiveTab('customers'); }} className="bg-gradient-to-br from-rose-500 to-rose-600 text-white p-5 rounded-2xl shadow-lg shadow-rose-500/20 text-left w-full">
 <p className="text-[10px] uppercase font-bold text-rose-100 flex items-center gap-1.5 tracking-wider">
   <DollarSign size={14}/> Receivables
@@ -899,10 +964,11 @@ return (
 </p>
 <p className="text-xl sm:text-2xl font-black mt-2 tracking-tight">Rs. {totalReceivables.toLocaleString('en-US')}</p>
 </button>
+)}
 </div>
 
-{/* Receivables Quick View */}
-{topReceivables.length > 0 && (
+{/* Receivables Quick View — admin only (shows all customers' balances) */}
+{isAdmin && topReceivables.length > 0 && (
 <div className="bg-white border border-rose-100 rounded-2xl shadow-sm overflow-hidden">
   <div className="flex justify-between items-center px-4 pt-4 pb-2">
     <h3 className="text-[11px] font-bold text-rose-700 uppercase tracking-widest flex items-center gap-1.5">
@@ -913,7 +979,7 @@ return (
   </div>
   <div className="divide-y divide-rose-50">
     {topReceivables.map(c => (
-      <button key={c.id} onClick={() => { setSelectedLedgerId(c.id); setShowLedgerModal(true); }} className="w-full flex justify-between items-center px-4 py-3 hover:bg-rose-50 transition-colors text-left">
+      <button key={c.id} onClick={() => hasPermission('viewLedger') && (setSelectedLedgerId(c.id), setShowLedgerModal(true))} className={`w-full flex justify-between items-center px-4 py-3 transition-colors text-left ${hasPermission('viewLedger') ? 'hover:bg-rose-50 cursor-pointer' : 'cursor-default'}`}>
         <div className="flex-1 min-w-0">
           <p className="font-bold text-slate-800 text-sm truncate">{c.name}</p>
           {c.phone && <p className="text-[10px] text-slate-400 mt-0.5">{c.phone}</p>}
@@ -922,7 +988,7 @@ return (
           <p className={`font-extrabold text-sm ${c.balance >= 100000 ? 'text-rose-600' : c.balance >= 50000 ? 'text-amber-600' : 'text-slate-700'}`}>Rs. {c.balance.toLocaleString('en-US')}</p>
           {c.balance >= 100000 && <span className="text-[9px] font-bold text-rose-500 uppercase tracking-wider">High</span>}
         </div>
-        <ChevronRight size={14} className="text-slate-300 ml-2 shrink-0"/>
+        {hasPermission('viewLedger') && <ChevronRight size={14} className="text-slate-300 ml-2 shrink-0"/>}
       </button>
     ))}
   </div>
@@ -997,7 +1063,7 @@ return (
 };
 
 const BillingTab = () => {
-const { isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, productPreFill, setProductPreFill, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig, setShowCreditNoteModal, setEditingCreditNote, showConfirm, riders, vehicleTypes } = useContext(AppContext);
+const { isAdmin, hasPermission, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, productPreFill, setProductPreFill, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig, setShowCreditNoteModal, setEditingCreditNote, showConfirm, riders, vehicleTypes } = useContext(AppContext);
 const [search, setSearch] = useState('');
 const [dateFilter, setDateFilter] = useState('All Time');
 const [statusFilter, setStatusFilter] = useState('All');
@@ -1133,7 +1199,7 @@ return (
     </div>
   )}
 </div>
-<button onClick={() => { setEditingCustomer(null); setShowCustomerModal(true); }} className="p-3 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-xl font-black shrink-0 transition-colors"><Plus size={18}/></button>
+{hasPermission('addCustomers') && <button onClick={() => { setEditingCustomer(null); setShowCustomerModal(true); }} className="p-3 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-xl font-black shrink-0 transition-colors"><Plus size={18}/></button>}
 {currentInvoice.customerId && <button type="button" onClick={() => { setSelectedLedgerId(currentInvoice.customerId); setShowLedgerModal(true); }} className="p-3 bg-slate-100 text-slate-600 hover:bg-slate-200 rounded-xl shrink-0 transition-colors" title="View Customer Ledger"><BookOpen size={18}/></button>}
 </div>
 {currentInvoice.customerId && (() => {
@@ -1172,12 +1238,12 @@ return (
 <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
 <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5"><Package size={12}/> Products{currentInvoice.items.length > 0 && <span className="ml-1 text-indigo-600 font-bold normal-case tracking-normal">{currentInvoice.items.length} SKU{currentInvoice.items.length !== 1 ? 's' : ''} · {currentInvoice.items.reduce((s,i)=>s+(i.quantity||0),0)} units</span>}</h3>
 <div className="flex gap-2 items-center mb-4">
-  <div className="relative flex-1"><Search size={16} className="absolute left-3.5 top-3.5 text-slate-400"/><input ref={prodSearchRef} placeholder="Search to add..." className={`pl-10 ${inputClass}`} value={prodSearch} onChange={e=>{ setProdSearch(e.target.value); setHiProduct(-1); }} onKeyDown={e => { const filtP = products.filter(p => p.available && p.name.toLowerCase().includes(prodSearch.toLowerCase())); if (e.key === 'ArrowDown') { e.preventDefault(); setHiProduct(h => Math.min(h + 1, filtP.length - 1)); } else if (e.key === 'ArrowUp') { e.preventDefault(); setHiProduct(h => Math.max(h - 1, 0)); } else if (e.key === 'Enter') { e.preventDefault(); const p = hiProduct >= 0 ? filtP[hiProduct] : filtP.length === 1 ? filtP[0] : null; if (p) { justAddedRef.current = true; handleAddItem(p, false); setProdSearch(''); setHiProduct(-1); } } else if (e.key === 'Escape') { setProdSearch(''); setHiProduct(-1); } }} /></div>
-  {isAdmin && <button type="button" onClick={() => { setProductPreFill(prodSearch.trim()); setEditingProduct(null); setShowProductModal(true); }} className="flex-shrink-0 flex items-center gap-1 px-3 py-2.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-bold hover:bg-indigo-100 active:scale-95 transition-all" title="Register a new product"><Plus size={14}/> New</button>}
+  <div className="relative flex-1"><Search size={16} className="absolute left-3.5 top-3.5 text-slate-400"/><input ref={prodSearchRef} placeholder="Search to add..." className={`pl-10 ${inputClass}`} value={prodSearch} onChange={e=>{ setProdSearch(e.target.value); setHiProduct(-1); }} onKeyDown={e => { const filtP = products.filter(p => p.available && !p.archived && p.name.toLowerCase().includes(prodSearch.toLowerCase())); if (e.key === 'ArrowDown') { e.preventDefault(); setHiProduct(h => Math.min(h + 1, filtP.length - 1)); } else if (e.key === 'ArrowUp') { e.preventDefault(); setHiProduct(h => Math.max(h - 1, 0)); } else if (e.key === 'Enter') { e.preventDefault(); const p = hiProduct >= 0 ? filtP[hiProduct] : filtP.length === 1 ? filtP[0] : null; if (p) { justAddedRef.current = true; handleAddItem(p, false); setProdSearch(''); setHiProduct(-1); } } else if (e.key === 'Escape') { setProdSearch(''); setHiProduct(-1); } }} /></div>
+  {hasPermission('addEditProducts') && <button type="button" onClick={() => { setProductPreFill(prodSearch.trim()); setEditingProduct(null); setShowProductModal(true); }} className="flex-shrink-0 flex items-center gap-1 px-3 py-2.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-bold hover:bg-indigo-100 active:scale-95 transition-all" title="Register a new product"><Plus size={14}/> New</button>}
 </div>
 {prodSearch && (
 <div className="border border-indigo-200 bg-indigo-50/50 rounded-xl mb-4 max-h-48 overflow-y-auto p-2 space-y-1 shadow-inner">
-{products.filter(p => p.available && p.name.toLowerCase().includes(prodSearch.toLowerCase())).map((p, idx) => (
+{products.filter(p => p.available && !p.archived && p.name.toLowerCase().includes(prodSearch.toLowerCase())).map((p, idx) => (
 <div key={p.id} className={`p-2 rounded-lg shadow-sm border flex justify-between items-center group ${idx === hiProduct ? 'bg-indigo-100 border-indigo-300' : 'bg-white border-indigo-100'}`}>
 <button type="button" className="flex-1 font-semibold text-sm text-slate-800 text-left hover:text-indigo-600 transition-colors" onClick={() => { justAddedRef.current = true; handleAddItem(p, false); setProdSearch(''); setHiProduct(-1); }}><span>{p.name}</span><span className="text-indigo-600 font-bold ml-2">Rs.{p.sellingPrice}</span></button>
 <button onClick={() => handleAddItem(p, true)} className="px-2.5 py-1 text-[10px] bg-emerald-50 text-emerald-600 border border-emerald-100 rounded font-bold hover:bg-emerald-100 transition-colors ml-2">🎁 Bonus</button>
@@ -1270,6 +1336,7 @@ return (
 <div><label className="text-[10px] font-bold text-rose-500 uppercase tracking-wider ml-1 mb-1 block">Driver Exp (-)</label><input type="number" className={inputClass} value={currentInvoice.transportExpense} onChange={e => setCurrentInvoice({...currentInvoice, transportExpense: e.target.value})} /></div>
 <div><label className="text-[10px] font-bold text-amber-600 uppercase tracking-wider ml-1 mb-1 block">Discount (-)</label><input type="number" className={inputClass} value={currentInvoice.discount || ''} placeholder="0" onChange={e => setCurrentInvoice({...currentInvoice, discount: Number(e.target.value) || 0})} /></div>
 </div>
+{hasPermission('collectOnBill') && (
 <div className="mt-4 bg-slate-50 p-3 rounded-xl border border-slate-200">
 <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 block mb-2">Payment Received</label>
 <div className="flex items-center gap-2">
@@ -1277,6 +1344,7 @@ return (
 <button onClick={() => setCurrentInvoice({...currentInvoice, receivedAmount: grandTotal, paymentStatus: 'Paid'})} className="px-4 py-3 bg-indigo-50 text-indigo-700 font-bold rounded-xl text-xs whitespace-nowrap border border-indigo-100">Full Pay</button>
 </div>
 </div>
+)}
 </div>
 <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
 <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5"><AlignLeft size={12}/> Notes / Remarks</h3>
@@ -1298,13 +1366,19 @@ return (
 </div>
 );
 }
-const filtered = invoices.filter(o => (o.customerName.toLowerCase().includes(search.toLowerCase()) || o.id.includes(search)) && checkDateFilter(o.date, dateFilter) && (statusFilter === 'All' || o.status === statusFilter));
+const ownOnly = !isAdmin && !currentUser?.permissions?.viewAllInvoices;
+const filtered = invoices.filter(o =>
+  (!ownOnly || String(o.salespersonId) === String(currentUser?.id)) &&
+  (o.customerName.toLowerCase().includes(search.toLowerCase()) || o.id.includes(search)) &&
+  checkDateFilter(o.date, dateFilter) &&
+  (statusFilter === 'All' || o.status === statusFilter)
+);
 return (
 <div className="p-4 flex flex-col h-full">
 <div className="flex gap-2 mb-4">
 <div className="relative flex-1"><Search className="absolute left-3.5 top-3.5 text-slate-400" size={18} /><input placeholder="Search Invoices..." className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl font-semibold outline-none shadow-sm text-sm" value={search} onChange={e => setSearch(e.target.value)} onKeyDown={e => { if (e.key === 'Escape' && search) { e.stopPropagation(); setSearch(''); } }} /></div>
 {statusFilter === 'CreditNote'
-  ? <button onClick={() => { setEditingCreditNote({ customerId: '', id: '' }); setShowCreditNoteModal(true); }} className="bg-rose-600 hover:bg-rose-700 text-white px-4 py-3 rounded-xl shadow-md font-bold flex items-center gap-1.5 active:scale-95 whitespace-nowrap"><RotateCcw size={16}/> New Return</button>
+  ? hasPermission('salesReturns') && <button onClick={() => { setEditingCreditNote({ customerId: '', id: '' }); setShowCreditNoteModal(true); }} className="bg-rose-600 hover:bg-rose-700 text-white px-4 py-3 rounded-xl shadow-md font-bold flex items-center gap-1.5 active:scale-95 whitespace-nowrap"><RotateCcw size={16}/> New Return</button>
   : <button onClick={startNewInvoice} className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-3 rounded-xl shadow-md font-bold flex items-center gap-1.5 active:scale-95"><Plus size={18}/> New</button>
 }
 </div>
@@ -1318,7 +1392,11 @@ return (
 ))}
 </div>
 <div className="flex-1 overflow-y-auto space-y-3 pb-24 pr-1">
-{filtered.slice().sort((a, b) => (b.date || '').localeCompare(a.date || '')).map(o => (
+{filtered.slice().sort((a, b) => {
+  const d = (b.date||'').localeCompare(a.date||'');
+  if (d !== 0) return d;
+  return (parseInt((b.id||'').replace(/\D/g,''))||0) - (parseInt((a.id||'').replace(/\D/g,''))||0);
+}).map(o => (
 <div key={o.id} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden group hover:border-indigo-200">
 <div className={`absolute top-0 left-0 w-1.5 h-full ${o.status==='CreditNote'?'bg-rose-500':o.status==='Estimate'?'bg-violet-400':o.status==='Billed'?(o.paymentStatus==='Paid'?'bg-emerald-500':'bg-amber-500'):'bg-slate-300'}`}></div>
 <div className="flex justify-between border-b border-slate-100 pb-3 mb-3 pl-3">
@@ -1328,11 +1406,11 @@ return (
 <div className="flex justify-between items-center pl-3">
 <div className="flex items-center gap-2"><span className={`text-[9px] px-2 py-0.5 rounded font-bold uppercase tracking-wider ${o.paymentStatus==='Paid'?'bg-emerald-100 text-emerald-700':o.paymentStatus==='Partial'?'bg-amber-100 text-amber-700':'bg-rose-100 text-rose-700'}`}>{o.paymentStatus}</span></div>
 <div className="flex gap-1.5">
-{o.status === 'Estimate' && isAdmin && <button onClick={async () => { await saveToFirebase('invoices', o.id, {...o, status: 'Booked'}); showToast('Converted to Draft Order'); }} title="Convert to Draft Order" className="p-2 bg-amber-50 text-amber-600 hover:bg-amber-100 border border-amber-200 rounded-lg"><Save size={14}/></button>}
-{(o.status === 'Estimate' || o.status === 'Booked') && isAdmin && <button onClick={async () => { const newId = `INV-${String(getNextSeqNum(invoices, 'INV')).padStart(4, '0')}`; await saveToFirebase('invoices', newId, {...o, id: newId, status: 'Billed', date: getLocalDateStr()}); await deleteFromFirebase('invoices', o.id); showToast(`Converted to Invoice: ${newId}`); }} title="Issue as Invoice" className="p-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-200 rounded-lg"><ReceiptText size={14}/></button>}
-{o.status === 'Billed' && isAdmin && <button onClick={() => { setEditingCreditNote({customerId: o.customerId, id: o.id}); setShowCreditNoteModal(true); }} title="Issue Credit Note / Return" className="p-2 bg-rose-50 text-rose-500 hover:bg-rose-100 border border-rose-200 rounded-lg"><RotateCcw size={14}/></button>}
-<button onClick={() => { setSelectedLedgerId(o.customerId); setShowLedgerModal(true); }} title="Customer Ledger" className="p-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-500 rounded-lg"><BookOpen size={14}/></button>
-{isAdmin && o.status !== 'CreditNote' && <button onClick={() => { setCurrentInvoice(o); setBillingView('form'); }} className="p-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 rounded-lg"><Edit size={16}/></button>}
+{o.status === 'Estimate' && hasPermission('issueInvoices') && <button onClick={async () => { await saveToFirebase('invoices', o.id, {...o, status: 'Booked'}); showToast('Converted to Draft Order'); }} title="Convert to Draft Order" className="p-2 bg-amber-50 text-amber-600 hover:bg-amber-100 border border-amber-200 rounded-lg"><Save size={14}/></button>}
+{(o.status === 'Estimate' || o.status === 'Booked') && hasPermission('issueInvoices') && <button onClick={async () => { const newId = `INV-${String(getNextSeqNum(invoices, 'INV')).padStart(4, '0')}`; await saveToFirebase('invoices', newId, {...o, id: newId, status: 'Billed', date: getLocalDateStr()}); await deleteFromFirebase('invoices', o.id); showToast(`Converted to Invoice: ${newId}`); }} title="Issue as Invoice" className="p-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-200 rounded-lg"><ReceiptText size={14}/></button>}
+{o.status === 'Billed' && hasPermission('salesReturns') && <button onClick={() => { setEditingCreditNote({customerId: o.customerId, id: o.id}); setShowCreditNoteModal(true); }} title="Issue Credit Note / Return" className="p-2 bg-rose-50 text-rose-500 hover:bg-rose-100 border border-rose-200 rounded-lg"><RotateCcw size={14}/></button>}
+{(hasPermission('viewLedger') || String(o.salespersonId) === String(currentUser?.id)) && <button onClick={() => { setSelectedLedgerId(o.customerId); setShowLedgerModal(true); }} title="Customer Ledger" className="p-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-500 rounded-lg"><BookOpen size={14}/></button>}
+{(isAdmin || (hasPermission('editOwnInvoices') && String(o.salespersonId) === String(currentUser?.id))) && o.status !== 'CreditNote' && <button onClick={() => { setCurrentInvoice(o); setBillingView('form'); }} className="p-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 rounded-lg"><Edit size={16}/></button>}
 {isAdmin && <button onClick={async () => { if(await showConfirm(`Delete ${o.id}?`)) await deleteFromFirebase('invoices', o.id); }} title="Delete" className="p-2 bg-rose-50 text-rose-500 hover:bg-rose-100 rounded-lg"><Trash2 size={16}/></button>}
 {o.status === 'Estimate' ? <button onClick={() => setPrintConfig({docType: 'estimate', format: 'a4', data: o})} title="View Estimate" className="p-2 bg-violet-50 text-violet-600 hover:bg-violet-100 rounded-lg"><FileText size={16}/></button> : o.status === 'Booked' ? <><button onClick={() => setPrintConfig({docType: 'dispatch', format: 'thermal', data: o})} title="Dispatch Note" className="p-2 bg-amber-50 text-amber-600 rounded-lg"><Truck size={16}/></button><button onClick={() => setPrintConfig({docType: 'estimate', format: 'a4', data: o})} title="View Order" className="p-2 bg-slate-50 text-slate-600 rounded-lg"><FileText size={16}/></button></> : o.status === 'CreditNote' ? <button onClick={() => setPrintConfig({docType: 'creditnote', format: 'a4', data: o})} title="Print Credit Note" className="p-2 bg-rose-50 text-rose-600 rounded-lg"><FileText size={16}/></button> : <><button onClick={() => setPrintConfig({docType: 'dispatch', format: 'thermal', data: o})} title="Dispatch" className="p-2 bg-amber-50 text-amber-600 rounded-lg"><Truck size={16}/></button><button onClick={() => setPrintConfig({docType: 'invoice', format: 'thermal', data: o})} title="Print" className="p-2 bg-indigo-50 text-indigo-600 rounded-lg"><ReceiptText size={16}/></button></>}
 </div>
@@ -1355,10 +1433,22 @@ return (
 </div>
 <div className="flex-1 overflow-y-auto space-y-3 pb-24 pr-1">
 {products.filter(p => p.name.toLowerCase().includes(search.toLowerCase())).map(p => (
-<div key={p.id} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+<div key={p.id} className={`p-4 rounded-2xl border shadow-sm ${p.archived ? 'bg-amber-50/40 border-amber-200 opacity-75' : 'bg-white border-slate-200'}`}>
 <div className="flex justify-between items-start mb-3">
-<div><h4 className="font-bold text-slate-800 text-base leading-tight">{p.name}</h4><p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mt-1">{getCompanyName(p.companyId)} • {p.unit} ({p.unitsInBox})</p></div>
-{isAdmin && (<div className="flex gap-1.5"><button onClick={() => { setEditingProduct(p); setShowProductModal(true); }} className="p-2 bg-slate-50 text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"><Edit size={16}/></button><button onClick={async () => { if(await showConfirm(`Permanently delete ${p.name}?`)) await deleteFromFirebase('products', p.id); }} className="p-2 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-100 transition-colors"><Trash2 size={16}/></button></div>)}
+<div><h4 className="font-bold text-slate-800 text-base leading-tight">{p.name}{p.archived && <span className="ml-2 px-1.5 py-0.5 text-[9px] font-bold bg-amber-100 text-amber-700 rounded-full uppercase align-middle">Archived</span>}</h4><p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mt-1">{getCompanyName(p.companyId)} • {p.unit} ({p.unitsInBox})</p></div>
+{isAdmin && (<div className="flex gap-1.5"><button onClick={() => { setEditingProduct(p); setShowProductModal(true); }} className="p-2 bg-slate-50 text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"><Edit size={16}/></button>
+{p.archived
+  ? <button onClick={async () => { await saveToFirebase('products', p.id, { ...p, archived: false }); }} className="p-2 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition-colors" title="Unarchive"><RotateCcw size={16}/></button>
+  : <button onClick={async () => {
+      const billCount = invoices.filter(inv => inv.items?.some(it => String(it.productId||it.uniqueId||'') === String(p.id))).length;
+      if (billCount > 0) {
+        const doArchive = await showConfirm(`"${p.name}" is used in ${billCount} bill${billCount>1?'s':''}.\n\nArchive instead? (Hidden from new sales, preserved in history)`);
+        if (doArchive) { await saveToFirebase('products', p.id, { ...p, archived: true, available: false }); return; }
+        if (!await showConfirm(`Permanently delete "${p.name}"? Cannot be undone.`)) return;
+      } else { if (!await showConfirm(`Delete ${p.name}?`)) return; }
+      await deleteFromFirebase('products', p.id);
+    }} className="p-2 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-100 transition-colors"><Trash2 size={16}/></button>
+}</div>)}
 </div>
 <div className="flex justify-between items-end border-t border-slate-100 pt-3 mt-1">
 <div className="flex flex-col"><span className="text-indigo-700 font-extrabold text-lg">Rs. {p.sellingPrice.toLocaleString('en-US')}</span>{isAdmin && <span className="text-slate-400 text-[9px] font-bold uppercase mt-0.5">Cost: Rs. {p.costPrice}</span>}</div>
@@ -1765,23 +1855,35 @@ return (
 
 // ─── Payments / Receipts Tab ───
 const PaymentsTab = () => {
-const { isAdmin, customers, payments, invoices, deleteFromFirebase, saveToFirebase, showToast, setShowPaymentModal, setSelectedCustomerForPayment, setEditingPayment, showConfirm, setPrintConfig, getCustomerLedger, generateReceiptData } = useContext(AppContext);
+const { isAdmin, hasPermission, currentUser, customers, payments, invoices, deleteFromFirebase, saveToFirebase, showToast, setShowPaymentModal, setSelectedCustomerForPayment, setEditingPayment, showConfirm, setPrintConfig, getCustomerLedger, generateReceiptData } = useContext(AppContext);
+const canReceive = hasPermission('receivePayments');
+// Staff without viewAllInvoices only see payments from their own customers.
+// Wrapped in useMemo so the Set reference is stable between renders —
+// allPayments useMemo depends on it and would re-run on every render otherwise.
+const myCustomerIds = useMemo(() => {
+  if (isAdmin || currentUser?.permissions?.viewAllInvoices) return null;
+  return new Set(invoices.filter(inv => String(inv.salespersonId) === String(currentUser?.id)).map(inv => String(inv.customerId)));
+}, [isAdmin, currentUser, invoices]);
 const [search, setSearch] = useState('');
 const [dateFilter, setDateFilter] = useState('This Month');
 const [customerFilter, setCustomerFilter] = useState('');
 const allPayments = useMemo(() => {
-  const standalone = payments.map(p => ({
-    id: p.id, date: p.date, customerId: p.customerId,
-    customerName: customers.find(c => c.id === p.customerId)?.name || 'Unknown',
-    amount: Number(p.amount), note: p.note || 'Payment', type: 'receipt', raw: p
-  }));
-  const invPays = invoices.filter(inv => Number(inv.receivedAmount) > 0).map(inv => ({
-    id: `${inv.id}-PAY`, date: inv.date, customerId: inv.customerId,
-    customerName: inv.customerName, amount: Number(inv.receivedAmount),
-    note: `On Invoice ${inv.id}`, type: 'invoice', raw: inv
-  }));
+  const standalone = payments
+    .filter(p => !myCustomerIds || myCustomerIds.has(String(p.customerId)))
+    .map(p => ({
+      id: p.id, date: p.date, customerId: p.customerId,
+      customerName: customers.find(c => c.id === p.customerId)?.name || 'Unknown',
+      amount: Number(p.amount), note: p.note || 'Payment', type: 'receipt', raw: p
+    }));
+  const invPays = invoices
+    .filter(inv => Number(inv.receivedAmount) > 0 && (!myCustomerIds || myCustomerIds.has(String(inv.customerId))))
+    .map(inv => ({
+      id: `${inv.id}-PAY`, date: inv.date, customerId: inv.customerId,
+      customerName: inv.customerName, amount: Number(inv.receivedAmount),
+      note: `On Invoice ${inv.id}`, type: 'invoice', raw: inv
+    }));
   return [...standalone, ...invPays].sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
-}, [payments, invoices, customers]);
+}, [payments, invoices, customers, myCustomerIds]);
 const filtered = allPayments.filter(p => {
   const matchSearch = !search || p.customerName.toLowerCase().includes(search.toLowerCase()) || p.id.toLowerCase().includes(search.toLowerCase());
   const matchCustomer = !customerFilter || String(p.customerId) === customerFilter;
@@ -1793,7 +1895,7 @@ return (
 <div className="p-4 flex flex-col h-full">
   <div className="flex justify-between items-center mb-4">
     <h2 className="text-2xl font-extrabold text-slate-800 tracking-tight">Receipts</h2>
-    {isAdmin && (
+    {canReceive && (
       <button onClick={() => { setEditingPayment(null); setSelectedCustomerForPayment(null); setShowPaymentModal(true); }}
         className="bg-emerald-500 text-white px-3 py-2.5 rounded-xl shadow-md font-bold flex items-center gap-1.5 text-xs active:scale-95 transition-all">
         <Plus size={16}/> New Receipt
@@ -1862,11 +1964,19 @@ return (
 };
 
 // ─── Company Manager sub-component ───
-const CompanyManager = () => {
-const { companies, saveToFirebase, deleteFromFirebase, showToast, checkDuplicate } = useContext(AppContext);
+const CompanyManager = ({ search = '' }) => {
+const { companies, products, saveToFirebase, deleteFromFirebase, showToast, checkDuplicate, showConfirm } = useContext(AppContext);
 const [newName, setNewName] = useState('');
 const [editingId, setEditingId] = useState(null);
 const [editVal, setEditVal] = useState('');
+const [mergeFrom, setMergeFrom] = useState(null); // company being deleted
+const [mergeTo, setMergeTo]   = useState('');     // target company id
+const [expandedId, setExpandedId] = useState(null); // company whose products are shown
+
+const companyProducts = (companyId) => products.filter(p => p.companyId === companyId);
+const productCount = (companyId) => companyProducts(companyId).length;
+const filtered = companies.filter(c => !search || c.name.toLowerCase().includes(search.toLowerCase()));
+
 const add = async () => {
   if (!newName.trim()) return;
   if (checkDuplicate(companies, newName)) return showToast("Company already exists", "error");
@@ -1876,8 +1986,30 @@ const add = async () => {
 };
 const saveEdit = async (item) => {
   if (!editVal.trim()) return;
+  if (checkDuplicate(companies, editVal.trim(), item.id)) return showToast("Name already used by another company", "error");
   await saveToFirebase('companies', item.id, { ...item, name: editVal.trim() });
   setEditingId(null); showToast("Company updated");
+};
+const startDelete = (c) => {
+  const count = productCount(c.id);
+  if (count === 0) {
+    showConfirm(`Delete "${c.name}"? It has no products.`).then(ok => {
+      if (ok) deleteFromFirebase('companies', c.id).then(() => showToast("Company deleted"));
+    });
+  } else {
+    setMergeFrom(c);
+    setMergeTo('');
+  }
+};
+const doMerge = async () => {
+  if (!mergeTo) return showToast("Select a company to reassign products to", "error");
+  const affected = products.filter(p => p.companyId === mergeFrom.id);
+  for (const p of affected) {
+    await saveToFirebase('products', p.id, { ...p, companyId: Number(mergeTo) });
+  }
+  await deleteFromFirebase('companies', mergeFrom.id);
+  showToast(`${affected.length} product${affected.length !== 1 ? 's' : ''} reassigned — "${mergeFrom.name}" deleted`);
+  setMergeFrom(null);
 };
 return (
 <div className="space-y-2">
@@ -1885,30 +2017,67 @@ return (
     <input type="text" placeholder="New company name..." className="flex-1 p-2.5 bg-white border border-slate-200 rounded-xl font-semibold outline-none focus:border-indigo-500 text-sm shadow-sm" value={newName} onChange={e=>setNewName(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')add();}} />
     <button onClick={add} className="bg-indigo-600 text-white px-4 rounded-xl font-bold text-sm hover:bg-indigo-700 transition-colors">Add</button>
   </div>
-  {companies.map(c=>(
-    <div key={c.id} className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex items-center gap-2">
-      {editingId===c.id ? (
-        <>
-          <input autoFocus className="flex-1 p-2 text-sm font-semibold border border-indigo-300 rounded-lg outline-none" value={editVal} onChange={e=>setEditVal(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')saveEdit(c);if(e.key==='Escape')setEditingId(null);}} />
-          <button onClick={()=>saveEdit(c)} className="text-xs font-bold text-indigo-600 px-3 py-1.5 bg-indigo-50 rounded-lg hover:bg-indigo-100">Save</button>
-          <button onClick={()=>setEditingId(null)} className="text-xs font-bold text-slate-500 px-2 py-1.5 bg-slate-100 rounded-lg">✕</button>
-        </>
-      ) : (
-        <>
-          <span className="flex-1 font-semibold text-slate-700 text-sm flex items-center gap-2"><Building2 size={14} className="text-slate-400"/> {c.name}</span>
-          <button onClick={()=>{setEditingId(c.id);setEditVal(c.name);}} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"><Edit size={14}/></button>
-          <button onClick={async()=>{if(await showConfirm(`Delete "${c.name}"?`))await deleteFromFirebase('companies',c.id);}} className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"><Trash2 size={14}/></button>
-        </>
+  {mergeFrom && (
+    <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-3">
+      <p className="text-sm font-bold text-amber-800">"{mergeFrom.name}" has {productCount(mergeFrom.id)} product{productCount(mergeFrom.id)!==1?'s':''}. Reassign them to another company before deleting.</p>
+      <select className="w-full p-2.5 bg-white border border-amber-300 rounded-xl text-sm font-semibold outline-none" value={mergeTo} onChange={e=>setMergeTo(e.target.value)}>
+        <option value="">— Select target company —</option>
+        {companies.filter(c=>c.id!==mergeFrom.id).map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+      </select>
+      <div className="flex gap-2">
+        <button onClick={doMerge} className="flex-1 bg-rose-600 hover:bg-rose-700 text-white font-bold py-2 rounded-xl text-sm">Reassign & Delete</button>
+        <button onClick={()=>setMergeFrom(null)} className="px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 rounded-xl text-sm">Cancel</button>
+      </div>
+    </div>
+  )}
+  {filtered.map(c=>{
+    const count = productCount(c.id);
+    const isExpanded = expandedId === c.id;
+    return (
+    <div key={c.id} className="rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="bg-white p-3 flex items-center gap-2">
+        {editingId===c.id ? (
+          <>
+            <input autoFocus className="flex-1 p-2 text-sm font-semibold border border-indigo-300 rounded-lg outline-none" value={editVal} onChange={e=>setEditVal(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')saveEdit(c);if(e.key==='Escape')setEditingId(null);}} />
+            <button onClick={()=>saveEdit(c)} className="text-xs font-bold text-indigo-600 px-3 py-1.5 bg-indigo-50 rounded-lg hover:bg-indigo-100">Save</button>
+            <button onClick={()=>setEditingId(null)} className="text-xs font-bold text-slate-500 px-2 py-1.5 bg-slate-100 rounded-lg">✕</button>
+          </>
+        ) : (
+          <>
+            <span className="flex-1 font-semibold text-slate-700 text-sm flex items-center gap-2">
+              <Building2 size={14} className="text-slate-400"/>
+              {c.name}
+              {count > 0 && (
+                <button onClick={()=>setExpandedId(isExpanded ? null : c.id)} className={`text-[10px] px-1.5 py-0.5 rounded font-bold transition-colors ${isExpanded ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-500 hover:bg-indigo-50 hover:text-indigo-600'}`}>
+                  {count} item{count!==1?'s':''} {isExpanded ? '▲' : '▼'}
+                </button>
+              )}
+            </span>
+            <button onClick={()=>{setEditingId(c.id);setEditVal(c.name);}} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"><Edit size={14}/></button>
+            <button onClick={()=>startDelete(c)} className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"><Trash2 size={14}/></button>
+          </>
+        )}
+      </div>
+      {isExpanded && count > 0 && (
+        <div className="border-t border-slate-100 bg-slate-50 px-3 py-2 space-y-1">
+          {companyProducts(c.id).map(p => (
+            <div key={p.id} className="flex items-center justify-between text-xs py-1">
+              <span className={`font-semibold ${p.archived ? 'text-slate-400 line-through' : 'text-slate-700'}`}>{p.name}</span>
+              <span className="text-slate-400 font-medium">{p.unit} &bull; Sell: Rs.{p.sellingPrice}{p.archived && ' · Archived'}</span>
+            </div>
+          ))}
+        </div>
       )}
     </div>
-  ))}
+    );
+  })}
 </div>
 );
 };
 
 // ─── Master Records View ───
 const MastersView = () => {
-const { products, customers, invoices, payments, expenseCategories, getCompanyName, deleteFromFirebase, showToast, setEditingProduct, setShowProductModal, setEditingCustomer, setShowCustomerModal, setShowExpenseCatModal, showConfirm } = useContext(AppContext);
+const { products, customers, invoices, payments, expenseCategories, getCompanyName, saveToFirebase, deleteFromFirebase, showToast, setEditingProduct, setShowProductModal, setEditingCustomer, setShowCustomerModal, setShowExpenseCatModal, showConfirm } = useContext(AppContext);
 const [tab, setTab] = useState('products');
 const [search, setSearch] = useState('');
 const tabConfig = [
@@ -1947,15 +2116,26 @@ return (
   {tab === 'products' && (
     <div className="space-y-2 pb-10">
       {products.filter(p=>p.name.toLowerCase().includes(search.toLowerCase())).map(p=>(
-        <div key={p.id} className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex justify-between items-center">
+        <div key={p.id} className={`p-3 rounded-xl border shadow-sm flex justify-between items-center ${p.archived?'bg-amber-50/40 border-amber-200 opacity-75':'bg-white border-slate-200'}`}>
           <div className="flex-1 min-w-0 mr-2">
-            <p className="font-bold text-slate-800 text-sm truncate">{p.name}</p>
+            <p className="font-bold text-slate-800 text-sm truncate">{p.name}{p.archived&&<span className="ml-2 px-1.5 py-0.5 text-[9px] font-bold bg-amber-100 text-amber-700 rounded-full uppercase align-middle">Archived</span>}</p>
             <p className="text-[10px] text-slate-400 font-medium mt-0.5 uppercase tracking-wider">{getCompanyName(p.companyId)} &bull; {p.unit} &bull; Cost: {p.costPrice} &bull; Sell: {p.sellingPrice}</p>
             <span className={`text-[9px] font-bold mt-1 inline-block px-1.5 py-0.5 rounded uppercase ${p.available?'bg-emerald-50 text-emerald-600 border border-emerald-100':'bg-rose-50 text-rose-500 border border-rose-100'}`}>{p.available?'In Stock':'Out of Stock'}</span>
           </div>
           <div className="flex gap-1.5 shrink-0">
             <button onClick={()=>{setEditingProduct(p);setShowProductModal(true);}} className="p-2 bg-slate-50 text-slate-600 rounded-lg hover:bg-indigo-50 hover:text-indigo-600 transition-colors"><Edit size={14}/></button>
-            <button onClick={async()=>{if(await showConfirm(`Delete ${p.name}?`))await deleteFromFirebase('products',p.id);}} className="p-2 bg-rose-50 text-rose-500 rounded-lg hover:bg-rose-100 transition-colors"><Trash2 size={14}/></button>
+            {p.archived
+              ? <button onClick={async()=>{await saveToFirebase('products',p.id,{...p,archived:false});}} className="p-2 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition-colors" title="Unarchive"><RotateCcw size={14}/></button>
+              : <button onClick={async()=>{
+                  const billCount=invoices.filter(inv=>inv.items?.some(it=>String(it.productId||it.uniqueId||'')===String(p.id))).length;
+                  if(billCount>0){
+                    const doArchive=await showConfirm(`"${p.name}" is used in ${billCount} bill${billCount>1?'s':''}.\n\nArchive instead? (Hidden from new sales, preserved in history)`);
+                    if(doArchive){await saveToFirebase('products',p.id,{...p,archived:true,available:false});return;}
+                    if(!await showConfirm(`Permanently delete "${p.name}"? Cannot be undone.`))return;
+                  }else{if(!await showConfirm(`Delete ${p.name}?`))return;}
+                  await deleteFromFirebase('products',p.id);
+                }} className="p-2 bg-rose-50 text-rose-500 rounded-lg hover:bg-rose-100 transition-colors"><Trash2 size={14}/></button>
+            }
           </div>
         </div>
       ))}
@@ -1994,7 +2174,7 @@ return (
     </div>
   )}
 
-  {tab === 'companies' && <CompanyManager />}
+  {tab === 'companies' && <CompanyManager search={search} />}
 
   {tab === 'categories' && (
     <div className="space-y-2 pb-10">
@@ -2435,21 +2615,33 @@ const run = async () => {
     return prod;
   };
   const isValidUnit = (u) => !!u && isNaN(u) && String(u).trim().length > 1;
-  let invoicesFixed=0, itemsFixed=0;
+  let invoicesFixed=0, unitsFixed=0, namesFixed=0;
   for (const inv of invoices) {
     const updatedItems = inv.items?.map(item => {
-      if (isValidUnit(item.unit)) return item;
       const prod = findProd(item);
       if (!prod) return item;
-      itemsFixed++;
-      return { ...item, unit: prod.unit||'', unitsInBox: item.unitsInBox||prod.unitsInBox||1 };
+      let updated = { ...item };
+      let anyChange = false;
+      if (!isValidUnit(item.unit)) {
+        updated.unit = prod.unit || '';
+        updated.unitsInBox = item.unitsInBox || prod.unitsInBox || 1;
+        unitsFixed++; anyChange = true;
+      }
+      // Only sync name when matched by ID — safe to update
+      const idMatch = byId.get(String(item.productId||'')) === prod || byId.get(String(item.uniqueId||'')) === prod;
+      if (idMatch && prod.name && item.name !== prod.name) {
+        updated.name = prod.name;
+        namesFixed++; anyChange = true;
+      }
+      return anyChange ? updated : item;
     });
     if (!updatedItems) continue;
-    const changed = updatedItems.some((it,i) => it.unit !== (inv.items[i]?.unit||''));
+    const changed = updatedItems.some((it,i) => JSON.stringify(it) !== JSON.stringify(inv.items[i]));
     if (changed) { await saveToFirebase('invoices', inv.id, {...inv, items: updatedItems}); invoicesFixed++; }
   }
   setRunning(false);
-  showToast(itemsFixed>0 ? `Fixed ${itemsFixed} items across ${invoicesFixed} invoices!` : 'All invoice items already have units — nothing to fix.', itemsFixed>0?'success':'info');
+  const total = unitsFixed + namesFixed;
+  showToast(total>0 ? `Updated ${invoicesFixed} invoice${invoicesFixed>1?'s':''}: ${namesFixed} name${namesFixed!==1?'s':''} + ${unitsFixed} unit${unitsFixed!==1?'s':''} fixed!` : 'All items already up to date — nothing to fix.', total>0?'success':'info');
 };
 return (
 <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
@@ -2499,9 +2691,28 @@ const avgOrder = userInvoices.length > 0 ? Math.round(totalSales / userInvoices.
 return (
 <div key={u.id} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
 <div className="flex justify-between items-start mb-3">
-<div>
+<div className="min-w-0 flex-1">
 <h4 className="font-bold text-slate-800 text-base">{u.name}</h4>
-<span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded mt-1 inline-block border ${u.role === 'admin' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'}`}>{u.role}</span>
+<span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded mt-1 inline-block border ${u.role === 'admin' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>{u.role === 'admin' ? 'Administrator' : 'Sales Staff'}</span>
+{u.role === 'staff' && (() => {
+  const p = u.permissions || {};
+  const grants = [
+    p.viewAllInvoices  && 'All Invoices',
+    p.viewDashboard    && 'Dashboard',
+    p.viewCustomers    && 'Customers',
+    p.receivePayments  && 'Receipts',
+    p.collectOnBill    && 'Collect on Bill',
+    p.editOwnInvoices  && 'Edit Own',
+    p.issueInvoices    && 'Issue Docs',
+    p.salesReturns     && 'Returns',
+    p.viewLedger       && 'Ledger',
+    p.addCustomers     && 'Add Customers',
+    p.addEditProducts  && 'Add Products',
+  ].filter(Boolean);
+  return grants.length > 0
+    ? <div className="flex flex-wrap gap-1 mt-1.5">{grants.map(g => <span key={g} className="text-[8px] font-bold bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded border border-indigo-100">{g}</span>)}</div>
+    : <p className="text-[9px] text-slate-400 italic mt-1">Own invoices only</p>;
+})()}
 </div>
 <div className="flex gap-1.5">
 <button onClick={() => { setEditingUser(u); setShowUserModal(true); }} className="p-2 bg-slate-50 text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"><Edit size={16}/></button>
@@ -2857,22 +3068,49 @@ const reportEngine = useMemo(() => {
   });
   kpis.creditNotesCount = creditNotes.length;
   kpis.creditNotesTotal = creditNotes.reduce((s, cn) => s + cn.total, 0);
-  // Payment collection rate for filtered period
+  // All-time collection rate: (total ever billed − currently outstanding) / total ever billed
+  // Period-filtered billing vs period-filtered payments is misleading (cross-period collections inflate to 100%)
+  const allTimeBilled = invoices.filter(o => o.status === 'Billed').reduce((s, o) => s + o.total, 0);
+  const allTimeOutstanding = receivablesList.reduce((s, r) => s + r.amount, 0);
+  const collectionRate = allTimeBilled > 0 ? Math.max(0, Math.min(((allTimeBilled - allTimeOutstanding) / allTimeBilled) * 100, 100)).toFixed(1) : '0.0';
   const totalBilledAmt = billedForPnL.reduce((s, o) => s + o.total, 0);
-  const invoiceCollected = billedForPnL.reduce((s, o) => s + Number(o.receivedAmount||0), 0);
-  const standaloneCollectedAmt = payments.filter(p => checkCustomFilter(p.date)).reduce((s, p) => s + Number(p.amount), 0);
-  const collectionRate = totalBilledAmt > 0 ? Math.min(((invoiceCollected + standaloneCollectedAmt) / totalBilledAmt) * 100, 100).toFixed(1) : '0.0';
+  // Payment velocity: avg days from invoice date to first payment received for that customer
+  let velDays = 0, velCount = 0;
+  invoices.filter(o => o.status === 'Billed' && o.paymentStatus === 'Paid').forEach(inv => {
+    const pmt = payments.filter(p => String(p.customerId) === String(inv.customerId) && p.date >= inv.date)
+      .sort((a, b) => a.date.localeCompare(b.date))[0];
+    if (pmt) { const d = Math.floor((new Date(pmt.date) - new Date(inv.date)) / 86400000); if (d >= 0) { velDays += d; velCount++; } }
+  });
+  const avgDaysToPay = velCount > 0 ? Math.round(velDays / velCount) : null;
   // New vs repeat customers in period
   const custFirstOrderDate = {};
   invoices.filter(o => o.status === 'Billed').sort((a,b)=>a.date.localeCompare(b.date)).forEach(o => { if (!custFirstOrderDate[o.customerId]) custFirstOrderDate[o.customerId] = o.date; });
   const periodCustIds = [...new Set(billedForPnL.map(o => o.customerId))];
   let newCustCount = 0, repeatCustCount = 0;
   periodCustIds.forEach(id => { if (billedForPnL.some(o => o.customerId === id && o.date === custFirstOrderDate[id])) newCustCount++; else repeatCustCount++; });
-  return { kpis, byProduct, byCompany, byCustomer, bySalesperson, byCity, byArea, byType, receivablesList: receivablesList.sort((a,b)=>b.amount-a.amount), trends, dailyBreakdown, byExpenseCategory, agingBuckets, monthlyData, collectionRate, newCustCount, repeatCustCount, totalBilledAmt };
+  return { kpis, byProduct, byCompany, byCustomer, bySalesperson, byCity, byArea, byType, receivablesList: receivablesList.sort((a,b)=>b.amount-a.amount), trends, dailyBreakdown, byExpenseCategory, agingBuckets, monthlyData, collectionRate, newCustCount, repeatCustCount, totalBilledAmt, avgDaysToPay };
 }, [invoices, expenses, payments, dateFilter, customStart, customEnd, ...[...filterCompanies], ...[...filterCustomers], ...[...filterSalespersons], products, customers]);
 
 const getSortedExportData = () => {
    if (view === 'Overview' || view === 'Item Sales') return null;
+   if (view === 'Insights') {
+     const kpis = reportEngine.kpis;
+     const gpMargin = kpis.productRevenue > 0 ? ((kpis.grossMargin / kpis.productRevenue) * 100).toFixed(1) : '0.0';
+     const netMargin = kpis.productRevenue > 0 ? ((kpis.netProfit / kpis.productRevenue) * 100).toFixed(1) : '0.0';
+     const rows = [{ 'P&L Item': 'Gross Product Sales', 'Amount (Rs)': kpis.productRevenue + kpis.creditNotesTotal, 'Notes': '' }];
+     if (kpis.creditNotesTotal > 0) rows.push({ 'P&L Item': 'Sales Returns', 'Amount (Rs)': -kpis.creditNotesTotal, 'Notes': `${kpis.creditNotesCount} credit notes` });
+     rows.push({ 'P&L Item': 'Net Product Sales', 'Amount (Rs)': kpis.productRevenue, 'Notes': '' });
+     rows.push({ 'P&L Item': 'Total COGS', 'Amount (Rs)': -kpis.totalCOGS, 'Notes': '' });
+     rows.push({ 'P&L Item': 'Gross Profit', 'Amount (Rs)': kpis.grossMargin, 'Notes': `${gpMargin}% margin` });
+     rows.push({ 'P&L Item': 'Delivery Revenue', 'Amount (Rs)': kpis.deliveryBilled, 'Notes': '' });
+     rows.push({ 'P&L Item': 'Transport Expense', 'Amount (Rs)': -kpis.transportExpense, 'Notes': '' });
+     rows.push({ 'P&L Item': 'Operational Expenses', 'Amount (Rs)': -kpis.totalExpenses, 'Notes': '' });
+     rows.push({ 'P&L Item': 'Net Profit', 'Amount (Rs)': kpis.netProfit, 'Notes': `${netMargin}% net margin` });
+     rows.push({ 'P&L Item': 'Outstanding Receivables', 'Amount (Rs)': kpis.totalReceivables, 'Notes': `${reportEngine.collectionRate}% collected` });
+     if (reportEngine.avgDaysToPay !== null) rows.push({ 'P&L Item': 'Avg Days to Pay', 'Amount (Rs)': '', 'Notes': `${reportEngine.avgDaysToPay} days` });
+     rows.push({ 'P&L Item': `Active Customers: ${reportEngine.newCustCount + reportEngine.repeatCustCount}`, 'Amount (Rs)': '', 'Notes': `${reportEngine.newCustCount} new · ${reportEngine.repeatCustCount} repeat` });
+     return rows;
+   }
    if (view === 'Receivables') return reportEngine.receivablesList.map(r => ({
      'Customer Name': r.name, 'Outstanding (Rs)': r.amount,
      'Days Since Last Invoice': r.daysSince || 0, 'Last Invoice Date': r.lastInvDate || ''
@@ -2946,6 +3184,33 @@ const handleExport = (format) => {
           text += `✅ *Net Profit: Rs. ${kpis.netProfit.toLocaleString('en-US')}*\n`;
           text += `📌 Receivables: Rs. ${kpis.totalReceivables.toLocaleString('en-US')}\n`;
           if (reportEngine.trends.revenue !== null) text += `📈 Revenue trend: ${Number(reportEngine.trends.revenue) >= 0 ? '+' : ''}${reportEngine.trends.revenue}% vs prev period\n`;
+        } else if (view === 'Insights') {
+          const gpMargin = kpis.productRevenue > 0 ? ((kpis.grossMargin / kpis.productRevenue) * 100).toFixed(1) : '0.0';
+          const netMargin = kpis.productRevenue > 0 ? ((kpis.netProfit / kpis.productRevenue) * 100).toFixed(1) : '0.0';
+          text += `💰 *P&L Summary*\n`;
+          text += `Gross Sales:     Rs.${(kpis.productRevenue + kpis.creditNotesTotal).toLocaleString('en-US')}\n`;
+          if (kpis.creditNotesTotal > 0) text += `Sales Returns:   - Rs.${kpis.creditNotesTotal.toLocaleString('en-US')}\n`;
+          text += `Net Sales:       Rs.${kpis.productRevenue.toLocaleString('en-US')}\n`;
+          text += `Total COGS:      - Rs.${kpis.totalCOGS.toLocaleString('en-US')}\n`;
+          text += `Gross Profit:    Rs.${kpis.grossMargin.toLocaleString('en-US')} (${gpMargin}%)\n`;
+          text += `Delivery Net:    + Rs.${(kpis.deliveryBilled - kpis.transportExpense).toLocaleString('en-US')}\n`;
+          text += `Op. Expenses:    - Rs.${kpis.totalExpenses.toLocaleString('en-US')}\n`;
+          text += `${'─'.repeat(30)}\n`;
+          text += `✅ *Net Profit: Rs.${kpis.netProfit.toLocaleString('en-US')} (${netMargin}%)*\n`;
+          text += `\n📌 *Key Metrics*\n`;
+          text += `Receivables:     Rs.${kpis.totalReceivables.toLocaleString('en-US')}\n`;
+          text += `Collection Rate: ${reportEngine.collectionRate}%\n`;
+          if (reportEngine.avgDaysToPay !== null) text += `Avg Days to Pay: ${reportEngine.avgDaysToPay} days\n`;
+          text += `Customers:       ${reportEngine.newCustCount + reportEngine.repeatCustCount} (${reportEngine.newCustCount} new, ${reportEngine.repeatCustCount} repeat)\n`;
+          const topProduct = Object.entries(reportEngine.byProduct).sort((a,b) => b[1].profit - a[1].profit)[0];
+          const topCustomer = Object.entries(reportEngine.byCustomer).sort((a,b) => b[1].productRevenue - a[1].productRevenue)[0];
+          if (topProduct || topCustomer || reportEngine.trends.revenue !== null) {
+            text += `\n⭐ *Smart Callouts*\n`;
+            if (topProduct) text += `Top Product: ${topProduct[0]} — Rs.${topProduct[1].profit.toLocaleString('en-US')} GP\n`;
+            if (topCustomer) text += `Top Customer: ${topCustomer[0]} — Rs.${(topCustomer[1].productRevenue||0).toLocaleString('en-US')} revenue\n`;
+            if (reportEngine.trends.revenue !== null) text += `Revenue Trend: ${Number(reportEngine.trends.revenue) >= 0 ? '+' : ''}${reportEngine.trends.revenue}% vs prev period\n`;
+            if (reportEngine.agingBuckets.days90plus.length > 0) text += `⚠️ ${reportEngine.agingBuckets.days90plus.length} customer(s) overdue 90+ days\n`;
+          }
         } else if (view === 'Receivables') {
           exportData.forEach((r, i) => {
             const name = r['Customer Name'] || '?';
@@ -3315,27 +3580,31 @@ return (
            )}
 
            {/* P&L Card */}
-           <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white p-6 rounded-3xl shadow-xl border border-slate-800">
-              <p className="text-[10px] uppercase font-bold text-slate-400 mb-5 tracking-widest flex justify-between"><span>P&L Dashboard</span><span className="text-indigo-300">{filterLabel}</span></p>
-              <div className="space-y-3.5">
-                <div className="flex justify-between items-center text-sm font-medium"><span className="text-slate-300">Gross Product Sales</span><span className="font-bold text-white">Rs.{(reportEngine.kpis.productRevenue + reportEngine.kpis.creditNotesTotal).toLocaleString('en-US')}</span></div>
-                {reportEngine.kpis.creditNotesTotal > 0 && <div className="flex justify-between items-center text-xs"><span className="text-rose-300">Sales Returns ({reportEngine.kpis.creditNotesCount})</span><span className="font-bold text-rose-300">− Rs.{reportEngine.kpis.creditNotesTotal.toLocaleString('en-US')}</span></div>}
-                <div className="flex justify-between items-center text-sm font-medium"><span className="text-rose-300">Total COGS</span><span className="font-bold text-rose-300">- Rs.{reportEngine.kpis.totalCOGS.toLocaleString('en-US')}</span></div>
-                <div className="flex justify-between items-center text-sm font-medium"><span className="text-indigo-300">Product Margin</span><span className="font-bold text-indigo-300">Rs.{reportEngine.kpis.grossMargin.toLocaleString('en-US')}</span></div>
-                <div className="h-px bg-slate-700"></div>
-                <div className="flex justify-between items-center text-xs"><span className="text-slate-400">Delivery Billed</span><span className="font-bold text-slate-300">+ Rs.{reportEngine.kpis.deliveryBilled.toLocaleString('en-US')}</span></div>
-                <div className="flex justify-between items-center text-xs"><span className="text-rose-400">Transport Expenses</span><span className="font-bold text-rose-400">- Rs.{reportEngine.kpis.transportExpense.toLocaleString('en-US')}</span></div>
-                <div className="flex justify-between items-center text-xs"><span className="text-rose-400">Operational Expenses</span><span className="font-bold text-rose-400">- Rs.{reportEngine.kpis.totalExpenses.toLocaleString('en-US')}</span></div>
-                <div className="h-px bg-slate-700"></div>
-                <div className="flex justify-between items-center"><span className="font-bold uppercase tracking-widest text-emerald-400 text-xs">Net Profit</span><span className={`font-black text-3xl tracking-tight ${reportEngine.kpis.netProfit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>Rs.{reportEngine.kpis.netProfit.toLocaleString('en-US')}</span></div>
-              </div>
-           </div>
-
-           {/* Total receivables */}
-           <div className="bg-rose-50 p-5 rounded-2xl border border-rose-100 shadow-sm">
-              <p className="text-[10px] font-bold uppercase text-rose-600 flex items-center gap-1.5 tracking-wider"><AlertCircle size={14}/> All-Time Receivables</p>
-              <p className="text-2xl font-black text-rose-700 mt-2 tracking-tight">Rs.{reportEngine.kpis.totalReceivables.toLocaleString('en-US')}</p>
-           </div>
+           {(() => {
+             const k = reportEngine.kpis;
+             const gpPct = k.productRevenue > 0 ? ((k.grossMargin / k.productRevenue) * 100).toFixed(1) : '0.0';
+             const netPct = k.productRevenue > 0 ? ((k.netProfit / k.productRevenue) * 100).toFixed(1) : '0.0';
+             return (
+               <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white p-6 rounded-3xl shadow-xl border border-slate-800">
+                 <p className="text-[10px] uppercase font-bold text-slate-400 mb-5 tracking-widest flex justify-between"><span>P&L Dashboard</span><span className="text-indigo-300">{filterLabel}</span></p>
+                 <div className="space-y-3">
+                   <div className="flex justify-between items-center text-sm font-medium"><span className="text-slate-300">Gross Product Sales</span><span className="font-bold text-white">Rs.{(k.productRevenue + k.creditNotesTotal).toLocaleString('en-US')}</span></div>
+                   {k.creditNotesTotal > 0 && <div className="flex justify-between items-center text-xs"><span className="text-rose-300">Sales Returns ({k.creditNotesCount})</span><span className="font-bold text-rose-300">− Rs.{k.creditNotesTotal.toLocaleString('en-US')}</span></div>}
+                   <div className="flex justify-between items-center text-sm font-medium"><span className="text-rose-300">Total COGS</span><span className="font-bold text-rose-300">- Rs.{k.totalCOGS.toLocaleString('en-US')}</span></div>
+                   <div className="flex justify-between items-baseline"><span className="text-indigo-300 text-sm font-semibold">Gross Profit</span><div className="text-right"><span className="font-bold text-indigo-300">Rs.{k.grossMargin.toLocaleString('en-US')}</span><span className="text-[10px] text-indigo-400 ml-2">{gpPct}%</span></div></div>
+                   <div className="h-px bg-slate-700 my-1"></div>
+                   <div className="flex justify-between items-center text-xs"><span className="text-slate-400">Delivery Billed</span><span className="font-bold text-slate-300">+ Rs.{k.deliveryBilled.toLocaleString('en-US')}</span></div>
+                   <div className="flex justify-between items-center text-xs"><span className="text-rose-400">Transport Expenses</span><span className="font-bold text-rose-400">- Rs.{k.transportExpense.toLocaleString('en-US')}</span></div>
+                   <div className="flex justify-between items-center text-xs"><span className="text-rose-400">Operational Expenses</span><span className="font-bold text-rose-400">- Rs.{k.totalExpenses.toLocaleString('en-US')}</span></div>
+                   <div className="h-px bg-slate-700 my-1"></div>
+                   <div className="flex justify-between items-baseline"><span className="font-bold uppercase tracking-widest text-emerald-400 text-xs">Net Profit</span><div className="text-right"><span className={`font-black text-2xl tracking-tight ${k.netProfit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>Rs.{k.netProfit.toLocaleString('en-US')}</span><span className={`text-[10px] ml-2 ${k.netProfit >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>{netPct}%</span></div></div>
+                   <div className="h-px bg-slate-700 my-1"></div>
+                   <div className="flex justify-between items-center text-xs"><span className="text-amber-400 font-semibold">Outstanding Receivables</span><span className="font-bold text-amber-300">Rs.{k.totalReceivables.toLocaleString('en-US')}</span></div>
+                   <div className="flex justify-between items-center text-xs"><span className="text-slate-500">Collection Rate (all-time)</span><span className={`font-bold ${Number(reportEngine.collectionRate) >= 80 ? 'text-emerald-400' : Number(reportEngine.collectionRate) >= 50 ? 'text-amber-400' : 'text-rose-400'}`}>{reportEngine.collectionRate}%</span></div>
+                 </div>
+               </div>
+             );
+           })()}
         </div>
       )}
 
@@ -3473,9 +3742,9 @@ return (
           {/* Collection rate summary */}
           <div className="grid grid-cols-2 gap-3">
             <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Collection Rate</p>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Collection Rate <span className="text-slate-300">(All-time)</span></p>
               <p className={`text-2xl font-black mt-1 ${Number(reportEngine.collectionRate) >= 80 ? 'text-emerald-600' : Number(reportEngine.collectionRate) >= 50 ? 'text-amber-600' : 'text-rose-600'}`}>{reportEngine.collectionRate}%</p>
-              <p className="text-[10px] text-slate-400 mt-1">of billed amount collected</p>
+              <p className="text-[10px] text-slate-400 mt-1">of all-time billed amount recovered</p>
             </div>
             <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Outstanding</p>
@@ -3483,6 +3752,33 @@ return (
               <p className="text-[10px] text-slate-400 mt-1">{reportEngine.receivablesList.length} customers with balance</p>
             </div>
           </div>
+          {/* Top Overdue Balances */}
+          {(() => {
+            const overdue = [...reportEngine.agingBuckets.days30, ...reportEngine.agingBuckets.days60, ...reportEngine.agingBuckets.days90plus].sort((a,b)=>b.amount-a.amount).slice(0,5);
+            if (!overdue.length) return null;
+            return (
+              <div className="bg-white rounded-2xl shadow-sm border border-rose-300 overflow-hidden">
+                <div className="bg-rose-600 p-3 flex justify-between items-center">
+                  <span className="text-xs font-bold text-white uppercase tracking-widest flex items-center gap-1.5"><AlertCircle size={13}/> Top Overdue Balances</span>
+                  <span className="text-[10px] font-black text-rose-200">{overdue.length} accounts · 31+ days</span>
+                </div>
+                <div className="divide-y divide-slate-100">
+                  {overdue.map((r,i) => (
+                    <div key={i} className="flex justify-between items-center p-3">
+                      <div className="flex-1 min-w-0">
+                        <button className="font-semibold text-sm text-slate-800 truncate hover:text-indigo-600 text-left w-full" onClick={()=>{setSelectedLedgerId(r.id);setShowLedgerModal(true);}}>{r.name}</button>
+                        <p className="text-[10px] text-rose-400 font-semibold">{r.daysSince} days overdue</p>
+                      </div>
+                      <div className="flex items-center gap-2 ml-2 shrink-0">
+                        <span className="font-extrabold text-rose-600 text-sm">Rs.{r.amount.toLocaleString('en-US')}</span>
+                        {r.phone && <a href={`https://wa.me/92${r.phone.replace(/^0/,'').replace(/\D/g,'')}?text=${encodeURIComponent(`Assalam o Alaikum ${r.name},\n\nYour outstanding balance is *Rs. ${r.amount.toLocaleString('en-US')}*. Kindly process payment at earliest.\n\nJazakAllah Khair`)}`} target="_blank" rel="noopener noreferrer" className="p-1.5 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 border border-green-100"><PhoneCall size={13}/></a>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
           {[
             { label: '0–30 days', key: 'current', color: 'emerald' },
             { label: '31–60 days', key: 'days30', color: 'amber' },
@@ -3545,8 +3841,9 @@ return (
         const insightCards = [
           { label: 'Gross Margin', value: `${gpMargin}%`, sub: `Rs.${kpis.grossMargin.toLocaleString('en-US')} on Rs.${kpis.productRevenue.toLocaleString('en-US')} sales`, color: Number(gpMargin) >= 25 ? 'emerald' : Number(gpMargin) >= 15 ? 'amber' : 'rose', icon: TrendingUp },
           { label: 'Net Profit Margin', value: `${netMargin}%`, sub: `Rs.${kpis.netProfit.toLocaleString('en-US')} after all expenses`, color: Number(netMargin) >= 15 ? 'emerald' : Number(netMargin) >= 5 ? 'amber' : 'rose', icon: DollarSign },
-          { label: 'Collection Rate', value: `${reportEngine.collectionRate}%`, sub: `of billed amount recovered`, color: Number(reportEngine.collectionRate) >= 80 ? 'emerald' : Number(reportEngine.collectionRate) >= 50 ? 'amber' : 'rose', icon: Wallet },
+          { label: 'Collection Rate', value: `${reportEngine.collectionRate}%`, sub: `all-time billed vs outstanding`, color: Number(reportEngine.collectionRate) >= 80 ? 'emerald' : Number(reportEngine.collectionRate) >= 50 ? 'amber' : 'rose', icon: Wallet },
           { label: 'Active Customers', value: `${reportEngine.newCustCount + reportEngine.repeatCustCount}`, sub: `${reportEngine.newCustCount} new · ${reportEngine.repeatCustCount} repeat`, color: 'indigo', icon: Users },
+          ...(reportEngine.avgDaysToPay !== null ? [{ label: 'Avg Days to Pay', value: `${reportEngine.avgDaysToPay}d`, sub: reportEngine.avgDaysToPay <= 7 ? 'Excellent payment speed' : reportEngine.avgDaysToPay <= 21 ? 'Acceptable turnaround' : 'Slow — follow up needed', color: reportEngine.avgDaysToPay <= 7 ? 'emerald' : reportEngine.avgDaysToPay <= 21 ? 'amber' : 'rose', icon: Clock }] : []),
         ];
         return (
           <div className="space-y-4 mt-2">
@@ -3571,19 +3868,25 @@ return (
             {/* P&L summary */}
             <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white p-5 rounded-3xl shadow-xl">
               <p className="text-[10px] uppercase font-bold text-slate-400 mb-4 tracking-widest">P&L Summary · {filterLabel}</p>
-              {[
-                ['Gross Sales', `Rs.${kpis.productRevenue.toLocaleString('en-US')}`, 'text-white'],
-                ['COGS', `- Rs.${kpis.totalCOGS.toLocaleString('en-US')}`, 'text-rose-300'],
-                ['Gross Profit', `Rs.${kpis.grossMargin.toLocaleString('en-US')} (${gpMargin}%)`, 'text-indigo-300'],
-                ['Delivery Net', `+ Rs.${(kpis.deliveryBilled-kpis.transportExpense).toLocaleString('en-US')}`, 'text-slate-300'],
-                ['Operational Expenses', `- Rs.${kpis.totalExpenses.toLocaleString('en-US')}`, 'text-rose-300'],
-                ['Net Profit', `Rs.${kpis.netProfit.toLocaleString('en-US')} (${netMargin}%)`, kpis.netProfit >= 0 ? 'text-emerald-400 text-lg font-black' : 'text-rose-400 text-lg font-black'],
-              ].map(([label, val, cls]) => (
-                <div key={label} className="flex justify-between items-center text-sm py-1.5 border-b border-slate-700 last:border-0">
-                  <span className="text-slate-400">{label}</span>
-                  <span className={`font-bold ${cls}`}>{val}</span>
-                </div>
-              ))}
+              <div className="space-y-0">
+                {[
+                  ['Gross Sales', `Rs.${(kpis.productRevenue + kpis.creditNotesTotal).toLocaleString('en-US')}`, 'text-white', false],
+                  ...(kpis.creditNotesTotal > 0 ? [['Sales Returns', `- Rs.${kpis.creditNotesTotal.toLocaleString('en-US')}`, 'text-rose-300 text-xs', false]] : []),
+                  ['COGS', `- Rs.${kpis.totalCOGS.toLocaleString('en-US')}`, 'text-rose-300', false],
+                  ['Gross Profit', `Rs.${kpis.grossMargin.toLocaleString('en-US')}`, 'text-indigo-300', gpMargin + '%'],
+                  ['Delivery Net', `+ Rs.${(kpis.deliveryBilled - kpis.transportExpense).toLocaleString('en-US')}`, 'text-slate-300', false],
+                  ['Operational Expenses', `- Rs.${kpis.totalExpenses.toLocaleString('en-US')}`, 'text-rose-300', false],
+                  ['Net Profit', `Rs.${kpis.netProfit.toLocaleString('en-US')}`, kpis.netProfit >= 0 ? 'text-emerald-400 text-base font-black' : 'text-rose-400 text-base font-black', netMargin + '%'],
+                ].map(([label, val, cls, pct]) => (
+                  <div key={label} className="flex justify-between items-center text-sm py-1.5 border-b border-slate-700 last:border-0">
+                    <span className="text-slate-400">{label}</span>
+                    <div className="text-right"><span className={`font-bold ${cls}`}>{val}</span>{pct && <span className="text-[10px] text-slate-500 ml-1.5">{pct}</span>}</div>
+                  </div>
+                ))}
+                <div className="h-px bg-slate-600 my-2"></div>
+                <div className="flex justify-between items-center text-xs py-1"><span className="text-amber-400">Outstanding Receivables</span><span className="font-bold text-amber-300">Rs.{kpis.totalReceivables.toLocaleString('en-US')}</span></div>
+                <div className="flex justify-between items-center text-xs py-0.5"><span className="text-slate-500">Collection Rate (all-time)</span><span className={`font-bold ${Number(reportEngine.collectionRate) >= 80 ? 'text-emerald-400' : Number(reportEngine.collectionRate) >= 50 ? 'text-amber-400' : 'text-rose-400'}`}>{reportEngine.collectionRate}%</span></div>
+              </div>
             </div>
           </div>
         );
@@ -4063,6 +4366,7 @@ const [confirmDialog, setConfirmDialog] = useState(null);
 const showConfirm = (message) => new Promise(resolve => setConfirmDialog({ message, resolve }));
 
 const isAdmin = currentUser?.role === 'admin';
+const hasPermission = (key) => isAdmin || !!(currentUser?.permissions?.[key]);
 
 const showToast = (msg, type = 'success') => {
 setToast({ msg, type });
@@ -4077,15 +4381,22 @@ return list.some(item => item.name.toLowerCase() === name.toLowerCase() && item.
 
 const handleLogin = async (e) => {
 e.preventDefault();
-if (appUsers.length === 0 && loginForm.name.toLowerCase() === 'tahir' && loginForm.password === '7869') {
-const initUser = { id: Date.now().toString(), name: 'Tahir', password: '7869', role: 'admin' };
+if (appUsers.length === 0) {
+// First run: only allowed if the password matches the setup secret from .env
+// This prevents anyone who copies the code from bootstrapping their own instance
+const setupSecret = import.meta.env.VITE_SETUP_SECRET;
+if (!setupSecret || loginForm.password !== setupSecret) {
+showToast("Invalid Credentials", "error");
+return;
+}
+const initUser = { id: Date.now().toString(), name: loginForm.name, password: loginForm.password, role: 'admin' };
 await saveToFirebase('app_users', initUser.id, initUser);
 if (expenseCategories.length === 0) {
 const defaultCats = ['Transport', 'Utility Bill', 'Staff Food/Tea', 'Maintenance', 'Other'];
 defaultCats.forEach((cat, i) => saveToFirebase('expenseCategories', Date.now()+i, { id: Date.now()+i, name: cat }));
 }
 setCurrentUser(initUser);
-showToast("Welcome! Clean Database Initialized.");
+showToast("Welcome! Admin account created.");
 return;
 }
 const user = appUsers.find(u => u.name.toLowerCase() === loginForm.name.toLowerCase() && u.password === loginForm.password);
@@ -4267,6 +4578,27 @@ useEffect(() => {
   return () => window.removeEventListener('keydown', handler);
 }, [currentUser, printConfig, showProductModal, showCustomerModal, showPaymentModal, showCreditNoteModal, showLedgerModal, showUserModal, showExpenseCatModal, showSegmentsModal, showRidersModal, billingView]);
 
+// Tab list & permission helpers — defined here so the redirect effect below can use them
+// while still being BEFORE any conditional return (Rules of Hooks)
+const TABS = [
+  { id: 'dashboard', icon: LayoutDashboard, label: 'Home',     perm: 'viewDashboard' },
+  { id: 'products',  icon: Package,         label: 'Items',    adminOnly: true },
+  { id: 'billing',   icon: ReceiptText,     label: 'Billing' },
+  { id: 'customers', icon: Users,           label: 'Clients',  perm: 'viewCustomers' },
+  { id: 'payments',  icon: Wallet,          label: 'Receipts' },
+  { id: 'admin',     icon: Settings,        label: 'Admin',    adminOnly: true },
+];
+const canSeeTab = (tab) => {
+  if (tab.adminOnly) return isAdmin;
+  if (tab.perm) return hasPermission(tab.perm);
+  return true;
+};
+// Auto-redirect away from restricted tabs — must be BEFORE conditional return
+useEffect(() => {
+  const cur = TABS.find(t => t.id === activeTab);
+  if (cur && !canSeeTab(cur)) setActiveTab('billing');
+}, [activeTab, currentUser]);  // eslint-disable-line react-hooks/exhaustive-deps
+
 // — Auth Screen —
 if (!currentUser) {
 return (
@@ -4293,16 +4625,8 @@ return (
 }
 
 // — Main Render —
-const TABS = [
-  { id: 'dashboard', icon: LayoutDashboard, label: 'Home' },
-  { id: 'products', icon: Package, label: 'Items' },
-  { id: 'billing', icon: ReceiptText, label: 'Billing' },
-  { id: 'customers', icon: Users, label: 'Clients' },
-  { id: 'payments', icon: Wallet, label: 'Receipts' },
-  { id: 'admin', icon: Settings, label: 'Admin', adminOnly: true },
-];
 const ctx = {
-isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers,
+isAdmin, hasPermission, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers,
 cities, areas, customerTypes, vehicleTypes,
 showToast, showConfirm, confirmDialog, setConfirmDialog, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData,
 billingView, setBillingView, currentInvoice, setCurrentInvoice,
@@ -4334,12 +4658,12 @@ return (
     </div>
     <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
       {TABS.map(tab => {
-        if (tab.adminOnly && !isAdmin) return null;
+        if (!canSeeTab(tab)) return null;
         const active = activeTab === tab.id;
         const draftCount = tab.id === 'billing' ? invoices.filter(o => o.status === 'Booked' || o.status === 'Estimate').length : 0;
         return (
           <button key={tab.id} data-sidenav={tab.id} tabIndex={active ? 0 : -1} onClick={() => setActiveTab(tab.id)} title={`Alt+${tab.label[0].toLowerCase()}`}
-            onKeyDown={makeArrowNav(TABS.filter(t=>!t.adminOnly||isAdmin).map(t=>t.id), activeTab, setActiveTab, 'data-sidenav')}
+            onKeyDown={makeArrowNav(TABS.filter(t=>canSeeTab(t)).map(t=>t.id), activeTab, setActiveTab, 'data-sidenav')}
             className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-semibold text-sm transition-all ${active ? 'bg-indigo-50 text-indigo-700 shadow-sm' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'}`}>
             <div className="relative shrink-0">
               <tab.icon size={18} strokeWidth={active ? 2.5 : 2} />
@@ -4396,12 +4720,12 @@ return (
     {/* Mobile bottom nav */}
     <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md border-t border-slate-200 flex items-center justify-between pb-6 pt-3 px-2 z-10 shadow-[0_-10px_20px_rgba(0,0,0,0.03)]">
       {TABS.map(tab => {
-        if (tab.adminOnly && !isAdmin) return null;
+        if (!canSeeTab(tab)) return null;
         const active = activeTab === tab.id;
         const draftCount = tab.id === 'billing' ? invoices.filter(o => o.status === 'Booked' || o.status === 'Estimate').length : 0;
         return (
           <button key={tab.id} data-sidenav={tab.id} tabIndex={active ? 0 : -1} onClick={() => setActiveTab(tab.id)}
-            onKeyDown={makeArrowNav(TABS.filter(t=>!t.adminOnly||isAdmin).map(t=>t.id), activeTab, setActiveTab, 'data-sidenav')}
+            onKeyDown={makeArrowNav(TABS.filter(t=>canSeeTab(t)).map(t=>t.id), activeTab, setActiveTab, 'data-sidenav')}
             className={`flex flex-col items-center justify-center w-full transition-all ${active ? 'text-indigo-600' : 'text-slate-400'}`}>
             <div className={`relative p-1.5 rounded-xl transition-all ${active ? 'bg-indigo-50 shadow-sm' : ''}`}>
               <tab.icon size={22} strokeWidth={active ? 2.5 : 2} />
