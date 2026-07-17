@@ -1229,7 +1229,7 @@ return (
               ))}
               <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '2px solid #1e293b', marginTop: sz('4px','5px','6px'), paddingTop: sz('5px','6px','8px'), fontWeight: 900, fontSize: sz('12px','13px','15px'), color: '#1e293b', fontVariantNumeric: 'tabular-nums' }}>
                 <span>Net Balance:</span>
-                <span>Rs. {(showPrevBal ? netBalance : (data.total || 0)).toLocaleString('en-US')}</span>
+                <span>Rs. {(showPrevBal ? netBalance : ((data.total || 0) - received)).toLocaleString('en-US')}</span>
               </div>
               {totalSavings > 0 && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: sz('6px','8px','10px'), padding: sz('5px 8px','6px 10px','8px 12px'), background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: '8px', fontWeight: 800, fontSize: sz('8px','9px','10px'), color: '#065f46' }}>
