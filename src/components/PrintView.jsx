@@ -799,7 +799,7 @@ return (
       <div className="keep-together" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: sz('14px','16px','20px'), gap: '8px' }}>
         {/* Left: customer */}
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: sz('7px','8.5px','9px'), textTransform: 'uppercase', fontWeight: 700, letterSpacing: '1.2px', color: '#94a3b8', marginBottom: '3px' }}>
+          <div style={{ fontSize: sz('7px','8.5px','9px'), textTransform: 'uppercase', fontWeight: 700, letterSpacing: '1.2px', color: '#1d4ed8', marginBottom: '3px' }}>
             {docType === 'ledger' ? 'Account Holder' : 'Customer'}
           </div>
           <div style={{ fontSize: sz('12px','15px','18px'), fontWeight: 900, lineHeight: 1.2, wordBreak: 'break-word', color: '#0f172a' }}>
@@ -810,7 +810,7 @@ return (
               {(data.customerDetails.contactPerson || data.customerDetails.phone) && (
                 <div style={{ fontWeight: 700 }}>
                   {data.customerDetails.contactPerson || 'N/A'}
-                  {data.customerDetails.phone && <span style={{ fontWeight: 400, color: '#64748b' }}> · {data.customerDetails.phone}</span>}
+                  {data.customerDetails.phone && <span style={{ fontWeight: 400, color: '#334155' }}> · {data.customerDetails.phone}</span>}
                 </div>
               )}
               {(() => {
@@ -829,7 +829,7 @@ return (
             </div>
           )}
           {docType === 'ledger' && data.phone && (
-            <div style={{ fontSize: '9px', color: '#64748b', marginTop: '2px' }}>{data.phone}</div>
+            <div style={{ fontSize: '9px', color: '#334155', marginTop: '2px' }}>{data.phone}</div>
           )}
         </div>
 
@@ -837,19 +837,19 @@ return (
         <div style={{ textAlign: 'right', flexShrink: 0, paddingLeft: '6px', minWidth: 0 }}>
           {docType !== 'ledger' && (
             <>
-              <div style={{ fontSize: sz('7px','8.5px','9px'), textTransform: 'uppercase', fontWeight: 700, letterSpacing: '1px', color: '#94a3b8', marginBottom: '2px' }}>Ref #</div>
+              <div style={{ fontSize: sz('7px','8.5px','9px'), textTransform: 'uppercase', fontWeight: 700, letterSpacing: '1px', color: '#1d4ed8', marginBottom: '2px' }}>Ref #</div>
               <div style={{ fontWeight: 800, fontSize: sz('11px','12px','13px'), color: '#1e293b', lineHeight: 1.2, fontFamily: 'monospace', wordBreak: 'break-all' }}>{data.id || '—'}</div>
-              <div style={{ color: '#64748b', fontSize: sz('9px','10px','11px'), marginTop: '2px', fontWeight: 600 }}>{formatDateDisp(data.date)}</div>
+              <div style={{ color: '#334155', fontSize: sz('9px','10px','11px'), marginTop: '2px', fontWeight: 600 }}>{formatDateDisp(data.date)}</div>
               {docType === 'invoice' && data.salespersonName && (
-                <div style={{ fontSize: sz('8px','9px','10px'), color: '#94a3b8', marginTop: '2px', wordBreak: 'break-word' }}>by {data.salespersonName}</div>
+                <div style={{ fontSize: sz('8px','9px','10px'), color: '#1e293b', marginTop: '2px', wordBreak: 'break-word' }}>by {data.salespersonName}</div>
               )}
             </>
           )}
           {docType === 'ledger' && (
             <>
-              <div style={{ fontSize: '7px', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '1px', color: '#94a3b8', marginBottom: '2px' }}>Printed</div>
+              <div style={{ fontSize: '7px', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '1px', color: '#1d4ed8', marginBottom: '2px' }}>Printed</div>
               <div style={{ fontWeight: 700, fontSize: sz('8px','9px','10px') }}>{formatDateDisp(getLocalDateStr())}</div>
-              <div style={{ fontSize: sz('7.5px','8px','9px'), color: '#64748b', marginTop: '2px', fontWeight: 600 }}>
+              <div style={{ fontSize: sz('7.5px','8px','9px'), color: '#334155', marginTop: '2px', fontWeight: 600 }}>
                 {formatDateDisp(data.dateRange?.start)} – {formatDateDisp(data.dateRange?.end)}
               </div>
             </>
@@ -884,10 +884,10 @@ return (
         <div className="keep-together" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: sz('6px','10px','12px'), borderBottom: '2px solid #1e293b', paddingBottom: '8px', flexWrap: 'wrap', gap: '6px' }}>
           <div>
             <div style={{ fontSize: sz('14px','18px','22px'), fontWeight: 900, lineHeight: 1.2 }}>{data.title || 'Report'}</div>
-            <div style={{ fontSize: '9px', color: '#64748b', marginTop: '3px' }}>Generated {formatDateDisp(data.generatedOn || getLocalDateStr())}</div>
+            <div style={{ fontSize: '9px', color: '#334155', marginTop: '3px' }}>Generated {formatDateDisp(data.generatedOn || getLocalDateStr())}</div>
           </div>
           <div style={{ textAlign: 'right', background: '#f1f5f9', padding: '6px 12px', borderRadius: '8px', flexShrink: 0 }}>
-            <div style={{ fontSize: '7.5px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px' }}>Period</div>
+            <div style={{ fontSize: '7.5px', fontWeight: 700, color: '#1d4ed8', textTransform: 'uppercase', letterSpacing: '1px' }}>Period</div>
             <div style={{ fontWeight: 800, color: '#1e293b', fontSize: '11px' }}>{data.dateFilter || 'All Time'}</div>
           </div>
         </div>
@@ -930,7 +930,7 @@ return (
                   fontWeight: row.bold ? 800 : 500,
                   fontSize: row.small ? sz('8px','9px','10px') : sz('9px','10px','11px'),
                 }}>
-                  <span style={{ color: '#475569' }}>{row.label}:</span>
+                  <span style={{ color: '#1e293b' }}>{row.label}:</span>
                   <span style={{ color: row.color || '#1e293b' }}>
                     {row.neg ? '− ' : ''}Rs. {Math.abs(row.val).toLocaleString('en-US')}
                   </span>
@@ -969,14 +969,14 @@ return (
                     fontSize: isNetProfit ? sz('11px','13px','15px') : sz('8.5px','9.5px','10.5px'),
                     borderBottom: '1px solid #f8fafc',
                   }}>
-                    <span style={{ color: '#475569' }}>{item}</span>
+                    <span style={{ color: '#1e293b' }}>{item}</span>
                     <div style={{ textAlign: 'right' }}>
                       {hasAmt && (
                         <span style={{ color: isNetProfit ? (Number(amt) >= 0 ? '#059669' : '#dc2626') : isGrossProfit ? '#4f46e5' : Number(amt) < 0 ? '#dc2626' : '#1e293b', fontWeight: isHeader ? 900 : 600 }}>
                           {Number(amt) < 0 ? '− ' : ''}Rs.{Math.abs(Number(amt)).toLocaleString('en-US')}
                         </span>
                       )}
-                      {note && <span style={{ fontSize: sz('7px','7.5px','8px'), color: '#94a3b8', marginLeft: '6px' }}>{note}</span>}
+                      {note && <span style={{ fontSize: sz('7px','7.5px','8px'), color: '#1e293b', marginLeft: '6px' }}>{note}</span>}
                     </div>
                   </div>
                 );
@@ -1006,7 +1006,7 @@ return (
                 <tr key={i} style={{ borderBottom: '1px solid #f1f5f9', background: i % 2 === 0 ? '#fff' : '#f8fafc', pageBreakInside: 'avoid', breakInside: 'avoid' }}>
                   <td style={{ padding: sz('6px','8px','9px'), fontWeight: 600, wordBreak: 'break-word', lineHeight: sz('1.5','1.55','1.6') }}>
                     {rName}
-                    {rBrand ? <span style={{ fontSize: '7.5px', color: '#94a3b8', display: 'block' }}>{rBrand}</span> : null}
+                    {rBrand ? <span style={{ fontSize: '7.5px', color: '#1e293b', display: 'block' }}>{rBrand}</span> : null}
                   </td>
                   {data.view !== 'Receivables' && <td style={{ padding: sz('6px','8px','9px'), textAlign: 'center', whiteSpace: 'nowrap' }}>{Number(rQty).toLocaleString('en-US')}</td>}
                   {data.view !== 'Receivables' && <td style={{ padding: sz('6px','8px','9px'), textAlign: 'right', whiteSpace: 'nowrap' }}>Rs.{Number(rRev).toLocaleString('en-US')}</td>}
@@ -1017,7 +1017,7 @@ return (
                 );
               })}
               {safeRows.length === 0 && (
-                <tr><td colSpan={data.view === 'Receivables' ? 2 : 4} style={{ padding: '16px', textAlign: 'center', color: '#94a3b8' }}>No data</td></tr>
+                <tr><td colSpan={data.view === 'Receivables' ? 2 : 4} style={{ padding: '16px', textAlign: 'center', color: '#1e293b' }}>No data</td></tr>
               )}
             </tbody>
             {safeRows.length > 0 && (() => {
@@ -1080,11 +1080,11 @@ return (
                     const { qty, uib, boxes, loose } = getDispatchParts(item);
                     const rawUnit = item?.unit || findProduct(item)?.unit || '';
                     const unitLabel = rawUnit && isNaN(rawUnit) && String(rawUnit).trim().length > 1 ? rawUnit : '';
-                    if (uib <= 1) return <span style={{ fontWeight: 800, color: '#1e293b' }}>{qty}{unitLabel && <span style={{ fontWeight: 500, color: '#64748b', fontSize: sz('7.5px','8px','8.5px'), marginLeft: '3px' }}>{unitLabel}</span>}</span>;
+                    if (uib <= 1) return <span style={{ fontWeight: 800, color: '#1e293b' }}>{qty}{unitLabel && <span style={{ fontWeight: 500, color: '#334155', fontSize: sz('7.5px','8px','8.5px'), marginLeft: '3px' }}>{unitLabel}</span>}</span>;
                     return (
                       <div>
                         <div style={{ fontWeight: 800, color: '#1e293b', fontSize: sz('9.5px','10px','11px') }}>
-                          {qty}{unitLabel && <span style={{ fontWeight: 500, color: '#64748b', fontSize: sz('7.5px','8px','8.5px'), marginLeft: '3px' }}>{unitLabel}</span>}
+                          {qty}{unitLabel && <span style={{ fontWeight: 500, color: '#334155', fontSize: sz('7.5px','8px','8.5px'), marginLeft: '3px' }}>{unitLabel}</span>}
                         </div>
                         {boxes > 0 && (
                           <div style={{ marginTop: '2px', display: 'flex', flexWrap: 'wrap', gap: '2px' }}>
@@ -1103,7 +1103,7 @@ return (
                   })() : (item?.quantity || 0)}
                 </td>
                 {(docType === 'invoice' || docType === 'estimate') && (
-                  <td style={{ padding: sz('6px 2px','8px 4px','9px 6px'), textAlign: 'right', color: '#475569', whiteSpace: 'nowrap' }}>
+                  <td style={{ padding: sz('6px 2px','8px 4px','9px 6px'), textAlign: 'right', color: '#1e293b', whiteSpace: 'nowrap' }}>
                     {item?.isBonus ? (
                       <span style={{ color: '#059669', fontWeight: 800, fontSize: sz('7px','8px','9px'), textTransform: 'uppercase' }}>Free</span>
                     ) : (
@@ -1117,7 +1117,7 @@ return (
                       </>
                     )}
                     {item?.isBonus && item?.originalPrice && (
-                      <span style={{ display: 'block', fontSize: '7px', textDecoration: 'line-through', color: '#94a3b8', marginTop: '1px' }}>
+                      <span style={{ display: 'block', fontSize: '7px', textDecoration: 'line-through', color: '#1e293b', marginTop: '1px' }}>
                         Rs.{item.originalPrice}
                       </span>
                     )}
@@ -1134,7 +1134,7 @@ return (
             ))}
             {safeItems.length === 0 && (
               <tr>
-                <td colSpan={(docType === 'invoice' || docType === 'estimate') ? (isThermal ? 3 : 4) : 2} style={{ padding: '16px', textAlign: 'center', color: '#94a3b8' }}>
+                <td colSpan={(docType === 'invoice' || docType === 'estimate') ? (isThermal ? 3 : 4) : 2} style={{ padding: '16px', textAlign: 'center', color: '#1e293b' }}>
                   No items
                 </td>
               </tr>
@@ -1147,7 +1147,7 @@ return (
             return (
               <tfoot>
                 <tr style={{ borderTop: '2px solid #1e293b' }}>
-                  <td style={{ padding: sz('6px 2px','8px 4px','9px 6px'), fontWeight: 700, fontSize: sz('8px','9px','10px'), color: '#475569' }}>
+                  <td style={{ padding: sz('6px 2px','8px 4px','9px 6px'), fontWeight: 700, fontSize: sz('8px','9px','10px'), color: '#1e293b' }}>
                     Total SKUs: <strong style={{ color: '#1e293b' }}>{safeItems.length}</strong>
                   </td>
                   <td colSpan={1} style={{ padding: sz('6px','8px','9px'), textAlign: 'left', fontWeight: 800, color: '#1e293b' }}>
@@ -1174,7 +1174,7 @@ return (
           {docType === 'invoice' && safeItems.length > 0 && (
             <tfoot>
               <tr style={{ borderTop: '2px solid #1e293b' }}>
-                <td style={{ padding: sz('6px 2px','8px 4px','9px 6px'), fontWeight: 700, fontSize: sz('8px','9px','10px'), color: '#475569' }}>
+                <td style={{ padding: sz('6px 2px','8px 4px','9px 6px'), fontWeight: 700, fontSize: sz('8px','9px','10px'), color: '#1e293b' }}>
                   Total SKUs: <strong style={{ color: '#1e293b' }}>{safeItems.length}</strong>
                 </td>
                 <td style={{ padding: sz('6px 2px','8px 4px','9px 6px'), textAlign: 'center', fontWeight: 800, color: '#1e293b', fontSize: sz('8px','9px','10px') }}>
@@ -1198,7 +1198,7 @@ return (
                 { label: 'Estimated Total', val: `Rs. ${estimateGrandTotal.toLocaleString('en-US')}`, bold: true, large: true, divider: true },
               ].filter(Boolean).map((row, i) => (
                 <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: sz('3px','4px','5px'), borderTop: row.divider ? '1px solid #e2e8f0' : 'none', paddingTop: row.divider ? sz('4px','5px','7px') : 0, marginTop: row.divider ? sz('3px','4px','5px') : 0, fontWeight: row.bold ? 800 : 500, fontSize: row.large ? sz('10px','12px','13px') : sz('8px','9px','10px'), fontVariantNumeric: 'tabular-nums' }}>
-                  <span style={{ color: row.muted ? '#94a3b8' : '#475569' }}>{row.label}:</span>
+                  <span style={{ color: row.muted ? '#1e293b' : '#1e293b' }}>{row.label}:</span>
                   <span style={{ color: row.bold ? '#7c3aed' : '#1e293b' }}>{row.val}</span>
                 </div>
               ))}
@@ -1225,7 +1225,7 @@ return (
                 received > 0 && { label: 'Payment Received', val: `− Rs. ${received.toLocaleString('en-US')}`, color: '#059669' },
               ].filter(Boolean).map((row, i) => row && (
                 <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: sz('3px','4px','5px'), borderTop: row.divider || row.top ? '1px solid #e2e8f0' : 'none', paddingTop: row.divider || row.top ? sz('4px','5px','7px') : 0, marginTop: row.divider || row.top ? sz('3px','4px','5px') : 0, fontWeight: row.bold ? 800 : 500, fontSize: row.large ? sz('10px','12px','13px') : sz('8px','9px','10px') }}>
-                  <span style={{ color: row.muted ? '#94a3b8' : '#475569' }}>{row.label}:</span>
+                  <span style={{ color: row.muted ? '#1e293b' : '#1e293b' }}>{row.label}:</span>
                   <span style={{ color: row.color || '#1e293b', fontVariantNumeric: 'tabular-nums' }}>{row.val}</span>
                 </div>
               ))}
@@ -1255,7 +1255,7 @@ return (
                 { label: 'Balance After Return', val: `Rs. ${newBalance.toLocaleString('en-US')}`, bold: true, color: newBalance <= 0 ? '#059669' : '#1e293b' },
               ].map((row, i) => (
                 <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: sz('3px','4px','5px'), borderTop: row.divider || row.top ? '1px solid #e2e8f0' : 'none', paddingTop: row.divider || row.top ? sz('4px','5px','7px') : 0, marginTop: row.divider || row.top ? sz('3px','4px','5px') : 0, fontWeight: row.bold ? 800 : 500, fontSize: row.large ? sz('10px','12px','13px') : sz('8px','9px','10px'), fontVariantNumeric: 'tabular-nums' }}>
-                  <span style={{ color: '#475569' }}>{row.label}:</span>
+                  <span style={{ color: '#1e293b' }}>{row.label}:</span>
                   <span style={{ color: row.color || '#1e293b' }}>{row.val}</span>
                 </div>
               ))}
@@ -1264,7 +1264,7 @@ return (
                 <span>Rs. {newBalance.toLocaleString('en-US')}</span>
               </div>
               {(data.originalInvoiceId || data.reason) && (
-                <div style={{ marginTop: sz('6px','8px','10px'), fontSize: sz('7px','8px','9px'), color: '#64748b', lineHeight: 1.6 }}>
+                <div style={{ marginTop: sz('6px','8px','10px'), fontSize: sz('7px','8px','9px'), color: '#334155', lineHeight: 1.6 }}>
                   {data.originalInvoiceId && <div><strong>Ref Invoice:</strong> {data.originalInvoiceId}</div>}
                   {data.reason && <div><strong>Reason:</strong> {data.reason}</div>}
                 </div>
@@ -1321,7 +1321,7 @@ return (
                 <div key={i} style={{ padding: sz('1.5px 0','2px 0','3px 0') }}>{item}</div>
               ))}
             </div>
-            <div style={{ marginTop: sz('4px','6px','8px'), textAlign: 'center', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '1px', fontSize: sz('6px','7px','7.5px'), borderTop: '1px dashed #cbd5e1', paddingTop: sz('4px','5px','6px') }}>
+            <div style={{ marginTop: sz('4px','6px','8px'), textAlign: 'center', fontWeight: 800, color: '#1e293b', textTransform: 'uppercase', letterSpacing: '1px', fontSize: sz('6px','7px','7.5px'), borderTop: '1px dashed #cbd5e1', paddingTop: sz('4px','5px','6px') }}>
               {showOnDocs ? `${bizName}${bizTagline ? ` · ${bizTagline}` : ''}` : ''}
             </div>
           </div>
@@ -1352,7 +1352,7 @@ return (
         </div>
         <div style={{ borderTop: '2px solid #1e293b', paddingTop: sz('10px','14px','16px') }}>
           {[
-            { label: 'Previous Balance', val: `Rs. ${(data.prevBalance || 0).toLocaleString('en-US')}`, color: '#64748b' },
+            { label: 'Previous Balance', val: `Rs. ${(data.prevBalance || 0).toLocaleString('en-US')}`, color: '#334155' },
             { label: 'Cash / Cheque Received', val: `− Rs. ${(data.receivedAmount || 0).toLocaleString('en-US')}`, color: '#059669' },
             (data.discount || 0) > 0 && { label: 'Round-off Discount', val: `− Rs. ${Number(data.discount).toLocaleString('en-US')}`, color: '#d97706' },
             (data.discount || 0) > 0 && { label: 'Total Credited', val: `− Rs. ${(data.totalCredit || data.receivedAmount || 0).toLocaleString('en-US')}`, color: '#059669', bold: true },
@@ -1378,13 +1378,13 @@ return (
         {/* Compact summary bar — 4 figures inline, smaller for thermal */}
         <div className="keep-together" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: sz('4px','6px','8px'), marginBottom: sz('12px','14px','16px') }}>
           {[
-            { label: 'Opening', val: data.openingBal || 0, color: '#475569', bg: '#f8fafc', border: '#e2e8f0' },
+            { label: 'Opening', val: data.openingBal || 0, color: '#1e293b', bg: '#f8fafc', border: '#e2e8f0' },
             { label: 'Debit (Dr)', val: data.totalDebit || 0, color: '#4338ca', bg: '#eef2ff', border: '#c7d2fe' },
             { label: 'Credit (Cr)', val: data.totalCredit || 0, color: '#059669', bg: '#f0fdf4', border: '#bbf7d0' },
             { label: 'Balance', val: closingBal, color: closingBal > 0 ? '#be123c' : '#065f46', bg: closingBal > 0 ? '#fff1f2' : '#f0fdf4', border: closingBal > 0 ? '#fecdd3' : '#bbf7d0' },
           ].map((item, i) => (
             <div key={i} style={{ background: item.bg, border: `1px solid ${item.border}`, borderRadius: sz('6px','7px','8px'), padding: sz('4px 4px','5px 6px','6px 8px'), textAlign: 'center' }}>
-              <div style={{ fontSize: sz('5.5px','6.5px','7px'), fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', color: '#94a3b8', marginBottom: '2px', whiteSpace: 'nowrap' }}>{item.label}</div>
+              <div style={{ fontSize: sz('5.5px','6.5px','7px'), fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', color: '#1e293b', marginBottom: '2px', whiteSpace: 'nowrap' }}>{item.label}</div>
               <div style={{ fontSize: sz('8px','10px','11px'), fontWeight: 900, color: item.color, fontVariantNumeric: 'tabular-nums', lineHeight: 1.2, wordBreak: 'break-all' }}>Rs.{item.val.toLocaleString('en-US')}</div>
             </div>
           ))}
@@ -1404,20 +1404,20 @@ return (
           <tbody>
             {safeRows.map((row, i) => (
               <tr key={row.id || i} style={{ borderBottom: '1px solid #f1f5f9', background: i % 2 === 0 ? '#fff' : '#f8fafc', pageBreakInside: 'avoid', breakInside: 'avoid' }}>
-                <td style={{ padding: sz('5px 2px','7px 4px','8px 6px'), color: '#64748b', whiteSpace: 'nowrap', fontSize: sz('6.5px','8px','9px') }}>
+                <td style={{ padding: sz('5px 2px','7px 4px','8px 6px'), color: '#334155', whiteSpace: 'nowrap', fontSize: sz('6.5px','8px','9px') }}>
                   {formatDateDisp(row.date)}
                 </td>
                 <td style={{ padding: sz('5px 2px','7px 4px','8px 6px'), wordBreak: 'break-word' }}>
                   <span style={{ fontWeight: 700, display: 'block', lineHeight: sz('1.5','1.55','1.6'), color: row.isCreditNote ? '#be123c' : '#1e293b', fontSize: sz('7px','8.5px','9.5px') }}>{row.desc || '—'}</span>
-                  {!isSimple && <span style={{ fontSize: sz('6px','7px','7.5px'), color: '#94a3b8', fontWeight: 500, display: 'block', marginTop: '1px', wordBreak: 'break-all' }}>{row.ref || ''}</span>}
+                  {!isSimple && <span style={{ fontSize: sz('6px','7px','7.5px'), color: '#1e293b', fontWeight: 500, display: 'block', marginTop: '1px', wordBreak: 'break-all' }}>{row.ref || ''}</span>}
                   {!isSimple && (row.lineItems || []).length > 0 && (row.lineItems || []).map((li, idx) => (
-                    <div key={idx} style={{ fontSize: sz('6px','7px','7.5px'), color: '#475569', display: 'flex', justifyContent: 'space-between', marginTop: '2px', paddingLeft: '6px' }}>
+                    <div key={idx} style={{ fontSize: sz('6px','7px','7.5px'), color: '#1e293b', display: 'flex', justifyContent: 'space-between', marginTop: '2px', paddingLeft: '6px' }}>
                       <span style={{ flex: 1 }}>{li.isBonus ? '🎁 ' : '• '}{li.name} ×{li.qty}{!li.isBonus && ` @ Rs.${(li.price||0).toLocaleString('en-US')}`}</span>
                       <span style={{ fontWeight: 700, marginLeft: '6px', flexShrink: 0 }}>{li.isBonus ? 'FREE' : `Rs.${(li.subtotal||0).toLocaleString('en-US')}`}</span>
                     </div>
                   ))}
                   {!isSimple && (row.deliveryBilled || 0) > 0 && (
-                    <div style={{ fontSize: sz('6px','7px','7.5px'), color: '#94a3b8', display: 'flex', justifyContent: 'space-between', paddingLeft: '6px', marginTop: '1px' }}>
+                    <div style={{ fontSize: sz('6px','7px','7.5px'), color: '#1e293b', display: 'flex', justifyContent: 'space-between', paddingLeft: '6px', marginTop: '1px' }}>
                       <span>+ Delivery</span><span>Rs.{(row.deliveryBilled||0).toLocaleString('en-US')}</span>
                     </div>
                   )}
@@ -1434,7 +1434,7 @@ return (
               </tr>
             ))}
             {safeRows.length === 0 && (
-              <tr><td colSpan={5} style={{ padding: '12px', textAlign: 'center', color: '#94a3b8' }}>No transactions in this period</td></tr>
+              <tr><td colSpan={5} style={{ padding: '12px', textAlign: 'center', color: '#1e293b' }}>No transactions in this period</td></tr>
             )}
           </tbody>
           <tfoot>
