@@ -311,8 +311,11 @@ const buildHtmlDoc = (screenHide = false) => {
   }
   const paperW  = isThermal ? '80mm' : isA5 ? '148mm' : '210mm';
   const padding = isThermal ? '12px' : isA5 ? '20px' : '28px';
+  // Thermal: pin clone to exactly the print content width (80mm paper − 3mm padding × 2)
+  // so the fixed-layout table calculates column widths correctly at render time —
+  // no reflowing needed when @media print constrains the page.
   const widthCss = isThermal
-    ? 'width:100%;max-width:100%'
+    ? 'width:74mm;max-width:74mm'
     : `width:100%;max-width:${paperW}`;
   clone.style.cssText = [
     widthCss, 'margin:0 auto', `padding:${padding}`, 'background:white',
@@ -345,7 +348,7 @@ const buildHtmlDoc = (screenHide = false) => {
   const pageSize   = isThermal ? '80mm auto' : isA5 ? 'A5 portrait' : 'A4 portrait';
   // Thermal: 3mm all sides — clears typical 1–2mm hardware non-printable zone
   const pageMargin = isThermal ? '3mm' : '10mm';
-  const bodyPad    = isThermal ? '4px' : '16px';
+  const bodyPad    = isThermal ? '3mm' : '16px';
   const docTitle   = getFileName().replace(/\.[^.]+$/, '');
   const html = `<!DOCTYPE html>
 <html lang="en">
