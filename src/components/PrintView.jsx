@@ -312,11 +312,11 @@ const buildHtmlDoc = () => {
   const paperW  = isThermal ? '80mm' : isA5 ? '148mm' : '210mm';
   const padding = isThermal ? '12px' : isA5 ? '20px' : '28px';
   const widthCss = isThermal
-    ? 'width:80mm;max-width:80mm;min-width:80mm'
+    ? 'width:100%;max-width:100%'
     : `width:100%;max-width:${paperW}`;
   clone.style.cssText = [
     widthCss, 'margin:0 auto', `padding:${padding}`, 'background:white',
-    `font-family:${isThermal ? "'Courier New',Courier,monospace" : 'system-ui,-apple-system,sans-serif'}`,
+    `font-family:${isThermal ? "'Courier New','Courier',monospace" : 'system-ui,-apple-system,sans-serif'}`,
     `font-size:${isThermal ? '9px' : isA5 ? '11px' : '12px'}`,
     'line-height:1.5', 'box-sizing:border-box',
   ].join(';');
@@ -333,7 +333,7 @@ const buildHtmlDoc = () => {
   <title>${docTitle}</title>
   <style>
     *{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
-    body{margin:0;padding:${bodyPad};background:white;font-family:${isThermal ? "'Courier New',Courier,monospace" : 'system-ui,-apple-system,sans-serif'};${isThermal ? 'font-weight:bold;' : ''}}
+    body{margin:0;padding:${bodyPad};background:white;font-family:${isThermal ? "'Courier New','Courier',monospace" : 'system-ui,-apple-system,sans-serif'};${isThermal ? 'font-weight:bold;' : ''}}
     @page{size:${pageSize};margin:0;}
     @media print{body{padding:${pageMargin};background:white;}#doc>*{width:100%!important;max-width:none!important;min-width:0!important;padding-left:0!important;padding-right:0!important;}}
     @media print{
