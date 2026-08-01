@@ -346,6 +346,7 @@ const buildHtmlDoc = () => {
         text-shadow:none!important;
       }
       #doc [data-dk]{background-color:black!important;border-color:black!important;}
+      #doc [data-dk] *{background-color:transparent!important;}
       #doc [data-dk],#doc [data-dk] *{color:white!important;}
     }
   </style>
