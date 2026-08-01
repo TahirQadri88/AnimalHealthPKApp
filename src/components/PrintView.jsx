@@ -345,10 +345,8 @@ const buildHtmlDoc = () => {
         box-shadow:none!important;
         text-shadow:none!important;
       }
-      ${isThermal ? `
       #doc [data-dk]{background-color:black!important;border-color:black!important;}
       #doc [data-dk],#doc [data-dk] *{color:white!important;}
-      ` : ''}
     }
   </style>
 </head>
