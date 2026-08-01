@@ -775,7 +775,7 @@ return (
     <div className="keep-together" style={{ textAlign: 'center', marginBottom: sz('14px','18px','22px'), borderRadius: isThermal ? '0' : sz('','6px 6px 0 0','8px 8px 0 0'), overflow: 'hidden', border: '2px solid #0f172a' }}>
       {showOnDocs && (
         <div data-dk="1" style={{ background: '#0f172a', padding: sz('12px 10px','18px 20px','22px 24px') }}>
-          <div style={{ fontSize: sz('16px','20px','24px'), fontWeight: 900, letterSpacing: '1px', textTransform: 'uppercase', color: '#f8fafc', lineHeight: 1.2 }}>
+          <div style={{ fontSize: sz('16px','20px','24px'), fontWeight: 900, letterSpacing: '1px', textTransform: 'uppercase', color: '#FFF200', lineHeight: 1.2 }}>
             {bizName}
           </div>
           {bizTagline && <div style={{ fontSize: sz('7px','8px','9px'), textTransform: 'uppercase', letterSpacing: '2px', fontWeight: 600, color: '#94a3b8', marginTop: '4px' }}>
@@ -791,7 +791,7 @@ return (
         letterSpacing: '3px',
         fontSize: sz('7px','9px','10px'),
         textAlign: 'center',
-        color: '#cbd5e1',
+        color: '#FFF200',
         lineHeight: 1.4,
       }}>
         {docLabel}
@@ -1233,7 +1233,7 @@ return (
                   <span style={{ color: row.color || '#0f172a', fontVariantNumeric: 'tabular-nums' }}>{row.val}</span>
                 </div>
               ))}
-              <div data-dk="1" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#0f172a', borderRadius: sz('4px','5px','6px'), marginTop: sz('6px','8px','10px'), padding: sz('6px 8px','8px 12px','10px 14px'), fontWeight: 900, fontSize: sz('12px','13px','15px'), color: '#f8fafc', fontVariantNumeric: 'tabular-nums' }}>
+              <div data-dk="1" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#0f172a', borderRadius: sz('4px','5px','6px'), marginTop: sz('6px','8px','10px'), padding: sz('6px 8px','8px 12px','10px 14px'), fontWeight: 900, fontSize: sz('12px','13px','15px'), color: '#FFF200', fontVariantNumeric: 'tabular-nums' }}>
                 <span>Net Balance:</span>
                 <span>Rs. {(showPrevBal ? netBalance : ((data.total || 0) - received)).toLocaleString('en-US')}</span>
               </div>
