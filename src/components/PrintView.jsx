@@ -797,7 +797,7 @@ return (
 
     {/* ── Customer / Doc Meta ── */}
     {docType !== 'report' && data && (
-      <div className="keep-together" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: sz('14px','16px','20px'), gap: '8px' }}>
+      <div className="keep-together" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: sz('14px','16px','20px'), gap: '8px', background: 'linear-gradient(135deg,#eff6ff 0%,#f0fdfa 100%)', borderRadius: sz('6px','7px','8px'), borderLeft: `3px solid #1d4ed8`, padding: sz('8px 6px','10px 10px','12px 14px') }}>
         {/* Left: customer */}
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: sz('7px','8.5px','9px'), textTransform: 'uppercase', fontWeight: 700, letterSpacing: '1.2px', color: '#1d4ed8', marginBottom: '3px' }}>
@@ -807,11 +807,11 @@ return (
             {data.customerName || 'Unknown'}
           </div>
           {docType === 'dispatch' && data.customerDetails && (
-            <div style={{ marginTop: '6px', fontSize: sz('8.5px','10px','11px'), color: '#334155', background: '#f8fafc', padding: '8px 10px', borderRadius: '6px', border: '1px solid #e2e8f0', lineHeight: 1.7, display: 'flex', flexDirection: 'column', gap: sz('4px','5px','6px') }}>
+            <div style={{ marginTop: '6px', fontSize: sz('8.5px','10px','11px'), color: '#1e3a5f', background: '#dbeafe', padding: '8px 10px', borderRadius: '6px', border: '1px solid #93c5fd', lineHeight: 1.7, display: 'flex', flexDirection: 'column', gap: sz('4px','5px','6px') }}>
               {(data.customerDetails.contactPerson || data.customerDetails.phone) && (
                 <div style={{ fontWeight: 700 }}>
                   {data.customerDetails.contactPerson || 'N/A'}
-                  {data.customerDetails.phone && <span style={{ fontWeight: 400, color: '#334155' }}> · {data.customerDetails.phone}</span>}
+                  {data.customerDetails.phone && <span style={{ fontWeight: 400, color: '#1e3a5f' }}> · {data.customerDetails.phone}</span>}
                 </div>
               )}
               {(() => {
@@ -819,7 +819,7 @@ return (
                 const addr = useKey === 'address2' ? data.customerDetails.address2 : data.customerDetails.address1;
                 const mapLink = useKey === 'address2' ? data.customerDetails.map2 : data.customerDetails.map1;
                 return (<>
-                  {addr && <div style={{ color: '#334155' }}>{addr}</div>}
+                  {addr && <div style={{ color: '#1e3a5f' }}>{addr}</div>}
                   {mapLink && (
                     <div style={{ fontSize: sz('7.5px','8.5px','9px'), color: '#6366f1', wordBreak: 'break-all', lineHeight: 1.6 }}>
                       🗺 {mapLink}
@@ -839,10 +839,10 @@ return (
           {docType !== 'ledger' && (
             <>
               <div style={{ fontSize: sz('7px','8.5px','9px'), textTransform: 'uppercase', fontWeight: 700, letterSpacing: '1px', color: '#1d4ed8', marginBottom: '2px' }}>Ref #</div>
-              <div style={{ fontWeight: 800, fontSize: sz('11px','12px','13px'), color: '#1e293b', lineHeight: 1.2, fontFamily: 'monospace', wordBreak: 'break-all' }}>{data.id || '—'}</div>
-              <div style={{ color: '#334155', fontSize: sz('9px','10px','11px'), marginTop: '2px', fontWeight: 600 }}>{formatDateDisp(data.date)}</div>
+              <div style={{ fontWeight: 900, fontSize: sz('11px','13px','14px'), color: '#1d4ed8', lineHeight: 1.2, fontFamily: 'monospace', wordBreak: 'break-all' }}>{data.id || '—'}</div>
+              <div style={{ color: '#0d9488', fontSize: sz('9px','10px','11px'), marginTop: '3px', fontWeight: 700 }}>{formatDateDisp(data.date)}</div>
               {docType === 'invoice' && data.salespersonName && (
-                <div style={{ fontSize: sz('8px','9px','10px'), color: '#1e293b', marginTop: '2px', wordBreak: 'break-word' }}>by {data.salespersonName}</div>
+                <div style={{ display: 'inline-block', marginTop: sz('3px','4px','5px'), padding: sz('1px 4px','2px 6px','2px 7px'), background: '#ede9fe', color: '#5b21b6', borderRadius: '20px', fontSize: sz('7px','8px','9px'), fontWeight: 700, wordBreak: 'break-word' }}>by {data.salespersonName}</div>
               )}
             </>
           )}
