@@ -341,11 +341,14 @@ const buildHtmlDoc = () => {
         color:black!important;
         background-color:white!important;
         background-image:none!important;
-        border-color:#000!important;
+        border-color:#ccc!important;
         box-shadow:none!important;
         text-shadow:none!important;
       }
-      [data-dk],[data-dk] *{color:white!important;}
+      ${isThermal ? `
+      #doc [data-dk]{background-color:black!important;border-color:black!important;}
+      #doc [data-dk],#doc [data-dk] *{color:white!important;}
+      ` : ''}
     }
   </style>
 </head>
@@ -771,7 +774,7 @@ return (
     {/* ── Header ── */}
     <div className="keep-together" style={{ textAlign: 'center', marginBottom: sz('14px','18px','22px'), borderRadius: isThermal ? '0' : sz('','6px 6px 0 0','8px 8px 0 0'), overflow: 'hidden', border: '2px solid #0f172a' }}>
       {showOnDocs && (
-        <div style={{ background: '#0f172a', padding: sz('12px 10px','18px 20px','22px 24px') }}>
+        <div data-dk="1" style={{ background: '#0f172a', padding: sz('12px 10px','18px 20px','22px 24px') }}>
           <div style={{ fontSize: sz('16px','20px','24px'), fontWeight: 900, letterSpacing: '1px', textTransform: 'uppercase', color: '#f8fafc', lineHeight: 1.2 }}>
             {bizName}
           </div>
@@ -780,7 +783,7 @@ return (
           </div>}
         </div>
       )}
-      <div style={{
+      <div data-dk="1" style={{
         background: '#1e293b',
         padding: isThermal ? '4px 0' : '6px 0',
         fontWeight: 700,
@@ -1230,7 +1233,7 @@ return (
                   <span style={{ color: row.color || '#0f172a', fontVariantNumeric: 'tabular-nums' }}>{row.val}</span>
                 </div>
               ))}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#0f172a', borderRadius: sz('4px','5px','6px'), marginTop: sz('6px','8px','10px'), padding: sz('6px 8px','8px 12px','10px 14px'), fontWeight: 900, fontSize: sz('12px','13px','15px'), color: '#f8fafc', fontVariantNumeric: 'tabular-nums' }}>
+              <div data-dk="1" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#0f172a', borderRadius: sz('4px','5px','6px'), marginTop: sz('6px','8px','10px'), padding: sz('6px 8px','8px 12px','10px 14px'), fontWeight: 900, fontSize: sz('12px','13px','15px'), color: '#f8fafc', fontVariantNumeric: 'tabular-nums' }}>
                 <span>Net Balance:</span>
                 <span>Rs. {(showPrevBal ? netBalance : ((data.total || 0) - received)).toLocaleString('en-US')}</span>
               </div>
