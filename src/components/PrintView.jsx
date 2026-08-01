@@ -336,16 +336,17 @@ const buildHtmlDoc = () => {
     body{margin:0;padding:${bodyPad};background:white;font-family:system-ui,-apple-system,sans-serif;}
     @page{size:${pageSize};margin:0;}
     @media print{body{padding:${pageMargin};background:white;}#doc>*{width:100%!important;max-width:none!important;min-width:0!important;padding-left:0!important;padding-right:0!important;}}
-    ${isThermal ? `@media print{
+    @media print{
       #doc *{
         color:black!important;
         background-color:white!important;
+        background-image:none!important;
         border-color:#000!important;
         box-shadow:none!important;
         text-shadow:none!important;
       }
       [data-dk],[data-dk] *{color:white!important;}
-    }` : ''}
+    }
   </style>
 </head>
 <body>
