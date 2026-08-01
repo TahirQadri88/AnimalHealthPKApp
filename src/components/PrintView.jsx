@@ -376,6 +376,8 @@ const handlePrint = () => {
   if (!newWin) { showToast('Allow popups to enable printing', 'error'); return; }
   newWin.document.open(); newWin.document.write(augmented); newWin.document.close();
   newWin.document.title = docTitle;
+  const closeAfterPrint = () => { try { newWin.close(); } catch(e) {} };
+  newWin.onafterprint = closeAfterPrint;
   const tid = setTimeout(() => { try { newWin.focus(); newWin.print(); } catch(e){} }, 900);
   newWin.onload = () => { clearTimeout(tid); newWin.focus(); newWin.print(); };
 };
