@@ -321,9 +321,9 @@ const buildHtmlDoc = () => {
     'line-height:1.5', 'box-sizing:border-box',
   ].join(';');
   const pageSize   = isThermal ? '80mm auto' : isA5 ? 'A5 portrait' : 'A4 portrait';
-  // Thermal: 5mm all sides — symmetric, clears most printers' 3–4mm hardware non-printable zone
-  const pageMargin = isThermal ? '5mm' : '10mm';
-  const bodyPad    = isThermal ? '8px' : '16px';
+  // Thermal: 3mm all sides — clears typical 1–2mm hardware non-printable zone with minimal waste
+  const pageMargin = isThermal ? '3mm' : '10mm';
+  const bodyPad    = isThermal ? '4px' : '16px';
   const docTitle   = getFileName().replace(/\.[^.]+$/, '');
   const html = `<!DOCTYPE html>
 <html lang="en">
