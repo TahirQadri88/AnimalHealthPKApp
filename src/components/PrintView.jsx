@@ -281,7 +281,7 @@ const generateShareText = () => {
 };
 
 // ── Build standalone HTML doc (shared by print + share) ──────────────────
-const buildHtmlDoc = () => {
+const buildHtmlDoc = (screenHide = false) => {
   const element = document.getElementById('print-document');
   if (!element) return null;
   const clone = element.cloneNode(true);
@@ -335,6 +335,7 @@ const buildHtmlDoc = () => {
     *{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
     body{margin:0;padding:${bodyPad};background:white;font-family:${isThermal ? "'Courier New','Courier',monospace" : 'system-ui,-apple-system,sans-serif'};${isThermal ? 'font-weight:bold;' : ''}}
     @page{size:${pageSize};margin:0;}
+    ${screenHide ? '@media screen{body{background:white;}#doc{visibility:hidden;}}' : ''}
     @media print{body{padding:${pageMargin};background:white;}#doc>*{width:100%!important;max-width:none!important;min-width:0!important;padding-left:0!important;padding-right:0!important;}}
     @media print{
       #doc *{
@@ -360,7 +361,7 @@ const buildHtmlDoc = () => {
 
 // ── Print — CSS injection for all formats → native browser print at full DPI ─
 const handlePrint = () => {
-  const result = buildHtmlDoc();
+  const result = buildHtmlDoc(true);
   if (!result) { showToast('Document not found', 'error'); return; }
   const { html, docTitle } = result;
 
