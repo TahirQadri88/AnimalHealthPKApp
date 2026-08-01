@@ -320,6 +320,28 @@ const buildHtmlDoc = (screenHide = false) => {
     `font-size:${isThermal ? '9px' : isA5 ? '11px' : '12px'}`,
     'line-height:1.5', 'box-sizing:border-box',
   ].join(';');
+
+  // For print popup: bake monochrome directly into inline styles so iOS Safari
+  // print preview shows correct colours without relying on @media print cascade.
+  if (screenHide) {
+    clone.querySelectorAll('*').forEach(el => {
+      el.style.color = 'black';
+      el.style.backgroundColor = 'white';
+      el.style.backgroundImage = 'none';
+      el.style.boxShadow = 'none';
+      el.style.textShadow = 'none';
+    });
+    clone.querySelectorAll('[data-dk]').forEach(dk => {
+      dk.style.backgroundColor = 'black';
+      dk.style.borderColor = 'black';
+      dk.style.color = 'white';
+      dk.querySelectorAll('*').forEach(child => {
+        child.style.backgroundColor = 'transparent';
+        child.style.color = 'white';
+      });
+    });
+  }
+
   const pageSize   = isThermal ? '80mm auto' : isA5 ? 'A5 portrait' : 'A4 portrait';
   // Thermal: 3mm all sides — clears typical 1–2mm hardware non-printable zone
   const pageMargin = isThermal ? '3mm' : '10mm';
