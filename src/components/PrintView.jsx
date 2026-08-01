@@ -321,9 +321,9 @@ const buildHtmlDoc = () => {
     'line-height:1.5', 'box-sizing:border-box',
   ].join(';');
   const pageSize   = isThermal ? '80mm auto' : isA5 ? 'A5 portrait' : 'A4 portrait';
-  // Thermal: 3mm all sides — clears typical 1–2mm hardware non-printable zone with minimal waste
-  const pageMargin = isThermal ? '3mm' : '10mm';
-  const bodyPad    = isThermal ? '4px' : '16px';
+  // Thermal: 2mm sides — minimum safe zone; content nearly edge-to-edge like dedicated POS software
+  const pageMargin = isThermal ? '2mm 2mm 2mm 2mm' : '10mm';
+  const bodyPad    = isThermal ? '2px' : '16px';
   const docTitle   = getFileName().replace(/\.[^.]+$/, '');
   const html = `<!DOCTYPE html>
 <html lang="en">
@@ -335,6 +335,10 @@ const buildHtmlDoc = () => {
     *{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
     body{margin:0;padding:${bodyPad};background:white;font-family:system-ui,-apple-system,sans-serif;}
     @page{size:${pageSize};margin:0;}
+    ${isThermal ? `
+    *{-webkit-font-smoothing:none!important;font-smooth:never!important;text-rendering:optimizeSpeed!important;}
+    body{font-weight:600;}
+    ` : ''}
     @media print{body{padding:${pageMargin};background:white;}#doc>*{width:100%!important;max-width:none!important;min-width:0!important;padding-left:0!important;padding-right:0!important;}}
     @media print{
       #doc *{
