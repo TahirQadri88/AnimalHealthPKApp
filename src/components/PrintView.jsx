@@ -765,30 +765,30 @@ return (
     id="print-document"
     ref={printRef}
     className={`bg-white mx-auto ${docWidth} ${pad}`}
-    style={{ fontFamily: "'Inter', system-ui, sans-serif", lineHeight: 1.5, fontSize: isThermal ? '10px' : isA5 ? '11px' : '12px', border: isThermal ? 'none' : '2px solid #1d4ed8', borderRadius: isThermal ? '0' : sz('','10px','12px'), overflow: 'hidden' }}
+    style={{ fontFamily: "'Inter', system-ui, sans-serif", lineHeight: 1.5, fontSize: isThermal ? '10px' : isA5 ? '11px' : '12px', border: isThermal ? 'none' : '1px solid #cbd5e1', borderRadius: isThermal ? '0' : sz('','8px','10px'), overflow: 'hidden' }}
   >
 
     {/* ── Header ── */}
     <div className="keep-together" style={{ textAlign: 'center', marginBottom: sz('14px','18px','22px'), borderRadius: isThermal ? '0' : sz('','6px 6px 0 0','8px 8px 0 0'), overflow: 'hidden', border: '2px solid #0f172a' }}>
       {showOnDocs && (
-        <div style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e3a8a 60%, #1d4ed8 100%)', padding: sz('12px 10px','18px 20px','22px 24px'), position: 'relative' }}>
-          <div style={{ fontSize: sz('16px','20px','24px'), fontWeight: 900, letterSpacing: '-0.5px', textTransform: 'uppercase', color: '#ffffff', lineHeight: 1.2 }}>
+        <div style={{ background: '#0f172a', padding: sz('12px 10px','18px 20px','22px 24px') }}>
+          <div style={{ fontSize: sz('16px','20px','24px'), fontWeight: 900, letterSpacing: '1px', textTransform: 'uppercase', color: '#f8fafc', lineHeight: 1.2 }}>
             {bizName}
           </div>
-          {bizTagline && <div style={{ fontSize: sz('7px','8px','9px'), textTransform: 'uppercase', letterSpacing: '2.5px', fontWeight: 700, color: '#7dd3fc', marginTop: '4px' }}>
+          {bizTagline && <div style={{ fontSize: sz('7px','8px','9px'), textTransform: 'uppercase', letterSpacing: '2px', fontWeight: 600, color: '#94a3b8', marginTop: '4px' }}>
             {bizTagline}
           </div>}
         </div>
       )}
       <div style={{
-        background: 'linear-gradient(90deg, #1d4ed8 0%, #0ea5e9 100%)',
+        background: '#1e293b',
         padding: isThermal ? '4px 0' : '6px 0',
-        fontWeight: 800,
+        fontWeight: 700,
         textTransform: 'uppercase',
         letterSpacing: '3px',
         fontSize: sz('7px','9px','10px'),
         textAlign: 'center',
-        color: '#ffffff',
+        color: '#cbd5e1',
         lineHeight: 1.4,
       }}>
         {docLabel}
@@ -797,7 +797,7 @@ return (
 
     {/* ── Customer / Doc Meta ── */}
     {docType !== 'report' && data && (
-      <div className="keep-together" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: sz('14px','16px','20px'), gap: '8px', background: 'linear-gradient(135deg,#eff6ff 0%,#f0fdfa 100%)', borderRadius: sz('6px','7px','8px'), borderLeft: `3px solid #1d4ed8`, padding: sz('8px 6px','10px 10px','12px 14px') }}>
+      <div className="keep-together" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: sz('14px','16px','20px'), gap: '8px', background: '#f8fafc', borderRadius: sz('6px','7px','8px'), borderLeft: `3px solid #0f172a`, padding: sz('8px 6px','10px 10px','12px 14px') }}>
         {/* Left: customer */}
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: sz('7px','8.5px','9px'), textTransform: 'uppercase', fontWeight: 700, letterSpacing: '1.2px', color: '#1d4ed8', marginBottom: '3px' }}>
@@ -839,10 +839,10 @@ return (
           {docType !== 'ledger' && (
             <>
               <div style={{ fontSize: sz('7px','8.5px','9px'), textTransform: 'uppercase', fontWeight: 700, letterSpacing: '1px', color: '#1d4ed8', marginBottom: '4px' }}>Ref #</div>
-              <div style={{ display: 'inline-block', background: 'linear-gradient(135deg,#1d4ed8,#0ea5e9)', color: '#fff', fontWeight: 900, fontSize: sz('10px','12px','13px'), fontFamily: 'monospace', padding: sz('2px 6px','3px 9px','4px 11px'), borderRadius: '6px', letterSpacing: '0.5px' }}>{data.id || '—'}</div>
-              <div style={{ color: '#0d9488', fontSize: sz('9px','10px','11px'), marginTop: sz('4px','5px','6px'), fontWeight: 700 }}>{formatDateDisp(data.date)}</div>
+              <div style={{ fontWeight: 800, fontSize: sz('11px','13px','14px'), color: '#0f172a', fontFamily: 'monospace', letterSpacing: '0.5px' }}>{data.id || '—'}</div>
+              <div style={{ color: '#475569', fontSize: sz('9px','10px','11px'), marginTop: sz('3px','4px','5px'), fontWeight: 600 }}>{formatDateDisp(data.date)}</div>
               {docType === 'invoice' && data.salespersonName && (
-                <div style={{ display: 'inline-block', marginTop: sz('3px','4px','5px'), padding: sz('1px 5px','2px 7px','2px 8px'), background: '#ede9fe', color: '#5b21b6', borderRadius: '20px', fontSize: sz('7px','8px','9px'), fontWeight: 700 }}>by {data.salespersonName}</div>
+                <div style={{ fontSize: sz('7px','8px','9px'), color: '#64748b', marginTop: sz('3px','4px','5px'), fontWeight: 500 }}>by {data.salespersonName}</div>
               )}
             </>
           )}
@@ -1067,7 +1067,7 @@ return (
           </thead>
           <tbody>
             {safeItems.map((item, idx) => (
-              <tr key={idx} style={{ borderBottom: '1px solid #e2e8f0', pageBreakInside: 'avoid', breakInside: 'avoid', background: idx % 2 === 1 ? '#f0f7ff' : '#ffffff' }}>
+              <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9', pageBreakInside: 'avoid', breakInside: 'avoid', background: idx % 2 === 1 ? '#f8fafc' : '#ffffff' }}>
                 <td style={{ padding: sz('6px 2px 6px 0','8px 4px 8px 0','9px 6px 9px 0'), fontWeight: 600, wordBreak: 'break-word', lineHeight: sz('1.5','1.55','1.6'), color: '#1e293b' }}>
                   {item?.name || '—'}
                   {item?.isBonus && (
@@ -1215,22 +1215,22 @@ return (
           const itemsSubtotal = (data.total || 0) - (data.deliveryBilled || 0) + invoiceDiscount;
 
           return (
-            <div className="keep-together" style={{ marginLeft: 'auto', width: isThermal ? '100%' : sz('','240px','280px'), borderTop: '3px solid #1d4ed8', paddingTop: sz('8px','10px','12px') }}>
+            <div className="keep-together" style={{ marginLeft: 'auto', width: isThermal ? '100%' : sz('','240px','280px'), borderTop: '2px solid #0f172a', paddingTop: sz('8px','10px','12px') }}>
               {[
                 { label: 'Items Subtotal', val: `Rs. ${itemsSubtotal.toLocaleString('en-US')}` },
                 (data.deliveryBilled || 0) > 0 && { label: `Delivery (${data.vehicle || ''})`, val: `Rs. ${Number(data.deliveryBilled).toLocaleString('en-US')}`, muted: true },
-                invoiceDiscount > 0 && { label: 'Discount', val: `− Rs. ${invoiceDiscount.toLocaleString('en-US')}`, color: '#d97706' },
-                { label: 'Current Bill', val: `Rs. ${(data.total || 0).toLocaleString('en-US')}`, bold: true, large: true, divider: true, accent: true },
+                invoiceDiscount > 0 && { label: 'Discount', val: `− Rs. ${invoiceDiscount.toLocaleString('en-US')}`, color: '#b45309' },
+                { label: 'Current Bill', val: `Rs. ${(data.total || 0).toLocaleString('en-US')}`, bold: true, large: true, divider: true },
                 showPrevBal && { label: 'Previous Balance', val: `Rs. ${prevBalance.toLocaleString('en-US')}`, top: true },
                 showPrevBal && { label: 'Subtotal', val: `Rs. ${(prevBalance + (data.total || 0)).toLocaleString('en-US')}`, bold: true },
-                received > 0 && { label: 'Payment Received', val: `− Rs. ${received.toLocaleString('en-US')}`, color: '#059669' },
+                received > 0 && { label: 'Payment Received', val: `− Rs. ${received.toLocaleString('en-US')}`, color: '#15803d' },
               ].filter(Boolean).map((row, i) => row && (
-                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: sz('3px','4px','5px'), borderTop: row.divider || row.top ? '1px solid #e2e8f0' : 'none', paddingTop: row.divider || row.top ? sz('4px','5px','7px') : 0, marginTop: row.divider || row.top ? sz('3px','4px','5px') : 0, fontWeight: row.bold ? 800 : 500, fontSize: row.large ? sz('10px','12px','13px') : sz('8px','9px','10px'), background: row.accent ? '#eff6ff' : 'transparent', borderRadius: row.accent ? '5px' : '0', padding: row.accent ? sz('3px 6px','4px 8px','5px 10px') : undefined }}>
-                  <span style={{ color: row.accent ? '#1d4ed8' : row.muted ? '#1e293b' : '#1e293b' }}>{row.label}:</span>
-                  <span style={{ color: row.color || (row.accent ? '#1d4ed8' : '#1e293b'), fontVariantNumeric: 'tabular-nums' }}>{row.val}</span>
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: sz('3px','4px','5px'), borderTop: row.divider || row.top ? '1px solid #e2e8f0' : 'none', paddingTop: row.divider || row.top ? sz('4px','5px','7px') : 0, marginTop: row.divider || row.top ? sz('3px','4px','5px') : 0, fontWeight: row.bold ? 800 : 500, fontSize: row.large ? sz('10px','12px','13px') : sz('8px','9px','10px') }}>
+                  <span style={{ color: '#334155' }}>{row.label}:</span>
+                  <span style={{ color: row.color || '#0f172a', fontVariantNumeric: 'tabular-nums' }}>{row.val}</span>
                 </div>
               ))}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%)', borderRadius: sz('4px','5px','6px'), marginTop: sz('6px','8px','10px'), padding: sz('6px 8px','8px 12px','10px 14px'), fontWeight: 900, fontSize: sz('12px','13px','15px'), color: '#ffffff', fontVariantNumeric: 'tabular-nums' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#0f172a', borderRadius: sz('4px','5px','6px'), marginTop: sz('6px','8px','10px'), padding: sz('6px 8px','8px 12px','10px 14px'), fontWeight: 900, fontSize: sz('12px','13px','15px'), color: '#f8fafc', fontVariantNumeric: 'tabular-nums' }}>
                 <span>Net Balance:</span>
                 <span>Rs. {(showPrevBal ? netBalance : ((data.total || 0) - received)).toLocaleString('en-US')}</span>
               </div>
