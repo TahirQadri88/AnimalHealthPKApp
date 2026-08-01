@@ -862,8 +862,8 @@ return (
 
     {/* ── Dispatch Logistics ── */}
     {docType === 'dispatch' && data && (
-      <div className="keep-together" style={{ marginBottom: sz('14px','18px','22px'), background: '#fffbeb', padding: sz('8px','12px','14px'), borderRadius: '8px', border: '1px solid #fcd34d', fontSize: sz('9.5px','11px','11.5px'), color: '#78350f' }}>
-        <div style={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '5px', fontSize: sz('7.5px','9.5px','10px'), color: '#92400e' }}>
+      <div className="keep-together" style={{ marginBottom: sz('14px','18px','22px'), background: '#f8fafc', padding: sz('8px','12px','14px'), borderRadius: sz('6px','7px','8px'), borderLeft: '3px solid #0f172a', fontSize: sz('9.5px','11px','11.5px'), color: '#1e293b' }}>
+        <div style={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '5px', fontSize: sz('7.5px','9.5px','10px'), color: '#1d4ed8' }}>
           Logistics / Delivery
         </div>
         <div><strong>Method:</strong> {data.vehicle || 'N/A'}</div>
@@ -1459,7 +1459,7 @@ return (
       marginTop: sz('20px','28px','36px'),
       textAlign: 'center',
       fontSize: sz('7px','7.5px','8px'),
-      color: '#cbd5e1',
+      color: '#64748b',
       fontWeight: 500,
       textTransform: 'uppercase',
       letterSpacing: '1.5px',
