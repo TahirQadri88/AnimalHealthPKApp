@@ -318,7 +318,7 @@ const buildHtmlDoc = (screenHide = false) => {
     ? 'width:74mm;max-width:74mm'
     : `width:100%;max-width:${paperW}`;
   clone.style.cssText = [
-    widthCss, 'margin:0 auto', `padding:${padding}`, 'background:white',
+    widthCss, 'margin:0', `padding:${padding}`, 'background:white',
     `font-family:${isThermal ? "'Courier New','Courier',monospace" : 'system-ui,-apple-system,sans-serif'}`,
     `font-size:${isThermal ? '9px' : isA5 ? '11px' : '12px'}`,
     'line-height:1.5', 'box-sizing:border-box',
