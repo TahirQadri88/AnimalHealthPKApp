@@ -335,7 +335,6 @@ const buildHtmlDoc = (screenHide = false) => {
       el.style.textShadow = 'none';
       if (isThermal) {
         el.style.fontFamily = "'Arial Black', Arial, sans-serif";
-        el.style.fontWeight = '900';
       }
     });
     clone.querySelectorAll('[data-dk]').forEach(dk => {
@@ -362,10 +361,10 @@ const buildHtmlDoc = (screenHide = false) => {
   <title>${docTitle}</title>
   <style>
     *{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
-    body{margin:0;padding:${bodyPad};background:white;font-family:${isThermal ? "'Arial Black','Arial',sans-serif" : 'system-ui,-apple-system,sans-serif'};${isThermal ? 'font-weight:bold;' : ''}}
+    body{margin:0;padding:${bodyPad};background:white;font-family:${isThermal ? "'Arial Black','Arial',sans-serif" : 'system-ui,-apple-system,sans-serif'};}
     @page{size:${pageSize};margin:0;}
     ${screenHide ? '@media screen{body{background:white;}#doc{visibility:hidden;}}' : ''}
-    @media print{body{padding:${pageMargin};background:white;}#doc>*{width:100%!important;max-width:none!important;min-width:0!important;padding-left:0!important;padding-right:0!important;}}
+    @media print{body{padding:${pageMargin};background:white;}#doc>*{${isThermal ? '' : 'width:100%!important;max-width:none!important;min-width:0!important;'}padding-left:0!important;padding-right:0!important;}}
     @media print{
       #doc *{
         color:black!important;
