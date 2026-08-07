@@ -333,6 +333,9 @@ const buildHtmlDoc = (screenHide = false) => {
       el.style.backgroundImage = 'none';
       el.style.boxShadow = 'none';
       el.style.textShadow = 'none';
+      if (isThermal) {
+        el.style.fontFamily = "'Courier New', Courier, monospace";
+      }
     });
     clone.querySelectorAll('[data-dk]').forEach(dk => {
       dk.style.backgroundColor = 'black';
