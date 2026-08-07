@@ -310,12 +310,11 @@ const buildHtmlDoc = (screenHide = false) => {
     });
   }
   const paperW  = isThermal ? '80mm' : isA5 ? '148mm' : '210mm';
-  const padding = isThermal ? '12px' : isA5 ? '20px' : '28px';
-  // Thermal: pin clone to exactly the print content width (80mm paper − 3mm padding × 2)
-  // so the fixed-layout table calculates column widths correctly at render time —
-  // no reflowing needed when @media print constrains the page.
+  const padding = isThermal ? '0' : isA5 ? '20px' : '28px';
+  // Thermal: 72mm = 80mm paper minus 4mm hardware non-printable zone on each side.
+  // No body/clone padding — @page margin 0 4mm handles alignment with the printable zone.
   const widthCss = isThermal
-    ? 'width:74mm;max-width:74mm'
+    ? 'width:72mm;max-width:72mm'
     : `width:100%;max-width:${paperW}`;
   clone.style.cssText = [
     widthCss, 'margin:0', `padding:${padding}`, 'background:white',
@@ -350,8 +349,8 @@ const buildHtmlDoc = (screenHide = false) => {
 
   const pageSize   = isThermal ? '80mm auto' : isA5 ? 'A5 portrait' : 'A4 portrait';
   // Thermal: 3mm all sides — clears typical 1–2mm hardware non-printable zone
-  const pageMargin = isThermal ? '3mm' : '10mm';
-  const bodyPad    = isThermal ? '3mm' : '16px';
+  const pageMargin = isThermal ? '0' : '10mm';
+  const bodyPad    = isThermal ? '0' : '16px';
   const docTitle   = getFileName().replace(/\.[^.]+$/, '');
   const html = `<!DOCTYPE html>
 <html lang="en">
@@ -362,7 +361,7 @@ const buildHtmlDoc = (screenHide = false) => {
   <style>
     *{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
     body{margin:0;padding:${bodyPad};background:white;font-family:${isThermal ? "'Arial Black','Arial',sans-serif" : 'system-ui,-apple-system,sans-serif'};}
-    @page{size:${pageSize};margin:0;}
+    @page{size:${pageSize};margin:${isThermal ? '0 4mm' : '0'};}
     ${screenHide ? '@media screen{body{background:white;}#doc{visibility:hidden;}}' : ''}
     @media print{body{padding:${pageMargin};background:white;}#doc>*{${isThermal ? '' : 'width:100%!important;max-width:none!important;min-width:0!important;'}padding-left:0!important;padding-right:0!important;}}
     @media print{
