@@ -814,18 +814,21 @@ return (
           </div>}
         </div>
       )}
-      <div data-dk="1" style={{
-        background: '#1e293b',
-        padding: isThermal ? '4px 0' : '6px 0',
-        fontWeight: 700,
-        textTransform: 'uppercase',
-        letterSpacing: '3px',
-        fontSize: sz('7px','9px','10px'),
-        textAlign: 'center',
-        color: '#FFF200',
-        lineHeight: 1.4,
-      }}>
-        {docLabel}
+      <div style={{ textAlign: 'center', padding: sz('5px 8px','7px 10px','8px 12px'), background: 'white' }}>
+        <span data-dk="1" style={{
+          display: 'inline-block',
+          background: '#0f172a',
+          color: '#FFF200',
+          padding: sz('3px 12px','4px 16px','5px 20px'),
+          borderRadius: '4px',
+          fontWeight: 800,
+          textTransform: 'uppercase',
+          letterSpacing: '2.5px',
+          fontSize: sz('7px','8.5px','9.5px'),
+          lineHeight: 1.5,
+        }}>
+          {docLabel}
+        </span>
       </div>
     </div>
 
