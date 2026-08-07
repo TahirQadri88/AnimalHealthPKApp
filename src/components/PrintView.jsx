@@ -319,7 +319,7 @@ const buildHtmlDoc = (screenHide = false) => {
     : `width:100%;max-width:${paperW}`;
   clone.style.cssText = [
     widthCss, 'margin:0', `padding:${padding}`, 'background:white',
-    `font-family:${isThermal ? "'Courier New','Courier',monospace" : 'system-ui,-apple-system,sans-serif'}`,
+    `font-family:${isThermal ? "'Arial Black','Arial',sans-serif" : 'system-ui,-apple-system,sans-serif'}`,
     `font-size:${isThermal ? '9px' : isA5 ? '11px' : '12px'}`,
     'line-height:1.5', 'box-sizing:border-box',
   ].join(';');
@@ -334,7 +334,8 @@ const buildHtmlDoc = (screenHide = false) => {
       el.style.boxShadow = 'none';
       el.style.textShadow = 'none';
       if (isThermal) {
-        el.style.fontFamily = "'Courier New', Courier, monospace";
+        el.style.fontFamily = "'Arial Black', Arial, sans-serif";
+        el.style.fontWeight = '900';
       }
     });
     clone.querySelectorAll('[data-dk]').forEach(dk => {
@@ -361,7 +362,7 @@ const buildHtmlDoc = (screenHide = false) => {
   <title>${docTitle}</title>
   <style>
     *{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
-    body{margin:0;padding:${bodyPad};background:white;font-family:${isThermal ? "'Courier New','Courier',monospace" : 'system-ui,-apple-system,sans-serif'};${isThermal ? 'font-weight:bold;' : ''}}
+    body{margin:0;padding:${bodyPad};background:white;font-family:${isThermal ? "'Arial Black','Arial',sans-serif" : 'system-ui,-apple-system,sans-serif'};${isThermal ? 'font-weight:bold;' : ''}}
     @page{size:${pageSize};margin:0;}
     ${screenHide ? '@media screen{body{background:white;}#doc{visibility:hidden;}}' : ''}
     @media print{body{padding:${pageMargin};background:white;}#doc>*{width:100%!important;max-width:none!important;min-width:0!important;padding-left:0!important;padding-right:0!important;}}
