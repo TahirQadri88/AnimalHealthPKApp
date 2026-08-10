@@ -331,7 +331,7 @@ const buildHtmlDoc = (screenHide = false) => {
   // so overflow is structurally impossible. The 72mm cap matches the BC-85AC's printable
   // window, and the 4mm padding above keeps actual ink 4mm clear of each edge — so the box
   // fills the paper and looks balanced while the content still has slack on both sides.
-  const thermalCap = '72mm';
+  const thermalCap = '68mm';
   const widthCss = isThermal
     ? `width:100%;max-width:${thermalCap}`
     : `width:100%;max-width:${paperW}`;
@@ -366,12 +366,15 @@ const buildHtmlDoc = (screenHide = false) => {
     });
   }
 
-  // Thermal page box = the 72mm PRINTABLE width, not the 80mm physical roll. The browser
-  // shrinks the page to fit the printable area, so an 80mm box on a 72mm head prints at
-  // 0.9x — measured on a calibration slip, a 50.0mm span came out 45mm. Every dimension
-  // in this file was arriving at 90% of its value, which is why tuning widths never landed
-  // where predicted. Matching the box to the head makes the ratio 1.0 so mm mean mm.
-  const pageSize   = isThermal ? '72mm auto' : isA5 ? 'A5 portrait' : 'A4 portrait';
+  // Thermal page box = 68mm, the head's MEASURED reach — not the 72mm the BC-85AC driver
+  // advertises in its Paper(80(72)) string. A calibration slip printed bars ending at known
+  // widths with the number set at each bar's tip: 68 printed, 72 did not. Trusting the
+  // driver's 72mm put the clone's right edge past the last dot, which is why the table
+  // header bar, the Net Balance box and every right-aligned figure were all being cut at
+  // one identical x. Everything here is sized as a percentage of this box, so the layout
+  // follows the head wherever it actually ends rather than depending on absolute mm
+  // surviving the browser's page-fitting.
+  const pageSize   = isThermal ? '68mm auto' : isA5 ? 'A5 portrait' : 'A4 portrait';
   const pageMargin = isThermal ? '0' : '10mm';
   const bodyPad    = isThermal ? '0' : '16px';
   const docTitle   = getFileName().replace(/\.[^.]+$/, '');
