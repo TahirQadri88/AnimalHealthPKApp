@@ -377,7 +377,12 @@ const buildHtmlDoc = (screenHide = false) => {
 <html lang="en">
 <head>
   <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=${isThermal ? '272' : 'device-width'},initial-scale=1,maximum-scale=1"/>
+  <!-- Never pin a px viewport width here. Doing so makes the browser lay the document
+       out at that width and then stretch it to fill the paper: a 272px (72mm) viewport
+       on 80mm paper scales everything by 80/72 = 1.11x, so every mm below is silently
+       inflated and right-aligned figures overrun the 72mm head. Letting the layout width
+       come from the @page box keeps mm values meaning millimetres. -->
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>${docTitle}</title>
   <style>
     *{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact;-webkit-text-size-adjust:none;text-size-adjust:none;}
