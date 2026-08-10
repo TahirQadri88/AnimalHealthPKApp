@@ -311,8 +311,8 @@ const buildHtmlDoc = (screenHide = false) => {
   }
   const paperW  = isThermal ? '80mm' : isA5 ? '148mm' : '210mm';
   const padding = isThermal ? '0' : isA5 ? '20px' : '28px';
-  // Thermal: 72mm = 80mm paper minus 4mm hardware non-printable zone on each side.
-  // No body/clone padding — @page margin 0 4mm handles alignment with the printable zone.
+  // Thermal: 72mm = BC-85AC printable width. Hardware left margin = 0mm (head starts at paper edge).
+  // No body/clone padding — content fills the 72mm printable zone flush from the left.
   const widthCss = isThermal
     ? 'width:72mm;max-width:72mm'
     : `width:100%;max-width:${paperW}`;
@@ -361,7 +361,7 @@ const buildHtmlDoc = (screenHide = false) => {
   <style>
     *{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
     body{margin:0;padding:${bodyPad};background:white;font-family:${isThermal ? "'Arial Black','Arial',sans-serif" : 'system-ui,-apple-system,sans-serif'};}
-    @page{size:${pageSize};margin:${isThermal ? '0 4mm' : '0'};}
+    @page{size:${pageSize};margin:0;}
     ${screenHide ? '@media screen{body{background:white;}#doc{visibility:hidden;}}' : ''}
     @media print{body{padding:${pageMargin};background:white;}#doc>*{${isThermal ? '' : 'width:100%!important;max-width:none!important;min-width:0!important;'}padding-left:0!important;padding-right:0!important;}}
     @media print{
