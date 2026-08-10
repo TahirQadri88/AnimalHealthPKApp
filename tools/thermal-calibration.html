@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>Thermal Printer Calibration</title>
+<!--
+  Measures what a thermal printer ACTUALLY prints, rather than trusting the width its
+  driver advertises. Built after a long debugging session in which the BC-85AC reported
+  Paper(80(72)) but its head reached only ~68mm; every receipt lost its last character
+  until that 4mm gap was measured rather than guessed.
+
+  Usage:  open in a browser, optionally with ?w=<mm> to set the page box (default 68),
+          print to the thermal printer at 100% scale / Margins: None, read the slip.
+
+  Read the slip like this:
+    - Bars are drawn to known widths with their number set at the tip. The LARGEST number
+      still visible is the head's usable width. This is the reliable signal: a label
+      either reached the paper or it did not.
+    - The 50mm span is the scale check. Measure it with a steel rule. If it reads short,
+      the browser or driver is scaling the page and absolute mm cannot be trusted.
+    - Where the ruler stops is a cross-check on the bars.
+
+  Feed the answer back into PrintView.jsx: the thermal @page size and clone cap should
+  equal the head's measured reach. See CLAUDE.md → Thermal receipt printing.
+-->
+<style>
+  * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { margin: 0; padding: 0; background: #fff; color: #000;
+         font-family: Arial, Helvetica, sans-serif; }
+
+  h1 { font-size: 10px; margin: 2mm 0 0.5mm 0; padding-left: 1mm; letter-spacing: 1px; }
+  p.note { font-size: 8px; margin: 0 0 2mm 0; padding-left: 1mm; line-height: 1.4; }
+
+  .ruler { position: relative; height: 9mm; border-bottom: 0.3mm solid #000; }
+  .tick  { position: absolute; bottom: 0; width: 0.2mm; background: #000; height: 1.5mm; }
+  .tick.t5  { height: 3mm; }
+  .tick.t10 { height: 5mm; width: 0.3mm; }
+  .tlab { position: absolute; bottom: 5.2mm; font-size: 7px; font-weight: bold;
+          transform: translateX(-50%); }
+
+  .bars { margin-top: 2mm; }
+  .bar { position: relative; height: 4.2mm; margin-bottom: 0.8mm; background: #000; color: #fff; }
+  .bar span { position: absolute; right: 0.6mm; top: 0; line-height: 4.2mm;
+              font-size: 7.5px; font-weight: bold; }
+
+  .scale { position: relative; height: 8mm; margin-top: 3mm; }
+  .scale .edge { position: absolute; top: 0; width: 0.4mm; height: 5mm; background: #000; }
+  .scale .lab  { position: absolute; top: 5.2mm; font-size: 7.5px; font-weight: bold; }
+
+  .foot { font-size: 7px; padding: 2mm 1mm 4mm 1mm; line-height: 1.5; }
+
+  button { font-size: 14px; padding: 8px 16px; margin: 12px; }
+  @media print { button, .screen-only { display: none !important; } }
+</style>
+</head>
+<body>
+
+<button onclick="window.print()">Print calibration</button>
+<div class="screen-only" style="font:12px Arial;padding:0 12px 12px">
+  Print at <b>100% scale / Margins: None</b>. Add <code>?w=72</code> to the URL to try a
+  different page width.
+</div>
+
+<div class="sheet" id="sheet"></div>
+
+<script>
+  // Page width in mm, from ?w= (default 68 — the BC-85AC's measured reach).
+  var W = parseInt((location.search.match(/[?&]w=(\d+)/) || [])[1], 10) || 68;
+
+  // @page cannot be set from a stylesheet property, so inject it.
+  var st = document.createElement('style');
+  st.textContent = '@page{size:' + W + 'mm auto;margin:0;}' +
+                   '.sheet{width:' + W + 'mm;margin:0;padding:0;position:relative;}' +
+                   '.ruler{width:' + W + 'mm;}';
+  document.head.appendChild(st);
+
+  var ruler = '';
+  for (var mm = 0; mm <= W; mm++) {
+    var cls = mm % 10 === 0 ? 'tick t10' : (mm % 5 === 0 ? 'tick t5' : 'tick');
+    ruler += '<div class="' + cls + '" style="left:' + mm + 'mm"></div>';
+    if (mm % 10 === 0) ruler += '<div class="tlab" style="left:' + mm + 'mm">' + mm + '</div>';
+  }
+
+  // Bars every 4mm over the plausible range, so the largest visible number pinpoints
+  // the head's reach to within 4mm.
+  var bars = '';
+  for (var end = W - 16; end <= W; end += 4) {
+    if (end > 0) bars += '<div class="bar" style="width:' + end + 'mm"><span>' + end + '</span></div>';
+  }
+
+  // Scale check: two marks exactly 50.0mm apart, inset 5mm from the left.
+  var span = '<div class="scale">' +
+             '<div class="edge" style="left:5mm"></div>' +
+             '<div class="edge" style="left:55mm"></div>' +
+             '<div class="lab" style="left:5mm">|&larr;&mdash; should be exactly 50.0 mm &mdash;&rarr;|</div>' +
+             '</div>';
+
+  document.getElementById('sheet').innerHTML =
+    '<h1>THERMAL CALIBRATION &mdash; ' + W + 'mm PAGE</h1>' +
+    '<p class="note">Photograph the whole slip, edge to edge.</p>' +
+    '<div class="ruler">' + ruler + '</div>' +
+    '<div class="bars">' + bars + '</div>' +
+    span +
+    '<div class="foot">' +
+    '1. Largest bar number still visible = the head\'s usable width.<br/>' +
+    '2. Measure the 50 mm span with a steel rule &mdash; short means the page is being scaled.<br/>' +
+    '3. Where does the ruler stop?' +
+    '</div>';
+</script>
+
+</body>
+</html>

@@ -3,6 +3,18 @@ import { FileDown, Printer, Share2, X, MessageCircle, Image } from 'lucide-react
 import { formatDateDisp, getLocalDateStr, APP_NAME } from '../helpers';
 
 // Format: 'thermal' | 'a5' | 'a4'
+//
+// ⚠️  THERMAL PRINT GEOMETRY — read CLAUDE.md ("Thermal receipt printing") before changing
+//     any width, padding, @page size or viewport below. Those rules were established by
+//     measurement after a long run of wrong fixes, and several look redundant but are not.
+//
+//     The three that cost the most:
+//       • The BC-85AC head reaches ~68mm, NOT the 72mm its driver advertises.
+//       • Size everything as a % of the page box. Absolute mm are silently rescaled by the
+//         print pipeline (0.75x–1.0x observed), so mm-based fixes appear to do nothing.
+//       • Never pin a px viewport on the popup — it stacks a second scale factor.
+//
+//     To re-measure on another printer: print tools/thermal-calibration.html.
 function PrintView({ printConfig, setPrintConfig, products, customers, getCustomerLedger, getCustomerBalance, showToast, appSettings }) {
 const { docType, format, data } = printConfig;
 const biz = appSettings || {};
@@ -401,6 +413,11 @@ const buildHtmlDoc = (screenHide = false) => {
        column rather than wrapping, which is what clipped the Rate/Amount figures. */
     #doc *{min-width:0;}
     #doc td,#doc th{white-space:normal!important;overflow-wrap:anywhere;}
+    /* The report table has no table-layout:fixed, so auto layout can size it past the
+       container. Cap it; overflow-wrap above drops min-content to a character so it
+       can always comply. Kept as auto layout — forcing fixed would even out the report's
+       columns and starve the product-name column. */
+    #doc table{width:100%!important;max-width:100%!important;}
     /* Defeat any centring: the receipt must be hard left-aligned in the page box. */
     #doc{margin:0;padding:0;width:100%;}
     #doc>*{margin-left:0!important;margin-right:auto!important;}` : ''}
