@@ -311,14 +311,27 @@ const buildHtmlDoc = (screenHide = false) => {
   }
   const paperW  = isThermal ? '80mm' : isA5 ? '148mm' : '210mm';
   const padding = isThermal ? '0' : isA5 ? '20px' : '28px';
-  // Thermal: 72mm = BC-85AC printable width. Hardware left margin = 0mm (head starts at paper edge).
-  // No body/clone padding — content fills the 72mm printable zone flush from the left.
+  // Thermal font: plain Arial, NOT Arial Black. On a 203 dpi 1-bit thermal head an
+  // ultra-heavy face at 8–9px turns into a smear — strokes merge and the antialiased
+  // grey edge pixels get dithered. Arial has real Regular + Bold faces, so the existing
+  // fontWeight:700–900 styles map to the true Bold face (no synthesis) and print crisp.
+  const printFont = isThermal
+    ? 'Arial,Helvetica,sans-serif'
+    : 'system-ui,-apple-system,sans-serif';
+  // Thermal width MUST be adaptive, never a fixed mm value. A fixed 72mm clone overflows
+  // the printable window the moment anything introduces a left offset (browser default
+  // page margin, driver origin) — that is exactly the "wide left margin + right cut"
+  // symptom. width:100% makes the clone shrink to whatever content box actually exists,
+  // so overflow is structurally impossible. The 68mm cap covers the case where the
+  // browser ignores @page size entirely, and leaves 4mm of slack inside the BC-85AC's
+  // 72mm printable window to absorb the driver's origin shift.
+  const thermalCap = '68mm';
   const widthCss = isThermal
-    ? 'width:72mm;max-width:72mm'
+    ? `width:100%;max-width:${thermalCap}`
     : `width:100%;max-width:${paperW}`;
   clone.style.cssText = [
     widthCss, 'margin:0', `padding:${padding}`, 'background:white',
-    `font-family:${isThermal ? "'Arial Black','Arial',sans-serif" : 'system-ui,-apple-system,sans-serif'}`,
+    `font-family:${printFont}`,
     `font-size:${isThermal ? '9px' : isA5 ? '11px' : '12px'}`,
     'line-height:1.5', 'box-sizing:border-box',
   ].join(';');
@@ -333,7 +346,7 @@ const buildHtmlDoc = (screenHide = false) => {
       el.style.boxShadow = 'none';
       el.style.textShadow = 'none';
       if (isThermal) {
-        el.style.fontFamily = "'Arial Black', Arial, sans-serif";
+        el.style.fontFamily = printFont;
       }
     });
     clone.querySelectorAll('[data-dk]').forEach(dk => {
@@ -347,8 +360,10 @@ const buildHtmlDoc = (screenHide = false) => {
     });
   }
 
+  // Thermal page box = the physical 80mm roll, so the driver has no reason to re-centre
+  // or rescale the rendered page. The clone's adaptive width keeps content inside the
+  // 72mm printable window regardless of where the driver puts the origin.
   const pageSize   = isThermal ? '80mm auto' : isA5 ? 'A5 portrait' : 'A4 portrait';
-  // Thermal: 3mm all sides — clears typical 1–2mm hardware non-printable zone
   const pageMargin = isThermal ? '0' : '10mm';
   const bodyPad    = isThermal ? '0' : '16px';
   const docTitle   = getFileName().replace(/\.[^.]+$/, '');
@@ -356,14 +371,22 @@ const buildHtmlDoc = (screenHide = false) => {
 <html lang="en">
 <head>
   <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=${isThermal ? '272' : 'device-width'},initial-scale=1,maximum-scale=1"/>
+  <meta name="viewport" content="width=${isThermal ? '257' : 'device-width'},initial-scale=1,maximum-scale=1"/>
   <title>${docTitle}</title>
   <style>
     *{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact;-webkit-text-size-adjust:none;text-size-adjust:none;}
-    body{margin:0;padding:${bodyPad};background:white;font-family:${isThermal ? "'Arial Black','Arial',sans-serif" : 'system-ui,-apple-system,sans-serif'};${isThermal ? 'width:72mm;overflow-x:hidden;' : ''}}
+    body{margin:0;padding:${bodyPad};background:white;font-family:${printFont};${isThermal ? 'overflow-x:hidden;' : ''}}
     @page{size:${pageSize};margin:0;}
+    ${isThermal ? `
+    /* Belt-and-braces against right-edge clipping on the 72mm head.
+       min-width:0 — flex rows (the totals lines) default to min-width:auto, so a long
+       "Rs. 118,500" refuses to shrink and spills past the container instead of wrapping.
+       white-space:normal — nowrap cells in a table-layout:fixed table overflow their
+       column rather than wrapping, which is what clipped the Rate/Amount figures. */
+    #doc *{min-width:0;}
+    #doc td,#doc th{white-space:normal!important;overflow-wrap:anywhere;}` : ''}
     ${screenHide ? '@media screen{body{background:white;}#doc{visibility:hidden;}}' : ''}
-    @media print{body{padding:${pageMargin};background:white;}#doc>*{${isThermal ? '' : 'width:100%!important;max-width:none!important;min-width:0!important;'}padding-left:0!important;padding-right:0!important;}}
+    @media print{body{padding:${pageMargin};background:white;}#doc>*{width:100%!important;max-width:${isThermal ? thermalCap : 'none'}!important;min-width:0!important;padding-left:0!important;padding-right:0!important;}}
     @media print{
       #doc *{
         color:black!important;
