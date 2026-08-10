@@ -310,7 +310,13 @@ const buildHtmlDoc = (screenHide = false) => {
     });
   }
   const paperW  = isThermal ? '80mm' : isA5 ? '148mm' : '210mm';
-  const padding = isThermal ? '0' : isA5 ? '20px' : '28px';
+  // Thermal: 4mm side padding is a deliberate ink-free gutter, not decoration. Empirically
+  // the container's right edge lands a millimetre or two past the print head, so anything
+  // sitting flush against it loses its last character — the Net Balance box survived only
+  // because its own 8px padding held the figure back. Insetting the contents means the
+  // clipping eats blank padding instead of digits.
+  const thermalPadX = '4mm';
+  const padding = isThermal ? `0 ${thermalPadX}` : isA5 ? '20px' : '28px';
   // Thermal font: plain Arial, NOT Arial Black. On a 203 dpi 1-bit thermal head an
   // ultra-heavy face at 8–9px turns into a smear — strokes merge and the antialiased
   // grey edge pixels get dithered. Arial has real Regular + Bold faces, so the existing
@@ -322,10 +328,10 @@ const buildHtmlDoc = (screenHide = false) => {
   // the printable window the moment anything introduces a left offset (browser default
   // page margin, driver origin) — that is exactly the "wide left margin + right cut"
   // symptom. width:100% makes the clone shrink to whatever content box actually exists,
-  // so overflow is structurally impossible. The 68mm cap covers the case where the
-  // browser ignores @page size entirely, and leaves 4mm of slack inside the BC-85AC's
-  // 72mm printable window to absorb the driver's origin shift.
-  const thermalCap = '68mm';
+  // so overflow is structurally impossible. The 72mm cap matches the BC-85AC's printable
+  // window, and the 4mm padding above keeps actual ink 4mm clear of each edge — so the box
+  // fills the paper and looks balanced while the content still has slack on both sides.
+  const thermalCap = '72mm';
   const widthCss = isThermal
     ? `width:100%;max-width:${thermalCap}`
     : `width:100%;max-width:${paperW}`;
@@ -371,7 +377,7 @@ const buildHtmlDoc = (screenHide = false) => {
 <html lang="en">
 <head>
   <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=${isThermal ? '257' : 'device-width'},initial-scale=1,maximum-scale=1"/>
+  <meta name="viewport" content="width=${isThermal ? '272' : 'device-width'},initial-scale=1,maximum-scale=1"/>
   <title>${docTitle}</title>
   <style>
     *{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact;-webkit-text-size-adjust:none;text-size-adjust:none;}
@@ -386,7 +392,7 @@ const buildHtmlDoc = (screenHide = false) => {
     #doc *{min-width:0;}
     #doc td,#doc th{white-space:normal!important;overflow-wrap:anywhere;}` : ''}
     ${screenHide ? '@media screen{body{background:white;}#doc{visibility:hidden;}}' : ''}
-    @media print{body{padding:${pageMargin};background:white;}#doc>*{width:100%!important;max-width:${isThermal ? thermalCap : 'none'}!important;min-width:0!important;padding-left:0!important;padding-right:0!important;}}
+    @media print{body{padding:${pageMargin};background:white;}#doc>*{width:100%!important;max-width:${isThermal ? thermalCap : 'none'}!important;min-width:0!important;padding-left:${isThermal ? thermalPadX : '0'}!important;padding-right:${isThermal ? thermalPadX : '0'}!important;}}
     @media print{
       #doc *{
         color:black!important;
