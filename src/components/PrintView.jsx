@@ -356,11 +356,11 @@ const buildHtmlDoc = (screenHide = false) => {
 <html lang="en">
 <head>
   <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <meta name="viewport" content="width=${isThermal ? '272' : 'device-width'},initial-scale=1,maximum-scale=1"/>
   <title>${docTitle}</title>
   <style>
-    *{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
-    body{margin:0;padding:${bodyPad};background:white;font-family:${isThermal ? "'Arial Black','Arial',sans-serif" : 'system-ui,-apple-system,sans-serif'};}
+    *{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact;-webkit-text-size-adjust:none;text-size-adjust:none;}
+    body{margin:0;padding:${bodyPad};background:white;font-family:${isThermal ? "'Arial Black','Arial',sans-serif" : 'system-ui,-apple-system,sans-serif'};${isThermal ? 'width:72mm;overflow-x:hidden;' : ''}}
     @page{size:${pageSize};margin:0;}
     ${screenHide ? '@media screen{body{background:white;}#doc{visibility:hidden;}}' : ''}
     @media print{body{padding:${pageMargin};background:white;}#doc>*{${isThermal ? '' : 'width:100%!important;max-width:none!important;min-width:0!important;'}padding-left:0!important;padding-right:0!important;}}
