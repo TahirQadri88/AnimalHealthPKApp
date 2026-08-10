@@ -315,7 +315,7 @@ const buildHtmlDoc = (screenHide = false) => {
   // sitting flush against it loses its last character — the Net Balance box survived only
   // because its own 8px padding held the figure back. Insetting the contents means the
   // clipping eats blank padding instead of digits.
-  const thermalPadX = '4mm';
+  const thermalPadX = '3mm';
   const padding = isThermal ? `0 ${thermalPadX}` : isA5 ? '20px' : '28px';
   // Thermal font: plain Arial, NOT Arial Black. On a 203 dpi 1-bit thermal head an
   // ultra-heavy face at 8–9px turns into a smear — strokes merge and the antialiased
@@ -366,10 +366,12 @@ const buildHtmlDoc = (screenHide = false) => {
     });
   }
 
-  // Thermal page box = the physical 80mm roll, so the driver has no reason to re-centre
-  // or rescale the rendered page. The clone's adaptive width keeps content inside the
-  // 72mm printable window regardless of where the driver puts the origin.
-  const pageSize   = isThermal ? '80mm auto' : isA5 ? 'A5 portrait' : 'A4 portrait';
+  // Thermal page box = the 72mm PRINTABLE width, not the 80mm physical roll. The browser
+  // shrinks the page to fit the printable area, so an 80mm box on a 72mm head prints at
+  // 0.9x — measured on a calibration slip, a 50.0mm span came out 45mm. Every dimension
+  // in this file was arriving at 90% of its value, which is why tuning widths never landed
+  // where predicted. Matching the box to the head makes the ratio 1.0 so mm mean mm.
+  const pageSize   = isThermal ? '72mm auto' : isA5 ? 'A5 portrait' : 'A4 portrait';
   const pageMargin = isThermal ? '0' : '10mm';
   const bodyPad    = isThermal ? '0' : '16px';
   const docTitle   = getFileName().replace(/\.[^.]+$/, '');
