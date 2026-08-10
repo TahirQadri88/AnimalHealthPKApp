@@ -390,7 +390,10 @@ const buildHtmlDoc = (screenHide = false) => {
        white-space:normal — nowrap cells in a table-layout:fixed table overflow their
        column rather than wrapping, which is what clipped the Rate/Amount figures. */
     #doc *{min-width:0;}
-    #doc td,#doc th{white-space:normal!important;overflow-wrap:anywhere;}` : ''}
+    #doc td,#doc th{white-space:normal!important;overflow-wrap:anywhere;}
+    /* Defeat any centring: the receipt must be hard left-aligned in the page box. */
+    #doc{margin:0;padding:0;width:100%;}
+    #doc>*{margin-left:0!important;margin-right:auto!important;}` : ''}
     ${screenHide ? '@media screen{body{background:white;}#doc{visibility:hidden;}}' : ''}
     @media print{body{padding:${pageMargin};background:white;}#doc>*{width:100%!important;max-width:${isThermal ? thermalCap : 'none'}!important;min-width:0!important;padding-left:${isThermal ? thermalPadX : '0'}!important;padding-right:${isThermal ? thermalPadX : '0'}!important;}}
     @media print{
@@ -421,12 +424,20 @@ const handlePrint = () => {
   if (!result) { showToast('Document not found', 'error'); return; }
   const { html, docTitle } = result;
 
+  // Never inject the app's stylesheets into a thermal popup. The clone is fully
+  // inline-styled, so it needs none of them, and they carry print rules that actively
+  // fight the receipt geometry — @page{size:auto} overriding the 80mm page, and
+  // table{width:100%!important}. On a 72mm head those are the difference between a
+  // clean receipt and a clipped one. A4/A5 still get them: those layouts rely on the
+  // page-break helpers (.keep-together, thead/tfoot grouping) that live in app CSS.
   let appCss = '';
-  try {
-    appCss = Array.from(document.styleSheets)
-      .flatMap(sheet => { try { return Array.from(sheet.cssRules).map(r => r.cssText); } catch(e) { return []; } })
-      .join('\n');
-  } catch(e) {}
+  if (!isThermal) {
+    try {
+      appCss = Array.from(document.styleSheets)
+        .flatMap(sheet => { try { return Array.from(sheet.cssRules).map(r => r.cssText); } catch(e) { return []; } })
+        .join('\n');
+    } catch(e) {}
+  }
   const augmented = appCss ? html.replace('<title>', `<style>${appCss}</style>\n  <title>`) : html;
 
   const newWin = window.open('', '_blank');
