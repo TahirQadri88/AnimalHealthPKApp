@@ -225,7 +225,7 @@ const generateShareText = () => {
     if (data.vehicle === 'Intercity Transport') {
       text += `\nTransport: ${data.transportCompany || '-'} | Bilty: ${data.biltyNumber || '-'}`;
     } else if (['Rider', 'Rickshaw', 'Suzuki'].includes(data.vehicle)) {
-      text += `\nDriver: ${data.driverName || '-'} (${data.driverPhone || ''})`;
+      text += `\nRider / Driver: ${data.driverName || '-'} (${data.driverPhone || ''})`;
     }
     text += `\n\n*Items to Deliver:*\n`;
     (data.items || []).forEach(i => {
@@ -975,7 +975,7 @@ return (
         )}
         {data.driverName && (
           <div style={{ marginTop: '3px' }}>
-            <strong>Driver:</strong> {data.driverName} &nbsp; {data.driverPhone && <><strong>Phone:</strong> {data.driverPhone}</>}
+            <strong>Rider / Driver:</strong> {data.driverName} &nbsp; {data.driverPhone && <><strong>Phone:</strong> {data.driverPhone}</>}
           </div>
         )}
       </div>
