@@ -223,7 +223,10 @@ const generateShareText = () => {
     if (_map) text += `${_map}\n`;
     text += `\n🚚 *${data.vehicle || 'N/A'}*`;
     if (data.vehicle === 'Intercity Transport') {
-      text += `\nTransport: ${data.transportCompany || '-'} | Bilty: ${data.biltyNumber || '-'}`;
+      text += `\nTransport: ${data.transportCompany || '-'} | Consignment: ${data.biltyNumber || '-'}`;
+      // The booking person matters on intercity jobs too — this used to be dropped
+      // because the rider line sat in an else-if.
+      if (data.driverName) text += `\nBooked By: ${data.driverName}${data.driverPhone ? ` (${data.driverPhone})` : ''}`;
     } else if (['Rider', 'Rickshaw', 'Suzuki'].includes(data.vehicle)) {
       text += `\nRider / Driver: ${data.driverName || '-'} (${data.driverPhone || ''})`;
     }
@@ -970,12 +973,12 @@ return (
         <div><strong>Method:</strong> {data.vehicle || 'N/A'}</div>
         {data.transportCompany && (
           <div style={{ marginTop: '3px' }}>
-            <strong>Transport Co:</strong> {data.transportCompany} &nbsp; {data.biltyNumber && <><strong>Bilty No:</strong> {data.biltyNumber}</>}
+            <strong>Transport Co:</strong> {data.transportCompany} &nbsp; {data.biltyNumber && <><strong>Consignment No:</strong> {data.biltyNumber}</>}
           </div>
         )}
         {data.driverName && (
           <div style={{ marginTop: '3px' }}>
-            <strong>Rider / Driver:</strong> {data.driverName} &nbsp; {data.driverPhone && <><strong>Phone:</strong> {data.driverPhone}</>}
+            <strong>{data.transportCompany ? 'Booked By' : 'Rider / Driver'}:</strong> {data.driverName} &nbsp; {data.driverPhone && <><strong>Phone:</strong> {data.driverPhone}</>}
           </div>
         )}
       </div>

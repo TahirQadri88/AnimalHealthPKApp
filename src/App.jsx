@@ -1075,6 +1075,8 @@ const [riderSearch, setRiderSearch] = useState('');
 const [showRiderDrop, setShowRiderDrop] = useState(false);
 const [tcSearch, setTcSearch] = useState('');
 const [showTcDrop, setShowTcDrop] = useState(false);
+const [bookerSearch, setBookerSearch] = useState('');
+const [showBookerDrop, setShowBookerDrop] = useState(false);
 const [hiProduct, setHiProduct] = useState(-1);
 const justAddedRef = useRef(false);
 const lastQtyRef = useRef(null);
@@ -1303,7 +1305,7 @@ return (
         <div className="absolute z-50 w-full mt-1 border border-amber-200 bg-white rounded-xl max-h-48 overflow-y-auto shadow-lg">
           <div
             className={`px-4 py-2.5 text-sm font-semibold cursor-pointer hover:bg-amber-50 ${!currentInvoice.transportCompany ? 'bg-amber-50 text-amber-700' : 'text-slate-400'}`}
-            onMouseDown={e => { e.preventDefault(); setCurrentInvoice({...currentInvoice, transportCompany: '', driverName: '', driverPhone: ''}); setShowTcDrop(false); }}
+            onMouseDown={e => { e.preventDefault(); setCurrentInvoice({...currentInvoice, transportCompany: ''}); setShowTcDrop(false); }}
           >– Clear Company –</div>
           {transportCompanies
             .filter(c => c.transportType === currentInvoice.vehicle && (!tcSearch || c.name.toLowerCase().includes(tcSearch.toLowerCase()) || (c.city||'').toLowerCase().includes(tcSearch.toLowerCase())))
@@ -1311,7 +1313,7 @@ return (
               <div
                 key={c.id}
                 className={`px-4 py-2.5 text-sm font-semibold cursor-pointer hover:bg-amber-50 ${c.name === currentInvoice.transportCompany ? 'bg-amber-50 text-amber-700' : 'text-slate-800'}`}
-                onMouseDown={e => { e.preventDefault(); setCurrentInvoice({...currentInvoice, transportCompany: c.name, driverName: c.defaultDriverName || '', driverPhone: c.defaultDriverPhone || ''}); setShowTcDrop(false); }}
+                onMouseDown={e => { e.preventDefault(); setCurrentInvoice({...currentInvoice, transportCompany: c.name, driverName: c.defaultDriverName || currentInvoice.driverName || '', driverPhone: c.defaultDriverPhone || currentInvoice.driverPhone || ''}); setShowTcDrop(false); }}
               >{c.name}{c.city ? ` · ${c.city}` : ''}</div>
             ))
           }
@@ -1324,9 +1326,49 @@ return (
   </div>
 )}
 <div className="col-span-2"><label className="text-[10px] font-bold text-amber-700 uppercase tracking-wider ml-1 mb-1 block">Transport Company</label><input placeholder="e.g. Daewoo Express" className={`${inputClass} !bg-white !border-amber-200`} value={currentInvoice.transportCompany || ''} onChange={e => setCurrentInvoice({...currentInvoice, transportCompany: e.target.value})} /></div>
-<div className="col-span-2"><label className="text-[10px] font-bold text-amber-700 uppercase tracking-wider ml-1 mb-1 block">Bilty / Bill-T Number</label><input placeholder="Enter Bilty #" className={`${inputClass} !bg-white !border-amber-200`} value={currentInvoice.biltyNumber || ''} onChange={e => setCurrentInvoice({...currentInvoice, biltyNumber: e.target.value})} /></div>
-<div className="col-span-2 sm:col-span-1"><label className="text-[10px] font-bold text-amber-700 uppercase tracking-wider ml-1 mb-1 block">Rider / Driver Name</label><input placeholder="Name, or 'By Hand'" className={`${inputClass} !bg-white !border-amber-200`} value={currentInvoice.driverName || ''} onChange={e => setCurrentInvoice({...currentInvoice, driverName: e.target.value})} /></div>
-<div className="col-span-2 sm:col-span-1"><label className="text-[10px] font-bold text-amber-700 uppercase tracking-wider ml-1 mb-1 block">Rider / Driver Phone</label><input placeholder="03XX..." className={`${inputClass} !bg-white !border-amber-200`} value={currentInvoice.driverPhone || ''} onChange={e => setCurrentInvoice({...currentInvoice, driverPhone: e.target.value})} /></div>
+<div className="col-span-2"><label className="text-[10px] font-bold text-amber-700 uppercase tracking-wider ml-1 mb-1 block">Consignment No. (Bill of Transport)</label><input placeholder="No. on the transport receipt" className={`${inputClass} !bg-white !border-amber-200`} value={currentInvoice.biltyNumber || ''} onChange={e => setCurrentInvoice({...currentInvoice, biltyNumber: e.target.value})} /></div>
+<div className="col-span-2 pt-1 border-t border-amber-200/70">
+  <p className="text-[9px] font-semibold text-amber-700/80 leading-snug mb-1.5 ml-1">Who took the stock to the transport office — one of your own riders, or by hand.</p>
+</div>
+{riders.length > 0 && (
+  <div className="col-span-2">
+    <label className="text-[10px] font-bold text-amber-700 uppercase tracking-wider ml-1 mb-1 block">Pick Booking Person</label>
+    <div className="relative">
+      <Search size={16} className="absolute left-3.5 top-3.5 text-slate-400 pointer-events-none z-10"/>
+      <input
+        className={`pl-10 ${inputClass} !bg-white !border-amber-200`}
+        placeholder="Search rider / rickshaw / driver…"
+        value={showBookerDrop ? bookerSearch : (currentInvoice.driverName || '')}
+        onFocus={() => { setShowBookerDrop(true); setBookerSearch(''); }}
+        onChange={e => setBookerSearch(e.target.value)}
+        onBlur={() => setTimeout(() => setShowBookerDrop(false), 150)}
+      />
+      {showBookerDrop && (
+        <div className="absolute z-50 w-full mt-1 border border-amber-200 bg-white rounded-xl max-h-48 overflow-y-auto shadow-lg">
+          <div className="px-4 py-2.5 text-sm font-semibold cursor-pointer hover:bg-amber-50 text-slate-400"
+            onMouseDown={e => { e.preventDefault(); setCurrentInvoice({...currentInvoice, riderId: '', driverName: '', driverPhone: ''}); setShowBookerDrop(false); }}
+          >– Clear –</div>
+          <div className="px-4 py-2.5 text-sm font-semibold cursor-pointer hover:bg-amber-50 text-slate-800"
+            onMouseDown={e => { e.preventDefault(); setCurrentInvoice({...currentInvoice, riderId: '', driverName: 'By Hand', driverPhone: ''}); setShowBookerDrop(false); }}
+          >By Hand</div>
+          {/* Any rider, whatever their vehicle — the person who runs stock to the courier
+              office may be a rider, a rickshaw driver or a Suzuki driver. */}
+          {riders.filter(r => !bookerSearch || r.name.toLowerCase().includes(bookerSearch.toLowerCase())).map(r => (
+            <div key={r.id}
+              className={`px-4 py-2.5 text-sm font-semibold cursor-pointer hover:bg-amber-50 ${String(r.id) === String(currentInvoice.riderId) ? 'bg-amber-50 text-amber-700' : 'text-slate-800'}`}
+              onMouseDown={e => { e.preventDefault(); setCurrentInvoice({...currentInvoice, riderId: r.id, driverName: r.name, driverPhone: r.phone || ''}); setShowBookerDrop(false); }}
+            >{r.name} <span className="text-[10px] text-slate-400">· {r.vehicleType}</span></div>
+          ))}
+          {riders.filter(r => !bookerSearch || r.name.toLowerCase().includes(bookerSearch.toLowerCase())).length === 0 && (
+            <p className="px-4 py-3 text-sm text-slate-400 font-medium">No riders found</p>
+          )}
+        </div>
+      )}
+    </div>
+  </div>
+)}
+<div className="col-span-2 sm:col-span-1"><label className="text-[10px] font-bold text-amber-700 uppercase tracking-wider ml-1 mb-1 block">Booked By (Rider / Driver)</label><input placeholder="Name, or 'By Hand'" className={`${inputClass} !bg-white !border-amber-200`} value={currentInvoice.driverName || ''} onChange={e => setCurrentInvoice({...currentInvoice, driverName: e.target.value, riderId: ''})} /></div>
+<div className="col-span-2 sm:col-span-1"><label className="text-[10px] font-bold text-amber-700 uppercase tracking-wider ml-1 mb-1 block">Their Phone</label><input placeholder="03XX..." className={`${inputClass} !bg-white !border-amber-200`} value={currentInvoice.driverPhone || ''} onChange={e => setCurrentInvoice({...currentInvoice, driverPhone: e.target.value})} /></div>
 </div>
 )}
 {(vehicleTypes.find(v => v.name === currentInvoice.vehicle)?.requiresRider ?? ['Rider','Rickshaw','Suzuki'].includes(currentInvoice.vehicle)) && (
@@ -2283,8 +2325,8 @@ const addForm = (
       <div className="col-span-2"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Company Name *</label><input className={compact ? smallCls : inputCls} placeholder="e.g. Daewoo Express" value={form.name} onChange={e=>setForm({...form,name:e.target.value})} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();add();}}} /></div>
       <div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Phone</label><input className={compact ? smallCls : inputCls} placeholder="03XX..." value={form.phone} onChange={e=>setForm({...form,phone:e.target.value})} /></div>
       <div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">City</label><input className={compact ? smallCls : inputCls} placeholder="e.g. Lahore" value={form.city} onChange={e=>setForm({...form,city:e.target.value})} /></div>
-      <div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Default Driver</label><input className={compact ? smallCls : inputCls} placeholder="Driver name" value={form.defaultDriverName} onChange={e=>setForm({...form,defaultDriverName:e.target.value})} /></div>
-      <div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Driver Phone</label><input className={compact ? smallCls : inputCls} placeholder="03XX..." value={form.defaultDriverPhone} onChange={e=>setForm({...form,defaultDriverPhone:e.target.value})} /></div>
+      <div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Usual Booking Person</label><input className={compact ? smallCls : inputCls} placeholder="Who usually books here" value={form.defaultDriverName} onChange={e=>setForm({...form,defaultDriverName:e.target.value})} /></div>
+      <div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Their Phone</label><input className={compact ? smallCls : inputCls} placeholder="03XX..." value={form.defaultDriverPhone} onChange={e=>setForm({...form,defaultDriverPhone:e.target.value})} /></div>
       {!lockedType && <div className="col-span-2"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Transport Type *</label><select className={compact ? smallCls : inputCls} value={form.transportType} onChange={e=>setForm({...form,transportType:e.target.value})}>{typeList.map(t=><option key={t} value={t}>{t}</option>)}</select></div>}
     </div>
     <div className="flex gap-2">
@@ -2304,8 +2346,8 @@ const list = (
               <input autoFocus className={`col-span-2 ${smallCls} !border-amber-300`} value={editForm.name||''} onChange={e=>setEditForm({...editForm,name:e.target.value})} placeholder="Company name" onKeyDown={e=>{if(e.key==='Escape')setEditingId(null);if(e.key==='Enter'){e.preventDefault();saveEdit(co);}}} />
               <input className={smallCls} value={editForm.phone||''} onChange={e=>setEditForm({...editForm,phone:e.target.value})} placeholder="Phone" />
               <input className={smallCls} value={editForm.city||''} onChange={e=>setEditForm({...editForm,city:e.target.value})} placeholder="City" />
-              <input className={smallCls} value={editForm.defaultDriverName||''} onChange={e=>setEditForm({...editForm,defaultDriverName:e.target.value})} placeholder="Default driver" />
-              <input className={smallCls} value={editForm.defaultDriverPhone||''} onChange={e=>setEditForm({...editForm,defaultDriverPhone:e.target.value})} placeholder="Driver phone" />
+              <input className={smallCls} value={editForm.defaultDriverName||''} onChange={e=>setEditForm({...editForm,defaultDriverName:e.target.value})} placeholder="Usual booking person" />
+              <input className={smallCls} value={editForm.defaultDriverPhone||''} onChange={e=>setEditForm({...editForm,defaultDriverPhone:e.target.value})} placeholder="Their phone" />
               {!lockedType && <select className={`col-span-2 ${smallCls}`} value={editForm.transportType||typeList[0]} onChange={e=>setEditForm({...editForm,transportType:e.target.value})}>{typeList.map(t=><option key={t} value={t}>{t}</option>)}</select>}
             </div>
             <div className="flex gap-2">
@@ -2323,7 +2365,7 @@ const list = (
               </div>
               <p className="text-[11px] text-slate-500 mt-0.5">
                 {co.phone || 'No phone'}
-                {co.defaultDriverName ? ` · Driver: ${co.defaultDriverName}${co.defaultDriverPhone ? ` (${co.defaultDriverPhone})` : ''}` : ''}
+                {co.defaultDriverName ? ` · Usually booked by: ${co.defaultDriverName}${co.defaultDriverPhone ? ` (${co.defaultDriverPhone})` : ''}` : ''}
               </p>
             </div>
             <button type="button" onClick={()=>{setEditingId(co.id);setEditForm({name:co.name,phone:co.phone||'',city:co.city||'',defaultDriverName:co.defaultDriverName||'',defaultDriverPhone:co.defaultDriverPhone||'',transportType:co.transportType||typeList[0]});}} className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg shrink-0"><Edit size={14}/></button>
