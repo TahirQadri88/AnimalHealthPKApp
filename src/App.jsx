@@ -1063,7 +1063,7 @@ return (
 };
 
 const BillingTab = () => {
-const { isAdmin, hasPermission, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, productPreFill, setProductPreFill, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig, setShowCreditNoteModal, setEditingCreditNote, showConfirm, riders, vehicleTypes } = useContext(AppContext);
+const { isAdmin, hasPermission, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, productPreFill, setProductPreFill, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig, setShowCreditNoteModal, setEditingCreditNote, showConfirm, riders, vehicleTypes, transportCompanies } = useContext(AppContext);
 const [search, setSearch] = useState('');
 const [dateFilter, setDateFilter] = useState('All Time');
 const [statusFilter, setStatusFilter] = useState('All');
@@ -1073,6 +1073,8 @@ const [showCustomerDrop, setShowCustomerDrop] = useState(false);
 const [hiCustomer, setHiCustomer] = useState(-1);
 const [riderSearch, setRiderSearch] = useState('');
 const [showRiderDrop, setShowRiderDrop] = useState(false);
+const [tcSearch, setTcSearch] = useState('');
+const [showTcDrop, setShowTcDrop] = useState(false);
 const [hiProduct, setHiProduct] = useState(-1);
 const justAddedRef = useRef(false);
 const lastQtyRef = useRef(null);
@@ -1284,8 +1286,47 @@ return (
 <div className="mb-3"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Vehicle / Transport Method</label><select className={inputClass} value={currentInvoice.vehicle} onChange={e => setCurrentInvoice({...currentInvoice, vehicle: e.target.value})}>{(vehicleTypes.length ? vehicleTypes : [{name:'Rider'},{name:'Rickshaw'},{name:'Suzuki'},{name:'Intercity Transport'},{name:'Self-Pickup'}]).map(v => <option key={v.name} value={v.name}>{v.name}</option>)}</select></div>
 {(() => { const vt = vehicleTypes.find(v => v.name === currentInvoice.vehicle); return (vt ? !vt.requiresRider && currentInvoice.vehicle !== 'Self-Pickup' : currentInvoice.vehicle === 'Intercity Transport'); })() && (
 <div className="grid grid-cols-2 gap-3 mb-3 bg-amber-50 p-3 rounded-xl border border-amber-100">
+{transportCompanies.filter(c => c.transportType === currentInvoice.vehicle).length > 0 && (
+  <div className="col-span-2">
+    <label className="text-[10px] font-bold text-amber-700 uppercase tracking-wider ml-1 mb-1 block">Pick from Registry</label>
+    <div className="relative">
+      <Search size={16} className="absolute left-3.5 top-3.5 text-slate-400 pointer-events-none z-10"/>
+      <input
+        className={`pl-10 ${inputClass} !bg-white !border-amber-200`}
+        placeholder="Search transport company…"
+        value={showTcDrop ? tcSearch : (currentInvoice.transportCompany || '')}
+        onFocus={() => { setShowTcDrop(true); setTcSearch(''); }}
+        onChange={e => setTcSearch(e.target.value)}
+        onBlur={() => setTimeout(() => setShowTcDrop(false), 150)}
+      />
+      {showTcDrop && (
+        <div className="absolute z-50 w-full mt-1 border border-amber-200 bg-white rounded-xl max-h-48 overflow-y-auto shadow-lg">
+          <div
+            className={`px-4 py-2.5 text-sm font-semibold cursor-pointer hover:bg-amber-50 ${!currentInvoice.transportCompany ? 'bg-amber-50 text-amber-700' : 'text-slate-400'}`}
+            onMouseDown={e => { e.preventDefault(); setCurrentInvoice({...currentInvoice, transportCompany: '', driverName: '', driverPhone: ''}); setShowTcDrop(false); }}
+          >– Clear Company –</div>
+          {transportCompanies
+            .filter(c => c.transportType === currentInvoice.vehicle && (!tcSearch || c.name.toLowerCase().includes(tcSearch.toLowerCase()) || (c.city||'').toLowerCase().includes(tcSearch.toLowerCase())))
+            .map(c => (
+              <div
+                key={c.id}
+                className={`px-4 py-2.5 text-sm font-semibold cursor-pointer hover:bg-amber-50 ${c.name === currentInvoice.transportCompany ? 'bg-amber-50 text-amber-700' : 'text-slate-800'}`}
+                onMouseDown={e => { e.preventDefault(); setCurrentInvoice({...currentInvoice, transportCompany: c.name, driverName: c.defaultDriverName || '', driverPhone: c.defaultDriverPhone || ''}); setShowTcDrop(false); }}
+              >{c.name}{c.city ? ` · ${c.city}` : ''}</div>
+            ))
+          }
+          {transportCompanies.filter(c => c.transportType === currentInvoice.vehicle && (!tcSearch || c.name.toLowerCase().includes(tcSearch.toLowerCase()) || (c.city||'').toLowerCase().includes(tcSearch.toLowerCase()))).length === 0 && (
+            <p className="px-4 py-3 text-sm text-slate-400 font-medium">No companies found</p>
+          )}
+        </div>
+      )}
+    </div>
+  </div>
+)}
 <div className="col-span-2"><label className="text-[10px] font-bold text-amber-700 uppercase tracking-wider ml-1 mb-1 block">Transport Company</label><input placeholder="e.g. Daewoo Express" className={`${inputClass} !bg-white !border-amber-200`} value={currentInvoice.transportCompany || ''} onChange={e => setCurrentInvoice({...currentInvoice, transportCompany: e.target.value})} /></div>
 <div className="col-span-2"><label className="text-[10px] font-bold text-amber-700 uppercase tracking-wider ml-1 mb-1 block">Bilty / Bill-T Number</label><input placeholder="Enter Bilty #" className={`${inputClass} !bg-white !border-amber-200`} value={currentInvoice.biltyNumber || ''} onChange={e => setCurrentInvoice({...currentInvoice, biltyNumber: e.target.value})} /></div>
+<div className="col-span-2 sm:col-span-1"><label className="text-[10px] font-bold text-amber-700 uppercase tracking-wider ml-1 mb-1 block">Driver Name</label><input placeholder="Name" className={`${inputClass} !bg-white !border-amber-200`} value={currentInvoice.driverName || ''} onChange={e => setCurrentInvoice({...currentInvoice, driverName: e.target.value})} /></div>
+<div className="col-span-2 sm:col-span-1"><label className="text-[10px] font-bold text-amber-700 uppercase tracking-wider ml-1 mb-1 block">Driver Phone</label><input placeholder="03XX..." className={`${inputClass} !bg-white !border-amber-200`} value={currentInvoice.driverPhone || ''} onChange={e => setCurrentInvoice({...currentInvoice, driverPhone: e.target.value})} /></div>
 </div>
 )}
 {(vehicleTypes.find(v => v.name === currentInvoice.vehicle)?.requiresRider ?? ['Rider','Rickshaw','Suzuki'].includes(currentInvoice.vehicle)) && (
@@ -2190,6 +2231,138 @@ return (
 );
 };
 
+// Courier registry CRUD for non-rider transport types. Rendered two ways:
+//   • as its own Admin tab (no `lockedType`) — shows every company, type selectable
+//   • inline under one transport type in Segments (`lockedType` set) — scoped to that type
+// One component rather than two so the two entry points cannot drift apart.
+const TransportCompaniesManager = ({ lockedType = null, compact = false }) => {
+const { transportCompanies, vehicleTypes, saveToFirebase, deleteFromFirebase, showToast, showConfirm } = useContext(AppContext);
+// Non-rider types are the ones a courier can belong to. Self-Pickup has no carrier.
+const nonRiderTypes = vehicleTypes.filter(vt => !vt.requiresRider && vt.name !== 'Self-Pickup').map(vt => vt.name);
+const typeList = nonRiderTypes.length ? nonRiderTypes : ['Intercity Transport'];
+const blank = { name: '', phone: '', city: '', defaultDriverName: '', defaultDriverPhone: '', transportType: lockedType || typeList[0] };
+const inputCls = "w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:border-amber-500 shadow-sm";
+const smallCls = "p-2 text-sm font-semibold border border-slate-200 rounded-lg outline-none w-full";
+const [form, setForm] = useState(blank);
+const [editingId, setEditingId] = useState(null);
+const [editForm, setEditForm] = useState({});
+const [search, setSearch] = useState('');
+const [showAdd, setShowAdd] = useState(!compact);
+
+const scoped = transportCompanies.filter(c => !lockedType || c.transportType === lockedType);
+const visible = scoped.filter(c => !search ||
+  c.name.toLowerCase().includes(search.toLowerCase()) ||
+  (c.phone || '').includes(search) ||
+  (c.city || '').toLowerCase().includes(search.toLowerCase()));
+
+const add = async () => {
+  if (!form.name.trim()) return showToast("Company name required", "error");
+  const obj = { id: Date.now(), ...form, name: form.name.trim(), transportType: lockedType || form.transportType };
+  await saveToFirebase('transportCompanies', obj.id, obj);
+  setForm({ ...blank, transportType: lockedType || form.transportType });
+  if (compact) setShowAdd(false);
+  showToast("Transport company added");
+};
+const saveEdit = async (co) => {
+  if (!(editForm.name || '').trim()) return showToast("Company name required", "error");
+  await saveToFirebase('transportCompanies', co.id, { ...co, ...editForm, name: editForm.name.trim() });
+  setEditingId(null);
+  showToast("Transport company updated");
+};
+const remove = async (co) => {
+  if (await showConfirm(`Delete "${co.name}"?`)) {
+    await deleteFromFirebase('transportCompanies', co.id);
+    showToast(`${co.name} deleted`);
+  }
+};
+
+const addForm = (
+  <div className={compact ? "space-y-2 bg-amber-50/60 p-3 rounded-xl border border-amber-100" : "bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3"}>
+    {!compact && <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest">Register New Transport Company</h3>}
+    <div className="grid grid-cols-2 gap-2">
+      <div className="col-span-2"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Company Name *</label><input className={compact ? smallCls : inputCls} placeholder="e.g. Daewoo Express" value={form.name} onChange={e=>setForm({...form,name:e.target.value})} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();add();}}} /></div>
+      <div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Phone</label><input className={compact ? smallCls : inputCls} placeholder="03XX..." value={form.phone} onChange={e=>setForm({...form,phone:e.target.value})} /></div>
+      <div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">City</label><input className={compact ? smallCls : inputCls} placeholder="e.g. Lahore" value={form.city} onChange={e=>setForm({...form,city:e.target.value})} /></div>
+      <div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Default Driver</label><input className={compact ? smallCls : inputCls} placeholder="Driver name" value={form.defaultDriverName} onChange={e=>setForm({...form,defaultDriverName:e.target.value})} /></div>
+      <div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Driver Phone</label><input className={compact ? smallCls : inputCls} placeholder="03XX..." value={form.defaultDriverPhone} onChange={e=>setForm({...form,defaultDriverPhone:e.target.value})} /></div>
+      {!lockedType && <div className="col-span-2"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Transport Type *</label><select className={compact ? smallCls : inputCls} value={form.transportType} onChange={e=>setForm({...form,transportType:e.target.value})}>{typeList.map(t=><option key={t} value={t}>{t}</option>)}</select></div>}
+    </div>
+    <div className="flex gap-2">
+      <button type="button" onClick={add} className={`${compact ? 'text-xs py-2 px-3' : 'w-full py-3'} bg-amber-600 text-white font-bold rounded-xl hover:bg-amber-700 transition-colors`}>Add Company</button>
+      {compact && <button type="button" onClick={()=>{setShowAdd(false);setForm(blank);}} className="text-xs font-bold text-slate-500 px-3 py-2 bg-slate-100 rounded-lg">Cancel</button>}
+    </div>
+  </div>
+);
+
+const list = (
+  <ul className="divide-y divide-slate-100">
+    {visible.map(co => (
+      <li key={co.id} className={compact ? "py-2" : "p-3 hover:bg-slate-50"}>
+        {editingId === co.id ? (
+          <div className="space-y-2">
+            <div className="grid grid-cols-2 gap-2">
+              <input autoFocus className={`col-span-2 ${smallCls} !border-amber-300`} value={editForm.name||''} onChange={e=>setEditForm({...editForm,name:e.target.value})} placeholder="Company name" onKeyDown={e=>{if(e.key==='Escape')setEditingId(null);if(e.key==='Enter'){e.preventDefault();saveEdit(co);}}} />
+              <input className={smallCls} value={editForm.phone||''} onChange={e=>setEditForm({...editForm,phone:e.target.value})} placeholder="Phone" />
+              <input className={smallCls} value={editForm.city||''} onChange={e=>setEditForm({...editForm,city:e.target.value})} placeholder="City" />
+              <input className={smallCls} value={editForm.defaultDriverName||''} onChange={e=>setEditForm({...editForm,defaultDriverName:e.target.value})} placeholder="Default driver" />
+              <input className={smallCls} value={editForm.defaultDriverPhone||''} onChange={e=>setEditForm({...editForm,defaultDriverPhone:e.target.value})} placeholder="Driver phone" />
+              {!lockedType && <select className={`col-span-2 ${smallCls}`} value={editForm.transportType||typeList[0]} onChange={e=>setEditForm({...editForm,transportType:e.target.value})}>{typeList.map(t=><option key={t} value={t}>{t}</option>)}</select>}
+            </div>
+            <div className="flex gap-2">
+              <button type="button" onClick={()=>saveEdit(co)} className="text-xs font-bold text-amber-700 px-3 py-1.5 bg-amber-50 rounded-lg hover:bg-amber-100">Save</button>
+              <button type="button" onClick={()=>setEditingId(null)} className="text-xs font-bold text-slate-500 px-2 py-1.5 bg-slate-100 rounded-lg">Cancel</button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-bold text-slate-800 text-sm">{co.name}</span>
+                {!lockedType && <span className="text-[9px] font-black bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded border border-amber-100">{co.transportType}</span>}
+                {co.city && <span className="text-[9px] font-bold bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">{co.city}</span>}
+              </div>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                {co.phone || 'No phone'}
+                {co.defaultDriverName ? ` · Driver: ${co.defaultDriverName}${co.defaultDriverPhone ? ` (${co.defaultDriverPhone})` : ''}` : ''}
+              </p>
+            </div>
+            <button type="button" onClick={()=>{setEditingId(co.id);setEditForm({name:co.name,phone:co.phone||'',city:co.city||'',defaultDriverName:co.defaultDriverName||'',defaultDriverPhone:co.defaultDriverPhone||'',transportType:co.transportType||typeList[0]});}} className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg shrink-0"><Edit size={14}/></button>
+            <button type="button" onClick={()=>remove(co)} className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg shrink-0"><Trash2 size={14}/></button>
+          </div>
+        )}
+      </li>
+    ))}
+  </ul>
+);
+
+// Inline variant: sits under one transport type in the Segments list.
+if (compact) return (
+  <div className="mt-2 pl-1 border-l-2 border-amber-200 ml-1 space-y-2">
+    <div className="flex items-center gap-2">
+      <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider">Transport Companies</span>
+      <span className="text-[10px] font-black text-amber-600">{scoped.length}</span>
+      {!showAdd && <button type="button" onClick={()=>setShowAdd(true)} className="ml-auto text-[10px] font-bold text-amber-700 px-2 py-1 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 flex items-center gap-1"><Plus size={11}/> Add</button>}
+    </div>
+    {showAdd && addForm}
+    {scoped.length === 0 && !showAdd && <p className="text-[11px] text-slate-400 font-medium py-1">None yet — add the couriers you ship with.</p>}
+    {scoped.length > 0 && list}
+  </div>
+);
+
+// Full variant: its own Admin tab.
+return (
+<div className="flex-1 overflow-y-auto p-4 pb-24 space-y-4">
+{addForm}
+<div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+  <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-2"><Truck size={14} className="text-amber-500"/><span className="text-xs font-bold text-slate-600 uppercase tracking-widest">Transport Companies</span><span className="ml-auto text-xs font-black text-amber-600">{transportCompanies.length}</span></div>
+  <div className="px-3 pt-3 pb-2"><div className="relative"><Search className="absolute left-3 top-2.5 text-slate-400" size={14}/><input placeholder="Search companies..." className="w-full pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg font-semibold outline-none text-sm focus:border-amber-400" value={search} onChange={e=>setSearch(e.target.value)} /></div></div>
+  {transportCompanies.length === 0 && <p className="text-center py-8 text-sm text-slate-400 font-medium">No transport companies registered yet.</p>}
+  {list}
+</div>
+</div>
+);
+};
+
 const RidersAdminView = () => {
 const { riders, vehicleTypes, saveToFirebase, deleteFromFirebase, showToast, showConfirm } = useContext(AppContext);
 const riderVehicleTypes = vehicleTypes.filter(vt => vt.requiresRider).map(vt => vt.name);
@@ -2275,10 +2448,10 @@ return (
 <h2 className="text-2xl font-extrabold text-slate-800 tracking-tight mb-4">Admin Hub</h2>
 <div className="bg-slate-200 p-1 rounded-xl">
 <ScrollableTabBar bgClass="bg-slate-200">
-{[['analytics','bg-white text-indigo-700',<BarChart3 size={14}/>,'Analytics'],['expenses','bg-white text-rose-600',<Wallet size={14}/>,'Expenses'],['masters','bg-white text-teal-600',<Archive size={14}/>,'Masters'],['bulk','bg-white text-emerald-600',<Upload size={14}/>,'Bulk Ops'],['segments','bg-white text-purple-600',<Globe size={14}/>,'Segments'],['users','bg-white text-amber-600',<Users size={14}/>,'Users'],['settings','bg-white text-slate-700',<Settings size={14}/>,'Settings'],['riders','bg-white text-indigo-600',<Truck size={14}/>,'Riders']].map(([v,activeClass,icon,label])=>(
+{[['analytics','bg-white text-indigo-700',<BarChart3 size={14}/>,'Analytics'],['expenses','bg-white text-rose-600',<Wallet size={14}/>,'Expenses'],['masters','bg-white text-teal-600',<Archive size={14}/>,'Masters'],['bulk','bg-white text-emerald-600',<Upload size={14}/>,'Bulk Ops'],['segments','bg-white text-purple-600',<Globe size={14}/>,'Segments'],['users','bg-white text-amber-600',<Users size={14}/>,'Users'],['settings','bg-white text-slate-700',<Settings size={14}/>,'Settings'],['riders','bg-white text-indigo-600',<Truck size={14}/>,'Riders'],['transportCos','bg-white text-amber-700',<Truck size={14}/>,'Transport Cos']].map(([v,activeClass,icon,label])=>(
   <button key={v} data-admintab={v} tabIndex={adminView===v?0:-1}
     onClick={()=>setAdminView(v)}
-    onKeyDown={makeArrowNav(['analytics','expenses','masters','bulk','segments','users','settings','riders'],adminView,setAdminView,'data-admintab')}
+    onKeyDown={makeArrowNav(['analytics','expenses','masters','bulk','segments','users','settings','riders','transportCos'],adminView,setAdminView,'data-admintab')}
     className={`py-2 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 whitespace-nowrap ${adminView===v?activeClass+' shadow-sm':'text-slate-500'}`}>{icon} {label}</button>
 ))}
 </ScrollableTabBar>
@@ -2293,6 +2466,7 @@ return (
 <div style={{display: adminView === 'users' ? 'flex' : 'none', flexDirection: 'column', height: '100%'}}><UserManagementView /></div>
 <div style={{display: adminView === 'settings' ? 'flex' : 'none', flexDirection: 'column', height: '100%'}}><AppSettingsView /></div>
 <div style={{display: adminView === 'riders' ? 'flex' : 'none', flexDirection: 'column', height: '100%'}}><RidersAdminView /></div>
+<div style={{display: adminView === 'transportCos' ? 'flex' : 'none', flexDirection: 'column', height: '100%'}}><TransportCompaniesManager /></div>
 </div>
 </div>
 )
@@ -2360,7 +2534,7 @@ function doGet(e) {
 const getDriveScript = () => DRIVE_SCRIPT;
 
 const AppSettingsView = () => {
-const { appSettings, saveToFirebase, showToast, showConfirm, appUsers, companies, products, customers, invoices, expenses, expenseCategories, payments, cities, areas, customerTypes, vehicleTypes, riders } = useContext(AppContext);
+const { appSettings, saveToFirebase, showToast, showConfirm, appUsers, companies, products, customers, invoices, expenses, expenseCategories, payments, cities, areas, customerTypes, vehicleTypes, riders, transportCompanies } = useContext(AppContext);
 const [form, setForm] = useState({
   id: 'main',
   businessName: appSettings?.businessName || 'Khyber Traders',
@@ -2399,18 +2573,18 @@ React.useEffect(() => {
 }, [appSettings?.id, appSettings?.businessName, appSettings?.showBusinessNameOnDocs, appSettings?.showBusinessNameOnReports, appSettings?.backupFreq, appSettings?.githubFreq, appSettings?.driveScriptUrl, appSettings?.driveFolderId, appSettings?.driveFreq]);
 const saveSettings = async () => { await saveToFirebase('appSettings', 'main', form); showToast('Settings saved!'); };
 const downloadBackup = async () => {
-  const backup = { exportedAt: new Date().toISOString(), collections: { app_users: appUsers, appSettings: appSettings ? [appSettings] : [], companies, products, customers, invoices, expenses, expenseCategories, payments, riders, cities, areas, customerTypes, vehicleTypes } };
+  const backup = { exportedAt: new Date().toISOString(), collections: { app_users: appUsers, appSettings: appSettings ? [appSettings] : [], companies, products, customers, invoices, expenses, expenseCategories, payments, riders, transportCompanies, cities, areas, customerTypes, vehicleTypes } };
   const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
   await shareOrDownload(blob, `AnimalHealthPK_Backup_${new Date().toISOString().slice(0,10).replace(/-/g,'')}.json`);
   showToast('Backup downloaded!');
 };
-const buildBackupObj = () => ({ exportedAt: new Date().toISOString(), collections: { app_users: appUsers, appSettings: appSettings ? [appSettings] : [], companies, products, customers, invoices, expenses, expenseCategories, payments, riders, cities, areas, customerTypes, vehicleTypes } });
+const buildBackupObj = () => ({ exportedAt: new Date().toISOString(), collections: { app_users: appUsers, appSettings: appSettings ? [appSettings] : [], companies, products, customers, invoices, expenses, expenseCategories, payments, riders, transportCompanies, cities, areas, customerTypes, vehicleTypes } });
 const manualFirebaseBackup = async () => {
   setFirebaseBacking(true);
   try {
     const backup = buildBackupObj();
     const date = new Date().toISOString().slice(0, 10);
-    const cols = ['app_users', 'appSettings', 'companies', 'products', 'customers', 'invoices', 'expenses', 'expenseCategories', 'payments', 'riders', 'cities', 'areas', 'customerTypes'];
+    const cols = ['app_users', 'appSettings', 'companies', 'products', 'customers', 'invoices', 'expenses', 'expenseCategories', 'payments', 'riders', 'transportCompanies', 'cities', 'areas', 'customerTypes'];
     for (const col of cols) {
       await saveToFirebase('backups', `${date}_${col}`, { items: backup.collections[col] || [], backedUpAt: backup.exportedAt });
     }
@@ -2743,8 +2917,10 @@ return (
 };
 
 const SegmentsAdminView = () => {
-const { cities, areas, customerTypes, vehicleTypes, customers, invoices, saveToFirebase, deleteFromFirebase, showToast, getCustomerBalance, setShowSegmentsModal, showConfirm } = useContext(AppContext);
+const { cities, areas, customerTypes, vehicleTypes, transportCompanies, riders, customers, invoices, saveToFirebase, deleteFromFirebase, showToast, getCustomerBalance, setShowSegmentsModal, showConfirm } = useContext(AppContext);
 const [tab, setTab] = useState('cities');
+// Which non-rider transport type has its courier list open.
+const [expandedVt, setExpandedVt] = useState(null);
 const [newVal, setNewVal] = useState('');
 const [newVtRequiresRider, setNewVtRequiresRider] = useState(false);
 const [editingId, setEditingId] = useState(null);
@@ -2766,7 +2942,20 @@ const add = async () => {
 };
 const saveEdit = async (item) => {
   if (!editVal.trim()) return;
-  await saveToFirebase(col, item.id, { ...item, name: editVal.trim() });
+  const newName = editVal.trim();
+  // Riders and transport companies point at their type by NAME, not id, so renaming a
+  // type would orphan them — they'd drop out of the invoice pickers and their inline
+  // list without any warning. Cascade the rename to keep them attached. Invoices keep
+  // the old name on purpose: they record the method used at the time.
+  if (tab === 'vehicleTypes' && newName !== item.name) {
+    await Promise.all([
+      ...riders.filter(r => r.vehicleType === item.name)
+        .map(r => saveToFirebase('riders', r.id, { ...r, vehicleType: newName })),
+      ...transportCompanies.filter(c => c.transportType === item.name)
+        .map(c => saveToFirebase('transportCompanies', c.id, { ...c, transportType: newName })),
+    ]);
+  }
+  await saveToFirebase(col, item.id, { ...item, name: newName });
   setEditingId(null);
 };
 // Compute sales per segment value
@@ -2825,9 +3014,25 @@ return (
   <div className="flex items-center gap-2"><span className="font-bold text-slate-800 text-sm">{item.name}</span>{tab==='vehicleTypes' ? <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${item.requiresRider ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>{item.requiresRider ? 'Rider' : 'No Rider'}</span> : stats.orders > 0 && <span className="text-[9px] font-bold bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded border border-indigo-100">{stats.orders} orders</span>}</div>
   {tab !== 'vehicleTypes' && stats.orders > 0 && <p className="text-[10px] text-slate-400 mt-0.5">{stats.customers.size} clients · Rs.{stats.revenue.toLocaleString('en-US')} revenue</p>}
   </div>
-  <button onClick={()=>{setEditingId(item.id);setEditVal(item.name);}} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg"><Edit size={14}/></button>
-  <button onClick={async()=>{if(await showConfirm(`Delete "${item.name}"?`))await deleteFromFirebase(col,item.id);}} className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg"><Trash2 size={14}/></button>
+  {tab==='vehicleTypes' && !item.requiresRider && item.name !== 'Self-Pickup' && (
+    <button onClick={()=>setExpandedVt(p=>p===item.id?null:item.id)} title="Transport companies" className="flex items-center gap-1 px-2 py-1.5 text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 shrink-0">
+      {transportCompanies.filter(c=>c.transportType===item.name).length} Cos {expandedVt===item.id ? <ChevronUp size={11}/> : <ChevronDown size={11}/>}
+    </button>
+  )}
+  <button onClick={()=>{setEditingId(item.id);setEditVal(item.name);setExpandedVt(tab==='vehicleTypes' && !item.requiresRider ? item.id : null);}} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg"><Edit size={14}/></button>
+  <button onClick={async()=>{
+    const attached = tab==='vehicleTypes'
+      ? riders.filter(r=>r.vehicleType===item.name).length + transportCompanies.filter(c=>c.transportType===item.name).length
+      : 0;
+    const msg = attached
+      ? `Delete "${item.name}"?\n\n${attached} rider(s) / transport company(ies) are attached and will be left unassigned.`
+      : `Delete "${item.name}"?`;
+    if(await showConfirm(msg))await deleteFromFirebase(col,item.id);
+  }} className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg"><Trash2 size={14}/></button>
   </div>
+  )}
+  {tab==='vehicleTypes' && !item.requiresRider && item.name !== 'Self-Pickup' && (expandedVt===item.id || editingId===item.id) && (
+    <TransportCompaniesManager lockedType={item.name} compact />
   )}
   </li>
   );
@@ -4339,6 +4544,9 @@ const customerTypes = useLiveCollection('customerTypes');
 const vehicleTypes = useLiveCollection('vehicleTypes');
 const appSettingsRaw = useLiveCollection('appSettings');
 const riders = useLiveCollection('riders');
+// Courier registry for transport types that carry no rider (Intercity Transport et al).
+// These are to non-rider vehicle types what riders are to rider-based ones.
+const transportCompanies = useLiveCollection('transportCompanies');
 const appSettings = appSettingsRaw.find(s => s.id === 'main') || { businessName: 'Khyber Traders', appName: 'AnimalHealth.PK', tagline: 'Wholesale Veterinary Pharmacy · Karachi', showBusinessNameOnDocs: true, showBusinessNameOnReports: true };
 
 // Complex UI State
@@ -4640,7 +4848,7 @@ showUserModal, setShowUserModal, editingUser, setEditingUser,
 setPrintConfig, printConfig,
 showSegmentsModal, setShowSegmentsModal,
 showRidersModal, setShowRidersModal,
-riders,
+riders, transportCompanies,
 editingPayment, setEditingPayment,
 showCreditNoteModal, setShowCreditNoteModal, editingCreditNote, setEditingCreditNote,
 appSettings,
