@@ -46,7 +46,11 @@ expected and are not bugs:
 - *"Email/Password sign-in is not enabled."* Step 2 was missed, or the console change has
   not propagated yet. Wait a minute and retry.
 
-**5. Verify before going further.** Have **every** person log in on their own device. The
+**5. Rebuild the login lookup.** In the same panel, click **Rebuild login lookup**. This
+writes the username→address entries the login screen needs once it can no longer read the
+user list. Accounts migrated before this button existed have no entry yet.
+
+**6. Verify before going further.** Have **every** person log in on their own device. The
 panel must read *"All N account(s) use Firebase Authentication"* with none left. Do not
 start Stage C while even one account is unmigrated.
 
@@ -75,20 +79,28 @@ seconds. Then report what failed.
 **5. Once confirmed,** copy `firestore.rules.strict` over `firestore.rules` in the repo so
 the file matches what is actually live.
 
-### What still needs doing in code at Stage C
+### Code changes for Auth-only operation — done
 
-The app is not finished for Auth-only operation. Before the strict rules can stay up:
+All shipped. For reference, what had to change and why:
 
-- **Login must stop reading `app_users` before authenticating.** It currently finds the
-  user by name to get their email. Under the new rules that read is denied while signed
-  out. Sign in first using the address derived from the typed name, then load the profile.
-- **Creating or editing a user must maintain `userRoles/{uid}`**, including creating the
-  Auth account. Right now only the migration writes that mirror, so a user added afterwards
-  will have no role document and the rules will refuse them everything.
-- **Renaming a user does not move their login.** The Auth address is fixed when the account
-  is created, which is why `loginName` is stored separately. Either keep the login name
-  fixed or update the Auth email too — silently breaking someone's login on a rename is the
-  failure mode to avoid.
+- **Login no longer reads `app_users` before authenticating.** It resolves the username
+  through the public `loginIndex`, signs in, then reads the role mirror. The old flow read
+  the user table to find credentials, which is denied to a signed-out visitor.
+- **Firestore listeners re-subscribe when the session changes.** A listener refused
+  permission is terminated and never retried, so every collection would have died on the
+  login screen and stayed dead — a logged-in user would have seen an empty app.
+- **First-run bootstrap no longer gates on `appUsers` being empty.** That list is
+  unreadable from the login screen under the new rules, so the check would have been true
+  for everyone and diverted every sign-in into bootstrap. It now runs only when Firebase
+  confirms no such account exists and the setup secret matches.
+- **Creating, editing and deleting users maintains all three records** — profile, role
+  mirror, login index. Deleting only the profile would leave the Auth account working with
+  its rights intact, since a browser cannot delete an Auth user.
+- **Forgotten passwords are recoverable.** Admins set a new password from the user modal;
+  it issues a fresh Auth account under a new alias and repoints the index.
+
+Still true and worth knowing: **renaming a user does not move their login.** The Auth
+address is fixed at creation, which is why `loginName` is stored separately.
 
 ---
 

@@ -11,9 +11,9 @@ Percent, Hash, Zap, Archive, RefreshCw, Eye, EyeOff, ChevronDown, ChevronUp,
 AlignLeft, Bell, Star, Layers, Globe, PhoneCall, MapPin, Briefcase, ClipboardList, Copy,
 RotateCcw, FileText, Database, Clock
 } from 'lucide-react';
-import { db, auth, firebaseConfig, collection, onSnapshot, doc, setDoc, deleteDoc,
+import { db, auth, firebaseConfig, collection, onSnapshot, doc, getDoc, setDoc, deleteDoc,
          getAuth, initializeApp, deleteApp, signInWithEmailAndPassword,
-         createUserWithEmailAndPassword, signOut, authEmailFor } from './firebase';
+         createUserWithEmailAndPassword, signOut, onAuthStateChanged, authEmailFor, loginSlug } from './firebase';
 import { APP_NAME, VEHICLES, getPKTDate, getLocalDateStr, formatDateDisp, checkDateFilter, exportToCSV, shareOrDownload } from './helpers';
 import PrintView from './components/PrintView';
 import SearchableSelect from './components/SearchableSelect';
@@ -144,7 +144,7 @@ return (
 };
 
 const UserModal = () => {
-const { editingUser, appUsers, checkDuplicate, saveToFirebase, showToast, setShowUserModal, resetUserLogin } = useContext(AppContext);
+const { editingUser, appUsers, checkDuplicate, saveToFirebase, showToast, setShowUserModal, resetUserLogin, saveUserAccount } = useContext(AppContext);
 const isEdit = !!editingUser;
 const [form, setForm] = useState(isEdit ? editingUser : { name: '', password: '', role: 'staff', permissions: {} });
 // A migrated account keeps no password here — Firebase holds it. Asking for one would
@@ -158,10 +158,10 @@ const save = async () => {
 if (!form.name) return showToast("Name is required", "error");
 if (!onFirebaseAuth && !form.password) return showToast("Password is required", "error");
 if (checkDuplicate(appUsers, form.name, form.id)) return showToast("Username already exists", "error");
-const id = isEdit ? form.id : Date.now().toString();
-// Admin role gets no permissions object (full access via role check)
-const toSave = form.role === 'admin' ? { ...form, id, permissions: {} } : { ...form, id };
-await saveToFirebase('app_users', id, toSave);
+// Creating a user now means creating a Firebase Auth account too, so this goes through
+// one function that keeps the profile, the role mirror and the login index in step.
+const res = await saveUserAccount(form, isEdit);
+if (!res.ok) return showToast(res.why, "error");
 showToast(isEdit ? "User Updated" : "User Added");
 setShowUserModal(false);
 };
@@ -685,7 +685,13 @@ return (
 };
 
 
-function useLiveCollection(collectionName) {
+// authKey re-subscribes the listener whenever the signed-in user changes.
+//
+// This is load-bearing once the security rules are closed. A listener that is refused
+// permission is TERMINATED — Firestore does not retry it when the user later signs in.
+// Without this dependency every collection would be denied on the login screen and stay
+// dead afterwards, leaving a logged-in user staring at an empty app.
+function useLiveCollection(collectionName, authKey) {
 const [data, setData] = React.useState([]);
 useEffect(() => {
 const unsubscribe = onSnapshot(collection(db, collectionName), (snapshot) => {
@@ -694,7 +700,7 @@ snapshot.forEach((d) => items.push(d.data()));
 setData(items.sort((a, b) => (a.id > b.id ? 1 : -1)));
 }, (error) => { console.error('Error fetching ' + collectionName + ':', error); });
 return () => unsubscribe();
-}, [collectionName]);
+}, [collectionName, authKey]);
 return data;
 }
 
@@ -2954,7 +2960,7 @@ return (
 };
 
 const UserManagementView = () => {
-const { migrateUsersToAuth,
+const { migrateUsersToAuth, repairLoginIndex,
         isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig, showConfirm } = useContext(AppContext);
 const [userDateFilter, setUserDateFilter] = useState('This Month');
 const [userSearch, setUserSearch] = useState('');
@@ -3020,7 +3026,14 @@ return (
 </div>
 <div className="flex gap-1.5">
 <button onClick={() => { setEditingUser(u); setShowUserModal(true); }} className="p-2 bg-slate-50 text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"><Edit size={16}/></button>
-<button onClick={async () => { if(u.id === currentUser.id) return showToast("Cannot delete yourself","error"); if(await showConfirm(`Permanently delete user ${u.name}?`)) await deleteFromFirebase('app_users', u.id); }} className="p-2 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-100 transition-colors"><Trash2 size={16}/></button>
+<button onClick={async () => { if(u.id === currentUser.id) return showToast("Cannot delete yourself","error"); if(await showConfirm(`Permanently delete user ${u.name}?`)) {
+    await deleteFromFirebase('app_users', u.id);
+    // The Firebase Auth account cannot be removed from the browser, so its password still
+    // works. Deleting the role mirror is what actually revokes access — leave it and the
+    // "deleted" user keeps full rights once the strict rules are live.
+    if (u.authUid) await deleteFromFirebase('userRoles', u.authUid);
+    await deleteFromFirebase('loginIndex', loginSlug(u.loginName || u.name));
+  } }} className="p-2 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-100 transition-colors"><Trash2 size={16}/></button>
 </div>
 </div>
 <div className="grid grid-cols-3 gap-2 pt-3 border-t border-slate-100">
@@ -3041,9 +3054,19 @@ return (
 <div className="mt-6 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
 <h3 className="text-xs font-bold text-slate-800 uppercase tracking-widest mb-3 flex items-center gap-1.5"><Lock size={14} className={legacyUsers.length ? "text-rose-600" : "text-emerald-600"}/> Login Security</h3>
 {legacyUsers.length === 0 ? (
-  <p className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-xl p-3 leading-relaxed">
-    All {appUsers.length} account(s) use Firebase Authentication. No passwords are stored in the database.
-  </p>
+  <>
+    <p className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-xl p-3 leading-relaxed mb-2">
+      All {appUsers.length} account(s) use Firebase Authentication. No passwords are stored in the database.
+    </p>
+    <p className="text-[10px] text-slate-500 leading-relaxed mb-2">
+      Run this once before locking the database down. It writes the username lookup that the
+      login screen needs when it can no longer read the user list.
+    </p>
+    <button onClick={async () => { const n = await repairLoginIndex(); showToast(`Login lookup rebuilt for ${n} account(s)`); }}
+      className="w-full bg-slate-800 text-white py-2.5 rounded-xl font-bold text-xs hover:bg-slate-700 transition-colors">
+      Rebuild login lookup
+    </button>
+  </>
 ) : (
   <>
     <p className="text-[11px] font-semibold text-slate-600 leading-relaxed mb-2">
@@ -4691,6 +4714,14 @@ window.localStorage.removeItem('app_currentUser');
 }
 }, [currentUser]);
 
+// A stored profile with no live Firebase session is a stale login left over from before
+// the Auth migration, or an expired one. Once the rules are closed every read it makes
+// would be denied, so clear it and show the login screen instead of a broken app.
+useEffect(() => {
+  if (authUid === null) setCurrentUser(prev => (prev && prev.authUid ? null : prev));
+}, [authUid]);
+
+
 const [loginForm, setLoginForm] = useState({ name: '', password: '' });
 const [activeTab, setActiveTab] = useState('dashboard');
 const [adminView, setAdminView] = useState('analytics');
@@ -4698,23 +4729,28 @@ const [analyticsView, setAnalyticsView] = useState('Overview');
 const [toast, setToast] = useState(null);
 
 // — Data State (Live from Firebase) —
-const appUsers = useLiveCollection('app_users');
-const companies = useLiveCollection('companies');
-const products = useLiveCollection('products');
-const customers = useLiveCollection('customers');
-const invoices = useLiveCollection('invoices');
-const expenses = useLiveCollection('expenses');
-const expenseCategories = useLiveCollection('expenseCategories');
-const payments = useLiveCollection('payments');
-const cities = useLiveCollection('cities');
-const areas = useLiveCollection('areas');
-const customerTypes = useLiveCollection('customerTypes');
-const vehicleTypes = useLiveCollection('vehicleTypes');
-const appSettingsRaw = useLiveCollection('appSettings');
-const riders = useLiveCollection('riders');
+// Tracks the Firebase session. Drives listener re-subscription (above) and clears a
+// stale stored profile below.
+const [authUid, setAuthUid] = useState(null);
+useEffect(() => onAuthStateChanged(auth, (fbUser) => setAuthUid(fbUser ? fbUser.uid : null)), []);
+
+const appUsers = useLiveCollection('app_users', authUid);
+const companies = useLiveCollection('companies', authUid);
+const products = useLiveCollection('products', authUid);
+const customers = useLiveCollection('customers', authUid);
+const invoices = useLiveCollection('invoices', authUid);
+const expenses = useLiveCollection('expenses', authUid);
+const expenseCategories = useLiveCollection('expenseCategories', authUid);
+const payments = useLiveCollection('payments', authUid);
+const cities = useLiveCollection('cities', authUid);
+const areas = useLiveCollection('areas', authUid);
+const customerTypes = useLiveCollection('customerTypes', authUid);
+const vehicleTypes = useLiveCollection('vehicleTypes', authUid);
+const appSettingsRaw = useLiveCollection('appSettings', authUid);
+const riders = useLiveCollection('riders', authUid);
 // Courier registry for transport types that carry no rider (Intercity Transport et al).
 // These are to non-rider vehicle types what riders are to rider-based ones.
-const transportCompanies = useLiveCollection('transportCompanies');
+const transportCompanies = useLiveCollection('transportCompanies', authUid);
 const appSettings = appSettingsRaw.find(s => s.id === 'main') || { businessName: 'Khyber Traders', appName: 'AnimalHealth.PK', tagline: 'Wholesale Veterinary Pharmacy · Karachi', showBusinessNameOnDocs: true, showBusinessNameOnReports: true };
 
 // Complex UI State
@@ -4757,51 +4793,142 @@ return list.some(item => item.name.toLowerCase() === name.toLowerCase() && item.
 
 const handleLogin = async (e) => {
 e.preventDefault();
-if (appUsers.length === 0) {
-// First run: only allowed if the password matches the setup secret from .env
-// This prevents anyone who copies the code from bootstrapping their own instance
-const setupSecret = import.meta.env.VITE_SETUP_SECRET;
-if (!setupSecret || loginForm.password !== setupSecret) {
-showToast("Invalid Credentials", "error");
-return;
+// First-run bootstrap deliberately does NOT gate on appUsers being empty any more.
+// That list is unreadable from the login screen once the rules are closed, so the old
+// check would have been true for everyone and every sign-in would have been diverted
+// into bootstrap and rejected. The setup secret is the gate; it is attempted only after
+// Firebase confirms there is no such account.
+const bootstrapFirstAdmin = async () => {
+  const setupSecret = import.meta.env.VITE_SETUP_SECRET;
+  if (!setupSecret || loginForm.password !== setupSecret) return false;
+  const email = authEmailFor(loginForm.name);
+  const cred = await createUserWithEmailAndPassword(auth, email, loginForm.password);
+  const id = Date.now().toString();
+  const profile = { id, name: loginForm.name, role: 'admin', permissions: {},
+                    authUid: cred.user.uid, authEmail: email, loginName: loginForm.name };
+  await saveToFirebase('app_users', id, profile);
+  await saveToFirebase('userRoles', cred.user.uid, {
+    uid: cred.user.uid, appUserId: id, name: loginForm.name, role: 'admin', permissions: {}, active: true });
+  await writeLoginIndex(profile, email);
+  const defaultCats = ['Transport', 'Utility Bill', 'Staff Food/Tea', 'Maintenance', 'Other'];
+  defaultCats.forEach((cat, i) => saveToFirebase('expenseCategories', Date.now()+i, { id: Date.now()+i, name: cat }));
+  setCurrentUser({ id, name: loginForm.name, role: 'admin', permissions: {}, authUid: cred.user.uid });
+  showToast("Welcome! Admin account created.");
+  return true;
+};
+// Authenticate BEFORE touching the database. The old flow looked the user up in
+// app_users to find their credentials, which cannot work once the rules are closed —
+// a signed-out visitor may read nothing. So: resolve the username to a login address
+// through the public loginIndex, sign in, and only then read anything.
+const slug = loginSlug(loginForm.name);
+let email = null;
+try {
+  const idx = await getDoc(doc(db, 'loginIndex', slug));
+  if (idx.exists()) email = idx.data().authEmail;
+} catch (err) {
+  console.error('Login index lookup failed:', err);
 }
-const initUser = { id: Date.now().toString(), name: loginForm.name, password: loginForm.password, role: 'admin' };
-await saveToFirebase('app_users', initUser.id, initUser);
-if (expenseCategories.length === 0) {
-const defaultCats = ['Transport', 'Utility Bill', 'Staff Food/Tea', 'Maintenance', 'Other'];
-defaultCats.forEach((cat, i) => saveToFirebase('expenseCategories', Date.now()+i, { id: Date.now()+i, name: cat }));
-}
-setCurrentUser(initUser);
-showToast("Welcome! Admin account created.");
-return;
-}
-// Two login paths on purpose, while the migration to Firebase Auth is in progress.
-// A migrated account (has authUid) is verified by Firebase; one that has not been
-// migrated yet still falls back to the old stored-password check. Removing the fallback
-// before every account is migrated would lock those people out of a live business.
-const named = appUsers.find(u => (u.name || '').toLowerCase() === loginForm.name.trim().toLowerCase());
+// No index entry: fall back to the address derived from the name. Covers accounts
+// migrated before the index existed, and anyone whose login has never been reset.
+if (!email) email = authEmailFor(loginForm.name);
 
-if (named?.authUid) {
-  try {
-    await signInWithEmailAndPassword(auth, named.authEmail || authEmailFor(named.name), loginForm.password);
-    setCurrentUser(named);
-    showToast(`Welcome ${named.name}`);
-  } catch (err) {
-    console.error('Auth sign-in failed:', err.code);
-    showToast(err.code === 'auth/too-many-requests'
-      ? "Too many attempts — try again shortly"
-      : "Invalid Credentials", "error");
+try {
+  const cred = await signInWithEmailAndPassword(auth, email, loginForm.password);
+  // Identity comes from the role mirror, keyed by uid — the one document a signed-in
+  // user is always allowed to read about themselves.
+  const roleSnap = await getDoc(doc(db, 'userRoles', cred.user.uid));
+  if (!roleSnap.exists()) {
+    await signOut(auth);
+    showToast("Account is not set up — ask an admin to re-save it", "error");
+    return;
   }
-  return;
+  const r = roleSnap.data();
+  if (r.active === false) {
+    await signOut(auth);
+    showToast("This account has been disabled", "error");
+    return;
+  }
+  setCurrentUser({ id: r.appUserId, name: r.name, role: r.role || 'staff', permissions: r.permissions || {}, authUid: cred.user.uid });
+  showToast(`Welcome ${r.name}`);
+} catch (err) {
+  const noSuchAccount = ['auth/user-not-found', 'auth/invalid-credential', 'auth/invalid-login-credentials'].includes(err.code);
+  if (noSuchAccount) {
+    try {
+      if (await bootstrapFirstAdmin()) return;
+    } catch (bootErr) {
+      console.error('Bootstrap failed:', bootErr.code || bootErr);
+    }
+  }
+  console.error('Sign-in failed:', err.code);
+  showToast(err.code === 'auth/too-many-requests'
+    ? "Too many attempts — wait a minute and try again"
+    : "Invalid Credentials", "error");
 }
+};
 
-const user = appUsers.find(u => u.name.toLowerCase() === loginForm.name.toLowerCase() && u.password === loginForm.password);
-if (user) {
-setCurrentUser(user);
-showToast(`Welcome ${user.name}`);
-} else {
-showToast("Invalid Credentials", "error");
-}
+// Write the username -> login address entry that sign-in reads before authenticating.
+// Public by necessity: it is consulted while signed out. It holds no secret — just the
+// synthetic address a username maps to.
+const writeLoginIndex = async (user, email) => {
+  const slug = loginSlug(user.loginName || user.name);
+  await saveToFirebase('loginIndex', slug, { slug, authEmail: email, appUserId: user.id });
+};
+
+// Rewrite every migrated account's index entry. Idempotent and cheap; exists because the
+// first accounts were migrated before the index did, and without an entry a reset login
+// cannot be resolved at sign-in.
+const repairLoginIndex = async () => {
+  const migrated = appUsers.filter(u => u.authUid);
+  for (const u of migrated) {
+    await writeLoginIndex(u, u.authEmail || authEmailFor(u.loginName || u.name));
+  }
+  return migrated.length;
+};
+
+// Create or update a staff account, keeping all three records in step: the profile in
+// app_users, the role mirror the security rules read, and the login index sign-in needs.
+// Letting these drift is how someone ends up able to log in but authorised for nothing.
+const saveUserAccount = async (form, isEdit) => {
+  const permissions = form.role === 'admin' ? {} : (form.permissions || {});
+  if (isEdit) {
+    const { password, ...rest } = form;
+    const profile = { ...rest, permissions };
+    await saveToFirebase('app_users', form.id, profile);
+    if (form.authUid) {
+      await saveToFirebase('userRoles', form.authUid, {
+        uid: form.authUid, appUserId: form.id, name: form.name,
+        role: form.role || 'staff', permissions, active: form.active !== false,
+      });
+      await writeLoginIndex(profile, profile.authEmail || authEmailFor(profile.loginName || profile.name));
+    }
+    return { ok: true };
+  }
+
+  const id = Date.now().toString();
+  const email = authEmailFor(form.name);
+  if ((form.password || '').length < 6) return { ok: false, why: 'Password must be at least 6 characters.' };
+  let secondary = null;
+  try {
+    secondary = initializeApp(firebaseConfig, 'newuser-' + id);
+    const cred = await createUserWithEmailAndPassword(getAuth(secondary), email, form.password);
+    const profile = { id, name: form.name, role: form.role || 'staff', permissions,
+                      authUid: cred.user.uid, authEmail: email, loginName: form.name };
+    await saveToFirebase('app_users', id, profile);
+    await saveToFirebase('userRoles', cred.user.uid, {
+      uid: cred.user.uid, appUserId: id, name: form.name,
+      role: form.role || 'staff', permissions, active: true,
+    });
+    await writeLoginIndex(profile, email);
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, why: err.code === 'auth/email-already-in-use'
+      ? 'That username is already taken by an old login. Pick a slightly different name.'
+      : err.code === 'auth/operation-not-allowed'
+        ? 'Email/Password sign-in is not enabled in the Firebase console.'
+        : (err.code || err.message) };
+  } finally {
+    if (secondary) { try { await signOut(getAuth(secondary)); } catch (e) {} try { await deleteApp(secondary); } catch (e) {} }
+  }
 };
 
 // Give a migrated account a new password.
@@ -4833,6 +4960,9 @@ const resetUserLogin = async (u, newPassword) => {
     if (previousUid && previousUid !== cred.user.uid) {
       await deleteFromFirebase('userRoles', previousUid);
     }
+    // Point the username at the NEW address, or sign-in would keep resolving to the old
+    // account and the reset would appear to do nothing.
+    await writeLoginIndex(u, email);
     return { ok: true };
   } catch (err) {
     return { ok: false, why: err.code === 'auth/operation-not-allowed'
@@ -4896,6 +5026,7 @@ const migrateUsersToAuth = async () => {
         permissions: u.permissions || {},
         active: true,
       });
+      await writeLoginIndex({ ...u, loginName: u.name }, email);
       done += 1;
     } catch (err) {
       failed.push({ name: u.name, why: err.code === 'auth/operation-not-allowed'
@@ -5149,7 +5280,7 @@ riders, transportCompanies,
 editingPayment, setEditingPayment,
 showCreditNoteModal, setShowCreditNoteModal, editingCreditNote, setEditingCreditNote,
 appSettings,
-migrateUsersToAuth, resetUserLogin, logout,
+migrateUsersToAuth, resetUserLogin, repairLoginIndex, saveUserAccount, logout,
 };
 return (
 <AppContext.Provider value={ctx}>

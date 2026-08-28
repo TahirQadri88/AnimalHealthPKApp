@@ -38,6 +38,16 @@ service cloud.firestore {
       return isAdmin() || (active() && roleDoc().permissions[permission] == true);
     }
 
+    // ── Login index ──────────────────────────────────────────────────────────
+    // Public read is required, not an oversight: the login screen resolves a username to
+    // its login address BEFORE anyone is signed in. It holds no secret — only the synthetic
+    // address a username maps to. Writable by admins alone; anyone able to repoint an entry
+    // could redirect a colleague's login to an account they control.
+    match /loginIndex/{slug} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
     // ── Role mirror ──────────────────────────────────────────────────────────
     // Readable by its owner (the app needs it at sign-in) and by admins. Writable by
     // admins only: a staff member who could edit this could make themselves an admin.

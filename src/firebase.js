@@ -1,5 +1,5 @@
 import { initializeApp, deleteApp } from "firebase/app";
-import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc } from "firebase/firestore";
+import { getFirestore, collection, onSnapshot, doc, getDoc, setDoc, deleteDoc } from "firebase/firestore";
 import {
   getAuth,
   signInWithEmailAndPassword,
@@ -36,12 +36,14 @@ setPersistence(auth, browserLocalPersistence).catch(() => {});
 // created with. That is why the address is stored on the user document during migration
 // instead of being recomputed at every sign-in — recomputing would silently lock out
 // anyone whose name was later corrected.
-const authEmailFor = (name) =>
-  `${String(name || '')
+const loginSlug = (name) =>
+  String(name || '')
     .trim()
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '.')
-    .replace(/^\.+|\.+$/g, '') || 'user'}@animalhealthpk.app`;
+    .replace(/^\.+|\.+$/g, '') || 'user';
+
+const authEmailFor = (name) => `${loginSlug(name)}@animalhealthpk.app`;
 
 export {
   db,
@@ -51,6 +53,7 @@ export {
   collection,
   onSnapshot,
   doc,
+  getDoc,
   setDoc,
   deleteDoc,
   getAuth,
@@ -61,4 +64,5 @@ export {
   signOut,
   onAuthStateChanged,
   authEmailFor,
+  loginSlug,
 };
