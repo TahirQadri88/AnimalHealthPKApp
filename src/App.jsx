@@ -4714,13 +4714,6 @@ window.localStorage.removeItem('app_currentUser');
 }
 }, [currentUser]);
 
-// A stored profile with no live Firebase session is a stale login left over from before
-// the Auth migration, or an expired one. Once the rules are closed every read it makes
-// would be denied, so clear it and show the login screen instead of a broken app.
-useEffect(() => {
-  if (authUid === null) setCurrentUser(prev => (prev && prev.authUid ? null : prev));
-}, [authUid]);
-
 
 const [loginForm, setLoginForm] = useState({ name: '', password: '' });
 const [activeTab, setActiveTab] = useState('dashboard');
@@ -4731,8 +4724,19 @@ const [toast, setToast] = useState(null);
 // — Data State (Live from Firebase) —
 // Tracks the Firebase session. Drives listener re-subscription (above) and clears a
 // stale stored profile below.
-const [authUid, setAuthUid] = useState(null);
+// undefined = Firebase has not reported yet, null = definitely signed out. The distinction
+// matters: treating the initial state as signed-out would clear a perfectly good persisted
+// session on every page load and bounce the user to the login screen.
+const [authUid, setAuthUid] = useState(undefined);
 useEffect(() => onAuthStateChanged(auth, (fbUser) => setAuthUid(fbUser ? fbUser.uid : null)), []);
+
+// A stored profile with no live Firebase session is a stale login — from before the Auth
+// migration, or expired. Once the rules are closed every read it makes would be denied, so
+// clear it and show the login screen rather than a broken app. Declared here, after
+// authUid: as a dependency it is read during render, so it must already exist.
+useEffect(() => {
+  if (authUid === null) setCurrentUser(prev => (prev && prev.authUid ? null : prev));
+}, [authUid]);
 
 const appUsers = useLiveCollection('app_users', authUid);
 const companies = useLiveCollection('companies', authUid);
