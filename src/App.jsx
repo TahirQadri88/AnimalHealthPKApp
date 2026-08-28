@@ -623,7 +623,7 @@ return (
               </div>
               <p className="text-[11px] text-slate-500 mt-0.5">{rider.phone || '—'}{rider.vehicleNumber ? ` · ${rider.vehicleNumber}` : ''}</p>
             </div>
-            <button type="button" onClick={()=>{setEditingId(rider.id);setEditForm({name:rider.name||'',phone:rider.phone||'',vehicleType:rider.vehicleType||'',vehicleNumber:rider.vehicleNumber||''});}} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg"><Edit size={14}/></button>
+            <button type="button" onClick={()=>{setEditingId(rider.id);setEditForm({...rider});}} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg"><Edit size={14}/></button>
             <button type="button" onClick={async()=>{if(await showConfirm(`Delete ${rider.name}?`))await deleteFromFirebase('riders',rider.id);}} className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg"><Trash2 size={14}/></button>
           </div>
         )}
@@ -2482,7 +2482,7 @@ return (
               </div>
               <p className="text-[11px] text-slate-500 mt-0.5">{rider.phone || 'No phone'}</p>
             </div>
-            <button type="button" onClick={()=>{setEditingId(rider.id);setEditForm({name:rider.name||'',phone:rider.phone||'',vehicleType:rider.vehicleType||'',vehicleNumber:rider.vehicleNumber||''});}} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg"><Edit size={14}/></button>
+            <button type="button" onClick={()=>{setEditingId(rider.id);setEditForm({...rider});}} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg"><Edit size={14}/></button>
             <button type="button" onClick={async()=>{if(await showConfirm(`Delete ${rider.name}?`))await deleteFromFirebase('riders',rider.id);showToast(`${rider.name} deleted`);}} className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg"><Trash2 size={14}/></button>
           </div>
         )}
