@@ -133,6 +133,31 @@ When inserting code by matching surrounding text, check the anchor's **scope**, 
 that the text is unique. `const PERMS = [` appears once in the file and is still the wrong
 place to hang a module-level helper.
 
+## Declaration order inside components: `npm run lint:scope`
+
+A dependency array is evaluated **during render**, so anything named in one must already be
+declared above it:
+
+```js
+useEffect(() => {...}, [authUid]);   // reads authUid at render time
+const [authUid] = useState();        // ...so this has to come first
+```
+
+Getting that backwards shipped a white screen with
+`ReferenceError: Cannot access 'f' before initialization`. The effect *body* was fine — it
+was the deps that ran early.
+
+`npm run lint:scope` finds these. It is a separate script from `npm run lint` because it
+also reports call-time-safe cases (a function referencing a const declared lower down is
+fine — it runs later), and that noise would stop the main lint from meaning anything. Run
+it after adding or moving a declaration and judge each NEW name it reports:
+
+- use in a **dependency array, JSX, or the top level of a component body** → real crash
+- use **inside a function body** → fine
+
+Two crashes now have come from misjudging where a declaration sits relative to its use.
+Both were invisible to `vite build` and to the browser smoke test.
+
 ## Never erase a field because a lookup failed
 
 `isTransportMethod()` answers "does this method use a courier". It returns false both for
