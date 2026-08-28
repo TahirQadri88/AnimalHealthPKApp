@@ -107,6 +107,28 @@ adjusting numbers on a hunch. What actually worked:
 4. **A standalone calibration file does not test the app.** It has its own `@page`; it
    measures the printer, not the fix. Verify fixes by printing a real document.
 
+## Before pushing: `npm run verify`
+
+`npm run verify` = lint then build. **A green `vite build` does not mean the app runs.**
+
+This was learned the hard way: a helper was inserted above `const PERMS = [`, which looked
+like module scope but sits inside a component body. It compiled cleanly, the build passed,
+and the deployed app threw `ReferenceError: Can't find variable: isTransportMethod` on
+render — every user hit a blank error screen.
+
+- **`npm run lint`** is the guard that catches it. The ESLint config is deliberately narrow:
+  `no-undef` only. On the broken file it reported the fault five times, at the exact lines.
+  Keep the run clean, so that a clean run means something.
+- **`tools/smoke-test.mjs`** loads the built bundle in a headless browser. Useful, but it
+  only reaches the login screen — it passed the crash above without complaint, because that
+  screen sits behind a login. Do not mistake it for a regression net.
+- Globals from CDN `<script>` tags in `index.html` (currently `html2pdf`) must be declared
+  in the ESLint config, or `no-undef` reports them as faults and the run stops being useful.
+
+When inserting code by matching surrounding text, check the anchor's **scope**, not just
+that the text is unique. `const PERMS = [` appears once in the file and is still the wrong
+place to hang a module-level helper.
+
 ## Deploying
 
 GitHub Actions deploys on push to `main` and `claude/**`. Allow ~3 minutes before testing on

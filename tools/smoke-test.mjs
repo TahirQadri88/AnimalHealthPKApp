@@ -1,9 +1,10 @@
 // Loads the built app in a real browser and fails on any load-time JS error.
 //
-// Exists because a green `vite build` does not mean the page runs: a helper was once
-// inserted inside a component body instead of at module scope, which compiles fine and
-// then throws ReferenceError for every other component at runtime. The app shipped
-// broken. This catches that class of error in about ten seconds.
+// Scope: this only exercises the FIRST screen (the login view). It catches a bundle that
+// fails outright, and nothing deeper — verified against the isTransportMethod crash, which
+// it passed happily because that fault lives on the billing screen, behind a login this
+// sandbox cannot complete. `npm run lint` is what catches out-of-scope identifiers; treat
+// this as a coarse "does the bundle boot" check, not a regression net.
 //
 //   npm run build
 //   npx serve -s dist -l 4173 &
