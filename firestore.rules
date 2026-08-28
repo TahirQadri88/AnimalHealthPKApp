@@ -128,6 +128,19 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // ── Document number counters ─────────────────────────────────────────────
+    // One document per prefix (INV, EST, ORD, REC, CN) holding the next number to issue.
+    // Anyone who can raise a document needs to claim a number, so writes are open to any
+    // active user — but only ever upward. Rewinding a counter would reissue numbers that
+    // are already printed on real invoices, so a decrease is refused outright rather than
+    // trusted to the client.
+    match /counters/{prefix} {
+      allow read:   if active();
+      allow create: if active();
+      allow update: if active() && request.resource.data.next > resource.data.next;
+      allow delete: if false;
+    }
+
     // Anything not named above is denied. New collections must be added deliberately
     // rather than inheriting access.
     match /{document=**} {

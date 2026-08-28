@@ -1,5 +1,5 @@
 import { initializeApp, deleteApp } from "firebase/app";
-import { getFirestore, collection, onSnapshot, doc, getDoc, setDoc, deleteDoc } from "firebase/firestore";
+import { getFirestore, collection, onSnapshot, doc, getDoc, setDoc, deleteDoc, runTransaction } from "firebase/firestore";
 import {
   getAuth,
   signInWithEmailAndPassword,
@@ -56,6 +56,7 @@ export {
   getDoc,
   setDoc,
   deleteDoc,
+  runTransaction,
   getAuth,
   initializeApp,
   deleteApp,

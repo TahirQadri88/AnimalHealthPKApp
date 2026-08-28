@@ -11,7 +11,7 @@ Percent, Hash, Zap, Archive, RefreshCw, Eye, EyeOff, ChevronDown, ChevronUp,
 AlignLeft, Bell, Star, Layers, Globe, PhoneCall, MapPin, Briefcase, ClipboardList, Copy,
 RotateCcw, FileText, Database, Clock
 } from 'lucide-react';
-import { db, auth, firebaseConfig, collection, onSnapshot, doc, getDoc, setDoc, deleteDoc,
+import { db, auth, firebaseConfig, collection, onSnapshot, doc, getDoc, setDoc, deleteDoc, runTransaction,
          getAuth, initializeApp, deleteApp, signInWithEmailAndPassword,
          createUserWithEmailAndPassword, signOut, onAuthStateChanged, authEmailFor, loginSlug } from './firebase';
 import { APP_NAME, VEHICLES, getPKTDate, getLocalDateStr, formatDateDisp, checkDateFilter, exportToCSV, shareOrDownload } from './helpers';
@@ -41,6 +41,41 @@ const isKnownVehicleType = (vehicleTypes, name) =>
 // one where the booking person is meaningless.
 const usesCarrierPerson = (name) => !!name && name !== 'Self-Pickup';
 
+
+// Claim the next document number atomically.
+//
+// getNextSeqNum below takes max()+1 over the records this browser happens to hold, so two
+// people billing in the same moment both compute the same number and one invoice
+// overwrites the other. A Firestore transaction is the fix: the read and the increment
+// happen as one operation, and a second caller retries against the updated value.
+//
+// fallbackStart is the client-side guess, used two ways. It seeds the counter the first
+// time, so numbering continues from existing records rather than restarting at 1. And it
+// is a floor on every subsequent claim, so if anything was ever numbered while the counter
+// was unavailable, the counter catches up instead of reissuing numbers already in use.
+//
+// Returns null if the transaction cannot run — most likely the counters rule has not been
+// published yet — and the caller falls back to the old behaviour. Degraded, not broken.
+const claimDocNumber = async (prefix, fallbackStart) => {
+  try {
+    return await runTransaction(db, async (tx) => {
+      const ref = doc(db, 'counters', prefix);
+      const snap = await tx.get(ref);
+      const stored = snap.exists() ? Number(snap.data().next) || 0 : 0;
+      const next = Math.max(stored, fallbackStart);
+      tx.set(ref, { prefix, next: next + 1, updatedAt: new Date().toISOString() }, { merge: true });
+      return next;
+    });
+  } catch (err) {
+    console.warn(
+      `[numbering] counter transaction failed for ${prefix} — falling back to client-side ` +
+      `numbering, which can duplicate numbers if two people bill at once. ` +
+      `Publish the counters rule from firestore.rules.`,
+      err?.code || err
+    );
+    return null;
+  }
+};
 
 const getNextSeqNum = (items, prefix) => {
   const LEGACY_THRESHOLD = 10000000;
@@ -420,7 +455,8 @@ if (isEdit) {
   await saveToFirebase('payments', updated.id, updated);
   showToast("Payment Receipt Updated!");
 } else {
-  const newPayment = { id: `REC-${String(getNextSeqNum(payments, 'REC')).padStart(4, '0')}`, customerId: Number(form.customerId), amount: Number(form.amount), discount, date: form.date, note: form.note };
+  const recNum = (await claimDocNumber('REC', getNextSeqNum(payments, 'REC'))) ?? getNextSeqNum(payments, 'REC');
+  const newPayment = { id: `REC-${String(recNum).padStart(4, '0')}`, customerId: Number(form.customerId), amount: Number(form.amount), discount, date: form.date, note: form.note };
   await saveToFirebase('payments', newPayment.id, newPayment);
   showToast("Payment Received & Ledger Updated!");
 }
@@ -1216,7 +1252,8 @@ const finalInvoice = { ...currentInvoice,
   items: enrichedItems, total: grandTotal, status: status, salespersonId: currentUser.id, salespersonName: currentUser.name, customerDetails: activeCustomer ? { contactPerson: activeCustomer.contactPerson || '', phone: activeCustomer.phone || '', address1: activeCustomer.address1 || activeCustomer.address || '', map1: activeCustomer.map1 || '', address2: activeCustomer.address2 || '', map2: activeCustomer.map2 || '' } : {} };
 if (!finalInvoice.id) {
   const prefix = status === 'Estimate' ? 'EST' : status === 'Booked' ? 'ORD' : 'INV';
-  const nextNum = getNextSeqNum(invoices, prefix);
+  const clientGuess = getNextSeqNum(invoices, prefix);
+  const nextNum = (await claimDocNumber(prefix, clientGuess)) ?? clientGuess;
   finalInvoice.id = `${prefix}-${String(nextNum).padStart(4, '0')}`;
   if (!finalInvoice.date) finalInvoice.date = getLocalDateStr();
 }
@@ -1585,7 +1622,7 @@ return (
 <div className="flex items-center gap-2"><span className={`text-[9px] px-2 py-0.5 rounded font-bold uppercase tracking-wider ${o.paymentStatus==='Paid'?'bg-emerald-100 text-emerald-700':o.paymentStatus==='Partial'?'bg-amber-100 text-amber-700':'bg-rose-100 text-rose-700'}`}>{o.paymentStatus}</span></div>
 <div className="flex gap-1.5">
 {o.status === 'Estimate' && hasPermission('issueInvoices') && <button onClick={async () => { await saveToFirebase('invoices', o.id, {...o, status: 'Booked'}); showToast('Converted to Draft Order'); }} title="Convert to Draft Order" className="p-2 bg-amber-50 text-amber-600 hover:bg-amber-100 border border-amber-200 rounded-lg"><Save size={14}/></button>}
-{(o.status === 'Estimate' || o.status === 'Booked') && hasPermission('issueInvoices') && <button onClick={async () => { const newId = `INV-${String(getNextSeqNum(invoices, 'INV')).padStart(4, '0')}`; await saveToFirebase('invoices', newId, {...o, id: newId, status: 'Billed', date: getLocalDateStr()}); await deleteFromFirebase('invoices', o.id); showToast(`Converted to Invoice: ${newId}`); }} title="Issue as Invoice" className="p-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-200 rounded-lg"><ReceiptText size={14}/></button>}
+{(o.status === 'Estimate' || o.status === 'Booked') && hasPermission('issueInvoices') && <button onClick={async () => { const invGuess = getNextSeqNum(invoices, 'INV'); const invNum = (await claimDocNumber('INV', invGuess)) ?? invGuess; const newId = `INV-${String(invNum).padStart(4, '0')}`; await saveToFirebase('invoices', newId, {...o, id: newId, status: 'Billed', date: getLocalDateStr()}); await deleteFromFirebase('invoices', o.id); showToast(`Converted to Invoice: ${newId}`); }} title="Issue as Invoice" className="p-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-200 rounded-lg"><ReceiptText size={14}/></button>}
 {o.status === 'Billed' && hasPermission('salesReturns') && <button onClick={() => { setEditingCreditNote({customerId: o.customerId, id: o.id}); setShowCreditNoteModal(true); }} title="Issue Credit Note / Return" className="p-2 bg-rose-50 text-rose-500 hover:bg-rose-100 border border-rose-200 rounded-lg"><RotateCcw size={14}/></button>}
 {(hasPermission('viewLedger') || String(o.salespersonId) === String(currentUser?.id)) && <button onClick={() => { setSelectedLedgerId(o.customerId); setShowLedgerModal(true); }} title="Customer Ledger" className="p-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-500 rounded-lg"><BookOpen size={14}/></button>}
 {(isAdmin || (hasPermission('editOwnInvoices') && String(o.salespersonId) === String(currentUser?.id))) && o.status !== 'CreditNote' && <button onClick={() => { setCurrentInvoice(o); setBillingView('form'); }} className="p-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 rounded-lg"><Edit size={16}/></button>}
@@ -1802,8 +1839,13 @@ const pickCustomer = (c) => {
 const save = async () => {
   if (!form.customerId || form.items.length === 0) return showToast('Customer and at least one item required', 'error');
   const cust = customers.find(c => c.id === Number(form.customerId));
+  let cnId = existingCN ? existingCN.id : null;
+  if (!cnId) {
+    const cnGuess = getNextSeqNum(invoices, 'CN');
+    cnId = `CN-${String((await claimDocNumber('CN', cnGuess)) ?? cnGuess).padStart(4, '0')}`;
+  }
   const cn = {
-    id: existingCN ? existingCN.id : `CN-${String(getNextSeqNum(invoices, 'CN')).padStart(4, '0')}`,
+    id: cnId,
     date: form.date,
     customerId: Number(form.customerId),
     customerName: cust?.name || '',
