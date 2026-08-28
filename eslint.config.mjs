@@ -6,18 +6,22 @@
 // catches exactly that, and a browser smoke test does not — the fault was on a screen
 // that only appears after login.
 //
-// Run `npm run lint` before pushing. Keep it quiet enough that a clean run means
-// something; if it starts reporting noise, fix the noise rather than ignoring the run.
+// Run `npm run lint` before pushing. A clean run must mean something, so it is wired to
+// exit non-zero on warnings too (--max-warnings 0 in the npm script).
+import reactHooks from 'eslint-plugin-react-hooks';
+
 export default [
   {
     files: ['src/**/*.{js,jsx}', 'tools/**/*.mjs'],
-    linterOptions: {
-      // The source carries a react-hooks/exhaustive-deps disable comment. That plugin is
-      // not installed here, and an unknown rule in an inline comment is itself an error,
-      // so inline config is ignored. Nothing in this config needs suppressing anyway.
-      noInlineConfig: true,
-      reportUnusedDisableDirectives: 'off',
-    },
+    // react-hooks is registered only so the existing exhaustive-deps disable comment in
+    // App.jsx resolves to a known rule. None of its rules are switched on — an unknown
+    // rule named in an inline comment is itself an error, and suppressing inline config
+    // instead makes every run emit a warning, so no run is ever clean.
+    plugins: { 'react-hooks': reactHooks },
+    // The disable comment is legitimate — it documents a deliberate dependency omission —
+    // but exhaustive-deps is not switched on here, so ESLint would flag the directive as
+    // unused. Don't report that; this config only checks scope.
+    linterOptions: { reportUnusedDisableDirectives: 'off' },
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: 'module',

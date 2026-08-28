@@ -222,13 +222,14 @@ const generateShareText = () => {
     if (_addr) text += `${_addr}\n`;
     if (_map) text += `${_map}\n`;
     text += `\n🚚 *${data.vehicle || 'N/A'}*`;
-    if (data.vehicle === 'Intercity Transport') {
+    // Driven by what the invoice actually holds, not by hardcoded method names: a custom
+    // courier type would otherwise lose its company, consignment number and booking person
+    // from the shared message. The two lines are independent — an intercity job has both.
+    if (data.transportCompany || data.biltyNumber) {
       text += `\nTransport: ${data.transportCompany || '-'} | Consignment: ${data.biltyNumber || '-'}`;
-      // The booking person matters on intercity jobs too — this used to be dropped
-      // because the rider line sat in an else-if.
-      if (data.driverName) text += `\nBooked By: ${data.driverName}${data.driverPhone ? ` (${data.driverPhone})` : ''}`;
-    } else if (['Rider', 'Rickshaw', 'Suzuki'].includes(data.vehicle)) {
-      text += `\nRider / Driver: ${data.driverName || '-'} (${data.driverPhone || ''})`;
+    }
+    if (data.driverName) {
+      text += `\n${data.transportCompany ? 'Booked By' : 'Rider / Driver'}: ${data.driverName}${data.driverPhone ? ` (${data.driverPhone})` : ''}`;
     }
     text += `\n\n*Items to Deliver:*\n`;
     (data.items || []).forEach(i => {

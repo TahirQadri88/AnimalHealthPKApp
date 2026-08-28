@@ -28,6 +28,17 @@ const isTransportMethod = (vehicleTypes, name) => {
   return vt ? !vt.requiresRider : name === 'Intercity Transport';
 };
 
+// Is this method still in the registry? A vehicle type can be renamed or deleted while
+// invoices keep the old name on purpose (they record the method used at the time), so an
+// unknown name means "we cannot classify this", not "this carries no courier". Anything
+// that ERASES data must check this first - see saveInvoice.
+const isKnownVehicleType = (vehicleTypes, name) =>
+  !!name && (vehicleTypes || []).some(v => v.name === name);
+
+// Self-Pickup is the only method where nobody carries the goods for us, so it is the only
+// one where the booking person is meaningless.
+const usesCarrierPerson = (name) => !!name && name !== 'Self-Pickup';
+
 
 const getNextSeqNum = (items, prefix) => {
   const LEGACY_THRESHOLD = 10000000;
@@ -569,14 +580,17 @@ const riderVehicleTypes = vehicleTypes.filter(vt => vt.requiresRider).map(vt => 
 const fallbackRiderTypes = ['Rider', 'Rickshaw', 'Suzuki'];
 const riderTypeList = riderVehicleTypes.length ? riderVehicleTypes : fallbackRiderTypes;
 const inputCls = "w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:border-indigo-500 shadow-sm";
-const [form, setForm] = useState({ name: '', phone: '', vehicleType: 'Rider', vehicleNumber: '' });
+const [form, setForm] = useState({ name: '', phone: '', vehicleType: '', vehicleNumber: '' });
 const [editingId, setEditingId] = useState(null);
 const [editForm, setEditForm] = useState({});
 const add = async () => {
-  if (!form.name || !form.vehicleType) return showToast("Name and vehicle type required", "error");
-  const obj = { id: Date.now(), name: form.name, phone: form.phone, vehicleType: form.vehicleType, vehicleNumber: form.vehicleNumber };
+  if (!form.name) return showToast("Name required", "error");
+  // Fall back to the first listed type. The select shows that type when state is
+  // empty, so saving the raw state would store a type the user never saw and the
+  // billing picker's filter would never match the rider.
+  const obj = { id: Date.now(), name: form.name, phone: form.phone, vehicleType: form.vehicleType || riderTypeList[0], vehicleNumber: form.vehicleNumber };
   await saveToFirebase('riders', obj.id, obj);
-  setForm({ name: '', phone: '', vehicleType: 'Rider', vehicleNumber: '' });
+  setForm({ name: '', phone: '', vehicleType: '', vehicleNumber: '' });
   showToast("Rider Added");
 };
 const saveEdit = async (rider) => {
@@ -593,7 +607,7 @@ return (
     <div className="col-span-2"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Name *</label><input className={inputCls} placeholder="e.g. Ali Raza" value={form.name} onChange={e=>setForm({...form,name:e.target.value})} /></div>
     <div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Phone</label><input className={inputCls} placeholder="03XX..." value={form.phone} onChange={e=>setForm({...form,phone:e.target.value})} /></div>
     <div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Vehicle No.</label><input className={inputCls} placeholder="e.g. ABC-123" value={form.vehicleNumber} onChange={e=>setForm({...form,vehicleNumber:e.target.value})} /></div>
-    <div className="col-span-2"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Vehicle Type *</label><select className={inputCls} value={form.vehicleType} onChange={e=>setForm({...form,vehicleType:e.target.value})}>{riderTypeList.map(t=><option key={t} value={t}>{t}</option>)}</select></div>
+    <div className="col-span-2"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Vehicle Type *</label><select className={inputCls} value={form.vehicleType || riderTypeList[0]} onChange={e=>setForm({...form,vehicleType:e.target.value})}>{riderTypeList.map(t=><option key={t} value={t}>{t}</option>)}</select></div>
   </div>
   <button type="submit" className="w-full bg-indigo-600 text-white font-bold py-2.5 rounded-xl hover:bg-indigo-700 transition-colors">Add Rider / Vehicle</button>
 </form>
@@ -1129,10 +1143,21 @@ const enrichedItems = currentInvoice.items.map(item => {
   );
   return { ...item, unit: item.unit || prod?.unit || '', unitsInBox: item.unitsInBox || prod?.unitsInBox || 1 };
 });
-// Strip courier fields when the method doesn't use one, so a company carried over
-// from a previous order can't ride along on a rider delivery.
+// Strip logistics fields the chosen method cannot use, so details carried over from a
+// previous order can't ride along invisibly. Only erase when the method is positively
+// classified: if its vehicle type was renamed or deleted after this invoice was written
+// we cannot tell what it used, and blanking a real consignment number would be data loss.
+const known = isKnownVehicleType(vehicleTypes, currentInvoice.vehicle);
 const usesCourier = isTransportMethod(vehicleTypes, currentInvoice.vehicle);
-const finalInvoice = { ...currentInvoice, transportCompany: usesCourier ? (currentInvoice.transportCompany || '') : '', biltyNumber: usesCourier ? (currentInvoice.biltyNumber || '') : '', items: enrichedItems, total: grandTotal, status: status, salespersonId: currentUser.id, salespersonName: currentUser.name, customerDetails: activeCustomer ? { contactPerson: activeCustomer.contactPerson || '', phone: activeCustomer.phone || '', address1: activeCustomer.address1 || activeCustomer.address || '', map1: activeCustomer.map1 || '', address2: activeCustomer.address2 || '', map2: activeCustomer.map2 || '' } : {} };
+const dropCourier = known && !usesCourier;
+const dropPerson  = known && !usesCarrierPerson(currentInvoice.vehicle);
+const finalInvoice = { ...currentInvoice,
+  transportCompany: dropCourier ? '' : (currentInvoice.transportCompany || ''),
+  biltyNumber:      dropCourier ? '' : (currentInvoice.biltyNumber || ''),
+  driverName:       dropPerson  ? '' : (currentInvoice.driverName || ''),
+  driverPhone:      dropPerson  ? '' : (currentInvoice.driverPhone || ''),
+  riderId:          dropPerson  ? '' : (currentInvoice.riderId || ''),
+  items: enrichedItems, total: grandTotal, status: status, salespersonId: currentUser.id, salespersonName: currentUser.name, customerDetails: activeCustomer ? { contactPerson: activeCustomer.contactPerson || '', phone: activeCustomer.phone || '', address1: activeCustomer.address1 || activeCustomer.address || '', map1: activeCustomer.map1 || '', address2: activeCustomer.address2 || '', map2: activeCustomer.map2 || '' } : {} };
 if (!finalInvoice.id) {
   const prefix = status === 'Estimate' ? 'EST' : status === 'Booked' ? 'ORD' : 'INV';
   const nextNum = getNextSeqNum(invoices, prefix);
@@ -1299,8 +1324,8 @@ return (
 </div>
 <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
 <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5"><Truck size={12}/> Logistics</h3>
-<div className="mb-3"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Vehicle / Transport Method</label><select className={inputClass} value={currentInvoice.vehicle} onChange={e => { const v = e.target.value; setCurrentInvoice({...currentInvoice, vehicle: v, ...(isTransportMethod(vehicleTypes, v) ? {} : { transportCompany: '', biltyNumber: '' })}); }}>{(vehicleTypes.length ? vehicleTypes : [{name:'Rider'},{name:'Rickshaw'},{name:'Suzuki'},{name:'Intercity Transport'},{name:'Self-Pickup'}]).map(v => <option key={v.name} value={v.name}>{v.name}</option>)}</select></div>
-{isTransportMethod(vehicleTypes, currentInvoice.vehicle) && (
+<div className="mb-3"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Vehicle / Transport Method</label><select className={inputClass} value={currentInvoice.vehicle} onChange={e => { const v = e.target.value; setCurrentInvoice({...currentInvoice, vehicle: v, ...(isTransportMethod(vehicleTypes, v) ? {} : { transportCompany: '', biltyNumber: '' }), ...(usesCarrierPerson(v) ? {} : { driverName: '', driverPhone: '', riderId: '' })}); }}>{(vehicleTypes.length ? vehicleTypes : [{name:'Rider'},{name:'Rickshaw'},{name:'Suzuki'},{name:'Intercity Transport'},{name:'Self-Pickup'}]).map(v => <option key={v.name} value={v.name}>{v.name}</option>)}</select></div>
+{(isTransportMethod(vehicleTypes, currentInvoice.vehicle) || (!isKnownVehicleType(vehicleTypes, currentInvoice.vehicle) && (currentInvoice.transportCompany || currentInvoice.biltyNumber))) && (
 <div className="grid grid-cols-2 gap-3 mb-3 bg-amber-50 p-3 rounded-xl border border-amber-100">
 {transportCompanies.filter(c => c.transportType === currentInvoice.vehicle).length > 0 && (
   <div className="col-span-2">
@@ -2424,15 +2449,18 @@ const { riders, vehicleTypes, saveToFirebase, deleteFromFirebase, showToast, sho
 const riderVehicleTypes = vehicleTypes.filter(vt => vt.requiresRider).map(vt => vt.name);
 const riderTypeList = riderVehicleTypes.length ? riderVehicleTypes : ['Rider', 'Rickshaw', 'Suzuki'];
 const inputCls = "w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:border-indigo-500 shadow-sm";
-const [form, setForm] = useState({ name: '', phone: '', vehicleType: 'Rider', vehicleNumber: '' });
+const [form, setForm] = useState({ name: '', phone: '', vehicleType: '', vehicleNumber: '' });
 const [editingId, setEditingId] = useState(null);
 const [editForm, setEditForm] = useState({});
 const [riderSearch, setRiderSearch] = useState('');
 const add = async () => {
   if (!form.name) return showToast("Name required", "error");
-  const obj = { id: Date.now(), name: form.name, phone: form.phone, vehicleType: form.vehicleType, vehicleNumber: form.vehicleNumber };
+  // Fall back to the first listed type. The select shows that type when state is
+  // empty, so saving the raw state would store a type the user never saw and the
+  // billing picker's filter would never match the rider.
+  const obj = { id: Date.now(), name: form.name, phone: form.phone, vehicleType: form.vehicleType || riderTypeList[0], vehicleNumber: form.vehicleNumber };
   await saveToFirebase('riders', obj.id, obj);
-  setForm({ name: '', phone: '', vehicleType: 'Rider', vehicleNumber: '' });
+  setForm({ name: '', phone: '', vehicleType: '', vehicleNumber: '' });
   showToast("Rider Added");
 };
 const saveEdit = async (rider) => {
@@ -2449,7 +2477,7 @@ return (
     <div className="col-span-2"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Full Name *</label><input className={inputCls} placeholder="e.g. Ali Raza" value={form.name} onChange={e=>setForm({...form,name:e.target.value})} /></div>
     <div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Phone</label><input className={inputCls} placeholder="03XX..." value={form.phone} onChange={e=>setForm({...form,phone:e.target.value})} /></div>
     <div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Vehicle Number</label><input className={inputCls} placeholder="e.g. ABC-123" value={form.vehicleNumber} onChange={e=>setForm({...form,vehicleNumber:e.target.value})} /></div>
-    <div className="col-span-2"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Vehicle Type *</label><select className={inputCls} value={form.vehicleType} onChange={e=>setForm({...form,vehicleType:e.target.value})}>{riderTypeList.map(t=><option key={t} value={t}>{t}</option>)}</select></div>
+    <div className="col-span-2"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Vehicle Type *</label><select className={inputCls} value={form.vehicleType || riderTypeList[0]} onChange={e=>setForm({...form,vehicleType:e.target.value})}>{riderTypeList.map(t=><option key={t} value={t}>{t}</option>)}</select></div>
   </div>
   <button type="submit" className="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl hover:bg-indigo-700 transition-colors">Add Rider / Vehicle</button>
 </form>

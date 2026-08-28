@@ -121,13 +121,31 @@ render — every user hit a blank error screen.
   Keep the run clean, so that a clean run means something.
 - **`tools/smoke-test.mjs`** loads the built bundle in a headless browser. Useful, but it
   only reaches the login screen — it passed the crash above without complaint, because that
-  screen sits behind a login. Do not mistake it for a regression net.
+  screen sits behind a login. Do not mistake it for a regression net. Set `CHROMIUM_PATH`
+  to pin a browser binary.
+- CI runs `npm run lint` before `npm run build`, so this cannot deploy again.
+- Keep `eslint` in **devDependencies**, not installed ad hoc. A guard that isn't in
+  package.json doesn't exist on CI or a fresh clone — this one shipped that way once.
 - Globals from CDN `<script>` tags in `index.html` (currently `html2pdf`) must be declared
   in the ESLint config, or `no-undef` reports them as faults and the run stops being useful.
 
 When inserting code by matching surrounding text, check the anchor's **scope**, not just
 that the text is unique. `const PERMS = [` appears once in the file and is still the wrong
 place to hang a module-level helper.
+
+## Never erase a field because a lookup failed
+
+`isTransportMethod()` answers "does this method use a courier". It returns false both for
+"no" and for "I have never heard of this method". Those are different, and code that
+DELETES data must tell them apart — use `isKnownVehicleType()` first.
+
+Vehicle types can be renamed or deleted while invoices deliberately keep the old name, so
+unknown methods are normal, not exceptional. `saveInvoice` once blanked
+`transportCompany` and `biltyNumber` for any unrecognised method, which silently destroyed
+the consignment number of every invoice on a renamed courier type the next time it was
+saved — and the logistics block doesn't render for an unknown method, so nothing was
+visible on screen either. The form now also keeps that block open when an unknown method
+still carries courier details, so orphaned invoices stay editable.
 
 ## Deploying
 

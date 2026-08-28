@@ -25,6 +25,9 @@ jobs:
         with:
           node-version: 20
       - run: npm install
+      # Lint before build: a scope error compiles cleanly and only throws at render,
+      # so `npm run build` alone once deployed an app that failed to load for everyone.
+      - run: npm run lint
       - run: npm run build
         env:
           VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
