@@ -18,6 +18,17 @@ import SearchableSelect from './components/SearchableSelect';
 
 const AppContext = createContext(null);
 
+// A "transport method" hands the consignment to an outside courier (Intercity Transport
+// and friends) instead of it being carried by one of our own riders. Kept in one place
+// because the invoice form, the prefill and the save path must all agree: if they don't,
+// a courier name can survive onto a rider delivery and print on the dispatch note.
+const isTransportMethod = (vehicleTypes, name) => {
+  if (!name || name === 'Self-Pickup') return false;
+  const vt = (vehicleTypes || []).find(v => v.name === name);
+  return vt ? !vt.requiresRider : name === 'Intercity Transport';
+};
+
+
 const getNextSeqNum = (items, prefix) => {
   const LEGACY_THRESHOLD = 10000000;
   const nums = items.map(item => {
@@ -135,16 +146,6 @@ showToast(isEdit ? "User Updated" : "User Added");
 setShowUserModal(false);
 };
 const inputClass = "w-full p-3.5 bg-white border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-sm text-slate-800 placeholder-slate-400";
-// A "transport method" hands the consignment to an outside courier (Intercity Transport
-// and friends) instead of it being carried by one of our own riders. Kept in one place
-// because the invoice form, the prefill and the save path must all agree: if they don't,
-// a courier name can survive onto a rider delivery and print on the dispatch note.
-const isTransportMethod = (vehicleTypes, name) => {
-  if (!name || name === 'Self-Pickup') return false;
-  const vt = (vehicleTypes || []).find(v => v.name === name);
-  return vt ? !vt.requiresRider : name === 'Intercity Transport';
-};
-
 const PERMS = [
   { key: 'viewAllInvoices',  label: 'View All Invoices',     desc: 'See invoices from all staff (default: own only)' },
   { key: 'viewDashboard',    label: 'Home Dashboard',        desc: 'Revenue summary & business overview' },
