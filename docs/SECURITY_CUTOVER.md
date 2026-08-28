@@ -3,9 +3,10 @@
 Moving login from "compare a plaintext password stored in Firestore" to Firebase
 Authentication, then closing the database with real rules.
 
-**The database is currently world-readable and world-writable.** Anyone with the API key —
-which is in the JavaScript of the deployed site, as it is for every Firebase web app — can
-read and change everything. Until step 4 is done, that remains true.
+**Status: complete, 2026-08-28.** The database was world-readable and world-writable; it is
+now closed. All accounts authenticate through Firebase, no passwords are stored in
+Firestore, and the live rules are mirrored in `firestore.rules`. This document is kept as
+the record of how it was done and how to undo it.
 
 This is staged deliberately. Do the stages in order and verify between them: publishing the
 new rules before every account is migrated locks the whole business out of a live system.
@@ -14,11 +15,11 @@ new rules before every account is migrated locks the whole business out of a liv
 
 ## Where things stand
 
-- **Stage A — shipped.** The app can authenticate with Firebase Auth, an admin can migrate
-  accounts, and the old login still works for anyone not yet migrated. Nothing has changed
-  for users yet.
-- **Stage B — you.** Enable the provider, run the migration, check everyone can log in.
-- **Stage C — after B is verified.** Switch login to Auth-only and publish the strict rules.
+- **Stage A — done.** Firebase Auth wired in, migration tool built, old login kept working
+  alongside it so nobody was locked out mid-flight.
+- **Stage B — done.** Provider enabled, 3 accounts migrated, login lookup built, all
+  verified by real sign-ins.
+- **Stage C — done.** Login switched to Auth-only, strict rules published and tested.
 
 ---
 
