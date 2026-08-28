@@ -49,10 +49,12 @@ Ordered by *risk of loss*, not by how interesting the work is.
 - [ ] **0. Restrict the Firebase API key to the app's domain** (Google Cloud Console).
       No code change, effective today, and it is the only thing standing between the
       current rules and anyone who views source. Do this first regardless of everything else.
-- [ ] **1. Stop exporting passwords.** Delete the password column from the users CSV export.
-      One line, removes the worst leak.
-- [ ] **2. Firebase Auth + real Firestore rules.** The actual fix for (1) and (2) above.
-      Needs a migration plan for existing users and a rollback path.
+- [x] **1. Stop exporting passwords.** Done — password column removed from the users CSV.
+- [~] **2. Firebase Auth + real Firestore rules.** Stage A shipped: the app can authenticate
+      with Firebase Auth, an admin can migrate accounts, and un-migrated users still log in
+      the old way so nobody is locked out mid-flight. Strict rules written to
+      `firestore.rules.strict` but **not live**. Stages B and C, plus the remaining code
+      changes for Auth-only operation, are in `docs/SECURITY_CUTOVER.md`.
 - [ ] **3. Tests for the money math** — invoice totals, ledger balance, analytics
       aggregation, date ranges. No UI risk, and the prerequisite for everything below.
 - [ ] **4. Atomic document numbering** via a Firestore transaction on a counters

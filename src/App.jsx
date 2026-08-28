@@ -11,7 +11,9 @@ Percent, Hash, Zap, Archive, RefreshCw, Eye, EyeOff, ChevronDown, ChevronUp,
 AlignLeft, Bell, Star, Layers, Globe, PhoneCall, MapPin, Briefcase, ClipboardList, Copy,
 RotateCcw, FileText, Database, Clock
 } from 'lucide-react';
-import { db, collection, onSnapshot, doc, setDoc, deleteDoc } from './firebase';
+import { db, auth, firebaseConfig, collection, onSnapshot, doc, setDoc, deleteDoc,
+         getAuth, initializeApp, deleteApp, signInWithEmailAndPassword,
+         createUserWithEmailAndPassword, signOut, authEmailFor } from './firebase';
 import { APP_NAME, VEHICLES, getPKTDate, getLocalDateStr, formatDateDisp, checkDateFilter, exportToCSV, shareOrDownload } from './helpers';
 import PrintView from './components/PrintView';
 import SearchableSelect from './components/SearchableSelect';
@@ -2921,9 +2923,22 @@ return (
 };
 
 const UserManagementView = () => {
-const { isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig, showConfirm } = useContext(AppContext);
+const { migrateUsersToAuth,
+        isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig, showConfirm } = useContext(AppContext);
 const [userDateFilter, setUserDateFilter] = useState('This Month');
 const [userSearch, setUserSearch] = useState('');
+const [migrating, setMigrating] = useState(false);
+const [migrateResult, setMigrateResult] = useState(null);
+const legacyUsers = appUsers.filter(u => !u.authUid);
+const runMigration = async () => {
+  setMigrating(true); setMigrateResult(null);
+  try {
+    const res = await migrateUsersToAuth();
+    setMigrateResult(res);
+    if (res.done > 0 && res.failed.length === 0) showToast(`${res.done} account(s) moved to Firebase Auth`);
+    else if (res.failed.length > 0) showToast(`${res.done} moved, ${res.failed.length} need attention`, 'error');
+  } finally { setMigrating(false); }
+};
 return (
 <div className="flex-1 overflow-y-auto p-4 pb-24">
 <div className="flex justify-between items-center mb-4">
@@ -2992,6 +3007,42 @@ return (
 );
 })}
 </div>
+<div className="mt-6 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+<h3 className="text-xs font-bold text-slate-800 uppercase tracking-widest mb-3 flex items-center gap-1.5"><Lock size={14} className={legacyUsers.length ? "text-rose-600" : "text-emerald-600"}/> Login Security</h3>
+{legacyUsers.length === 0 ? (
+  <p className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-xl p-3 leading-relaxed">
+    All {appUsers.length} account(s) use Firebase Authentication. No passwords are stored in the database.
+  </p>
+) : (
+  <>
+    <p className="text-[11px] font-semibold text-slate-600 leading-relaxed mb-2">
+      <strong className="text-rose-600">{legacyUsers.length} of {appUsers.length} account(s)</strong> still keep their
+      password in the database as plain text, where anyone who can read the database can read it.
+      Moving them to Firebase Authentication stores only a hash, handled by Google.
+    </p>
+    <p className="text-[10px] text-slate-500 leading-relaxed mb-3">
+      Nobody is signed out and passwords do not change — everyone keeps logging in exactly as they do now.
+      Enable <strong>Email/Password</strong> under Authentication → Sign-in method in the Firebase console first,
+      and take a backup before running this.
+    </p>
+    <button onClick={runMigration} disabled={migrating}
+      className="w-full bg-rose-600 disabled:bg-slate-300 text-white py-2.5 rounded-xl font-bold text-xs hover:bg-rose-700 transition-colors">
+      {migrating ? 'Moving accounts…' : `Move ${legacyUsers.length} account(s) to Firebase Auth`}
+    </button>
+  </>
+)}
+{migrateResult && (
+  <div className="mt-3 space-y-1.5">
+    {migrateResult.done > 0 && <p className="text-[11px] font-bold text-emerald-700">✓ {migrateResult.done} account(s) moved.</p>}
+    {migrateResult.failed.map((f, i) => (
+      <p key={i} className="text-[10px] font-semibold text-rose-700 bg-rose-50 border border-rose-100 rounded-lg p-2 leading-relaxed">
+        <strong>{f.name}:</strong> {f.why}
+      </p>
+    ))}
+  </div>
+)}
+</div>
+
 <div className="mt-6 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
 <h3 className="text-xs font-bold text-slate-800 uppercase tracking-widest mb-3 flex items-center gap-1.5"><Download size={14} className="text-indigo-600"/> Export Users</h3>
 <button onClick={() => { // Never export credentials. This CSV lands in Downloads, gets mailed around and
@@ -4693,6 +4744,26 @@ setCurrentUser(initUser);
 showToast("Welcome! Admin account created.");
 return;
 }
+// Two login paths on purpose, while the migration to Firebase Auth is in progress.
+// A migrated account (has authUid) is verified by Firebase; one that has not been
+// migrated yet still falls back to the old stored-password check. Removing the fallback
+// before every account is migrated would lock those people out of a live business.
+const named = appUsers.find(u => (u.name || '').toLowerCase() === loginForm.name.trim().toLowerCase());
+
+if (named?.authUid) {
+  try {
+    await signInWithEmailAndPassword(auth, named.authEmail || authEmailFor(named.name), loginForm.password);
+    setCurrentUser(named);
+    showToast(`Welcome ${named.name}`);
+  } catch (err) {
+    console.error('Auth sign-in failed:', err.code);
+    showToast(err.code === 'auth/too-many-requests'
+      ? "Too many attempts — try again shortly"
+      : "Invalid Credentials", "error");
+  }
+  return;
+}
+
 const user = appUsers.find(u => u.name.toLowerCase() === loginForm.name.toLowerCase() && u.password === loginForm.password);
 if (user) {
 setCurrentUser(user);
@@ -4700,6 +4771,71 @@ showToast(`Welcome ${user.name}`);
 } else {
 showToast("Invalid Credentials", "error");
 }
+};
+
+// Migrate every account that still holds a stored password into Firebase Auth.
+//
+// Each account is created through a SECONDARY Firebase app instance: the client SDK signs
+// you in as whoever it just created, which would kick the admin out of their own session
+// halfway through the run. The secondary instance is discarded immediately after.
+//
+// Only clears the stored password once Firebase confirms the account exists, so a failure
+// leaves that user still able to log in the old way.
+const migrateUsersToAuth = async () => {
+  const pending = appUsers.filter(u => !u.authUid);
+  if (pending.length === 0) return { done: 0, failed: [] };
+  const failed = [];
+  let done = 0;
+
+  for (const u of pending) {
+    const email = authEmailFor(u.name);
+    const pw = u.password || '';
+    if (pw.length < 6) {
+      failed.push({ name: u.name, why: 'Password is under 6 characters. Firebase requires 6+. Set a longer password for this user, then run this again.' });
+      continue;
+    }
+    let secondary = null;
+    try {
+      secondary = initializeApp(firebaseConfig, 'migrate-' + u.id + '-' + Date.now());
+      const sAuth = getAuth(secondary);
+      let uid;
+      try {
+        const cred = await createUserWithEmailAndPassword(sAuth, email, pw);
+        uid = cred.user.uid;
+      } catch (err) {
+        if (err.code === 'auth/email-already-in-use') {
+          // A previous partial run already created it — adopt that account rather than
+          // failing, but only if this password really opens it.
+          const cred = await signInWithEmailAndPassword(sAuth, email, pw);
+          uid = cred.user.uid;
+        } else {
+          throw err;
+        }
+      }
+      const { password, ...withoutPassword } = u;
+      await saveToFirebase('app_users', u.id, { ...withoutPassword, authUid: uid, authEmail: email, loginName: u.name });
+      // Mirror the role under the Auth UID. Security rules can only get() a document by
+      // path, and user documents are keyed by a timestamp id, not by uid — so without this
+      // the rules have no way to look up who is asking. Keep it minimal: no password, no
+      // personal data, just what an authorisation decision needs.
+      await saveToFirebase('userRoles', uid, {
+        uid,
+        appUserId: u.id,
+        name: u.name,
+        role: u.role || 'staff',
+        permissions: u.permissions || {},
+        active: true,
+      });
+      done += 1;
+    } catch (err) {
+      failed.push({ name: u.name, why: err.code === 'auth/operation-not-allowed'
+        ? 'Email/Password sign-in is not enabled in the Firebase console.'
+        : (err.code || err.message) });
+    } finally {
+      if (secondary) { try { await signOut(getAuth(secondary)); } catch (e) {} try { await deleteApp(secondary); } catch (e) {} }
+    }
+  }
+  return { done, failed };
 };
 
 const saveToFirebase = async (collectionName, id, dataObj) => {
@@ -4918,6 +5054,11 @@ return (
 );
 }
 
+const logout = async () => {
+  try { await signOut(auth); } catch (e) { console.error('Sign-out failed:', e); }
+  setCurrentUser(null);
+};
+
 // — Main Render —
 const ctx = {
 isAdmin, hasPermission, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers,
@@ -4938,6 +5079,7 @@ riders, transportCompanies,
 editingPayment, setEditingPayment,
 showCreditNoteModal, setShowCreditNoteModal, editingCreditNote, setEditingCreditNote,
 appSettings,
+migrateUsersToAuth, logout,
 };
 return (
 <AppContext.Provider value={ctx}>
@@ -4971,7 +5113,7 @@ return (
     </nav>
     <div className="px-3 py-3 border-t border-slate-100">
       <div className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mb-2 px-1">Shortcuts: Alt+B=Billing, Alt+C=Clients</div>
-      <button onClick={() => setCurrentUser(null)} className="w-full text-xs font-bold uppercase tracking-widest text-slate-500 bg-slate-100 px-3 py-2 rounded-lg hover:bg-slate-200 transition-colors">Log Out</button>
+      <button onClick={logout} className="w-full text-xs font-bold uppercase tracking-widest text-slate-500 bg-slate-100 px-3 py-2 rounded-lg hover:bg-slate-200 transition-colors">Log Out</button>
     </div>
   </aside>
 
@@ -4983,7 +5125,7 @@ return (
         <h1 className="text-xl font-extrabold bg-gradient-to-r from-indigo-700 to-blue-500 bg-clip-text text-transparent tracking-tight leading-none pb-0.5">{APP_NAME}</h1>
         <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1.5 flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>{currentUser?.name}</p>
       </div>
-      <button onClick={() => setCurrentUser(null)} className="text-[10px] font-bold uppercase tracking-widest text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg hover:bg-slate-200">Log Out</button>
+      <button onClick={logout} className="text-[10px] font-bold uppercase tracking-widest text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg hover:bg-slate-200">Log Out</button>
     </header>
 
     {/* Desktop top bar */}

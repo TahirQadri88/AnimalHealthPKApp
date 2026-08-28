@@ -155,10 +155,11 @@ running plan, with checkboxes to update.
 
 The short version of what is verified and unfixed:
 
-- **Firestore rules are `allow read, write: if true`** and **user passwords are stored in
-  plaintext** — and exported to CSV including the password column. With the rules open,
-  anyone holding the API key can read every password. This is the most serious issue in
-  the repository.
+- **Firestore rules are still `allow read, write: if true`.** Migration to Firebase Auth is
+  half done: the app can authenticate and migrate accounts, but the strict rules in
+  `firestore.rules.strict` are NOT live, and publishing them before every account is
+  migrated locks the business out. See `docs/SECURITY_CUTOVER.md`. The password CSV export
+  is fixed; passwords remain in Firestore until the migration is run.
 - Document numbers come from `Math.max(...)+1` over client-side records, so two people
   billing at the same moment get the same invoice number.
 - All 15 collections are loaded in full by unconstrained `onSnapshot` listeners, including
