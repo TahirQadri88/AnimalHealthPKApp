@@ -2994,7 +2994,9 @@ return (
 </div>
 <div className="mt-6 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
 <h3 className="text-xs font-bold text-slate-800 uppercase tracking-widest mb-3 flex items-center gap-1.5"><Download size={14} className="text-indigo-600"/> Export Users</h3>
-<button onClick={() => { const data = appUsers.map(u => ({ ID: u.id, Name: u.name, Role: u.role, Password: u.password || '' })); exportToCSV(data, 'Users_Export.csv'); }} className="w-full bg-indigo-50 border border-indigo-100 text-indigo-700 py-2.5 rounded-xl font-bold text-xs">Export Users CSV</button>
+<button onClick={() => { // Never export credentials. This CSV lands in Downloads, gets mailed around and
+              // sits in backups; a password column here is a leak with no legitimate use.
+              const data = appUsers.map(u => ({ ID: u.id, Name: u.name, Role: u.role })); exportToCSV(data, 'Users_Export.csv'); }} className="w-full bg-indigo-50 border border-indigo-100 text-indigo-700 py-2.5 rounded-xl font-bold text-xs">Export Users CSV</button>
 </div>
 </div>
 );
