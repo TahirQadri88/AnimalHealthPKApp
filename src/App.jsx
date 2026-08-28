@@ -144,12 +144,19 @@ return (
 };
 
 const UserModal = () => {
-const { editingUser, appUsers, checkDuplicate, saveToFirebase, showToast, setShowUserModal } = useContext(AppContext);
+const { editingUser, appUsers, checkDuplicate, saveToFirebase, showToast, setShowUserModal, resetUserLogin } = useContext(AppContext);
 const isEdit = !!editingUser;
 const [form, setForm] = useState(isEdit ? editingUser : { name: '', password: '', role: 'staff', permissions: {} });
+// A migrated account keeps no password here — Firebase holds it. Asking for one would
+// both block ordinary edits and write a plaintext password straight back into the
+// database we just cleaned.
+const onFirebaseAuth = !!form.authUid;
+const [newPassword, setNewPassword] = useState('');
+const [resetting, setResetting] = useState(false);
 const setPermission = (key, val) => setForm(f => ({ ...f, permissions: { ...(f.permissions || {}), [key]: val } }));
 const save = async () => {
-if (!form.name || !form.password) return showToast("Name and Password are required", "error");
+if (!form.name) return showToast("Name is required", "error");
+if (!onFirebaseAuth && !form.password) return showToast("Password is required", "error");
 if (checkDuplicate(appUsers, form.name, form.id)) return showToast("Username already exists", "error");
 const id = isEdit ? form.id : Date.now().toString();
 // Admin role gets no permissions object (full access via role check)
@@ -176,7 +183,31 @@ return (
 <ModalWrapper title={isEdit ? "Edit Team Member" : "Add Team Member"} onClose={() => setShowUserModal(false)}>
 <form onSubmit={e => { e.preventDefault(); save(); }} className="space-y-4">
 <div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Full Name / Username</label><input className={inputClass} value={form.name} onChange={e=>setForm({...form, name: e.target.value})} placeholder="e.g. Ali Raza" /></div>
-<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Login Password</label><input type="text" className={inputClass} value={form.password} onChange={e=>setForm({...form, password: e.target.value})} placeholder="Set Password" /></div>
+{onFirebaseAuth ? (
+  <div>
+    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Login Password</label>
+    <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3">
+      <p className="text-[11px] font-bold text-emerald-800 mb-2">Held by Firebase Authentication — not stored here.</p>
+      <p className="text-[10px] text-slate-500 leading-relaxed mb-2">Forgotten password? Set a new one below. This issues the account a fresh login; the old password stops working immediately.</p>
+      <div className="flex gap-2">
+        <input type="text" className="flex-1 p-2 text-sm font-semibold border border-emerald-200 rounded-lg outline-none" value={newPassword} onChange={e=>setNewPassword(e.target.value)} placeholder="New password (6+ characters)" />
+        <button type="button" disabled={resetting || newPassword.length < 6}
+          onClick={async () => {
+            setResetting(true);
+            const res = await resetUserLogin(form, newPassword);
+            setResetting(false);
+            if (res.ok) { setNewPassword(''); showToast(`New password set for ${form.name}`); setShowUserModal(false); }
+            else showToast(res.why, 'error');
+          }}
+          className="bg-emerald-600 disabled:bg-slate-300 text-white px-3 rounded-lg font-bold text-xs shrink-0">
+          {resetting ? '…' : 'Set'}
+        </button>
+      </div>
+    </div>
+  </div>
+) : (
+<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Login Password</label><input type="text" className={inputClass} value={form.password || ''} onChange={e=>setForm({...form, password: e.target.value})} placeholder="Set Password" /></div>
+)}
 <div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Role</label><select className={inputClass} value={form.role} onChange={e=>setForm({...form, role: e.target.value})}><option value="staff">Sales Staff (Restricted)</option><option value="admin">Administrator (Full Access)</option></select></div>
 {form.role === 'staff' && (
 <div>
@@ -4773,6 +4804,45 @@ showToast("Invalid Credentials", "error");
 }
 };
 
+// Give a migrated account a new password.
+//
+// The client SDK cannot change another user's password, and Firebase's reset-by-email
+// flow needs a real mailbox — these synthetic addresses have none. Without this there is
+// NO way to recover a forgotten password short of a backend, which would mean a permanent
+// lockout. So: create a fresh Auth account under a new alias and repoint the user record.
+//
+// The old Auth account still exists and its password still opens it, so its role mirror
+// MUST be deleted — under the strict rules a stale userRoles document would keep granting
+// that old login full access.
+const resetUserLogin = async (u, newPassword) => {
+  if (!newPassword || newPassword.length < 6) return { ok: false, why: 'Password must be at least 6 characters.' };
+  const base = authEmailFor(u.loginName || u.name).split('@')[0];
+  const email = `${base}.${Date.now().toString(36)}@animalhealthpk.app`;
+  const previousUid = u.authUid;
+  let secondary = null;
+  try {
+    secondary = initializeApp(firebaseConfig, 'reset-' + u.id + '-' + Date.now());
+    const sAuth = getAuth(secondary);
+    const cred = await createUserWithEmailAndPassword(sAuth, email, newPassword);
+    const { password, ...rest } = u;
+    await saveToFirebase('app_users', u.id, { ...rest, authUid: cred.user.uid, authEmail: email, loginName: u.loginName || u.name });
+    await saveToFirebase('userRoles', cred.user.uid, {
+      uid: cred.user.uid, appUserId: u.id, name: u.name,
+      role: u.role || 'staff', permissions: u.permissions || {}, active: true,
+    });
+    if (previousUid && previousUid !== cred.user.uid) {
+      await deleteFromFirebase('userRoles', previousUid);
+    }
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, why: err.code === 'auth/operation-not-allowed'
+      ? 'Email/Password sign-in is not enabled in the Firebase console.'
+      : (err.code || err.message) };
+  } finally {
+    if (secondary) { try { await signOut(getAuth(secondary)); } catch (e) {} try { await deleteApp(secondary); } catch (e) {} }
+  }
+};
+
 // Migrate every account that still holds a stored password into Firebase Auth.
 //
 // Each account is created through a SECONDARY Firebase app instance: the client SDK signs
@@ -5079,7 +5149,7 @@ riders, transportCompanies,
 editingPayment, setEditingPayment,
 showCreditNoteModal, setShowCreditNoteModal, editingCreditNote, setEditingCreditNote,
 appSettings,
-migrateUsersToAuth, logout,
+migrateUsersToAuth, resetUserLogin, logout,
 };
 return (
 <AppContext.Provider value={ctx}>
