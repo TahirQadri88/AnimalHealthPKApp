@@ -135,6 +135,16 @@ showToast(isEdit ? "User Updated" : "User Added");
 setShowUserModal(false);
 };
 const inputClass = "w-full p-3.5 bg-white border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-sm text-slate-800 placeholder-slate-400";
+// A "transport method" hands the consignment to an outside courier (Intercity Transport
+// and friends) instead of it being carried by one of our own riders. Kept in one place
+// because the invoice form, the prefill and the save path must all agree: if they don't,
+// a courier name can survive onto a rider delivery and print on the dispatch note.
+const isTransportMethod = (vehicleTypes, name) => {
+  if (!name || name === 'Self-Pickup') return false;
+  const vt = (vehicleTypes || []).find(v => v.name === name);
+  return vt ? !vt.requiresRider : name === 'Intercity Transport';
+};
+
 const PERMS = [
   { key: 'viewAllInvoices',  label: 'View All Invoices',     desc: 'See invoices from all staff (default: own only)' },
   { key: 'viewDashboard',    label: 'Home Dashboard',        desc: 'Revenue summary & business overview' },
@@ -594,10 +604,10 @@ return (
         {editingId === rider.id ? (
           <div className="space-y-2">
             <div className="grid grid-cols-2 gap-2">
-              <input autoFocus className="col-span-2 p-2 text-sm font-semibold border border-indigo-300 rounded-lg outline-none" value={editForm.name||''} onChange={e=>setEditForm({...editForm,name:e.target.value})} placeholder="Name" />
-              <input className="p-2 text-sm font-semibold border border-slate-200 rounded-lg outline-none" value={editForm.phone||''} onChange={e=>setEditForm({...editForm,phone:e.target.value})} placeholder="Phone" />
-              <input className="p-2 text-sm font-semibold border border-slate-200 rounded-lg outline-none" value={editForm.vehicleNumber||''} onChange={e=>setEditForm({...editForm,vehicleNumber:e.target.value})} placeholder="Vehicle No." />
-              <select className="col-span-2 p-2 text-sm font-semibold border border-slate-200 rounded-lg outline-none" value={editForm.vehicleType||'Rider'} onChange={e=>setEditForm({...editForm,vehicleType:e.target.value})}>{riderTypeList.map(t=><option key={t} value={t}>{t}</option>)}</select>
+              <div className="col-span-2"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Name *</label><input autoFocus className="w-full p-2 text-sm font-semibold border border-indigo-300 rounded-lg outline-none" value={editForm.name||''} onChange={e=>setEditForm({...editForm,name:e.target.value})} placeholder="e.g. Ali Raza" /></div>
+              <div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Phone</label><input className="w-full p-2 text-sm font-semibold border border-slate-200 rounded-lg outline-none" value={editForm.phone||''} onChange={e=>setEditForm({...editForm,phone:e.target.value})} placeholder="03XX..." /></div>
+              <div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Vehicle No.</label><input className="w-full p-2 text-sm font-semibold border border-slate-200 rounded-lg outline-none" value={editForm.vehicleNumber||''} onChange={e=>setEditForm({...editForm,vehicleNumber:e.target.value})} placeholder="e.g. ABC-123" /></div>
+              <div className="col-span-2"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Vehicle Type *</label><select className="w-full p-2 text-sm font-semibold border border-slate-200 rounded-lg outline-none" value={editForm.vehicleType||riderTypeList[0]} onChange={e=>setEditForm({...editForm,vehicleType:e.target.value})}>{[...new Set([...(editForm.vehicleType ? [editForm.vehicleType] : []), ...riderTypeList])].map(t=><option key={t} value={t}>{t}</option>)}</select></div>
             </div>
             <div className="flex gap-2">
               <button type="button" onClick={()=>saveEdit(rider)} className="text-xs font-bold text-indigo-600 px-3 py-1.5 bg-indigo-50 rounded-lg">Save</button>
@@ -613,7 +623,7 @@ return (
               </div>
               <p className="text-[11px] text-slate-500 mt-0.5">{rider.phone || '—'}{rider.vehicleNumber ? ` · ${rider.vehicleNumber}` : ''}</p>
             </div>
-            <button type="button" onClick={()=>{setEditingId(rider.id);setEditForm({name:rider.name,phone:rider.phone,vehicleType:rider.vehicleType,vehicleNumber:rider.vehicleNumber});}} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg"><Edit size={14}/></button>
+            <button type="button" onClick={()=>{setEditingId(rider.id);setEditForm({name:rider.name||'',phone:rider.phone||'',vehicleType:rider.vehicleType||'',vehicleNumber:rider.vehicleNumber||''});}} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg"><Edit size={14}/></button>
             <button type="button" onClick={async()=>{if(await showConfirm(`Delete ${rider.name}?`))await deleteFromFirebase('riders',rider.id);}} className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg"><Trash2 size={14}/></button>
           </div>
         )}
@@ -1085,7 +1095,7 @@ const pickCustomer = (c) => {
   const cid = c.id; const cName = c.name;
   const pastInvs = invoices.filter(inv => inv.customerId === cid).sort((a,b) => new Date(b.date) - new Date(a.date) || b.id.localeCompare(a.id));
   const lastInv = pastInvs[0];
-  setCurrentInvoice(prev => ({ ...prev, customerId: cid, customerName: cName, vehicle: lastInv ? (lastInv.vehicle || VEHICLES[0]) : VEHICLES[0], transportCompany: lastInv ? (lastInv.transportCompany || '') : '', biltyNumber: lastInv ? (lastInv.biltyNumber || '') : '', driverName: lastInv ? (lastInv.driverName || '') : '', driverPhone: lastInv ? (lastInv.driverPhone || '') : '', riderId: lastInv ? (lastInv.riderId || '') : '', deliveryAddressKey: lastInv ? (lastInv.deliveryAddressKey || 'address1') : 'address1', deliveryBilled: lastInv ? (lastInv.deliveryBilled || 0) : 0, transportExpense: lastInv ? (lastInv.transportExpense || 0) : 0 }));
+  setCurrentInvoice(prev => ({ ...prev, customerId: cid, customerName: cName, vehicle: lastInv ? (lastInv.vehicle || VEHICLES[0]) : VEHICLES[0], transportCompany: lastInv && isTransportMethod(vehicleTypes, lastInv.vehicle) ? (lastInv.transportCompany || '') : '', biltyNumber: lastInv && isTransportMethod(vehicleTypes, lastInv.vehicle) ? (lastInv.biltyNumber || '') : '', driverName: lastInv ? (lastInv.driverName || '') : '', driverPhone: lastInv ? (lastInv.driverPhone || '') : '', riderId: lastInv ? (lastInv.riderId || '') : '', deliveryAddressKey: lastInv ? (lastInv.deliveryAddressKey || 'address1') : 'address1', deliveryBilled: lastInv ? (lastInv.deliveryBilled || 0) : 0, transportExpense: lastInv ? (lastInv.transportExpense || 0) : 0 }));
   setShowCustomerDrop(false); setHiCustomer(-1);
   setTimeout(() => prodSearchRef.current?.focus(), 80);
 };
@@ -1118,7 +1128,10 @@ const enrichedItems = currentInvoice.items.map(item => {
   );
   return { ...item, unit: item.unit || prod?.unit || '', unitsInBox: item.unitsInBox || prod?.unitsInBox || 1 };
 });
-const finalInvoice = { ...currentInvoice, items: enrichedItems, total: grandTotal, status: status, salespersonId: currentUser.id, salespersonName: currentUser.name, customerDetails: activeCustomer ? { contactPerson: activeCustomer.contactPerson || '', phone: activeCustomer.phone || '', address1: activeCustomer.address1 || activeCustomer.address || '', map1: activeCustomer.map1 || '', address2: activeCustomer.address2 || '', map2: activeCustomer.map2 || '' } : {} };
+// Strip courier fields when the method doesn't use one, so a company carried over
+// from a previous order can't ride along on a rider delivery.
+const usesCourier = isTransportMethod(vehicleTypes, currentInvoice.vehicle);
+const finalInvoice = { ...currentInvoice, transportCompany: usesCourier ? (currentInvoice.transportCompany || '') : '', biltyNumber: usesCourier ? (currentInvoice.biltyNumber || '') : '', items: enrichedItems, total: grandTotal, status: status, salespersonId: currentUser.id, salespersonName: currentUser.name, customerDetails: activeCustomer ? { contactPerson: activeCustomer.contactPerson || '', phone: activeCustomer.phone || '', address1: activeCustomer.address1 || activeCustomer.address || '', map1: activeCustomer.map1 || '', address2: activeCustomer.address2 || '', map2: activeCustomer.map2 || '' } : {} };
 if (!finalInvoice.id) {
   const prefix = status === 'Estimate' ? 'EST' : status === 'Booked' ? 'ORD' : 'INV';
   const nextNum = getNextSeqNum(invoices, prefix);
@@ -1285,8 +1298,8 @@ return (
 </div>
 <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
 <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5"><Truck size={12}/> Logistics</h3>
-<div className="mb-3"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Vehicle / Transport Method</label><select className={inputClass} value={currentInvoice.vehicle} onChange={e => setCurrentInvoice({...currentInvoice, vehicle: e.target.value})}>{(vehicleTypes.length ? vehicleTypes : [{name:'Rider'},{name:'Rickshaw'},{name:'Suzuki'},{name:'Intercity Transport'},{name:'Self-Pickup'}]).map(v => <option key={v.name} value={v.name}>{v.name}</option>)}</select></div>
-{(() => { const vt = vehicleTypes.find(v => v.name === currentInvoice.vehicle); return (vt ? !vt.requiresRider && currentInvoice.vehicle !== 'Self-Pickup' : currentInvoice.vehicle === 'Intercity Transport'); })() && (
+<div className="mb-3"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Vehicle / Transport Method</label><select className={inputClass} value={currentInvoice.vehicle} onChange={e => { const v = e.target.value; setCurrentInvoice({...currentInvoice, vehicle: v, ...(isTransportMethod(vehicleTypes, v) ? {} : { transportCompany: '', biltyNumber: '' })}); }}>{(vehicleTypes.length ? vehicleTypes : [{name:'Rider'},{name:'Rickshaw'},{name:'Suzuki'},{name:'Intercity Transport'},{name:'Self-Pickup'}]).map(v => <option key={v.name} value={v.name}>{v.name}</option>)}</select></div>
+{isTransportMethod(vehicleTypes, currentInvoice.vehicle) && (
 <div className="grid grid-cols-2 gap-3 mb-3 bg-amber-50 p-3 rounded-xl border border-amber-100">
 {transportCompanies.filter(c => c.transportType === currentInvoice.vehicle).length > 0 && (
   <div className="col-span-2">
@@ -2449,10 +2462,10 @@ return (
         {editingId === rider.id ? (
           <div className="space-y-2">
             <div className="grid grid-cols-2 gap-2">
-              <input autoFocus className="col-span-2 p-2 text-sm font-semibold border border-indigo-300 rounded-lg outline-none" value={editForm.name||''} onChange={e=>setEditForm({...editForm,name:e.target.value})} placeholder="Name" onKeyDown={e=>{if(e.key==='Escape')setEditingId(null);if(e.key==='Enter'){e.preventDefault();saveEdit(rider);}}} />
-              <input className="p-2 text-sm font-semibold border border-slate-200 rounded-lg outline-none" value={editForm.phone||''} onChange={e=>setEditForm({...editForm,phone:e.target.value})} placeholder="Phone" />
-              <input className="p-2 text-sm font-semibold border border-slate-200 rounded-lg outline-none" value={editForm.vehicleNumber||''} onChange={e=>setEditForm({...editForm,vehicleNumber:e.target.value})} placeholder="Vehicle No." />
-              <select className="col-span-2 p-2 text-sm font-semibold border border-slate-200 rounded-lg outline-none" value={editForm.vehicleType||'Rider'} onChange={e=>setEditForm({...editForm,vehicleType:e.target.value})}>{riderTypeList.map(t=><option key={t} value={t}>{t}</option>)}</select>
+              <div className="col-span-2"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Name *</label><input autoFocus className="w-full p-2 text-sm font-semibold border border-indigo-300 rounded-lg outline-none" value={editForm.name||''} onChange={e=>setEditForm({...editForm,name:e.target.value})} placeholder="e.g. Ali Raza" onKeyDown={e=>{if(e.key==='Escape')setEditingId(null);if(e.key==='Enter'){e.preventDefault();saveEdit(rider);}}} /></div>
+              <div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Phone</label><input className="w-full p-2 text-sm font-semibold border border-slate-200 rounded-lg outline-none" value={editForm.phone||''} onChange={e=>setEditForm({...editForm,phone:e.target.value})} placeholder="03XX..." /></div>
+              <div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Vehicle No.</label><input className="w-full p-2 text-sm font-semibold border border-slate-200 rounded-lg outline-none" value={editForm.vehicleNumber||''} onChange={e=>setEditForm({...editForm,vehicleNumber:e.target.value})} placeholder="e.g. ABC-123" /></div>
+              <div className="col-span-2"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Vehicle Type *</label><select className="w-full p-2 text-sm font-semibold border border-slate-200 rounded-lg outline-none" value={editForm.vehicleType||riderTypeList[0]} onChange={e=>setEditForm({...editForm,vehicleType:e.target.value})}>{[...new Set([...(editForm.vehicleType ? [editForm.vehicleType] : []), ...riderTypeList])].map(t=><option key={t} value={t}>{t}</option>)}</select></div>
             </div>
             <div className="flex gap-2">
               <button type="button" onClick={()=>saveEdit(rider)} className="text-xs font-bold text-indigo-600 px-3 py-1.5 bg-indigo-50 rounded-lg hover:bg-indigo-100">Save</button>
@@ -2469,7 +2482,7 @@ return (
               </div>
               <p className="text-[11px] text-slate-500 mt-0.5">{rider.phone || 'No phone'}</p>
             </div>
-            <button type="button" onClick={()=>{setEditingId(rider.id);setEditForm({name:rider.name,phone:rider.phone||'',vehicleType:rider.vehicleType,vehicleNumber:rider.vehicleNumber||''});}} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg"><Edit size={14}/></button>
+            <button type="button" onClick={()=>{setEditingId(rider.id);setEditForm({name:rider.name||'',phone:rider.phone||'',vehicleType:rider.vehicleType||'',vehicleNumber:rider.vehicleNumber||''});}} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg"><Edit size={14}/></button>
             <button type="button" onClick={async()=>{if(await showConfirm(`Delete ${rider.name}?`))await deleteFromFirebase('riders',rider.id);showToast(`${rider.name} deleted`);}} className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg"><Trash2 size={14}/></button>
           </div>
         )}
