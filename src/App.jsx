@@ -3059,8 +3059,14 @@ return (
       All {appUsers.length} account(s) use Firebase Authentication. No passwords are stored in the database.
     </p>
     <p className="text-[10px] text-slate-500 leading-relaxed mb-2">
-      Run this once before locking the database down. It writes the username lookup that the
-      login screen needs when it can no longer read the user list.
+      <strong>Repair tool.</strong> Sign-in looks a username up here before it can read anything
+      else. If someone is told &ldquo;Invalid Credentials&rdquo; with a password you know is
+      right, rebuild this first — it is far more likely than a wrong password. Safe to run any
+      time; it rewrites every entry.
+    </p>
+    <p className="text-[10px] text-slate-400 leading-relaxed mb-3">
+      Note: renaming a user does not change the name they log in with. The login name is fixed
+      when the account is created.
     </p>
     <button onClick={async () => { const n = await repairLoginIndex(); showToast(`Login lookup rebuilt for ${n} account(s)`); }}
       className="w-full bg-slate-800 text-white py-2.5 rounded-xl font-bold text-xs hover:bg-slate-700 transition-colors">
