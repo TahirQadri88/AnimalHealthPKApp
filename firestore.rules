@@ -33,6 +33,13 @@ service cloud.firestore {
     function isAdmin() {
       return active() && roleDoc().role == 'admin';
     }
+    // NOT WIRED UP. Every rule below uses active() or isAdmin(); none calls this.
+    //
+    // Stated plainly so nobody reads its presence as evidence that per-permission
+    // authorisation is enforced — it is not. Granular permissions (viewAllInvoices,
+    // viewLedger and the rest) are UI-only today: a staff member without them can still
+    // read those collections directly from the database. Kept as the shape the rules
+    // should take when that is tightened.
     function can(permission) {
       return isAdmin() || (active() && roleDoc().permissions[permission] == true);
     }

@@ -3026,7 +3026,8 @@ return (
 </div>
 <div className="flex gap-1.5">
 <button onClick={() => { setEditingUser(u); setShowUserModal(true); }} className="p-2 bg-slate-50 text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"><Edit size={16}/></button>
-<button onClick={async () => { if(u.id === currentUser.id) return showToast("Cannot delete yourself","error"); if(await showConfirm(`Permanently delete user ${u.name}?`)) {
+<button onClick={async () => { if(u.id === currentUser.id) return showToast("Cannot delete yourself","error");
+  if (u.role === 'admin' && appUsers.filter(x => x.role === 'admin').length <= 1) return showToast("This is the only admin — promote someone else first","error"); if(await showConfirm(`Permanently delete user ${u.name}?`)) {
     await deleteFromFirebase('app_users', u.id);
     // The Firebase Auth account cannot be removed from the browser, so its password still
     // works. Deleting the role mirror is what actually revokes access — leave it and the
@@ -4900,6 +4901,15 @@ const repairLoginIndex = async () => {
 // Letting these drift is how someone ends up able to log in but authorised for nothing.
 const saveUserAccount = async (form, isEdit) => {
   const permissions = form.role === 'admin' ? {} : (form.permissions || {});
+  // Demoting the last admin leaves nobody able to write userRoles, and the rules only
+  // grant that to admins — so the app could never promote anyone again. Recovery would
+  // mean hand-editing Firestore in the console. Refuse instead.
+  if (isEdit && form.role !== 'admin') {
+    const admins = appUsers.filter(u => u.role === 'admin');
+    if (admins.length <= 1 && admins.some(u => String(u.id) === String(form.id))) {
+      return { ok: false, why: 'This is the only admin. Make someone else an admin first, or you will lock yourself out of user management.' };
+    }
+  }
   if (isEdit) {
     const { password, ...rest } = form;
     const profile = { ...rest, permissions };

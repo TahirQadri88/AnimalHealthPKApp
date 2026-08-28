@@ -54,6 +54,10 @@ Ordered by *risk of loss*, not by how interesting the work is.
       authenticate through Firebase, no passwords in Firestore, strict rules live and
       verified against admin, staff and signed-out access. `firestore.rules` mirrors what
       is published. Record in `docs/SECURITY_CUTOVER.md`.
+- [ ] **2b. Enforce permissions in the rules.** `can()` exists in `firestore.rules` but is
+      never called, so granular permissions gate the UI only — a staff member without
+      `viewAllInvoices` can still read every invoice from the database. Decide which
+      collections each permission governs, then wire it up.
 - [ ] **3. Tests for the money math** — invoice totals, ledger balance, analytics
       aggregation, date ranges. No UI risk, and the prerequisite for everything below.
 - [ ] **4. Atomic document numbering** via a Firestore transaction on a counters

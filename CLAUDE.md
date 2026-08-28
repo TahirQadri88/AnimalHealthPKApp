@@ -184,7 +184,13 @@ The short version of what is verified and unfixed:
   Firestore, and `firestore.rules` is closed and mirrors what is published. Anything
   touching login, users or roles must keep three records in step — the `app_users` profile,
   the `userRoles/{uid}` mirror the rules read, and the public `loginIndex` sign-in needs
-  before authenticating. See `docs/SECURITY_CUTOVER.md`.
+  before authenticating. See `docs/SECURITY_CUTOVER.md`, and `docs/ADMIN_RECOVERY.md` for
+  what to do when nobody can administer the app.
+- **Granular permissions are NOT enforced by the rules.** They gate the UI only. Every rule
+  checks `active()` or `isAdmin()`; the `can()` helper in `firestore.rules` is defined and
+  never called. A staff member without `viewAllInvoices` can still read every invoice
+  straight from the database. Do not describe permissions as enforced until `can()` is
+  actually wired into the rules.
 - Document numbers come from `Math.max(...)+1` over client-side records, so two people
   billing at the same moment get the same invoice number.
 - All 15 collections are loaded in full by unconstrained `onSnapshot` listeners, including
