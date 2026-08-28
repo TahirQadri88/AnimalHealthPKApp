@@ -208,6 +208,23 @@ return (
 ) : (
 <div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Login Password</label><input type="text" className={inputClass} value={form.password || ''} onChange={e=>setForm({...form, password: e.target.value})} placeholder="Set Password" /></div>
 )}
+{onFirebaseAuth && (
+  <div className={`rounded-xl border p-3 ${form.active === false ? 'bg-rose-50 border-rose-200' : 'bg-slate-50 border-slate-200'}`}>
+    <div className="flex items-center justify-between gap-3">
+      <div>
+        <p className="text-[11px] font-bold text-slate-700">{form.active === false ? 'Account disabled' : 'Account active'}</p>
+        <p className="text-[10px] text-slate-500 leading-relaxed mt-0.5">
+          Disabling blocks all access but keeps their history. Use this when someone leaves —
+          deleting them detaches their name from every invoice they raised.
+        </p>
+      </div>
+      <button type="button" onClick={() => setForm({ ...form, active: form.active === false })}
+        className={`shrink-0 px-3 py-2 rounded-lg font-bold text-[11px] border transition-colors ${form.active === false ? 'bg-white text-rose-700 border-rose-300' : 'bg-slate-800 text-white border-slate-800'}`}>
+        {form.active === false ? 'Enable' : 'Disable'}
+      </button>
+    </div>
+  </div>
+)}
 <div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Role</label><select className={inputClass} value={form.role} onChange={e=>setForm({...form, role: e.target.value})}><option value="staff">Sales Staff (Restricted)</option><option value="admin">Administrator (Full Access)</option></select></div>
 {form.role === 'staff' && (
 <div>
@@ -3002,7 +3019,7 @@ return (
 <div key={u.id} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
 <div className="flex justify-between items-start mb-3">
 <div className="min-w-0 flex-1">
-<h4 className="font-bold text-slate-800 text-base">{u.name}</h4>
+<h4 className="font-bold text-slate-800 text-base">{u.name}{u.active === false && <span className="ml-2 text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-rose-50 text-rose-700 border border-rose-200 align-middle">Disabled</span>}</h4>
 <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded mt-1 inline-block border ${u.role === 'admin' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>{u.role === 'admin' ? 'Administrator' : 'Sales Staff'}</span>
 {u.role === 'staff' && (() => {
   const p = u.permissions || {};
@@ -4901,14 +4918,19 @@ const repairLoginIndex = async () => {
 // Letting these drift is how someone ends up able to log in but authorised for nothing.
 const saveUserAccount = async (form, isEdit) => {
   const permissions = form.role === 'admin' ? {} : (form.permissions || {});
-  // Demoting the last admin leaves nobody able to write userRoles, and the rules only
-  // grant that to admins — so the app could never promote anyone again. Recovery would
-  // mean hand-editing Firestore in the console. Refuse instead.
-  if (isEdit && form.role !== 'admin') {
-    const admins = appUsers.filter(u => u.role === 'admin');
-    if (admins.length <= 1 && admins.some(u => String(u.id) === String(form.id))) {
-      return { ok: false, why: 'This is the only admin. Make someone else an admin first, or you will lock yourself out of user management.' };
+  // Losing the last working admin leaves nobody able to write userRoles, and the rules
+  // grant that to admins alone — so the app could never promote anyone again. Recovery
+  // would mean hand-editing Firestore in the console. Refuse instead. Demoting and
+  // disabling both remove an admin, so both are checked.
+  const stillAdmin = form.role === 'admin' && form.active !== false;
+  if (isEdit && !stillAdmin) {
+    const workingAdmins = appUsers.filter(u => u.role === 'admin' && u.active !== false);
+    if (workingAdmins.length <= 1 && workingAdmins.some(u => String(u.id) === String(form.id))) {
+      return { ok: false, why: 'This is the only active admin. Give someone else admin access first, or nobody will be able to manage users.' };
     }
+  }
+  if (isEdit && form.active === false && String(form.id) === String(currentUser?.id)) {
+    return { ok: false, why: 'You cannot disable your own account — you would be signed out with no way back in.' };
   }
   if (isEdit) {
     const { password, ...rest } = form;
