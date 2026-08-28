@@ -5253,6 +5253,17 @@ useEffect(() => {
   if (cur && !canSeeTab(cur)) setActiveTab('billing');
 }, [activeTab, currentUser]);  // eslint-disable-line react-hooks/exhaustive-deps
 
+// Toasts must be rendered by both the login screen and the main app. The login screen
+// returns early, so anything defined only in the main render never appears there — which
+// silently swallowed every login error, including "Invalid Credentials" on a wrong
+// password. The screen simply did nothing.
+const toastEl = toast && (
+  <div className={`fixed top-6 right-6 lg:left-auto left-1/2 lg:-translate-x-0 -translate-x-1/2 px-5 py-3 rounded-2xl shadow-xl z-[100] font-semibold text-white flex items-center gap-2.5 text-sm transition-all animate-slide-up ${toast.type === 'error' ? 'bg-rose-600' : 'bg-slate-800'}`}>
+    {toast.type === 'error' ? <AlertCircle size={18}/> : <CheckCircle2 size={18} className="text-emerald-400"/>}
+    {toast.msg}
+  </div>
+);
+
 // — Auth Screen —
 if (!currentUser) {
 return (
@@ -5274,6 +5285,7 @@ return (
 <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 rounded-2xl text-lg shadow-lg shadow-indigo-600/20 mt-8 active:scale-[0.98] transition-all">Access System</button>
 </form>
 </div>
+{toastEl}
 </div>
 );
 }
@@ -5423,12 +5435,7 @@ return (
   {showRidersModal && <RidersModal />}
   <ConfirmDialog />
 
-  {toast && (
-    <div className={`fixed top-6 right-6 lg:left-auto left-1/2 lg:-translate-x-0 -translate-x-1/2 px-5 py-3 rounded-2xl shadow-xl z-[100] font-semibold text-white flex items-center gap-2.5 text-sm transition-all animate-slide-up ${toast.type === 'error' ? 'bg-rose-600' : 'bg-slate-800'}`}>
-      {toast.type === 'error' ? <AlertCircle size={18}/> : <CheckCircle2 size={18} className="text-emerald-400"/>}
-      {toast.msg}
-    </div>
-  )}
+  {toastEl}
 
   <style>{`
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
