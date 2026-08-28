@@ -44,32 +44,72 @@ the most serious one it *understates* the problem.
 
 ## Working priority order
 
-Ordered by *risk of loss*, not by how interesting the work is.
+Ordered by *risk of loss*, not by how interesting the work is. Security is finished; what
+remains is correctness and maintainability.
 
-- [ ] **0. Restrict the Firebase API key to the app's domain** (Google Cloud Console).
-      No code change, effective today, and it is the only thing standing between the
-      current rules and anyone who views source. Do this first regardless of everything else.
-- [x] **1. Stop exporting passwords.** Done — password column removed from the users CSV.
-- [x] **2. Firebase Auth + real Firestore rules.** Done 2026-08-28. All accounts
-      authenticate through Firebase, no passwords in Firestore, strict rules live and
-      verified against admin, staff and signed-out access. `firestore.rules` mirrors what
-      is published. Record in `docs/SECURITY_CUTOVER.md`.
-- [ ] **2b. Enforce permissions in the rules.** `can()` exists in `firestore.rules` but is
-      never called, so granular permissions gate the UI only — a staff member without
-      `viewAllInvoices` can still read every invoice from the database. Decide which
-      collections each permission governs, then wire it up.
-- [ ] **3. Tests for the money math** — invoice totals, ledger balance, analytics
-      aggregation, date ranges. No UI risk, and the prerequisite for everything below.
-- [ ] **4. Atomic document numbering** via a Firestore transaction on a counters
-      collection. Keep the existing `INV-0001` format. Legacy IDs stay readable.
-- [ ] **5. One ledger calculation.** Derive `paymentStatus` and customer balance from
-      transactions instead of storing them. Single source of truth.
-- [ ] **6. Void instead of delete, plus an audit log**, for invoices, payments, credit
-      notes and expenses.
-- [ ] **7. Query constraints on `invoices` and `payments`.** Date-bounded reads instead of
-      whole-collection listeners. Do this when it starts to hurt, and measure first.
-- [ ] **8. Incremental `App.jsx` extraction** — one feature at a time, `npm run verify`
-      after each. Only once (3) exists.
+### Done
+
+- [x] **Restrict the Firebase API key** to the app's domain (referrer restrictions set).
+- [x] **Stop exporting passwords** — password column removed from the users CSV.
+- [x] **Firebase Auth + closed Firestore rules** (2026-08-28). No passwords in Firestore,
+      rules live and verified against admin, staff and signed-out access.
+      See `docs/SECURITY_CUTOVER.md`.
+- [x] **Admin lockout protection and recovery** — last admin cannot be demoted or deleted;
+      console recovery documented in `docs/ADMIN_RECOVERY.md`.
+
+### Next, in this order
+
+**A. Verification pass — no code, ~20 minutes, do this first.**
+Everything built for the closed-rules path was reasoned through rather than executed; it
+cannot be tested from a dev machine without access to the live project. Untested paths:
+disabled user, wrong password, and one full invoice → payment → ledger → print cycle. That
+last one matters most because printing touches several collections at once.
+
+**B. Atomic document numbering — small, and a live bug.**
+`getNextSeqNum()` takes `Math.max(...)+1` over records already loaded in the browser, so
+two people billing at the same moment get the same invoice number. With three users that is
+a matter of when, not if. Move to a Firestore transaction over a `counters/` collection.
+Keep the `INV-0001` format — those numbers are read aloud and printed on receipts, and
+changing the format buys nothing. Legacy ids must stay readable.
+
+**C. Tests for the money math — the prerequisite for everything after it.**
+Invoice subtotal, discount, delivery, total, profit; ledger opening balance through to
+closing; analytics revenue, COGS, gross and net profit; date ranges (today, week, month,
+custom) against the Karachi timezone. Pure functions, no UI risk. Nothing structural should
+be attempted before these exist, because there is currently nothing to catch a regression
+in a 5,000-line file.
+
+**D. Audit log — the rules are already in place.**
+`auditLogs` is append-only in `firestore.rules` and nothing writes to it. Record who did
+what, when, and to which record for: invoice created/edited/voided, payment
+created/edited/voided, credit note, expense, customer edit, product price change,
+permission change, settings change. Never log credentials.
+
+**E. Void instead of delete.** Financial records should carry
+`{status:'void', voidedAt, voidedBy, voidReason}` rather than being removed. Pairs
+naturally with D — a deletion you cannot see is exactly what the audit log is for.
+
+**F. Derive `paymentStatus`** from payment transactions instead of storing it on the
+invoice, alongside a single customer-balance calculation used everywhere. Do this after C:
+it changes numbers on screen, and tests are what make that safe.
+
+**G. Enforce permissions in the rules.** `can()` is defined in `firestore.rules` and never
+called, so granular permissions gate the UI only.
+
+**H. Query constraints on `invoices` and `payments`.** Whole collections stream to every
+client today. Measure before optimising — a few thousand documents is not a problem yet.
+
+**I. Incremental `App.jsx` extraction.** One feature at a time, `npm run verify` between
+each. Last, and only once C exists.
+
+### Optional, not on the path
+
+- **Real-email login.** Usernames are already real addresses
+  (`animalhealthpk@gmail.com`, `owais797@icloud.com`, `ghousia.qadri@gmail.com`), so
+  Firebase Auth could use them directly and enable self-service password reset. Recovery is
+  already covered by admin reset, so this is convenience. Needs a fallback during the
+  switch: the account email changes when the user clicks a link in their inbox, and the
+  login index still points at the old address until it is updated.
 
 ### Scope guard
 
