@@ -147,6 +147,28 @@ saved — and the logistics block doesn't render for an unknown method, so nothi
 visible on screen either. The form now also keeps that block open when an unknown method
 still carries courier details, so orphaned invoices stay editable.
 
+## Roadmap and known weaknesses
+
+`docs/IMPROVEMENT_BRIEF.md` holds an external review of the app plus my verification of its
+claims and a working priority order. Read it before starting improvement work — it is the
+running plan, with checkboxes to update.
+
+The short version of what is verified and unfixed:
+
+- **Firestore rules are `allow read, write: if true`** and **user passwords are stored in
+  plaintext** — and exported to CSV including the password column. With the rules open,
+  anyone holding the API key can read every password. This is the most serious issue in
+  the repository.
+- Document numbers come from `Math.max(...)+1` over client-side records, so two people
+  billing at the same moment get the same invoice number.
+- All 15 collections are loaded in full by unconstrained `onSnapshot` listeners, including
+  invoices and payments.
+- `paymentStatus` is stored and editable rather than derived from payment transactions.
+- No audit log, no void mechanism — financial deletes are physical.
+- No tests. Write these **before** refactoring `App.jsx`, not after: the brief's own phase
+  order gets this backwards, and there is nothing else to catch a regression in a
+  4,900-line file.
+
 ## Deploying
 
 GitHub Actions deploys on push to `main` and `claude/**`. Allow ~3 minutes before testing on
