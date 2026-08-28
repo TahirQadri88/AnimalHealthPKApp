@@ -5080,7 +5080,10 @@ React.useEffect(() => {
 // Auto-backup (Firebase + Google Drive) — runs once per session when settings load
 const autoBackupRan = React.useRef(false);
 React.useEffect(() => {
-  if (autoBackupRan.current || !appSettings?.id) return;
+  // Admins only. Once the rules are closed a staff member cannot read app_users, so their
+  // backup would write an EMPTY copy over that day's real one — and every write would be
+  // refused anyway, producing a failure toast per collection. Backing up is an admin job.
+  if (autoBackupRan.current || !appSettings?.id || !isAdmin) return;
   const exportedAt = new Date().toISOString();
   const date = exportedAt.slice(0, 10);
   const isDue = (lastAt, freq) => {
@@ -5112,7 +5115,7 @@ React.useEffect(() => {
       .then(() => showToast('Auto-backup sent to Google Drive'))
       .catch(e => console.warn('Drive auto-backup failed:', e));
   }
-}, [appSettings?.id, appSettings?.backupFreq, appSettings?.githubFreq, appSettings?.lastBackupAt, appSettings?.driveFreq, appSettings?.driveScriptUrl, appSettings?.lastDriveBackupAt]);
+}, [isAdmin, appSettings?.id, appSettings?.backupFreq, appSettings?.githubFreq, appSettings?.lastBackupAt, appSettings?.driveFreq, appSettings?.driveScriptUrl, appSettings?.lastDriveBackupAt]);
 
 const deleteFromFirebase = async (collectionName, id) => {
 try {
