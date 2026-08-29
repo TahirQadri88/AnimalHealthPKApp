@@ -35,7 +35,7 @@ churn would be optimising the wrong thing.
 | Change | Effect |
 |---|---|
 | Listeners no longer attach before sign-in | Removes a full duplicate read of every collection on every page load, and the denied evaluations that went with it |
-| **Persistent local cache (IndexedDB)** | Reloads serve from cache and resume listeners from a token, fetching only what changed rather than everything |
+| **Persistent local cache (IndexedDB)** | Reloads can serve unchanged documents from cache and resume listeners from a token, rather than re-reading everything |
 
 ### The persistent cache is not "local-first"
 
@@ -52,8 +52,12 @@ confirms, and an offline device will show the last known data rather than an err
 wholesale ledger that is an improvement over a blank screen, but it is a change, so watch
 for anything that looks stale after another device edits it.
 
-The persistent cache is the big one. Staff reload throughout the day, and the same invoices
-were being paid for over and over.
+The persistent cache is the biggest single lever, but **it is not a quota bypass and it does
+not make reloads free.** Resume tokens expire, a reconnect can re-deliver a whole result
+set, and a device with a cold cache still reads everything once. The honest claim is
+narrower: it avoids *unnecessary repeated* network reads of documents that have not changed.
+Expect a meaningful reduction, not a collapse to near-zero — and judge it on the measured
+figure, not on the mechanism.
 
 ---
 

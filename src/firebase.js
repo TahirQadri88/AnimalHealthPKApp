@@ -29,10 +29,14 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 // Persistent local cache — the single biggest lever on read cost.
 //
-// Without it every page load re-reads every document a listener touches. Staff reload all
-// day, so the same invoices were being charged for over and over; that is how the account
-// crossed the 50,000 reads/day free limit. With IndexedDB persistence the SDK serves the
-// cached copy and resumes each listener from where it left off, fetching only what changed.
+// Without it every page load re-reads every document a listener touches, and staff reload
+// all day. With IndexedDB persistence the SDK can serve unchanged documents from cache and
+// resume a listener from where it left off instead of re-reading the collection.
+//
+// Not a quota bypass: resume tokens expire, a reconnect can re-deliver a full result set,
+// and a cold cache still reads everything once. It removes unnecessary repeated reads of
+// unchanged data — worth having, but the collection listeners are still unbounded and that
+// remains the real problem.
 //
 // It also makes the app usable on a dropped connection, which matters on a phone in a
 // warehouse.
