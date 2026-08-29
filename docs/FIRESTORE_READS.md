@@ -149,6 +149,68 @@ functions guard with `exists()` before reading, so this should not recur.
 is still attempting something the rules refuse. Check which collection and whether it is a
 read or a write before changing any rule; the fix belongs in the app, not in the rules.
 
+## The free solution, when the time comes
+
+No plan upgrade, no new service. Cost is roughly *documents pulled per cold load* × *cold
+loads*, so the whole job is to stop pulling documents nobody is looking at. In order of
+impact per unit of effort:
+
+### 1. Per-customer ledger query — do this first
+
+`where('customerId','==',id)` when a ledger opens, instead of filtering every invoice in
+memory. A customer with 50 invoices costs 50 reads rather than the whole collection.
+
+This one comes first because it is what **unblocks** step 2: the ledger is the only screen
+that genuinely needs full history, and once it fetches its own, nothing else does.
+
+Single-field equality, so no composite index needed.
+
+### 2. Rolling window on the invoice and payment listeners
+
+Bound the global listeners to something like the last 90 days. Billing lists, dispatch and
+the dashboard never show more than that anyway, so nothing visible changes.
+
+Turns "every invoice ever" into "invoices from this quarter" — a constant, not a number that
+grows forever. This is the change that actually fixes the scaling curve.
+
+Needs a `date` index; Firestore creates single-field ones automatically.
+
+### 3. Date-scoped analytics
+
+Query the selected period rather than reading everything and filtering client-side. A
+"This Month" report should read this month.
+
+`customerId` + `date` together needs a composite index — free, and the console offers a
+one-click link the first time a query needs one.
+
+### 4. Lazy-load the admin-only collections
+
+`app_users`, `expenseCategories`, `companies` attach on the Admin tab rather than at
+startup. Small collections, so this is cleanup rather than a saving — worth doing while the
+surrounding code is already open.
+
+### 5. Only if the above is not enough: a dashboard summary document
+
+One document holding today's totals, updated when an invoice is written. Dashboard reads 1
+document instead of hundreds.
+
+Deliberately last. It is denormalisation: the same figure then exists in two places and can
+disagree. Writes are nearly free here (7 a day against a 20,000 limit) so it is affordable,
+but only take it on if steps 1–3 have not done the job.
+
+### What this is worth
+
+Steps 1–3 change cost from *"database size × loads"* to *"recent activity × loads"*. Recent
+activity is roughly constant, so the daily figure stops tracking how long the business has
+been running — which is the only property that actually matters here.
+
+### And if it were ever exceeded anyway
+
+Reads beyond the free tier cost about $0.06 per 100,000. Even a careless 200,000 a day is
+roughly $3–4 a month. Worth knowing so the decision stays an engineering one: this is not a
+looming bill, and there is no reason to rush the work or to compromise the ledger's
+correctness to avoid it.
+
 ## The real remaining problem
 
 `invoices` and `payments` grow without limit and are read by every screen. They cannot
