@@ -17,6 +17,7 @@ import { db, auth, firebaseConfig, collection, onSnapshot, doc, getDoc, setDoc, 
 import { APP_NAME, VEHICLES, getPKTDate, getLocalDateStr, formatDateDisp, checkDateFilter, exportToCSV, shareOrDownload } from './helpers';
 import PrintView from './components/PrintView';
 import { invoiceTotal } from './services/accounting/invoiceTotals';
+import { buildCustomerLedger, allocateCredits, statusFromSettled } from './services/accounting/ledger';
 import SearchableSelect from './components/SearchableSelect';
 
 const AppContext = createContext(null);
@@ -986,7 +987,7 @@ return (
 
 // — Tabs —
 const DashboardTab = () => {
-const { isAdmin, hasPermission, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, analyticsView, setAnalyticsView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, productPreFill, setProductPreFill, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig, showConfirm } = useContext(AppContext);
+const { getPaymentStatus, isAdmin, hasPermission, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, analyticsView, setAnalyticsView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, productPreFill, setProductPreFill, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig, showConfirm } = useContext(AppContext);
 const [dateFilter, setDateFilter] = useState('This Month');
 const [activitySearch, setActivitySearch] = useState('');
 // Staff without viewAllInvoices only see their own invoices on the dashboard
@@ -1038,7 +1039,7 @@ const recentActivity = useMemo(() => {
   const invEntries = visibleInvoices.filter(o => checkDateFilter(o.date, dateFilter)).map(o => ({
     id: o.id, date: o.date, customerName: o.customerName, amount: o.total,
     kind: o.status === 'Billed' ? 'invoice' : o.status === 'Estimate' ? 'estimate' : o.status === 'CreditNote' ? 'creditnote' : 'draft',
-    paymentStatus: o.paymentStatus, raw: o
+    paymentStatus: getPaymentStatus(o), raw: o
   }));
   const payEntries = (ownOnly ? [] : payments).filter(p => checkDateFilter(p.date, dateFilter)).map(p => ({
     id: p.id, date: p.date,
@@ -1190,7 +1191,7 @@ return (
 };
 
 const BillingTab = () => {
-const { isAdmin, hasPermission, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, productPreFill, setProductPreFill, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig, setShowCreditNoteModal, setEditingCreditNote, showConfirm, riders, vehicleTypes, transportCompanies } = useContext(AppContext);
+const { getPaymentStatus, isAdmin, hasPermission, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, productPreFill, setProductPreFill, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig, setShowCreditNoteModal, setEditingCreditNote, showConfirm, riders, vehicleTypes, transportCompanies } = useContext(AppContext);
 const [search, setSearch] = useState('');
 const [dateFilter, setDateFilter] = useState('All Time');
 const [statusFilter, setStatusFilter] = useState('All');
@@ -1622,13 +1623,13 @@ return (
   return (parseInt((b.id||'').replace(/\D/g,''))||0) - (parseInt((a.id||'').replace(/\D/g,''))||0);
 }).map(o => (
 <div key={o.id} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden group hover:border-indigo-200">
-<div className={`absolute top-0 left-0 w-1.5 h-full ${o.status==='CreditNote'?'bg-rose-500':o.status==='Estimate'?'bg-violet-400':o.status==='Billed'?(o.paymentStatus==='Paid'?'bg-emerald-500':'bg-amber-500'):'bg-slate-300'}`}></div>
+<div className={`absolute top-0 left-0 w-1.5 h-full ${o.status==='CreditNote'?'bg-rose-500':o.status==='Estimate'?'bg-violet-400':o.status==='Billed'?(getPaymentStatus(o)==='Paid'?'bg-emerald-500':'bg-amber-500'):'bg-slate-300'}`}></div>
 <div className="flex justify-between border-b border-slate-100 pb-3 mb-3 pl-3">
 <div><h4 className="font-bold text-slate-800 text-sm">{o.customerName}</h4><p className="text-[11px] text-slate-500 font-medium mt-0.5">{o.id} • {formatDateDisp(o.date)} • <span className={`font-bold ${o.status==='Billed'?'text-indigo-600':o.status==='Estimate'?'text-violet-600':o.status==='CreditNote'?'text-rose-600':'text-amber-500'}`}>{o.status==='CreditNote'?'Credit Note':o.status==='Booked'?'Draft Order':o.status}</span></p></div>
 <div className="text-right"><p className={`font-extrabold text-base ${o.status==='CreditNote'?'text-rose-600':'text-indigo-700'}`}>{o.status==='CreditNote'?'-':''} Rs. {o.total.toLocaleString('en-US')}</p><p className={`text-[9px] font-bold uppercase tracking-widest mt-1 ${o.status==='Billed'?'text-indigo-500':o.status==='CreditNote'?'text-rose-500':'text-slate-400'}`}>{o.status==='CreditNote'?'Credit Note':o.status==='Booked'?'Draft Order':o.status}</p></div>
 </div>
 <div className="flex justify-between items-center pl-3">
-<div className="flex items-center gap-2"><span className={`text-[9px] px-2 py-0.5 rounded font-bold uppercase tracking-wider ${o.paymentStatus==='Paid'?'bg-emerald-100 text-emerald-700':o.paymentStatus==='Partial'?'bg-amber-100 text-amber-700':'bg-rose-100 text-rose-700'}`}>{o.paymentStatus}</span></div>
+<div className="flex items-center gap-2"><span className={`text-[9px] px-2 py-0.5 rounded font-bold uppercase tracking-wider ${getPaymentStatus(o)==='Paid'?'bg-emerald-100 text-emerald-700':o.paymentStatus==='Partial'?'bg-amber-100 text-amber-700':'bg-rose-100 text-rose-700'}`}>{o.paymentStatus}</span></div>
 <div className="flex gap-1.5">
 {o.status === 'Estimate' && hasPermission('issueInvoices') && <button onClick={async () => { await saveToFirebase('invoices', o.id, {...o, status: 'Booked'}); showToast('Converted to Draft Order'); }} title="Convert to Draft Order" className="p-2 bg-amber-50 text-amber-600 hover:bg-amber-100 border border-amber-200 rounded-lg"><Save size={14}/></button>}
 {(o.status === 'Estimate' || o.status === 'Booked') && hasPermission('issueInvoices') && <button onClick={async () => { const invGuess = getNextSeqNum(invoices, 'INV'); const invNum = (await claimDocNumber('INV', invGuess)) ?? invGuess; const newId = `INV-${String(invNum).padStart(4, '0')}`; await saveToFirebase('invoices', newId, {...o, id: newId, status: 'Billed', date: getLocalDateStr()}); await deleteFromFirebase('invoices', o.id); showToast(`Converted to Invoice: ${newId}`); }} title="Issue as Invoice" className="p-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-200 rounded-lg"><ReceiptText size={14}/></button>}
@@ -3375,7 +3376,7 @@ const MultiPicker = ({ label, Icon, items, selected, onToggle, onClear }) => {
 };
 
 const AnalyticsView = () => {
-const { isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, cities, areas, customerTypes, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, analyticsView, setAnalyticsView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig, showConfirm } = useContext(AppContext);
+const { getPaymentStatus, isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, cities, areas, customerTypes, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, analyticsView, setAnalyticsView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig, showConfirm } = useContext(AppContext);
 const [view, setView] = useState(analyticsView || 'Overview');
 useEffect(() => { if (analyticsView) { setView(analyticsView); setAnalyticsView(''); } }, [analyticsView]);
 const [dateFilter, setDateFilter] = useState('This Month');
@@ -3547,7 +3548,7 @@ const reportEngine = useMemo(() => {
   const totalBilledAmt = billedForPnL.reduce((s, o) => s + o.total, 0);
   // Payment velocity: avg days from invoice date to first payment received for that customer
   let velDays = 0, velCount = 0;
-  invoices.filter(o => o.status === 'Billed' && o.paymentStatus === 'Paid').forEach(inv => {
+  invoices.filter(o => o.status === 'Billed' && getPaymentStatus(o) === 'Paid').forEach(inv => {
     const pmt = payments.filter(p => String(p.customerId) === String(inv.customerId) && p.date >= inv.date)
       .sort((a, b) => a.date.localeCompare(b.date))[0];
     if (pmt) { const d = Math.floor((new Date(pmt.date) - new Date(inv.date)) / 86400000); if (d >= 0) { velDays += d; velCount++; } }
@@ -5216,40 +5217,34 @@ showToast("Network Error - Could not delete", "error");
 };
 
 // — Ledger Engine —
-const getCustomerLedger = (customerId) => {
-const customer = customers.find(c => c.id === customerId);
-if (!customer) return null;
-const openingBal = customer.openingBalance || 0;
-let entries = [];
-invoices.filter(o => o.customerId === customerId && o.status === 'Billed').forEach(inv => {
-const itemLines = (inv.items || []).map(i => ({ name: i.name, qty: i.quantity, price: i.isBonus ? 0 : (i.price || 0), subtotal: i.isBonus ? 0 : (i.price || 0) * (i.quantity || 0), isBonus: !!i.isBonus }));
-entries.push({ id: inv.id, date: inv.date, ref: inv.id, desc: 'Sales Invoice', debit: inv.total, credit: 0, lineItems: itemLines, deliveryBilled: inv.deliveryBilled || 0, timestamp: new Date(inv.date).getTime() });
-if (inv.receivedAmount > 0) {
-entries.push({ id: `${inv.id}-PAY`, date: inv.date, ref: inv.id, desc: 'Payment (On Invoice)', debit: 0, credit: Number(inv.receivedAmount), timestamp: new Date(inv.date).getTime() + 1 });
-}
-});
-invoices.filter(o => o.customerId === customerId && o.status === 'CreditNote').forEach(cn => {
-const cnLines = (cn.items || []).map(i => ({ name: i.name, qty: i.quantity, price: i.price || 0, subtotal: (i.price || 0) * (i.quantity || 0), isBonus: false }));
-entries.push({ id: cn.id, date: cn.date, ref: cn.originalInvoiceId ? `Ref: ${cn.originalInvoiceId}` : cn.id, desc: `Credit Note / Sales Return${cn.reason ? ` \u2014 ${cn.reason}` : ''}`, debit: 0, credit: cn.total, lineItems: cnLines, isCreditNote: true, timestamp: new Date(cn.date).getTime() + 3 });
-});
-payments.filter(p => p.customerId === customerId).forEach(pay => {
-const payDiscount = Number(pay.discount || 0);
-  const payDesc = (pay.note || 'Payment Received') + (payDiscount > 0 ? ` + Discount Rs.${payDiscount.toLocaleString('en-US')}` : '');
-  entries.push({ id: pay.id, date: pay.date, ref: pay.id, desc: payDesc, debit: 0, credit: Number(pay.amount) + payDiscount, discount: payDiscount, timestamp: new Date(pay.date).getTime() + 2 });
-});
-entries.sort((a, b) => a.timestamp === b.timestamp ? a.id.localeCompare(b.id) : a.timestamp - b.timestamp);
-let runningBal = openingBal;
-let totalDebit = 0;
-let totalCredit = 0;
-const rows = entries.map(entry => {
-runningBal += entry.debit;
-runningBal -= entry.credit;
-totalDebit += entry.debit;
-totalCredit += entry.credit;
-return { ...entry, balance: runningBal };
-});
-return { id: customer.id, customerName: customer.name, phone: customer.phone, openingBal, rows, totalDebit, totalCredit, closingBal: runningBal };
-};
+// Delegates to the tested service so every screen computes a balance identically.
+// Behaviour is unchanged from the inline version this replaced; ledger.test.js pins it.
+const getCustomerLedger = (customerId) => buildCustomerLedger(customerId, { customers, invoices, payments });
+
+// Payment status, derived rather than stored.
+//
+// The stored `paymentStatus` field was set by hand and never maintained, so an invoice
+// still read "Pending" after the customer had paid — on screen, and in the analytics filter
+// that counts paid invoices. Computed here from what the customer has actually paid.
+//
+// Built as one map per data change rather than per row: allocation is per-customer, so
+// calling it inside a list render would be quadratic.
+const paymentStatusById = useMemo(() => {
+  const byId = new Map();
+  const customerIds = [...new Set(invoices.filter(o => o.status === 'Billed').map(o => o.customerId))];
+  customerIds.forEach(cid => {
+    const settled = allocateCredits(cid, { invoices, payments });
+    settled.forEach((amount, invoiceId) => {
+      const inv = invoices.find(o => o.id === invoiceId);
+      if (inv) byId.set(invoiceId, statusFromSettled(inv.total, amount));
+    });
+  });
+  return byId;
+}, [invoices, payments]);
+
+// Falls back to the stored value only for records the allocator does not cover.
+const getPaymentStatus = (invoice) =>
+  (invoice && paymentStatusById.get(invoice.id)) || invoice?.paymentStatus || null;
 
 const getCustomerBalance = (customerId) => {
 const ledger = getCustomerLedger(customerId);
@@ -5372,6 +5367,7 @@ const logout = async () => {
 const ctx = {
 isAdmin, hasPermission, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers,
 cities, areas, customerTypes, vehicleTypes,
+getPaymentStatus,
 showToast, showConfirm, confirmDialog, setConfirmDialog, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData,
 billingView, setBillingView, currentInvoice, setCurrentInvoice,
 activeTab, setActiveTab, adminView, setAdminView, analyticsView, setAnalyticsView,
