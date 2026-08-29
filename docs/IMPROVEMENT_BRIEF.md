@@ -72,32 +72,65 @@ a matter of when, not if. Move to a Firestore transaction over a `counters/` col
 Keep the `INV-0001` format — those numbers are read aloud and printed on receipts, and
 changing the format buys nothing. Legacy ids must stay readable.
 
-**C. Tests for the money math — the prerequisite for everything after it.**
+**C. Tests for the money math — DONE.** vitest wired into `npm run verify`; invoice
+arithmetic extracted to `services/accounting/invoiceTotals.js` with tests, plus the Karachi
+date handling. Found and fixed a real bug on the first run (`formatDateDisp` rendering
+"date-undefined-ot"). Ledger and analytics calculations are still inline and untested —
+extract them the same way when touching them.
+
+**C (original scope, partly remaining).**
 Invoice subtotal, discount, delivery, total, profit; ledger opening balance through to
 closing; analytics revenue, COGS, gross and net profit; date ranges (today, week, month,
 custom) against the Karachi timezone. Pure functions, no UI risk. Nothing structural should
 be attempted before these exist, because there is currently nothing to catch a regression
 in a 5,000-line file.
 
-**D. Audit log — the rules are already in place.**
+**D. Firestore read cost — the account went over the free quota on 2026-08-28.**
+53,000 reads against a 50,000/day limit, with 61 writes and 1 delete. Reads are the whole
+problem, and the shape of it is not mysterious: `useLiveCollection` is called 15 times, each
+attaching `onSnapshot` to an entire collection with no `where`, `limit` or date bound. Three
+signed-in users × 15 collections is exactly the 45 peak listeners the console reported.
+Every attach reads every document in the collection, and every page load re-attaches.
+
+Two contributing factors already dealt with: listeners no longer attach before sign-in (they
+were pulling everything on the login screen and then being replaced the moment the session
+resolved — a second full read per load), and that fix is live.
+
+Before optimising further, note that 2026-08-28 was not a normal day — dozens of deploys,
+each forcing every open tab to reload and re-read every collection. Measure a quiet day
+before assuming the steady-state number is anywhere near 53k.
+
+Then audit rather than guess, per collection: which screens need it, whether realtime is
+actually valuable, how many documents it returns, and whether it can be scoped by date,
+paginated, loaded on demand, or read once. Priorities in order: **invoices** and
+**payments** first (they grow forever and are read on every screen), then **customers** and
+**expenses**. Leave `cities`, `areas`, `customerTypes`, `vehicleTypes`, `riders`,
+`transportCompanies` alone — a handful of documents each, and scoping them buys nothing.
+
+Do NOT upgrade the Firebase plan to make this go away, and do NOT blanket-replace realtime
+listeners with one-time reads. Realtime is genuinely useful where two people work the same
+data; the problem is unbounded queries, not listeners as such.
+
+Worth knowing: the `get()` calls in the security rules are themselves billable reads. That
+is not a reason to weaken the rules — security first — but it means read volume will not go
+to zero.
+
+**E. Audit log — the rules are already in place.**
 `auditLogs` is append-only in `firestore.rules` and nothing writes to it. Record who did
 what, when, and to which record for: invoice created/edited/voided, payment
 created/edited/voided, credit note, expense, customer edit, product price change,
 permission change, settings change. Never log credentials.
 
-**E. Void instead of delete.** Financial records should carry
+**F. Void instead of delete.** Financial records should carry
 `{status:'void', voidedAt, voidedBy, voidReason}` rather than being removed. Pairs
 naturally with D — a deletion you cannot see is exactly what the audit log is for.
 
-**F. Derive `paymentStatus`** from payment transactions instead of storing it on the
+**G. Derive `paymentStatus`** from payment transactions instead of storing it on the
 invoice, alongside a single customer-balance calculation used everywhere. Do this after C:
 it changes numbers on screen, and tests are what make that safe.
 
-**G. Enforce permissions in the rules.** `can()` is defined in `firestore.rules` and never
+**H. Enforce permissions in the rules.** `can()` is defined in `firestore.rules` and never
 called, so granular permissions gate the UI only.
-
-**H. Query constraints on `invoices` and `payments`.** Whole collections stream to every
-client today. Measure before optimising — a few thousand documents is not a problem yet.
 
 **I. Incremental `App.jsx` extraction.** One feature at a time, `npm run verify` between
 each. Last, and only once C exists.
