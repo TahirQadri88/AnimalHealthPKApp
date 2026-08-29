@@ -18,11 +18,17 @@ const getLocalDateStr = (date = new Date()) => {
 
 const formatDateDisp = (dateStr) => {
   if (!dateStr) return '';
-  const parts = dateStr.split('-');
+  const parts = String(dateStr).split('-');
   if (parts.length !== 3) return dateStr;
   const [year, month, day] = parts;
+  const monthIndex = parseInt(month, 10) - 1;
+  // A hyphenated non-date splits into three parts too, so the length check alone lets it
+  // through: "not-a-date" used to render as "date-undefined-ot". Anything without a real
+  // month is handed back untouched — a value that is visibly raw beats the word
+  // "undefined" printed on a customer's invoice.
+  if (!Number.isInteger(monthIndex) || monthIndex < 0 || monthIndex > 11) return dateStr;
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  return `${day}-${months[parseInt(month, 10) - 1]}-${year.slice(-2)}`;
+  return `${day}-${months[monthIndex]}-${year.slice(-2)}`;
 };
 
 const checkDateFilter = (dateStr, filter) => {

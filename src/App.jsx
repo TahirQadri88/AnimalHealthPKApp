@@ -16,6 +16,7 @@ import { db, auth, firebaseConfig, collection, onSnapshot, doc, getDoc, setDoc, 
          createUserWithEmailAndPassword, signOut, onAuthStateChanged, authEmailFor, loginSlug } from './firebase';
 import { APP_NAME, VEHICLES, getPKTDate, getLocalDateStr, formatDateDisp, checkDateFilter, exportToCSV, shareOrDownload } from './helpers';
 import PrintView from './components/PrintView';
+import { invoiceTotal } from './services/accounting/invoiceTotals';
 import SearchableSelect from './components/SearchableSelect';
 
 const AppContext = createContext(null);
@@ -747,6 +748,15 @@ return (
 function useLiveCollection(collectionName, authKey) {
 const [data, setData] = React.useState([]);
 useEffect(() => {
+// Do not subscribe until somebody is signed in. authKey is undefined until Firebase
+// reports, then null when signed out, then a uid.
+//
+// Subscribing earlier is pure waste and it was costing real money: the listener attached
+// on the login screen, pulled the whole collection, and was then torn down and replaced
+// the moment authKey changed to the uid — a second full read of every collection on every
+// page load. Nothing before sign-in needs this data; login reads its two documents
+// directly with getDoc.
+if (!authKey) { setData([]); return undefined; }
 const unsubscribe = onSnapshot(collection(db, collectionName), (snapshot) => {
 const items = [];
 snapshot.forEach((d) => items.push(d.data()));
@@ -1221,8 +1231,7 @@ useEffect(() => {
 }, [currentInvoice?.items?.length]);
 const saveInvoice = async (status) => {
 if(!currentInvoice.customerId || currentInvoice.items.length === 0) return showToast("Customer and items are required", "error");
-const totalItems = currentInvoice.items.reduce((sum, i) => sum + (i.isBonus ? 0 : i.price * i.quantity), 0);
-const grandTotal = totalItems + Number(currentInvoice.deliveryBilled || 0) - Number(currentInvoice.discount || 0);
+const grandTotal = invoiceTotal(currentInvoice);
 const activeCustomer = customers.find(c => c.id === currentInvoice.customerId);
 const enrichedItems = currentInvoice.items.map(item => {
   if (item.unit && item.unitsInBox) return item;
@@ -1282,7 +1291,7 @@ setProdSearch('');
 if (billingView === 'form') {
 const isEdit = !!currentInvoice.id;
 const editingStatus = currentInvoice.status || '';
-const grandTotal = currentInvoice.items.reduce((s,i)=>s+(i.isBonus?0:i.price*i.quantity),0) + Number(currentInvoice.deliveryBilled||0) - Number(currentInvoice.discount||0);
+const grandTotal = invoiceTotal(currentInvoice);
 const formTypeLabel = isEdit
   ? (editingStatus === 'Estimate' ? 'Edit Estimate' : editingStatus === 'Booked' ? 'Edit Draft Order' : editingStatus === 'CreditNote' ? 'Credit Note' : `Edit Invoice`)
   : (statusFilter === 'Estimate' ? 'New Estimate / Quotation' : statusFilter === 'Booked' ? 'New Draft Order' : 'New Invoice');
