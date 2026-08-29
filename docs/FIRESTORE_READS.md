@@ -1,7 +1,11 @@
 # Firestore read cost — audit
 
 **Trigger:** 2026-08-28, the project crossed the Spark free tier's 50,000 reads/day.
-53,000 reads, 61 writes, 1 delete. Reads are the entire problem.
+53,000 reads, 61 writes, 1 delete.
+
+**Resolved:** measurement the next day showed a cold app load costs ~900 reads and 60
+forced reloads (20 deploys × 3 users) accounts for the full 54,000. Normal use is 9k–18k a
+day. Not urgent — but the cost scales with database size, so see the baseline section.
 
 ---
 
@@ -60,6 +64,44 @@ Expect a meaningful reduction, not a collapse to near-zero — and judge it on t
 figure, not on the mechanism.
 
 ---
+
+## Measured baseline — 2026-08-29, one hour of real use
+
+**1,500 reads, 7 writes, 0 deletes in 60 minutes.** The per-minute graph is flat at zero
+except for a single spike of roughly 900 in one minute.
+
+Two things follow, and they matter more than yesterday's headline number.
+
+**An open, idle app costs nothing.** The flat line is listeners sitting attached with no
+billing. Realtime is not the expense — attaching is.
+
+**One cold load costs roughly 900 reads**, which is about the whole database. That number
+explains yesterday exactly:
+
+```
+20 deploys × 3 users = 60 forced reloads
+60 loads × 900 reads = 54,000 reads     ← yesterday's figure
+```
+
+That is close enough to settle it. **Yesterday's 54k was our own deployment churn**, not the
+business using the app. Normal use of 10–20 loads a day sits around 9k–18k, comfortably
+inside the free tier.
+
+### But it scales badly, and that is the real point
+
+Cost is roughly *documents in the database × cold loads per day*. The database is currently
+small — about 900 documents — which is the only reason unbounded listeners are survivable:
+
+| Total documents | 20 loads/day | |
+|---|---|---|
+| 900 (today) | 18,000 | fine |
+| 3,000 | 60,000 | **over the free limit** |
+| 10,000 | 200,000 | far over |
+
+Nothing needs doing today. The work in "The real remaining problem" below becomes necessary
+somewhere around 2,500–3,000 documents, and invoices are the collection that will get there
+first. Worth re-measuring an hour of normal use every few months rather than waiting for
+another quota mail.
 
 ## Where each collection is really used
 
