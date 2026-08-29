@@ -85,7 +85,7 @@ custom) against the Karachi timezone. Pure functions, no UI risk. Nothing struct
 be attempted before these exist, because there is currently nothing to catch a regression
 in a 5,000-line file.
 
-**D. Firestore read cost — the account went over the free quota on 2026-08-28.**
+**D. Firestore read cost — audit in `docs/FIRESTORE_READS.md`. Partly done.**
 53,000 reads against a 50,000/day limit, with 61 writes and 1 delete. Reads are the whole
 problem, and the shape of it is not mysterious: `useLiveCollection` is called 15 times, each
 attaching `onSnapshot` to an entire collection with no `where`, `limit` or date bound. Three

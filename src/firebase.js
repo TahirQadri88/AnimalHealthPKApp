@@ -1,5 +1,11 @@
 import { initializeApp, deleteApp } from "firebase/app";
-import { getFirestore, collection, onSnapshot, doc, getDoc, setDoc, deleteDoc, runTransaction } from "firebase/firestore";
+import {
+  getFirestore,
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+  collection, onSnapshot, doc, getDoc, setDoc, deleteDoc, runTransaction,
+} from "firebase/firestore";
 import {
   getAuth,
   signInWithEmailAndPassword,
@@ -21,7 +27,29 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+// Persistent local cache — the single biggest lever on read cost.
+//
+// Without it every page load re-reads every document a listener touches. Staff reload all
+// day, so the same invoices were being charged for over and over; that is how the account
+// crossed the 50,000 reads/day free limit. With IndexedDB persistence the SDK serves the
+// cached copy and resumes each listener from where it left off, fetching only what changed.
+//
+// It also makes the app usable on a dropped connection, which matters on a phone in a
+// warehouse.
+//
+// Falls back to the in-memory default when IndexedDB is unavailable — private windows, or
+// an older browser. The app works either way; it just pays full price for reads.
+let db;
+try {
+  db = initializeFirestore(app, {
+    // Several tabs open at once is normal here, and without a multi-tab manager only one
+    // of them gets persistence.
+    localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+  });
+} catch (err) {
+  console.warn('Firestore persistent cache unavailable — falling back to memory cache.', err);
+  db = getFirestore(app);
+}
 const auth = getAuth(app);
 
 // Keep the session across reloads. Staff use this on phones all day; re-typing a password

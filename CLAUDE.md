@@ -172,6 +172,18 @@ saved — and the logistics block doesn't render for an unknown method, so nothi
 visible on screen either. The form now also keeps that block open when an unknown method
 still carries courier details, so orphaned invoices stay editable.
 
+## Firestore reads cost money — check before adding a listener
+
+The project blew through the 50,000 reads/day free tier on 2026-08-28. `useLiveCollection`
+attaches `onSnapshot` to a WHOLE collection: 15 calls × 3 users was exactly the 45 peak
+listeners the console showed. Persistent local cache is now enabled, which is what stops
+every page reload re-reading everything, and listeners no longer attach before sign-in.
+
+Before adding another `useLiveCollection`, ask whether the screen needs the whole
+collection and whether it needs realtime at all. `invoices` and `payments` grow forever and
+still stream in full — see `docs/FIRESTORE_READS.md` for why they cannot simply be
+date-bounded (the ledger needs full history) and what the proper fix looks like.
+
 ## Roadmap and known weaknesses
 
 `docs/IMPROVEMENT_BRIEF.md` holds an external review of the app plus my verification of its
