@@ -34,8 +34,23 @@ churn would be optimising the wrong thing.
 
 | Change | Effect |
 |---|---|
-| Listeners no longer attach before sign-in | Removes a full duplicate read of every collection on every page load |
+| Listeners no longer attach before sign-in | Removes a full duplicate read of every collection on every page load, and the denied evaluations that went with it |
 | **Persistent local cache (IndexedDB)** | Reloads serve from cache and resume listeners from a token, fetching only what changed rather than everything |
+
+### The persistent cache is not "local-first"
+
+Worth separating, because the two get conflated and the second genuinely is risky:
+
+- **Local-first** means the app owns its data, writes queue offline and a sync engine
+  reconciles conflicts. A large architectural change. **Not done, not planned.**
+- **Firestore's persistent cache** is one configuration option on `initializeFirestore`. No
+  business logic changes, no data flow changes, no conflict model. Firebase's own answer to
+  repeated reads of unchanged documents.
+
+The behaviour worth knowing: a screen may paint from cache a moment before the server
+confirms, and an offline device will show the last known data rather than an error. For a
+wholesale ledger that is an improvement over a blank screen, but it is a change, so watch
+for anything that looks stale after another device edits it.
 
 The persistent cache is the big one. Staff reload throughout the day, and the same invoices
 were being paid for over and over.
@@ -64,6 +79,29 @@ one staff user three small listeners, and each gate is a chance to break a scree
 trade against the persistent cache, which helps everyone on every load.
 
 ---
+
+## The 105 denied rule evaluations
+
+**105 ÷ 15 collections = exactly 7.** Almost certainly seven page loads while signed out,
+each attaching all fifteen listeners and having every one refused. That was the pre-sign-in
+subscription bug, and it is fixed — listeners now wait for a session.
+
+Two other sources are expected and already dealt with:
+
+- **`counters` writes before the rule was published.** The atomic numbering code shipped
+  before the matching rule went live, so each invoice save attempted a transaction, was
+  refused, logged a warning and fell back. By design — degraded, not broken — but each
+  attempt is a deny.
+- **`backups` writes by a non-admin.** Auto-backup used to run for whoever was signed in;
+  it is now admin-only.
+
+The single rule **error** (as opposed to deny) most likely dates from the migration window,
+when an account could authenticate before its `userRoles` document existed. The rule
+functions guard with `exists()` before reading, so this should not recur.
+
+**If denies keep climbing after a normal day, that is a bug, not noise** — it means the UI
+is still attempting something the rules refuse. Check which collection and whether it is a
+read or a write before changing any rule; the fix belongs in the app, not in the rules.
 
 ## The real remaining problem
 
