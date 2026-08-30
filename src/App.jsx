@@ -19,6 +19,7 @@ import PrintView from './components/PrintView';
 import { invoiceTotal } from './services/accounting/invoiceTotals';
 import { buildCustomerLedger, allocateCredits, statusFromSettled } from './services/accounting/ledger';
 import { profitImpactOfCostChange, defaultEffectiveDate, firstSaleDate } from './services/accounting/costPriceChange';
+import { computePnL } from './services/analytics/profitAndLoss';
 import SearchableSelect from './components/SearchableSelect';
 
 const AppContext = createContext(null);
@@ -3570,7 +3571,36 @@ const reportEngine = useMemo(() => {
     if (dailyBreakdown[cn.date]) { dailyBreakdown[cn.date].revenue -= cnRev; dailyBreakdown[cn.date].profit -= cnGP; }
   });
   kpis.creditNotesCount = creditNotes.length;
-  kpis.creditNotesTotal = creditNotes.reduce((s, cn) => s + cn.total, 0);
+
+  // Sales returns, corrected. See services/analytics/profitAndLoss.js.
+  //
+  // Revenue above comes only from Billed invoices, so a credit note reduced nothing. The
+  // P&L then showed "Gross Sales = revenue + returns" and subtracted the returns back off,
+  // which cancelled out: a fully returned sale still reported profit, and the cost of the
+  // goods that came back stayed in COGS.
+  //
+  // productRevenue and totalCOGS are reassigned to the NET figures. Every display already
+  // adds returns back for its "Gross Sales" line and derives gross profit as
+  // productRevenue − totalCOGS, so correcting the two inputs makes those lines right
+  // without touching a thousand lines of presentation.
+  //
+  // Per-product, per-customer and per-company breakdowns further up remain gross; they are
+  // adjusted separately by the credit-note loop above.
+  const pnl = computePnL({
+    billedInvoices: billedForPnL,
+    creditNotes,
+    expenses: filteredExpenses,
+    includeItem: (item) => {
+      if (filterCompanies.size === 0) return true;
+      const cid = products.find(p => p.id === item.productId)?.companyId;
+      return filterCompanies.has(String(cid));
+    },
+  });
+  kpis.creditNotesTotal = pnl.salesReturns;
+  kpis.productRevenue  = pnl.netSales;
+  kpis.totalCOGS       = pnl.cogs;
+  kpis.grossMargin     = pnl.grossProfit;
+  kpis.netProfit       = pnl.netProfit;
   // All-time collection rate: (total ever billed − currently outstanding) / total ever billed
   // Period-filtered billing vs period-filtered payments is misleading (cross-period collections inflate to 100%)
   const allTimeBilled = invoices.filter(o => o.status === 'Billed').reduce((s, o) => s + o.total, 0);
