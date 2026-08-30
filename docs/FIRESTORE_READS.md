@@ -3,9 +3,9 @@
 **Trigger:** 2026-08-28, the project crossed the Spark free tier's 50,000 reads/day.
 53,000 reads, 61 writes, 1 delete.
 
-**Resolved:** measurement the next day showed a cold app load costs ~900 reads and 60
-forced reloads (20 deploys × 3 users) accounts for the full 54,000. Normal use is 9k–18k a
-day. Not urgent — but the cost scales with database size, so see the baseline section.
+**Resolved.** A clean day (30–31 Aug, no deploys) measured **6,000 reads — 12% of the free
+limit**, with **zero denies and zero errors**. The 54,000 was our own deployment churn. See
+"Clean-day baseline" below; the scaling concern still stands but is months away.
 
 ---
 
@@ -102,6 +102,32 @@ Nothing needs doing today. The work in "The real remaining problem" below become
 somewhere around 2,500–3,000 documents, and invoices are the collection that will get there
 first. Worth re-measuring an hour of normal use every few months rather than waiting for
 another quota mail.
+
+## Clean-day baseline — 30–31 August, no deploys
+
+|  | 28 Aug (churn) | 30–31 Aug (clean) |
+|---|---|---|
+| Reads | 54,000 | **6,000** — 12% of the limit |
+| Writes | 61 | 8 |
+| Denies | 120 | **0** |
+| Rule errors | 1 | **0** |
+| Peak listeners | 45 | 15 |
+| Peak connections | 4 | 1 |
+
+**Zero denies settles the diagnosis.** They were signed-out listener attachments, and gating
+subscription on a session removed every one. The single rule error was migration residue, as
+suspected, and has not recurred.
+
+**15 peak listeners is 15 collections × one user** — this was a single-user day (1 peak
+connection), so 6,000 is a light figure, not a ceiling. Three people working concurrently
+would put it near 18,000, which is still only about a third of the limit.
+
+Reads arrive in three per-hour spikes of roughly 1,500 with nothing in between, which is the
+same shape as before: attaching costs, sitting idle does not.
+
+**Nothing to do.** The scaling maths in the section above is unchanged — cost still tracks
+database size — but at 12% of the limit on a working day, the query-scoping work stays
+where it is: dated to roughly 2,500–3,000 documents, not urgent.
 
 ## Where each collection is really used
 
