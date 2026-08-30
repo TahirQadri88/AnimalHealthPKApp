@@ -56,6 +56,12 @@ remains is correctness and maintainability.
       See `docs/SECURITY_CUTOVER.md`.
 - [x] **Admin lockout protection and recovery** — last admin cannot be demoted or deleted;
       console recovery documented in `docs/ADMIN_RECOVERY.md`.
+- [x] **Receivables aging + exports** (brief §15). Admin → Receivables buckets debt by age
+      and agrees with the ledger by construction. Exports go through the existing
+      `docType: 'report'` PrintView pipeline rather than a second one, so aging gets A4, A5,
+      thermal, PDF, image share and WhatsApp text for free; CSV is `exportToCSV`. Every
+      export foots to the rows on screen — the bucket chip and search box filter the sheet
+      as well, and `summariseAging` recomputes the totals over what is shown.
 
 ### Next, in this order
 

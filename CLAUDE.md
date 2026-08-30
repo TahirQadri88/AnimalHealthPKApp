@@ -123,6 +123,12 @@ render — every user hit a blank error screen.
   only reaches the login screen — it passed the crash above without complaint, because that
   screen sits behind a login. Do not mistake it for a regression net. Set `CHROMIUM_PATH`
   to pin a browser binary.
+- **Print layouts can be tested without a browser.** `src/components/PrintView.aging.test.jsx`
+  renders the real `PrintView` through `react-dom/server` at all three paper sizes and
+  asserts the figures reach the page — including that the markup contains no `undefined`
+  or `NaN`, which is what a renamed data key looks like on paper. `useEffect` does not run
+  under SSR, so no DOM stub is needed. Copy that file's shape for any new document type;
+  it is the only automated check that has ever exercised a PrintView layout.
 - CI runs `npm run lint` before `npm run build`, so this cannot deploy again.
 - Keep `eslint` in **devDependencies**, not installed ad hoc. A guard that isn't in
   package.json doesn't exist on CI or a fresh clone — this one shipped that way once.

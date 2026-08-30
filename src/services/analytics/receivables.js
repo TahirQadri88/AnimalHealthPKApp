@@ -107,22 +107,29 @@ export const customerAging = (customerId, { customers = [], invoices = [], payme
   };
 };
 
+// Bucket totals for a set of aging rows.
+//
+// Exported separately because the screen filters (bucket chip, search box) hide rows, and an
+// export must foot to what is actually on the page. Totalling the whole report while showing
+// a subset is how a printed sheet ends up disagreeing with the screen it came from.
+export const summariseAging = (rows = []) => ({
+  totals: AGING_BUCKETS.reduce((acc, b) => {
+    acc[b.key] = rows.reduce((s, r) => s + ((r.buckets && r.buckets[b.key]) || 0), 0);
+    return acc;
+  }, {}),
+  grandTotal: rows.reduce((s, r) => s + (r.totalOutstanding || 0), 0),
+  customerCount: rows.length,
+});
+
 // Every customer who owes something, worst first.
 export const buildAgingReport = ({ customers = [], invoices = [], payments = [], asOf } = {}) => {
   const rows = customers
     .map(c => customerAging(c.id, { customers, invoices, payments, asOf }))
     .filter(r => r && r.totalOutstanding > 0.5);
 
-  const totals = AGING_BUCKETS.reduce((acc, b) => {
-    acc[b.key] = rows.reduce((s, r) => s + r.buckets[b.key], 0);
-    return acc;
-  }, {});
-
   return {
     asOf,
     rows: rows.sort((a, b) => b.oldestAgeDays - a.oldestAgeDays || b.totalOutstanding - a.totalOutstanding),
-    totals,
-    grandTotal: rows.reduce((s, r) => s + r.totalOutstanding, 0),
-    customerCount: rows.length,
+    ...summariseAging(rows),
   };
 };

@@ -25,6 +25,11 @@ const showOnDocs = biz.showBusinessNameOnDocs !== false;
 const showOnReports = biz.showBusinessNameOnReports !== false;
 const isThermal = format === 'thermal';
 const isA5 = format === 'a5';
+// The receivables aging report is a report, but it is a name-and-amount list rather than an
+// analytics table, so it gets its own layout and is allowed onto the thermal roll.
+const isAging = docType === 'report' && data?.view === 'Aging';
+const aging = isAging ? (data.aging || {}) : null;
+const agingBuckets = (aging && aging.buckets) || [];
 const printRef = useRef(null);
 const [showPrevBal, setShowPrevBal] = useState(true);
 // Keyboard: Escape closes the print view
@@ -134,6 +139,7 @@ const getShareCaption = () => {
   if (docType === 'receipt') return `Payment Receipt ${data.id} — Rs. ${(data.receivedAmount || 0).toLocaleString('en-US')} received from ${data.customerName}`;
   if (docType === 'creditnote') return `Credit Note ${data.id} for ${data.customerName} — Rs. ${(data.total || 0).toLocaleString('en-US')}`;
   if (docType === 'ledger') return `Account Statement: ${data.customerName} | ${formatDateDisp(data.dateRange?.start)} – ${formatDateDisp(data.dateRange?.end)}`;
+  if (isAging) return `${data.title || 'Receivables Aging'} — Rs.${Math.round(aging.grandTotal || 0).toLocaleString('en-US')} outstanding across ${aging.customerCount || 0} customers | ${data.dateFilter || ''}`;
   if (docType === 'report') return `${data.title || 'Analytics Report'} | Period: ${data.dateFilter || ''}`;
   return getFileName().replace(/\.[^.]+$/, '');
 };
@@ -266,6 +272,28 @@ const generateShareText = () => {
     text += `Total Credits: Rs.${(data.totalCredit || 0).toLocaleString('en-US')}\n`;
     text += `*Closing Balance: Rs.${periodClosingBal.toLocaleString('en-US')}*\n\n`;
     text += `Please arrange payment at your earliest convenience.`;
+
+  } else if (isAging) {
+    // A collection list read off a phone: worst debt first, buckets under each name, and
+    // the bucket summary at the end so the total is the last thing on screen.
+    const money = (n) => `Rs.${Math.round(Number(n) || 0).toLocaleString('en-US')}`;
+    text += `*${data.title || 'Receivables Aging'}*\n`;
+    text += `${hr}\n`;
+    text += `${data.dateFilter || ''}\n\n`;
+    const agingRows = aging.rows || [];
+    agingRows.slice(0, 25).forEach((r, i) => {
+      text += `${i + 1}. *${r.name}* — ${money(r.totalOutstanding)}\n`;
+      const detail = [
+        `oldest ${r.oldestAgeDays}d`,
+        ...agingBuckets.filter(b => (r.buckets?.[b.key] || 0) > 0).map(b => `${b.label}: ${money(r.buckets[b.key])}`),
+      ].join(' | ');
+      text += `   ${detail}\n`;
+      if (r.phone) text += `   📞 ${r.phone}\n`;
+    });
+    if (agingRows.length > 25) text += `... and ${agingRows.length - 25} more\n`;
+    text += `\n${hr}\n`;
+    agingBuckets.forEach(b => { text += `${b.label}: ${money(aging.totals?.[b.key])}\n`; });
+    text += `*Total Outstanding: ${money(aging.grandTotal)}* (${aging.customerCount || agingRows.length} customers)`;
 
   } else if (docType === 'report') {
     text += `*${data.title || 'Analytics Report'}*\n`;
@@ -738,7 +766,8 @@ const docWidth = isThermal
 // Which format buttons to show per doc type
 const showA5     = true;
 const showA4     = docType !== 'receipt';
-const showThermal = docType !== 'report';
+// Analytics tables are four columns wide and unreadable at 68mm; the aging list is two.
+const showThermal = docType !== 'report' || isAging;
 
 // Doc type display labels
 const docLabel = {
@@ -746,7 +775,7 @@ const docLabel = {
   dispatch: 'Dispatch Note',
   receipt: 'Payment Receipt',
   ledger: 'Account Statement',
-  report: 'Analytics Report',
+  report: isAging ? 'Receivables Aging' : 'Analytics Report',
   estimate: 'Price Estimate / Quotation',
   creditnote: 'Sales Return / Credit Note',
 }[docType] || 'Document';
@@ -1000,7 +1029,7 @@ return (
         </div>
 
         {/* Criteria box */}
-        {(data.appliedFilters?.companies || data.appliedFilters?.company || data.appliedFilters?.customers || data.appliedFilters?.customer || data.appliedFilters?.salespersons || data.appliedFilters?.salesperson || data.appliedFilters?.customStart) && (
+        {(data.appliedFilters?.companies || data.appliedFilters?.company || data.appliedFilters?.customers || data.appliedFilters?.customer || data.appliedFilters?.salespersons || data.appliedFilters?.salesperson || data.appliedFilters?.customStart || data.appliedFilters?.scope) && (
           <div className="keep-together" style={{ marginBottom: sz('8px','12px','14px'), padding: sz('6px 8px','8px 12px','10px 14px'), background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '8px', fontSize: sz('7px','8px','9px') }}>
             <div style={{ fontWeight: 800, color: '#0369a1', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '5px', fontSize: sz('6px','7px','7.5px') }}>
               Filters Applied
@@ -1010,11 +1039,141 @@ return (
               {(data.appliedFilters.customers || data.appliedFilters.customer) && <span><strong>Client:</strong> {data.appliedFilters.customers || data.appliedFilters.customer}</span>}
               {(data.appliedFilters.salespersons || data.appliedFilters.salesperson) && <span><strong>Staff:</strong> {data.appliedFilters.salespersons || data.appliedFilters.salesperson}</span>}
               {data.appliedFilters.customStart && <span><strong>From:</strong> {formatDateDisp(data.appliedFilters.customStart)} <strong>To:</strong> {formatDateDisp(data.appliedFilters.customEnd)}</span>}
+              {data.appliedFilters.scope && <span><strong>Showing:</strong> {data.appliedFilters.scope}</span>}
             </div>
           </div>
         )}
 
-        {data.view === 'Overview' ? (
+        {isAging ? (() => {
+          const rows = aging.rows || [];
+          const money = (n) => 'Rs.' + Math.round(Number(n) || 0).toLocaleString('en-US');
+          // Past 60 days is the reason this sheet exists; colour follows the screen.
+          const tone = (d) => d > 90 ? '#be123c' : d > 60 ? '#b45309' : '#1e293b';
+
+          // Four boxes side by side need ~17mm each; at 68mm the labels wrap to shreds, so
+          // the roll gets the same figures stacked as label-and-amount rows instead.
+          const summary = isThermal ? (
+            <div className="keep-together" style={{ marginBottom: '6px', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '4px 6px', background: '#f8fafc' }}>
+              {agingBuckets.map(b => (
+                <div key={b.key} style={{ display: 'flex', justifyContent: 'space-between', gap: '4px', fontSize: '8px', fontWeight: 700, padding: '1px 0' }}>
+                  <span style={{ overflowWrap: 'anywhere', color: '#475569' }}>{b.label}</span>
+                  <span style={{ overflowWrap: 'anywhere', textAlign: 'right', color: b.key === 'd90plus' ? '#be123c' : '#1e293b' }}>{money(aging.totals?.[b.key])}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="keep-together" style={{
+              display: 'flex', flexWrap: 'wrap', gap: sz('4px','6px','8px'),
+              marginBottom: sz('8px','12px','14px'),
+            }}>
+              {agingBuckets.map(b => (
+                <div key={b.key} style={{
+                  flex: '1 1 0', minWidth: 0,
+                  border: '1px solid #e2e8f0', borderRadius: '8px',
+                  padding: sz('4px 5px','6px 8px','8px 10px'), background: '#f8fafc',
+                }}>
+                  <div style={{ fontSize: sz('6px','7px','7.5px'), fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px', color: '#64748b' }}>{b.label}</div>
+                  <div style={{ fontSize: sz('8px','10px','11px'), fontWeight: 900, color: b.key === 'd90plus' ? '#be123c' : '#1e293b', overflowWrap: 'anywhere' }}>
+                    {money(aging.totals?.[b.key])}
+                  </div>
+                </div>
+              ))}
+            </div>
+          );
+
+          const grandTotal = (
+            <div className="keep-together" style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px',
+              background: '#1e293b', color: 'white', borderRadius: '8px',
+              padding: sz('6px 8px','8px 12px','10px 14px'), marginTop: sz('8px','10px','12px'),
+              fontWeight: 900, fontSize: sz('9px','12px','14px'),
+            }} data-dk="1">
+              <span>TOTAL OUTSTANDING ({aging.customerCount ?? rows.length})</span>
+              <span style={{ overflowWrap: 'anywhere' }}>{money(aging.grandTotal)}</span>
+            </div>
+          );
+
+          if (rows.length === 0) {
+            return <div>{summary}<div style={{ padding: '16px', textAlign: 'center', color: '#64748b', fontSize: sz('8px','9px','10px') }}>Nothing outstanding.</div>{grandTotal}</div>;
+          }
+
+          // Thermal: seven columns cannot fit 68mm, so each customer becomes a block. All
+          // widths stay percentage-based and every amount is allowed to wrap (CLAUDE.md).
+          if (isThermal) {
+            return (
+              <div>
+                {summary}
+                <div style={{ borderTop: '1px solid #1e293b' }}>
+                  {rows.map((r, i) => (
+                    <div key={i} className="keep-together" style={{ borderBottom: '1px solid #e2e8f0', padding: '4px 0' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '4px', fontWeight: 800, fontSize: '9px' }}>
+                        <span style={{ overflowWrap: 'anywhere' }}>{i + 1}. {r.name}</span>
+                        <span style={{ overflowWrap: 'anywhere', textAlign: 'right' }}>{money(r.totalOutstanding)}</span>
+                      </div>
+                      <div style={{ fontSize: '7.5px', color: tone(r.oldestAgeDays), fontWeight: 700 }}>
+                        oldest {r.oldestAgeDays}d{r.phone ? ` · ${r.phone}` : ''}
+                      </div>
+                      {agingBuckets.filter(b => (r.buckets?.[b.key] || 0) > 0).map(b => (
+                        <div key={b.key} style={{ display: 'flex', justifyContent: 'space-between', gap: '4px', fontSize: '7.5px', paddingLeft: '6px' }}>
+                          <span style={{ overflowWrap: 'anywhere' }}>{b.label}</span>
+                          <span style={{ overflowWrap: 'anywhere', textAlign: 'right' }}>{money(r.buckets[b.key])}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+                {grandTotal}
+              </div>
+            );
+          }
+
+          return (
+            <div>
+              {summary}
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: sz('8px','8.5px','10px') }}>
+                <thead>
+                  <tr style={{ background: '#1e293b', color: 'white' }}>
+                    <th style={{ padding: sz('5px 4px','6px 5px','8px 8px'), textAlign: 'left', fontWeight: 800 }}>Customer</th>
+                    <th style={{ padding: sz('5px 4px','6px 5px','8px 8px'), textAlign: 'center', fontWeight: 800, whiteSpace: 'nowrap' }}>Oldest</th>
+                    {agingBuckets.map(b => (
+                      <th key={b.key} style={{ padding: sz('5px 4px','6px 5px','8px 8px'), textAlign: 'right', fontWeight: 800 }}>{b.label}</th>
+                    ))}
+                    <th style={{ padding: sz('5px 4px','6px 5px','8px 8px'), textAlign: 'right', fontWeight: 800 }}>Total Due</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((r, i) => (
+                    <tr key={i} style={{ borderBottom: '1px solid #f1f5f9', background: i % 2 === 0 ? '#fff' : '#f8fafc', pageBreakInside: 'avoid', breakInside: 'avoid' }}>
+                      <td style={{ padding: sz('6px 4px','7px 5px','9px 8px'), fontWeight: 600, wordBreak: 'break-word', lineHeight: sz('1.5','1.55','1.6') }}>
+                        {r.name}
+                        {r.phone ? <span style={{ fontSize: '7.5px', color: '#64748b', display: 'block' }}>{r.phone}</span> : null}
+                      </td>
+                      <td style={{ padding: sz('6px 4px','7px 5px','9px 8px'), textAlign: 'center', whiteSpace: 'nowrap', fontWeight: 800, color: tone(r.oldestAgeDays) }}>
+                        {r.oldestAgeDays}d
+                      </td>
+                      {agingBuckets.map(b => (
+                        <td key={b.key} style={{ padding: sz('6px 4px','7px 5px','9px 8px'), textAlign: 'right', color: b.key === 'd90plus' && (r.buckets?.[b.key] || 0) > 0 ? '#be123c' : '#334155' }}>
+                          {(r.buckets?.[b.key] || 0) > 0 ? money(r.buckets[b.key]) : '—'}
+                        </td>
+                      ))}
+                      <td style={{ padding: sz('6px 4px','7px 5px','9px 8px'), textAlign: 'right', fontWeight: 800 }}>{money(r.totalOutstanding)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr style={{ background: '#1e293b', color: 'white', fontWeight: 900 }} data-dk="1">
+                    <td style={{ padding: sz('6px 4px','7px 5px','9px 8px') }}>TOTAL ({aging.customerCount ?? rows.length})</td>
+                    <td />
+                    {agingBuckets.map(b => (
+                      <td key={b.key} style={{ padding: sz('6px 4px','7px 5px','9px 8px'), textAlign: 'right' }}>{money(aging.totals?.[b.key])}</td>
+                    ))}
+                    <td style={{ padding: sz('6px 4px','7px 5px','9px 8px'), textAlign: 'right' }}>{money(aging.grandTotal)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          );
+        })() : data.view === 'Overview' ? (
           <div className="keep-together" style={{ border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden' }}>
             <div style={{ background: '#1e293b', color: 'white', padding: sz('8px 12px','10px 16px','12px 20px'), fontSize: sz('9px','10px','11px'), fontWeight: 800, letterSpacing: '1px', textTransform: 'uppercase' }}>
               Profit & Loss Summary

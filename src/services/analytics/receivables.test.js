@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildAgingReport, customerAging, bucketFor } from './receivables';
+import { buildAgingReport, customerAging, bucketFor, summariseAging } from './receivables';
 import { customerBalance } from '../accounting/ledger';
 
 const ASOF = '2026-08-31';
@@ -187,5 +187,60 @@ describe('buildAgingReport', () => {
     const r = buildAgingReport({ asOf: ASOF });
     expect(r.rows).toEqual([]);
     expect(r.grandTotal).toBe(0);
+  });
+});
+
+// Exports foot to the rows on screen, not to the whole report — the bucket chip and the
+// search box both hide rows, and a printed total that disagrees with the screen is a bug
+// the user has no way to explain to a customer.
+describe('summariseAging', () => {
+  const row = (total, buckets) => ({ totalOutstanding: total, buckets });
+
+  it('is all zeroes for no rows', () => {
+    const s = summariseAging([]);
+    expect(s.grandTotal).toBe(0);
+    expect(s.customerCount).toBe(0);
+    expect(s.totals.d90plus).toBe(0);
+  });
+
+  it('adds the buckets and the grand total across rows', () => {
+    const s = summariseAging([
+      row(3000, { current: 1000, d31_60: 2000, d61_90: 0, d90plus: 0 }),
+      row(5000, { current: 0, d31_60: 0, d61_90: 500, d90plus: 4500 }),
+    ]);
+    expect(s.customerCount).toBe(2);
+    expect(s.grandTotal).toBe(8000);
+    expect(s.totals.current).toBe(1000);
+    expect(s.totals.d31_60).toBe(2000);
+    expect(s.totals.d61_90).toBe(500);
+    expect(s.totals.d90plus).toBe(4500);
+  });
+
+  it('totals a filtered subset, not the report it came from', () => {
+    const all = [
+      row(3000, { current: 3000, d31_60: 0, d61_90: 0, d90plus: 0 }),
+      row(5000, { current: 0, d31_60: 0, d61_90: 0, d90plus: 5000 }),
+    ];
+    const onlyOld = all.filter(r => r.buckets.d90plus > 0);
+    expect(summariseAging(onlyOld).grandTotal).toBe(5000);
+    expect(summariseAging(onlyOld).customerCount).toBe(1);
+  });
+
+  it('survives a row with no buckets rather than producing NaN', () => {
+    const s = summariseAging([{ totalOutstanding: 100 }]);
+    expect(s.grandTotal).toBe(100);
+    expect(Number.isNaN(s.totals.current)).toBe(false);
+  });
+
+  it('agrees with buildAgingReport over the same rows', () => {
+    const r = buildAgingReport({
+      customers: [CUST, { id: 2, name: 'Ghousia Farms', openingBalance: 0 }],
+      invoices: [billed('INV-1', '2026-08-28', 1000), { ...billed('INV-2', '2026-03-01', 7000), customerId: 2 }],
+      payments: [],
+      asOf: ASOF,
+    });
+    const s = summariseAging(r.rows);
+    expect(s.grandTotal).toBe(r.grandTotal);
+    expect(s.totals).toEqual(r.totals);
   });
 });

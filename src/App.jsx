@@ -20,7 +20,7 @@ import { invoiceTotal } from './services/accounting/invoiceTotals';
 import { buildCustomerLedger, allocateCredits, statusFromSettled } from './services/accounting/ledger';
 import { profitImpactOfCostChange, defaultEffectiveDate, firstSaleDate } from './services/accounting/costPriceChange';
 import { computePnL } from './services/analytics/profitAndLoss';
-import { buildAgingReport, AGING_BUCKETS } from './services/analytics/receivables';
+import { buildAgingReport, summariseAging, AGING_BUCKETS } from './services/analytics/receivables';
 import SearchableSelect from './components/SearchableSelect';
 
 const AppContext = createContext(null);
@@ -2592,19 +2592,79 @@ return (
 // report that disagrees with the ledger is worse than none.
 const ReceivablesView = () => {
 const { customers, invoices, payments, setSelectedLedgerId, setShowLedgerModal,
-        setSelectedCustomerForPayment, setShowPaymentModal, setEditingPayment, isAdmin } = useContext(AppContext);
+        setSelectedCustomerForPayment, setShowPaymentModal, setEditingPayment, isAdmin,
+        setPrintConfig, showToast } = useContext(AppContext);
 const [bucket, setBucket] = useState('all');
 const [search, setSearch] = useState('');
 
+const asOf = getLocalDateStr();
 const report = useMemo(
-  () => buildAgingReport({ customers, invoices, payments, asOf: getLocalDateStr() }),
-  [customers, invoices, payments]);
+  () => buildAgingReport({ customers, invoices, payments, asOf }),
+  [customers, invoices, payments, asOf]);
 
 const rows = report.rows
   .filter(r => bucket === 'all' || r.buckets[bucket] > 0)
   .filter(r => !search || r.name.toLowerCase().includes(search.toLowerCase()) || (r.phone || '').includes(search));
 
 const money = (n) => 'Rs. ' + Math.round(n).toLocaleString('en-US');
+
+// ── Export ────────────────────────────────────────────────────────────────
+// Everything below exports what is ON SCREEN — the bucket chip and the search box both
+// hide rows, and a sheet that foots to the unfiltered report would contradict the screen
+// it was printed from. Totals are recomputed over the filtered rows for the same reason.
+const shown = summariseAging(rows);
+const scopeLabel = [
+  bucket === 'all' ? 'All buckets' : AGING_BUCKETS.find(b => b.key === bucket)?.label,
+  search && `Search: "${search}"`,
+].filter(Boolean).join(' | ');
+
+const csvRows = () => rows.map(r => {
+  const row = { 'Customer': r.name, 'Phone': r.phone || '', 'Oldest (Days)': r.oldestAgeDays };
+  AGING_BUCKETS.forEach(b => { row[`${b.label} (Rs)`] = Math.round(r.buckets[b.key] || 0); });
+  row['Total Due (Rs)'] = Math.round(r.totalOutstanding);
+  return row;
+});
+
+const exportCsv = () => {
+  if (rows.length === 0) return showToast('Nothing to export', 'error');
+  const totals = {};
+  AGING_BUCKETS.forEach(b => { totals[`${b.label} (Rs)`] = Math.round(shown.totals[b.key]); });
+  totals['Total Due (Rs)'] = Math.round(shown.grandTotal);
+  exportToCSV(csvRows(), `Receivables_Aging_${asOf.replace(/-/g, '')}.csv`, {
+    title: `${APP_NAME} — Receivables Aging`,
+    subtitle: `As at ${formatDateDisp(asOf)} | ${scopeLabel} | Generated: ${asOf}`,
+    totals,
+  });
+};
+
+// One config drives print, PDF, image and WhatsApp text — PrintView already owns all four,
+// plus the A4 / A5 / thermal switcher. A4 opens first because the table is seven columns.
+const openPrintView = () => {
+  if (rows.length === 0) return showToast('Nothing to export', 'error');
+  setPrintConfig({
+    docType: 'report',
+    format: 'a4',
+    data: {
+      title: 'Receivables Aging',
+      dateFilter: `As at ${formatDateDisp(asOf)}`,
+      view: 'Aging',
+      generatedOn: asOf,
+      appliedFilters: { scope: scopeLabel },
+      aging: {
+        asOf,
+        buckets: AGING_BUCKETS.map(b => ({ key: b.key, label: b.label })),
+        rows: rows.map(r => ({
+          name: r.name, phone: r.phone || '',
+          oldestAgeDays: r.oldestAgeDays, buckets: r.buckets,
+          totalOutstanding: r.totalOutstanding,
+        })),
+        totals: shown.totals,
+        grandTotal: shown.grandTotal,
+        customerCount: shown.customerCount,
+      },
+    },
+  });
+};
 // Anything past 60 days is the reason to open this screen.
 const ageTone = (d) => d > 90 ? 'text-rose-700 bg-rose-50 border-rose-200'
   : d > 60 ? 'text-amber-700 bg-amber-50 border-amber-200'
@@ -2612,10 +2672,25 @@ const ageTone = (d) => d > 90 ? 'text-rose-700 bg-rose-50 border-rose-200'
 
 return (
 <div className="flex-1 overflow-y-auto p-4 pb-24 space-y-4">
-  <div>
-    <h3 className="text-xs font-bold text-slate-800 uppercase tracking-widest">Receivables Aging</h3>
-    <p className="text-[11px] text-slate-500 mt-0.5">
-      {report.customerCount} customer{report.customerCount !== 1 ? 's' : ''} owing {money(report.grandTotal)} · as at {formatDateDisp(getLocalDateStr())}
+  <div className="flex items-start justify-between gap-3 flex-wrap">
+    <div className="min-w-0">
+      <h3 className="text-xs font-bold text-slate-800 uppercase tracking-widest">Receivables Aging</h3>
+      <p className="text-[11px] text-slate-500 mt-0.5">
+        {report.customerCount} customer{report.customerCount !== 1 ? 's' : ''} owing {money(report.grandTotal)} · as at {formatDateDisp(asOf)}
+      </p>
+    </div>
+    <div className="flex items-center gap-1.5 shrink-0">
+      <button onClick={exportCsv} title="Download as CSV (Excel)"
+        className="flex items-center gap-1.5 px-2.5 py-1.5 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg font-bold text-[11px] hover:bg-emerald-100 transition-colors">
+        <FileSpreadsheet size={13}/> CSV
+      </button>
+      <button onClick={openPrintView} title="Print, PDF, image or WhatsApp text — A4, A5 or thermal"
+        className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-800 text-white rounded-lg font-bold text-[11px] hover:bg-slate-900 transition-colors">
+        <FileDown size={13}/> PDF / Print
+      </button>
+    </div>
+    <p className="w-full text-[10px] text-slate-400 -mt-1">
+      Exports follow the bucket and search below. PDF / Print opens A4, A5 or thermal, and can also share as an image or WhatsApp text.
     </p>
   </div>
 
