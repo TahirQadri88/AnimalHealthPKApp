@@ -20,6 +20,7 @@ import { invoiceTotal } from './services/accounting/invoiceTotals';
 import { buildCustomerLedger, allocateCredits, statusFromSettled } from './services/accounting/ledger';
 import { profitImpactOfCostChange, defaultEffectiveDate, firstSaleDate } from './services/accounting/costPriceChange';
 import { computePnL } from './services/analytics/profitAndLoss';
+import { buildAgingReport, AGING_BUCKETS } from './services/analytics/receivables';
 import SearchableSelect from './components/SearchableSelect';
 
 const AppContext = createContext(null);
@@ -2584,6 +2585,105 @@ return (
 );
 };
 
+// Receivables aging — who owes, and for how long.
+//
+// Additive: reads the same debts and credits the ledger does and changes no stored value.
+// Totals are asserted against the ledger in receivables.test.js, because a collections
+// report that disagrees with the ledger is worse than none.
+const ReceivablesView = () => {
+const { customers, invoices, payments, setSelectedLedgerId, setShowLedgerModal,
+        setSelectedCustomerForPayment, setShowPaymentModal, setEditingPayment, isAdmin } = useContext(AppContext);
+const [bucket, setBucket] = useState('all');
+const [search, setSearch] = useState('');
+
+const report = useMemo(
+  () => buildAgingReport({ customers, invoices, payments, asOf: getLocalDateStr() }),
+  [customers, invoices, payments]);
+
+const rows = report.rows
+  .filter(r => bucket === 'all' || r.buckets[bucket] > 0)
+  .filter(r => !search || r.name.toLowerCase().includes(search.toLowerCase()) || (r.phone || '').includes(search));
+
+const money = (n) => 'Rs. ' + Math.round(n).toLocaleString('en-US');
+// Anything past 60 days is the reason to open this screen.
+const ageTone = (d) => d > 90 ? 'text-rose-700 bg-rose-50 border-rose-200'
+  : d > 60 ? 'text-amber-700 bg-amber-50 border-amber-200'
+  : 'text-slate-600 bg-slate-50 border-slate-200';
+
+return (
+<div className="flex-1 overflow-y-auto p-4 pb-24 space-y-4">
+  <div>
+    <h3 className="text-xs font-bold text-slate-800 uppercase tracking-widest">Receivables Aging</h3>
+    <p className="text-[11px] text-slate-500 mt-0.5">
+      {report.customerCount} customer{report.customerCount !== 1 ? 's' : ''} owing {money(report.grandTotal)} · as at {formatDateDisp(getLocalDateStr())}
+    </p>
+  </div>
+
+  <div className="grid grid-cols-2 lg:grid-cols-5 gap-2">
+    {[{ key: 'all', label: 'All', amount: report.grandTotal }, ...AGING_BUCKETS.map(b => ({ key: b.key, label: b.label, amount: report.totals[b.key] }))]
+      .map(b => (
+      <button key={b.key} onClick={() => setBucket(b.key)}
+        className={`text-left p-3 rounded-xl border transition-colors ${bucket === b.key ? 'bg-slate-800 text-white border-slate-800' : 'bg-white border-slate-200 hover:border-slate-300'}`}>
+        <p className={`text-[9px] font-bold uppercase tracking-wider ${bucket === b.key ? 'text-slate-300' : 'text-slate-400'}`}>{b.label}</p>
+        <p className={`text-sm font-black mt-0.5 ${bucket === b.key ? 'text-white' : b.key === 'd90plus' && b.amount > 0 ? 'text-rose-600' : 'text-slate-800'}`}>{money(b.amount)}</p>
+      </button>
+    ))}
+  </div>
+
+  <div className="relative">
+    <Search className="absolute left-3 top-2.5 text-slate-400" size={14}/>
+    <input placeholder="Search customer or phone..." value={search} onChange={e => setSearch(e.target.value)}
+      className="w-full pl-8 pr-3 py-2 bg-white border border-slate-200 rounded-xl font-semibold outline-none text-sm focus:border-indigo-400" />
+  </div>
+
+  {rows.length === 0 && (
+    <p className="text-center py-10 text-sm text-slate-400 font-medium">
+      {report.customerCount === 0 ? 'Nothing outstanding. Everyone is settled.' : 'No customers in this bucket.'}
+    </p>
+  )}
+
+  <div className="space-y-2">
+    {rows.map(r => (
+      <div key={r.customerId} className="bg-white border border-slate-200 rounded-2xl p-3 shadow-sm">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="font-bold text-slate-800 text-sm truncate">{r.name}</p>
+            <div className="flex items-center gap-2 mt-1 flex-wrap">
+              <span className={`text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded border ${ageTone(r.oldestAgeDays)}`}>
+                oldest {r.oldestAgeDays}d
+              </span>
+              {r.phone && <span className="text-[10px] text-slate-500">{r.phone}</span>}
+            </div>
+          </div>
+          <p className="text-base font-black text-slate-900 shrink-0">{money(r.totalOutstanding)}</p>
+        </div>
+
+        <div className="flex gap-1 mt-2 flex-wrap">
+          {AGING_BUCKETS.filter(b => r.buckets[b.key] > 0).map(b => (
+            <span key={b.key} className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${b.key === 'd90plus' ? 'bg-rose-50 text-rose-700 border-rose-200' : b.key === 'd61_90' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-slate-50 text-slate-600 border-slate-200'}`}>
+              {b.label}: {money(r.buckets[b.key])}
+            </span>
+          ))}
+        </div>
+
+        <div className="flex gap-2 mt-3">
+          <button onClick={() => { setSelectedLedgerId(r.customerId); setShowLedgerModal(true); }}
+            className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px] py-2 rounded-lg transition-colors">Ledger</button>
+          {isAdmin && (
+            <button onClick={() => { setEditingPayment(null); setSelectedCustomerForPayment(r.customerId); setShowPaymentModal(true); }}
+              className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] py-2 rounded-lg transition-colors">Receive</button>
+          )}
+          {r.phone && (
+            <a href={`tel:${r.phone}`} className="px-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-[11px] py-2 rounded-lg flex items-center transition-colors">Call</a>
+          )}
+        </div>
+      </div>
+    ))}
+  </div>
+</div>
+);
+};
+
 const RidersAdminView = () => {
 const { riders, vehicleTypes, saveToFirebase, deleteFromFirebase, showToast, showConfirm } = useContext(AppContext);
 const riderVehicleTypes = vehicleTypes.filter(vt => vt.requiresRider).map(vt => vt.name);
@@ -2672,10 +2772,10 @@ return (
 <h2 className="text-2xl font-extrabold text-slate-800 tracking-tight mb-4">Admin Hub</h2>
 <div className="bg-slate-200 p-1 rounded-xl">
 <ScrollableTabBar bgClass="bg-slate-200">
-{[['analytics','bg-white text-indigo-700',<BarChart3 size={14}/>,'Analytics'],['expenses','bg-white text-rose-600',<Wallet size={14}/>,'Expenses'],['masters','bg-white text-teal-600',<Archive size={14}/>,'Masters'],['bulk','bg-white text-emerald-600',<Upload size={14}/>,'Bulk Ops'],['segments','bg-white text-purple-600',<Globe size={14}/>,'Segments'],['users','bg-white text-amber-600',<Users size={14}/>,'Users'],['settings','bg-white text-slate-700',<Settings size={14}/>,'Settings'],['riders','bg-white text-indigo-600',<Truck size={14}/>,'Riders'],['transportCos','bg-white text-amber-700',<Truck size={14}/>,'Transport Cos']].map(([v,activeClass,icon,label])=>(
+{[['analytics','bg-white text-indigo-700',<BarChart3 size={14}/>,'Analytics'],['expenses','bg-white text-rose-600',<Wallet size={14}/>,'Expenses'],['masters','bg-white text-teal-600',<Archive size={14}/>,'Masters'],['bulk','bg-white text-emerald-600',<Upload size={14}/>,'Bulk Ops'],['segments','bg-white text-purple-600',<Globe size={14}/>,'Segments'],['users','bg-white text-amber-600',<Users size={14}/>,'Users'],['settings','bg-white text-slate-700',<Settings size={14}/>,'Settings'],['riders','bg-white text-indigo-600',<Truck size={14}/>,'Riders'],['transportCos','bg-white text-amber-700',<Truck size={14}/>,'Transport Cos'],['receivables','bg-white text-rose-600',<Wallet size={14}/>,'Receivables']].map(([v,activeClass,icon,label])=>(
   <button key={v} data-admintab={v} tabIndex={adminView===v?0:-1}
     onClick={()=>setAdminView(v)}
-    onKeyDown={makeArrowNav(['analytics','expenses','masters','bulk','segments','users','settings','riders','transportCos'],adminView,setAdminView,'data-admintab')}
+    onKeyDown={makeArrowNav(['analytics','expenses','masters','bulk','segments','users','settings','riders','transportCos','receivables'],adminView,setAdminView,'data-admintab')}
     className={`py-2 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 whitespace-nowrap ${adminView===v?activeClass+' shadow-sm':'text-slate-500'}`}>{icon} {label}</button>
 ))}
 </ScrollableTabBar>
@@ -2691,6 +2791,7 @@ return (
 <div style={{display: adminView === 'settings' ? 'flex' : 'none', flexDirection: 'column', height: '100%'}}><AppSettingsView /></div>
 <div style={{display: adminView === 'riders' ? 'flex' : 'none', flexDirection: 'column', height: '100%'}}><RidersAdminView /></div>
 <div style={{display: adminView === 'transportCos' ? 'flex' : 'none', flexDirection: 'column', height: '100%'}}><TransportCompaniesManager /></div>
+<div style={{display: adminView === 'receivables' ? 'flex' : 'none', flexDirection: 'column', height: '100%'}}><ReceivablesView /></div>
 </div>
 </div>
 )
