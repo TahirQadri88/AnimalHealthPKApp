@@ -24,6 +24,10 @@ const bizAppName = biz.appName || APP_NAME;
 const bizTagline = biz.tagline || 'Wholesale Veterinary Pharmacy · Karachi';
 const showOnDocs = biz.showBusinessNameOnDocs !== false;
 const showOnReports = biz.showBusinessNameOnReports !== false;
+// Settings offers two toggles — "Show on Invoices & Documents" and "Show on Reports" — but
+// one renderer draws both, so the choice is made here. The reports flag used to be read
+// into a variable and never used, which left that toggle doing nothing at all.
+const showBizName = docType === 'report' ? showOnReports : showOnDocs;
 const isThermal = format === 'thermal';
 const isA5 = format === 'a5';
 // The receivables aging report is a report, but it is a name-and-amount list rather than an
@@ -981,7 +985,7 @@ return (
 
     {/* ── Header ── */}
     <div className="keep-together" style={{ textAlign: 'center', marginBottom: sz('14px','18px','22px'), borderRadius: isThermal ? '0' : sz('','6px 6px 0 0','8px 8px 0 0'), overflow: 'hidden', border: '2px solid #0f172a' }}>
-      {showOnDocs && (
+      {showBizName && (
         <div data-dk="1" style={{ background: '#0f172a', padding: sz('12px 10px','18px 20px','22px 24px') }}>
           <div style={{ fontSize: `${mastheadFontPx}px`, fontWeight: 900, letterSpacing: '1px', textTransform: 'uppercase', color: '#FFF200', lineHeight: 1.2 }}>
             {bizName}
@@ -1693,7 +1697,7 @@ return (
               ))}
             </div>
             <div style={{ marginTop: sz('4px','6px','8px'), textAlign: 'center', fontWeight: 800, color: '#1e293b', textTransform: 'uppercase', letterSpacing: '1px', fontSize: sz('6px','7px','7.5px'), borderTop: '1px dashed #cbd5e1', paddingTop: sz('4px','5px','6px') }}>
-              {showOnDocs ? `${bizName}${bizTagline ? ` · ${bizTagline}` : ''}` : ''}
+              {showBizName ? `${bizName}${bizTagline ? ` · ${bizTagline}` : ''}` : ''}
             </div>
           </div>
         </div>}
@@ -1835,7 +1839,7 @@ return (
       paddingTop: sz('10px','12px','14px'),
       borderTop: '1px dashed #e2e8f0',
     }}>
-      Software Generated{showOnDocs ? ` · ${bizName}` : ''} · {formatDateDisp(getLocalDateStr())}
+      Software Generated{showBizName ? ` · ${bizName}` : ''} · {formatDateDisp(getLocalDateStr())}
     </div>
   </div>
 

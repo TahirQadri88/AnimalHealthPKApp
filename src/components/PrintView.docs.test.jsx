@@ -141,6 +141,43 @@ describe('masthead name is sized to the box', () => {
   });
 });
 
+// Settings has two independent toggles and one renderer. "Show on Reports" governed
+// nothing at all until it was wired up — the flag was read and never used.
+describe('the two business-name toggles govern what their labels say', () => {
+  const withSettings = (docType, appSettings, data) => renderToStaticMarkup(
+    <PrintView printConfig={{ docType, format: 'a4', data: data || DATA[docType] }}
+      setPrintConfig={() => {}} products={[]} customers={[]}
+      getCustomerLedger={() => LEDGER} getCustomerBalance={() => 105600}
+      showToast={() => {}} appSettings={appSettings} />
+  );
+  const REPORT = { title: 'Receivables Aging', dateFilter: 'As at 30-Aug-26', view: 'Aging', generatedOn: '2026-08-30',
+    aging: { buckets: [{ key: 'current', label: 'Current (0-30)' }], rows: [], totals: { current: 0 }, grandTotal: 0, customerCount: 0 } };
+
+  it('both on by default — an unset setting must not blank the masthead', () => {
+    expect(withSettings('invoice', {})).toContain('Khyber Traders');
+    expect(withSettings('report', {}, REPORT)).toContain('Khyber Traders');
+  });
+
+  it('"Show on Reports" off hides the name on a report and nowhere else', () => {
+    const off = { showBusinessNameOnReports: false };
+    expect(withSettings('report', off, REPORT)).not.toContain('Khyber Traders');
+    expect(withSettings('invoice', off)).toContain('Khyber Traders');
+  });
+
+  it('"Show on Invoices & Documents" off hides the name on documents and not on reports', () => {
+    const off = { showBusinessNameOnDocs: false };
+    expect(withSettings('invoice', off)).not.toContain('Khyber Traders');
+    expect(withSettings('dispatch', off)).not.toContain('Khyber Traders');
+    expect(withSettings('report', off, REPORT)).toContain('Khyber Traders');
+  });
+
+  it('a custom name follows the same toggle', () => {
+    expect(withSettings('invoice', { businessName: 'Peshawar Vet Supply' })).toContain('Peshawar Vet Supply');
+    expect(withSettings('invoice', { businessName: 'Peshawar Vet Supply', showBusinessNameOnDocs: false }))
+      .not.toContain('Peshawar Vet Supply');
+  });
+});
+
 describe('no document leaks a missing value onto paper', () => {
   ['invoice', 'creditnote', 'dispatch'].forEach(docType => {
     ['thermal', 'a5', 'a4'].forEach(format => {
