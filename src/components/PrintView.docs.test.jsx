@@ -101,6 +101,46 @@ describe('dispatch note can be signed for', () => {
   });
 });
 
+// The masthead box is full-bleed, so the name has to be sized to the box. Measured fill of
+// the business name against the box's inner width was 69% on thermal, 46% on A5 and 38% on
+// A4 — the box was never too wide, the name was too small.
+describe('masthead name is sized to the box', () => {
+  const titlePx = (html) => {
+    const m = html.match(/<div style="font-size:([\d.]+)px;font-weight:900;letter-spacing:1px/);
+    return m ? parseFloat(m[1]) : null;
+  };
+  const render2 = (format, businessName) => renderToStaticMarkup(
+    <PrintView printConfig={{ docType: 'invoice', format, data: DATA.invoice }}
+      setPrintConfig={() => {}} products={[]} customers={[]}
+      getCustomerLedger={() => LEDGER} getCustomerBalance={() => 105600}
+      showToast={() => {}} appSettings={businessName ? { businessName } : {}} />
+  );
+
+  it('sets the default name large enough to fill A4 and A5', () => {
+    expect(titlePx(render2('a5'))).toBe(30);
+    expect(titlePx(render2('a4'))).toBe(42);
+  });
+
+  it('leaves thermal at the size that was settled by printing', () => {
+    expect(titlePx(render2('thermal'))).toBe(16);
+    expect(titlePx(render2('thermal', 'Khyber Traders & Sons Veterinary Distributors'))).toBe(16);
+  });
+
+  // The box has to hold whatever is in settings, and today's size is the floor — this may
+  // only ever enlarge the name, never shrink it below what already ships.
+  it('steps a long name back down rather than blowing the box apart', () => {
+    const long = 'Khyber Traders & Sons Veterinary Distributors';
+    expect(titlePx(render2('a5', long))).toBe(20);
+    expect(titlePx(render2('a4', long))).toBe(24);
+  });
+
+  it('never goes below the size it had before', () => {
+    const huge = 'X'.repeat(200);
+    expect(titlePx(render2('a5', huge))).toBeGreaterThanOrEqual(20);
+    expect(titlePx(render2('a4', huge))).toBeGreaterThanOrEqual(24);
+  });
+});
+
 describe('no document leaks a missing value onto paper', () => {
   ['invoice', 'creditnote', 'dispatch'].forEach(docType => {
     ['thermal', 'a5', 'a4'].forEach(format => {

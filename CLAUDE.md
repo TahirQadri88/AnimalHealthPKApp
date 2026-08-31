@@ -123,6 +123,27 @@ element, so changing the preview would silently change every PDF too.
 
 ---
 
+## Sizing type to a box: measure the fill, don't eyeball the box
+
+"The masthead box is too wide" turned out to be the opposite problem. Measuring the
+business name's rendered width against the box's inner width gave 69% on thermal, 46% on
+A5, 38% on A4 — the box is the document's width, which is right for a masthead; the name
+was simply too small on paper. Thermal, sized by printing rather than by eye, was the
+reference that already looked correct.
+
+Two things worth keeping from that:
+
+- **Measure the ratio, not the element.** A range over the text node
+  (`range.selectNodeContents(el).getBoundingClientRect().width`) against the parent's
+  content box answers "is this too wide or too small" in one number. A block-level heading
+  reports the full container width, so measuring the element itself tells you nothing.
+- **Type sized to a box must be derived from the content.** `mastheadFontPx` scales with
+  the business name's length and floors at the previous fixed size, so a short name fills
+  the box and a long one degrades to exactly what shipped before. A hard-coded 42px would
+  have looked right for "Khyber Traders" and wrapped to three lines for anyone else.
+
+---
+
 ## Debugging print output: measure, don't guess
 
 The single biggest time sink here was reasoning about geometry from photographs and

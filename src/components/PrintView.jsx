@@ -827,6 +827,36 @@ const showRateCol   = docType === 'invoice' || docType === 'estimate' || (docTyp
 const showAmountCol = !isThermal && (docType === 'invoice' || docType === 'estimate' || docType === 'creditnote');
 const itemColSpan   = 2 + (showRateCol ? 1 : 0) + (showAmountCol ? 1 : 0);
 
+// Masthead sizing.
+//
+// The navy box is the full width of the document, which is correct for a masthead — the
+// complaint that it looked "too wide" was really that the name inside it was too small.
+// Measured fill of the business name against the box's inner width:
+//
+//     thermal  69%   <- the one that looks right
+//     A5       46%
+//     A4       38%
+//
+// So this raises the paper sizes to roughly the thermal ratio rather than narrowing the
+// box. Thermal returns its existing 16px unchanged: that layout was settled by printing,
+// not by measuring on screen, and nothing here may reach it.
+//
+// The size is derived from the name's length rather than fixed, because the box has to
+// hold whatever business name is in settings. `max` is tuned so a 14-character name (the
+// default, "Khyber Traders") fills about two thirds; a longer name steps down. The floor
+// is today's size, so this can only ever enlarge the name, never shrink it.
+const mastheadFontPx = (() => {
+  if (isThermal) return 16;
+  const min = isA5 ? 20 : 24;
+  const max = isA5 ? 30 : 42;
+  const chars = Math.max((bizName || '').length, 1);
+  return Math.round(Math.max(min, Math.min(max, (max * 14) / chars)));
+})();
+// The tagline follows the name up, but at a capped rate — it is a subtitle, and matching
+// the heading's growth would have it competing for the same attention.
+const mastheadScale = mastheadFontPx / sz(16, 20, 24);
+const taglineFontPx = +(sz(7, 8, 9) * Math.min(mastheadScale, 1.35)).toFixed(1);
+
 // Ledger totals for credit note
 const getCreditNoteLedger = () => {
   if (docType !== 'creditnote' || !data?.customerId) return { prevBalance: 0, newBalance: 0 };
@@ -953,10 +983,10 @@ return (
     <div className="keep-together" style={{ textAlign: 'center', marginBottom: sz('14px','18px','22px'), borderRadius: isThermal ? '0' : sz('','6px 6px 0 0','8px 8px 0 0'), overflow: 'hidden', border: '2px solid #0f172a' }}>
       {showOnDocs && (
         <div data-dk="1" style={{ background: '#0f172a', padding: sz('12px 10px','18px 20px','22px 24px') }}>
-          <div style={{ fontSize: sz('16px','20px','24px'), fontWeight: 900, letterSpacing: '1px', textTransform: 'uppercase', color: '#FFF200', lineHeight: 1.2 }}>
+          <div style={{ fontSize: `${mastheadFontPx}px`, fontWeight: 900, letterSpacing: '1px', textTransform: 'uppercase', color: '#FFF200', lineHeight: 1.2 }}>
             {bizName}
           </div>
-          {bizTagline && <div style={{ fontSize: sz('7px','8px','9px'), textTransform: 'uppercase', letterSpacing: '2px', fontWeight: 600, color: '#94a3b8', marginTop: '4px' }}>
+          {bizTagline && <div style={{ fontSize: `${taglineFontPx}px`, textTransform: 'uppercase', letterSpacing: '2px', fontWeight: 600, color: '#94a3b8', marginTop: '4px' }}>
             {bizTagline}
           </div>}
         </div>
