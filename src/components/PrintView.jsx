@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { FileDown, Printer, Share2, X, MessageCircle, Image } from 'lucide-react';
 import { formatDateDisp, getLocalDateStr, APP_NAME } from '../helpers';
-import { applyYellowBlocks } from './printTheme';
+import { applyYellowBlocks, isBlockBackground } from './printTheme';
 
 // Format: 'thermal' | 'a5' | 'a4'
 //
@@ -362,6 +362,22 @@ const buildHtmlDoc = (screenHide = false) => {
         // Clear light inline backgrounds; print CSS rule will force white
         el.style.background = '';
         el.style.backgroundColor = '';
+      }
+    });
+  } else if (screenHide) {
+    // A4/A5 print: tag the same dark slabs so the monochrome pass below can restore them
+    // as black bars. Only six elements carry data-dk in the JSX, so without this every
+    // table header — invoice items, ledger, report, aging — printed as plain text with no
+    // bar, while the PDF (which clones the live document) kept it. Same document, two
+    // different looks.
+    //
+    // Tagging ONLY. The thermal branch above is left exactly as it was: it additionally
+    // pins backgrounds with !important because the receipt stylesheet blanket-whites
+    // everything, and it keeps its own local colour maths so that this change cannot
+    // reach the 68mm path at all.
+    clone.querySelectorAll('*').forEach(el => {
+      if (isBlockBackground(el.style.background || el.style.backgroundColor)) {
+        el.setAttribute('data-dk', '1');
       }
     });
   }
@@ -799,6 +815,17 @@ const docLabel = {
 // Sizing helpers
 const sz = (thermal, a5, a4) => isThermal ? thermal : isA5 ? a5 : a4;
 const pad = sz('p-3', 'p-5', 'p-7');
+
+// Rate / Amount columns on the items table.
+//
+// Credit notes get them so the customer can check the arithmetic on a document that
+// reduces what they owe — with four returned lines and only a grand total, they cannot.
+// NOT on thermal: those column widths were measured against the 68mm head, and a fourth
+// column is exactly the kind of change that pushed right-aligned figures past the last dot.
+// The thermal credit note stays Description + Qty, unchanged.
+const showRateCol   = docType === 'invoice' || docType === 'estimate' || (docType === 'creditnote' && !isThermal);
+const showAmountCol = !isThermal && (docType === 'invoice' || docType === 'estimate' || docType === 'creditnote');
+const itemColSpan   = 2 + (showRateCol ? 1 : 0) + (showAmountCol ? 1 : 0);
 
 // Ledger totals for credit note
 const getCreditNoteLedger = () => {
@@ -1340,12 +1367,12 @@ return (
               <th style={{ padding: sz('6px 2px','8px 4px','9px 6px'), textAlign: 'center', fontWeight: 800, color: '#FFF200', textTransform: 'uppercase', fontSize: sz('7.5px','8.5px','9px'), letterSpacing: '0.5px', whiteSpace: 'nowrap', width: isThermal ? (docType === 'dispatch' ? '35%' : '10%') : (docType === 'dispatch' ? '35%' : '9%') }}>
                 {docType === 'dispatch' ? 'Qty / Pack' : 'Qty'}
               </th>
-              {(docType === 'invoice' || docType === 'estimate') && (
+              {showRateCol && (
                 <th style={{ padding: sz('6px 2px','8px 4px','9px 6px'), textAlign: 'right', fontWeight: 800, color: '#FFF200', textTransform: 'uppercase', fontSize: sz('7.5px','8.5px','9px'), letterSpacing: '0.5px', whiteSpace: 'nowrap', width: isThermal ? '42%' : '17%' }}>
                   Rate
                 </th>
               )}
-              {(docType === 'invoice' || docType === 'estimate') && !isThermal && (
+              {showAmountCol && (
                 <th style={{ padding: sz('','8px 4px 8px 0','9px 0 9px 4px'), textAlign: 'right', fontWeight: 800, color: '#FFF200', textTransform: 'uppercase', fontSize: sz('','8.5px','9px'), letterSpacing: '0.5px', whiteSpace: 'nowrap', width: '24%' }}>
                   Amount
                 </th>
@@ -1390,7 +1417,7 @@ return (
                     );
                   })() : (item?.quantity || 0)}
                 </td>
-                {(docType === 'invoice' || docType === 'estimate') && (
+                {showRateCol && (
                   <td style={{ padding: sz('6px 2px','8px 4px','9px 6px'), textAlign: 'right', color: '#1e293b', whiteSpace: 'nowrap' }}>
                     {item?.isBonus ? (
                       <span style={{ color: '#059669', fontWeight: 800, fontSize: sz('7px','8px','9px'), textTransform: 'uppercase' }}>Free</span>
@@ -1411,7 +1438,7 @@ return (
                     )}
                   </td>
                 )}
-                {(docType === 'invoice' || docType === 'estimate') && !isThermal && (
+                {showAmountCol && (
                   <td style={{ padding: sz('','8px 4px 8px 0','9px 0 9px 4px'), textAlign: 'right', fontWeight: 800, color: '#1e293b', whiteSpace: 'nowrap' }}>
                     {item?.isBonus
                       ? <span style={{ color: '#059669' }}>Rs. 0</span>
@@ -1422,7 +1449,7 @@ return (
             ))}
             {safeItems.length === 0 && (
               <tr>
-                <td colSpan={(docType === 'invoice' || docType === 'estimate') ? (isThermal ? 3 : 4) : 2} style={{ padding: '16px', textAlign: 'center', color: '#1e293b' }}>
+                <td colSpan={itemColSpan} style={{ padding: '16px', textAlign: 'center', color: '#1e293b' }}>
                   No items
                 </td>
               </tr>
@@ -1473,6 +1500,32 @@ return (
             </tfoot>
           )}
         </table>
+
+        {/* Proof of handover.
+            The dispatch note is the one document that physically changes hands, and it was
+            the only one with nowhere to record that it did. A4/A5 only — the thermal slip's
+            geometry is measured against the 68mm head and is left exactly as it is. */}
+        {docType === 'dispatch' && !isThermal && (
+          <div className="keep-together" style={{ display: 'flex', gap: sz('','10px','14px'), marginBottom: sz('','16px','20px') }}>
+            {[
+              { label: 'Delivered By', filled: [data.driverName, data.driverPhone].filter(Boolean).join(' · '), hint: 'Rider / Driver' },
+              { label: 'Received By', filled: '', hint: 'Name & CNIC' },
+              { label: 'Signature & Date', filled: '', hint: '' },
+            ].map((box, i) => (
+              <div key={i} style={{ flex: '1 1 0', minWidth: 0, border: '1px solid #cbd5e1', borderRadius: sz('','7px','8px'), padding: sz('','8px 10px','10px 12px') }}>
+                <div style={{ fontSize: sz('','7px','7.5px'), fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px', color: '#1d4ed8' }}>
+                  {box.label}
+                </div>
+                {/* Pre-filled where the document already knows the answer; blank to sign otherwise. */}
+                <div style={{ fontSize: sz('','9px','10px'), fontWeight: 700, color: '#1e293b', marginTop: '4px', minHeight: sz('','13px','15px'), wordBreak: 'break-word' }}>
+                  {box.filled || '\u00A0'}
+                </div>
+                <div style={{ borderBottom: '1px dashed #94a3b8', marginTop: sz('','12px','16px') }} />
+                {box.hint && <div style={{ fontSize: sz('','6.5px','7px'), color: '#64748b', marginTop: '3px' }}>{box.hint}</div>}
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Estimate Totals */}
         {docType === 'estimate' && data && (() => {

@@ -99,7 +99,13 @@ destination is different:
    yellow text, on white. Source of truth for the other two.
 2. **Print / HTML share** — `buildHtmlDoc(screenHide=true)` bakes monochrome onto the
    clone's inline styles, then restores `data-dk="1"` blocks to black-with-white-text.
-   White paper, black toner: colour here costs money and prints muddy.
+   White paper, black toner: colour here costs money and prints muddy. Only six elements
+   carry `data-dk` in the JSX, so `buildHtmlDoc` tags the rest by luminance first —
+   originally for thermal only, which is why every table header (invoice items, ledger,
+   report, aging) once printed as bare text with no bar on A4/A5 while the PDF kept it.
+   The two tagging passes are deliberately **not** merged: the thermal one also pins
+   backgrounds with `!important` against the receipt stylesheet and keeps its own local
+   colour maths, so a change to the paper path cannot reach the 68mm path.
 3. **Image share** — `applyYellowBlocks()` in `printTheme.js` flips the dark blocks to
    yellow fill with black text. A shared image is read at thumbnail size in a chat, where
    navy slabs read as heavy dark bands and the yellow is the half of the brand that carries.
@@ -150,6 +156,13 @@ render — every user hit a blank error screen.
   only reaches the login screen — it passed the crash above without complaint, because that
   screen sits behind a login. Do not mistake it for a regression net. Set `CHROMIUM_PATH`
   to pin a browser binary.
+- **`src/components/PrintView.docs.test.jsx` locks the thermal layouts.** Anything added to
+  a document for paper must stay off the 68mm roll — an extra column is exactly what pushed
+  right-aligned figures past the last dot before. It asserts the column count of every
+  items table at every size, so a change that reaches thermal fails the run rather than the
+  printer. When changing a document, also render it at thermal before and after and diff
+  the markup: `renderToStaticMarkup` at `format:'thermal'` on HEAD vs the working tree is a
+  byte-exact answer, which beats looking at a photo.
 - **Print layouts can be tested without a browser.** `src/components/PrintView.aging.test.jsx`
   renders the real `PrintView` through `react-dom/server` at all three paper sizes and
   asserts the figures reach the page — including that the markup contains no `undefined`
