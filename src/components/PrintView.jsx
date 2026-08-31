@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { FileDown, Printer, Share2, X, MessageCircle, Image } from 'lucide-react';
 import { formatDateDisp, getLocalDateStr, APP_NAME } from '../helpers';
-import { applyDarkTheme, DARK } from './printTheme';
+import { applyYellowBlocks } from './printTheme';
 
 // Format: 'thermal' | 'a5' | 'a4'
 //
@@ -33,14 +33,15 @@ const aging = isAging ? (data.aging || {}) : null;
 const agingBuckets = (aging && aging.buckets) || [];
 const printRef = useRef(null);
 const [showPrevBal, setShowPrevBal] = useState(true);
-// Shared images are read on a phone in a dark chat; printed paper is white with black
-// toner. The two cannot share a palette, so the image gets its own. Remembered per device
+// A shared image is read at thumbnail size in a chat, where the navy slabs read as heavy
+// dark bands. Flipping them to yellow-with-black-text puts the louder half of the brand on
+// the outside. Image only — paper still wants ink-cheap dark blocks. Remembered per device
 // because whoever sends invoices on WhatsApp sends all of them the same way.
-const [imageDark, setImageDark] = useState(() => {
-  try { return localStorage.getItem('printImageDark') !== '0'; } catch { return true; }
+const [imageYellow, setImageYellow] = useState(() => {
+  try { return localStorage.getItem('printImageYellowBlocks') !== '0'; } catch { return true; }
 });
-const toggleImageDark = () => setImageDark(v => {
-  try { localStorage.setItem('printImageDark', v ? '0' : '1'); } catch { /* private mode */ }
+const toggleImageYellow = () => setImageYellow(v => {
+  try { localStorage.setItem('printImageYellowBlocks', v ? '0' : '1'); } catch { /* private mode */ }
   return !v;
 });
 // Keyboard: Escape closes the print view
@@ -691,16 +692,17 @@ const handleImageShare = async () => {
   });
   document.body.appendChild(clone);
   await new Promise(r => setTimeout(r, 400));
-  // Repaint AFTER the clone is in the document — applyDarkTheme reads computed styles, and
-  // a detached node has none. The live document is untouched, so print and PDF stay light.
-  if (imageDark) applyDarkTheme(clone);
+  // Repaint AFTER the clone is in the document — applyYellowBlocks reads computed styles,
+  // and a detached node has none. The live document is untouched, so print and PDF keep the
+  // dark blocks.
+  if (imageYellow) applyYellowBlocks(clone);
   const captureH = clone.scrollHeight > 0 ? clone.scrollHeight : originalH;
 
   try {
     // Thermal: single tall JPEG — continuous roll, no page slicing needed
     if (isThermal) {
       const dataUrl = await withTimeout(window.htmlToImage.toJpeg(clone, {
-        quality: 0.95, pixelRatio: 3, backgroundColor: imageDark ? DARK.page : '#ffffff', height: captureH,
+        quality: 0.95, pixelRatio: 3, backgroundColor: '#ffffff', height: captureH,
       }), 30000);
       if (document.body.contains(clone)) document.body.removeChild(clone);
       shareBlob(await (await fetch(dataUrl)).blob());
@@ -711,7 +713,7 @@ const handleImageShare = async () => {
     const GAP_PX = 20;
 
     const srcCanvas = await withTimeout(window.htmlToImage.toCanvas(clone, {
-      pixelRatio: PIXEL_RATIO, backgroundColor: imageDark ? DARK.page : '#ffffff', height: captureH,
+      pixelRatio: PIXEL_RATIO, backgroundColor: '#ffffff', height: captureH,
     }), 30000);
     if (document.body.contains(clone)) document.body.removeChild(clone);
 
@@ -731,13 +733,13 @@ const handleImageShare = async () => {
     const out = document.createElement('canvas');
     out.width = srcCanvas.width; out.height = compositeH;
     const ctx = out.getContext('2d');
-    ctx.fillStyle = imageDark ? '#2a2a2a' : '#e2e8f0';
+    ctx.fillStyle = '#e2e8f0';
     ctx.fillRect(0, 0, out.width, compositeH);
     for (let i = 0; i < pageCount; i++) {
       const srcY = i * pageHeightPx;
       const sliceH = Math.min(pageHeightPx, totalH - srcY);
       const dstY = i * (pageHeightPx + GAP_PX);
-      ctx.fillStyle = imageDark ? DARK.page : '#ffffff';
+      ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, dstY, out.width, sliceH);
       ctx.drawImage(srcCanvas, 0, srcY, srcCanvas.width, sliceH, 0, dstY, out.width, sliceH);
     }
@@ -879,10 +881,10 @@ return (
         ><Image size={14}/> Image</button>
 
         <button
-          onClick={toggleImageDark}
-          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg font-bold text-xs transition-colors shadow border ${imageDark ? 'bg-black border-yellow-300 text-yellow-300 hover:bg-slate-800' : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100'}`}
-          title={imageDark ? 'Shared image is yellow on black — tap for a white image' : 'Shared image is black on white — tap for yellow on black'}
-        >{imageDark ? 'Image: Dark' : 'Image: Light'}</button>
+          onClick={toggleImageYellow}
+          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg font-bold text-xs transition-colors shadow border ${imageYellow ? 'bg-[#FFF200] border-yellow-300 text-black hover:brightness-95' : 'bg-slate-900 border-slate-600 text-yellow-300 hover:bg-slate-800'}`}
+          title={imageYellow ? 'Shared image has yellow blocks with black text — tap for dark blocks' : 'Shared image has dark blocks — tap for yellow blocks'}
+        >{imageYellow ? 'Boxes: Yellow' : 'Boxes: Dark'}</button>
 
         <a
           href={`https://wa.me/?text=${encodeURIComponent(generateShareText())}`}

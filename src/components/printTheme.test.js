@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { darkColorFor, parseRgb, DARK } from './printTheme';
+import { parseRgb, luminance, isBlockBackground, blockTextColor, YELLOW } from './printTheme';
 
 describe('parseRgb', () => {
   it('reads the shapes getComputedStyle actually returns', () => {
@@ -15,92 +15,61 @@ describe('parseRgb', () => {
   });
 });
 
-describe('darkColorFor — backgrounds', () => {
-  it('drops paper white into the page rather than leaving a slab', () => {
-    expect(darkColorFor('background', 'rgb(255, 255, 255)')).toBe('transparent');
+// Every dark slab in every document type must be caught, and nothing else may be.
+describe('isBlockBackground', () => {
+  it('catches the blocks the documents actually use', () => {
+    expect(isBlockBackground('rgb(15, 23, 42)')).toBe(true);   // #0f172a masthead, pill, net balance
+    expect(isBlockBackground('rgb(30, 41, 59)')).toBe(true);   // #1e293b table header, policy strip
+    expect(isBlockBackground('rgb(0, 0, 0)')).toBe(true);
   });
 
-  it('turns the light cards and zebra rows into a panel', () => {
-    expect(darkColorFor('background', 'rgb(248, 250, 252)')).toBe(DARK.panel); // #f8fafc
-    expect(darkColorFor('background', 'rgb(241, 245, 249)')).toBe(DARK.panel); // #f1f5f9
-    expect(darkColorFor('background', 'rgb(226, 232, 240)')).toBe(DARK.panel); // #e2e8f0
+  it('leaves the page and its light panels alone', () => {
+    expect(isBlockBackground('rgb(255, 255, 255)')).toBe(false);
+    expect(isBlockBackground('rgb(248, 250, 252)')).toBe(false);  // #f8fafc customer card
+    expect(isBlockBackground('rgb(241, 245, 249)')).toBe(false);  // #f1f5f9
+    expect(isBlockBackground('rgb(236, 253, 245)')).toBe(false);  // #ecfdf5 bonus savings
+    expect(isBlockBackground('rgb(240, 249, 255)')).toBe(false);  // #f0f9ff report filters
   });
 
-  it('lifts the navy blocks just off the page black', () => {
-    expect(darkColorFor('background', 'rgb(15, 23, 42)')).toBe(DARK.block);  // #0f172a
-    expect(darkColorFor('background', 'rgb(30, 41, 59)')).toBe(DARK.block);  // #1e293b
-  });
-
-  it('leaves a transparent background transparent', () => {
-    expect(darkColorFor('background', 'rgba(0, 0, 0, 0)')).toBeNull();
-  });
-});
-
-describe('darkColorFor — text', () => {
-  it('keeps the brand yellow exactly as it is', () => {
-    expect(darkColorFor('text', 'rgb(255, 242, 0)')).toBe(DARK.brand);
-  });
-
-  it('turns near-black copy into the soft yellow', () => {
-    expect(darkColorFor('text', 'rgb(15, 23, 42)')).toBe(DARK.body);
-    expect(darkColorFor('text', 'rgb(51, 65, 85)')).toBe(DARK.body);   // #334155
-  });
-
-  it('keeps secondary labels secondary', () => {
-    expect(darkColorFor('text', 'rgb(148, 163, 184)')).toBe(DARK.muted); // #94a3b8
-    expect(darkColorFor('text', 'rgb(100, 116, 139)')).toBe(DARK.muted); // #64748b
-  });
-
-  it('promotes white-on-dark text to the yellow', () => {
-    expect(darkColorFor('text', 'rgb(255, 255, 255)')).toBe(DARK.brand);
-  });
-
-  // Money that is green or red must not be flattened into the yellow — the colour is the
-  // information.
-  it('keeps the accounting colours legible instead of yellowing them', () => {
-    expect(darkColorFor('text', 'rgb(21, 128, 61)')).toBe(DARK.good);   // payment received
-    expect(darkColorFor('text', 'rgb(5, 150, 105)')).toBe(DARK.good);   // #059669
-    expect(darkColorFor('text', 'rgb(220, 38, 38)')).toBe(DARK.bad);    // #dc2626
-    expect(darkColorFor('text', 'rgb(225, 29, 72)')).toBe(DARK.bad);    // #e11d48 credit note
-    expect(darkColorFor('text', 'rgb(29, 78, 216)')).toBe(DARK.info);   // #1d4ed8
+  it('does not treat an unpainted element as a block', () => {
+    expect(isBlockBackground('rgba(0, 0, 0, 0)')).toBe(false);
+    expect(isBlockBackground('')).toBe(false);
   });
 });
 
-describe('darkColorFor — borders', () => {
-  it('promotes a dark rule to the yellow so it still divides', () => {
-    expect(darkColorFor('border', 'rgb(15, 23, 42)')).toBe(DARK.brand);
-    expect(darkColorFor('border', 'rgb(30, 41, 59)')).toBe(DARK.brand);
+describe('blockTextColor', () => {
+  it('turns the yellow lettering black — that is the whole point', () => {
+    expect(blockTextColor('rgb(255, 242, 0)')).toBe(YELLOW.ink);
   });
 
-  it('leaves a hairline as a hairline', () => {
-    expect(darkColorFor('border', 'rgb(226, 232, 240)')).toBe(DARK.edge);
-    expect(darkColorFor('border', 'rgb(203, 213, 225)')).toBe(DARK.edge);
+  it('turns white lettering black too', () => {
+    expect(blockTextColor('rgb(255, 255, 255)')).toBe(YELLOW.ink);
   });
 
-  it('does not paint an edge onto something that had none', () => {
-    expect(darkColorFor('border', 'rgba(0, 0, 0, 0)')).toBeNull();
+  it('keeps secondary text a step below the heading it sits under', () => {
+    expect(blockTextColor('rgb(148, 163, 184)')).toBe(YELLOW.inkMuted);  // #94a3b8 tagline
+    expect(blockTextColor('rgb(203, 213, 225)')).toBe(YELLOW.inkMuted);  // #cbd5e1
+  });
+
+  it('falls back to black rather than leaving text unreadable', () => {
+    expect(blockTextColor('')).toBe(YELLOW.ink);
+    expect(blockTextColor('inherit')).toBe(YELLOW.ink);
   });
 });
 
-describe('the palette itself', () => {
-  // A slab the same colour as the page is not a slab. The table header bar disappeared
-  // entirely the first time this was tuned too dark.
-  it('keeps dark blocks visibly off the page black', () => {
-    const v = (hex) => parseInt(hex.slice(1), 16);
-    expect(v(DARK.block)).toBeGreaterThan(v('#141414'));
-    expect(v(DARK.block)).toBeGreaterThan(v(DARK.panel));
+describe('the result is black on yellow', () => {
+  it('fills with the brand yellow and writes in black', () => {
+    expect(YELLOW.fill).toBe('#FFF200');
+    expect(YELLOW.ink).toBe('#000000');
   });
 
-  it('is yellow on black, not black on yellow', () => {
-    expect(DARK.page).toBe('#000000');
-    expect(DARK.brand).toBe('#FFF200');
-    // Every text colour must be lighter than the page it sits on.
+  it('keeps every ink dark enough to read on that yellow', () => {
     const l = (hex) => {
       const n = parseInt(hex.slice(1), 16);
-      return (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255;
+      return luminance({ r: n >> 16, g: (n >> 8) & 255, b: n & 255 });
     };
-    [DARK.brand, DARK.body, DARK.muted, DARK.good, DARK.bad, DARK.info].forEach(c => {
-      expect(l(c)).toBeGreaterThan(l(DARK.block) + 0.3);
+    [YELLOW.ink, YELLOW.inkMuted, YELLOW.edge].forEach(c => {
+      expect(l(YELLOW.fill) - l(c)).toBeGreaterThan(0.5);
     });
   });
 });

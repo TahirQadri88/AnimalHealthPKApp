@@ -95,29 +95,25 @@ actually works.
 The same document is painted three different ways, and each one exists because the
 destination is different:
 
-1. **Screen preview** — the light document as written in `PrintView.jsx`. Source of truth.
+1. **Screen preview** — the document as written in `PrintView.jsx`: navy blocks carrying
+   yellow text, on white. Source of truth for the other two.
 2. **Print / HTML share** — `buildHtmlDoc(screenHide=true)` bakes monochrome onto the
    clone's inline styles, then restores `data-dk="1"` blocks to black-with-white-text.
    White paper, black toner: colour here costs money and prints muddy.
-3. **Image share** — `applyDarkTheme()` in `printTheme.js` repaints the capture clone
-   yellow-on-black. A shared image is read on a phone in a dark chat, so it wants the
-   opposite of paper.
+3. **Image share** — `applyYellowBlocks()` in `printTheme.js` flips the dark blocks to
+   yellow fill with black text. A shared image is read at thumbnail size in a chat, where
+   navy slabs read as heavy dark bands and the yellow is the half of the brand that carries.
 
-Pass 3 remaps whatever colour an element already has (`darkColorFor`) rather than threading
-a theme through 1,600 lines of inline styles — add a new section to a document and it goes
-dark for free. It runs on the clone **after** it is appended to the document, because it
-reads computed styles and a detached node has none, and it reads every element's colours
-before writing any, so later elements do not inherit the colours it just set.
+Pass 3 finds the blocks **by colour, not by selector** — any element whose computed
+background is below `BLOCK_MAX_LUM`, plus anything tagged `data-dk="1"`. Add a new dark
+section to any document type and it is picked up without coming back here. It runs on the
+clone **after** it is appended to the document, because it reads computed styles and a
+detached node has none, and it reads every element's colours before writing any, or nested
+elements report the yellow just set instead of the navy the document actually had.
 
-Keep the passes independent. The image toggle (`Image: Dark` / `Image: Light`, remembered in
-`localStorage`) must never reach the live document — the PDF path clones that same element,
-so a dark preview would silently produce black-page PDFs.
-
-Two values are load-bearing and were both tuned by rendering, not by taste:
-`DARK.block` must sit visibly above the page black (at `#111318` the table-header bar
-vanished and the column titles floated), and the white→transparent cut sits just below pure
-white, because `#f8fafc` is a real card at 0.979 luminance and a 0.96 threshold swallowed
-every panel in the document.
+Keep the passes independent. The image toggle (`Boxes: Yellow` / `Boxes: Dark`, remembered
+in `localStorage`) must never reach the live document — the PDF path clones that same
+element, so changing the preview would silently change every PDF too.
 
 ---
 
