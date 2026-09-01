@@ -45,17 +45,6 @@ const aging = isAging ? (data.aging || {}) : null;
 const agingBuckets = (aging && aging.buckets) || [];
 const printRef = useRef(null);
 const [showPrevBal, setShowPrevBal] = useState(true);
-// A shared image is read at thumbnail size in a chat, where the navy slabs read as heavy
-// dark bands. Flipping them to yellow-with-black-text puts the louder half of the brand on
-// the outside. Image only — paper still wants ink-cheap dark blocks. Remembered per device
-// because whoever sends invoices on WhatsApp sends all of them the same way.
-const [imageYellow, setImageYellow] = useState(() => {
-  try { return localStorage.getItem('printImageYellowBlocks') !== '0'; } catch { return true; }
-});
-const toggleImageYellow = () => setImageYellow(v => {
-  try { localStorage.setItem('printImageYellowBlocks', v ? '0' : '1'); } catch { /* private mode */ }
-  return !v;
-});
 // Keyboard: Escape closes the print view
 useEffect(() => {
   const onKey = (e) => { if (e.key === 'Escape') setPrintConfig(null); };
@@ -720,10 +709,13 @@ const handleImageShare = async () => {
   });
   document.body.appendChild(clone);
   await new Promise(r => setTimeout(r, 400));
-  // Repaint AFTER the clone is in the document — applyYellowBlocks reads computed styles,
-  // and a detached node has none. The live document is untouched, so print and PDF keep the
-  // dark blocks.
-  if (imageYellow) applyYellowBlocks(clone);
+  // A shared image is read at thumbnail size in a chat, where the navy slabs read as heavy
+  // dark bands, so the blocks go yellow with black text. Not a choice — paper wants the
+  // ink-cheap dark blocks and a phone wants the brand, and the two destinations never
+  // overlap. Repainted AFTER the clone is in the document: applyYellowBlocks reads
+  // computed styles and a detached node has none. The live document is untouched, so
+  // print and PDF keep the dark blocks.
+  applyYellowBlocks(clone);
   const captureH = clone.scrollHeight > 0 ? clone.scrollHeight : originalH;
 
   try {
@@ -949,11 +941,6 @@ return (
           title="Share as Image (PNG/JPG) — works with WhatsApp"
         ><Image size={14}/> Image</button>
 
-        <button
-          onClick={toggleImageYellow}
-          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg font-bold text-xs transition-colors shadow border ${imageYellow ? 'bg-[#FFF200] border-yellow-300 text-black hover:brightness-95' : 'bg-slate-900 border-slate-600 text-yellow-300 hover:bg-slate-800'}`}
-          title={imageYellow ? 'Shared image has yellow blocks with black text — tap for dark blocks' : 'Shared image has dark blocks — tap for yellow blocks'}
-        >{imageYellow ? 'Boxes: Yellow' : 'Boxes: Dark'}</button>
 
         <a
           href={`https://wa.me/?text=${encodeURIComponent(generateShareText())}`}

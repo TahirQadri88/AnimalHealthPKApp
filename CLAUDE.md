@@ -117,9 +117,11 @@ clone **after** it is appended to the document, because it reads computed styles
 detached node has none, and it reads every element's colours before writing any, or nested
 elements report the yellow just set instead of the navy the document actually had.
 
-Keep the passes independent. The image toggle (`Boxes: Yellow` / `Boxes: Dark`, remembered
-in `localStorage`) must never reach the live document — the PDF path clones that same
-element, so changing the preview would silently change every PDF too.
+Keep the passes independent, and note that pass 3 is **not optional**. It briefly had a
+`Boxes: Yellow` / `Boxes: Dark` toggle; that was removed because the two destinations never
+overlap — paper wants ink-cheap dark blocks, a phone wants the brand — so the choice was
+one nobody would ever make twice. It must also never reach the live document: the PDF path
+clones that same element, so repainting the preview would silently change every PDF too.
 
 ---
 
