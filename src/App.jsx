@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef, createContext, useContext } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useContext } from 'react';
 import { createPortal } from 'react-dom';
 import {
 LayoutDashboard, Package, ReceiptText, BarChart3, Settings,
@@ -25,8 +25,8 @@ import { computePnL } from './services/analytics/profitAndLoss';
 import { buildAgingReport, summariseAging, AGING_BUCKETS } from './services/analytics/receivables';
 import { netBilled, topProducts, momChangePct } from './services/analytics/dashboard';
 import SearchableSelect from './components/SearchableSelect';
+import { AppContext } from './context/AppContext';
 
-const AppContext = createContext(null);
 
 // A "transport method" hands the consignment to an outside courier (Intercity Transport
 // and friends) instead of it being carried by one of our own riders. Kept in one place
