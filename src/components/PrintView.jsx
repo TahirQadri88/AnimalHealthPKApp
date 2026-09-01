@@ -964,9 +964,16 @@ return (
       </div>
     </div>
 
-    {/* File name hint */}
+    {/* File name hint.
+        The preview below deliberately shows the PAPER version — the PDF button clones
+        that same element, so a yellow preview would mean yellow PDFs. The image is
+        repainted on its own clone at share time, so it looks different on purpose. That
+        used to be obvious from the Boxes toggle; with the toggle gone it has to be said. */}
     <div className="text-center pb-1.5 no-print">
       <span className="text-[10px] text-slate-500 font-mono">{getFileName()}</span>
+      <span className="block text-[10px] text-slate-400 mt-0.5">
+        Preview shows the print version · <span className="text-yellow-300 font-bold">Image</span> shares with yellow boxes
+      </span>
     </div>
   </div>
 
