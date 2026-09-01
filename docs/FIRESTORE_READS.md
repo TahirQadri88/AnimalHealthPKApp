@@ -7,6 +7,10 @@
 limit**, with **zero denies and zero errors**. The 54,000 was our own deployment churn. See
 "Clean-day baseline" below; the scaling concern still stands but is months away.
 
+**2026-09-01: the fix in §2 below was checked against the code and is wrong.** A rolling
+window on the invoice listener understates every customer balance, including the Previous
+Balance printed on invoices. The corrected plan is in §2b. Nothing was changed in the app.
+
 ---
 
 ## Where the number comes from
@@ -191,15 +195,54 @@ that genuinely needs full history, and once it fetches its own, nothing else doe
 
 Single-field equality, so no composite index needed.
 
-### 2. Rolling window on the invoice and payment listeners
+### 2. Rolling window on the invoice and payment listeners — ⚠️ WRONG AS WRITTEN
 
-Bound the global listeners to something like the last 90 days. Billing lists, dispatch and
-the dashboard never show more than that anyway, so nothing visible changes.
+**Do not do this. It was checked against the code on 2026-09-01 and it silently corrupts
+customer balances, including balances printed on paper and handed to customers.**
 
-Turns "every invoice ever" into "invoices from this quarter" — a constant, not a number that
-grows forever. This is the change that actually fixes the scaling curve.
+The claim above — "billing lists, dispatch and the dashboard never show more than that
+anyway, so nothing visible changes" — is false. Four things read the invoice array for
+*balances*, and a balance is a running total from the beginning of the relationship:
 
-Needs a `date` index; Firestore creates single-field ones automatically.
+| What | Where | Effect of a 90-day window |
+|---|---|---|
+| **Previous Balance printed on every invoice** | `PrintView.getInvoiceLedger()` → `getCustomerLedger()` | Understated on paper the customer receives |
+| Total receivables, over every customer | `App.jsx` dashboard, `customers.reduce(getCustomerBalance)` | Understated |
+| Every row of the customers list | `App.jsx` customers list | Understated |
+| Receivables aging | `buildAgingReport({ invoices, payments })` | The 90+ bucket is, by definition, outside the window |
+
+`buildCustomerLedger` walks `invoices.filter(o => o.customerId === id)` from the start of
+time. Give it a truncated array and it does not fail — it returns a smaller number. That is
+the dangerous part: nothing errors, no screen goes blank, the figures simply come out too
+low, and the first person to notice is a customer being asked for the wrong amount.
+
+**The window and the per-customer query are one change, not two.** Step 1 has to be doing
+the work for every screen that shows a balance *before* the window can be applied. And step
+1 on its own makes reads worse, not better: the ledger currently filters an array that is
+already in memory and costs nothing extra to open.
+
+### 2b. What would actually work
+
+Two routes. Both are real projects, not patches.
+
+**Route A — on-demand per-customer history.** Bound the global listeners, and have every
+screen that needs a balance fetch that one customer's full history:
+`where('customerId','==',id)`. Ledger, billing (the invoice's Previous Balance), the
+customers list and the aging report all need it, and the last two need it for *every*
+customer at once, which is the whole collection again. So Route A fixes the ledger and
+billing but not the receivables screens.
+
+**Route B — a stored balance per customer.** `customers/{id}.balance`, updated whenever an
+invoice, payment or credit note is written. The dashboard, the customers list and aging then
+read what they already read. This is denormalisation — the same figure lives in two places
+and can drift — so it needs a recompute-and-reconcile tool, and the derived value must stay
+the source of truth for anything that matters. It is the only route that bounds the
+receivables screens.
+
+Route B is the honest answer for scale, and it is a bigger decision than a query change: it
+partly reverses "do not trust stored derived values", which this project has just spent
+effort moving away from for `paymentStatus`. Take it deliberately, not as a cost
+optimisation.
 
 ### 3. Date-scoped analytics
 
@@ -243,17 +286,25 @@ correctness to avoid it.
 simply be date-bounded, because **the customer ledger needs full history** — an opening
 balance is meaningless if the query starts in January.
 
-The design that fixes it properly:
+The design that fixes it properly — corrected 2026-09-01, see §2 above:
 
-1. A **rolling window** (say 12 months) for the global listeners that feed lists, dashboard
-   and billing. That is all those screens ever show.
-2. **Per-customer queries on demand** — `where('customerId','==',id)` when a ledger opens,
-   fetching that customer's full history and nothing else.
-3. **Date-scoped analytics** — query the selected period rather than filtering everything
+1. **A stored per-customer balance** (Route B), because the dashboard, the customers list
+   and the aging report each need a balance for *every* customer, and no per-customer query
+   bounds that.
+2. **Per-customer history on demand** for the ledger and for the Previous Balance printed on
+   an invoice, once (1) means those are the only screens still needing full history.
+3. **Only then** a rolling window on the global listeners.
+4. **Date-scoped analytics** — query the selected period rather than filtering everything
    client-side.
 
-This changes how data flows through the app, so it needs doing deliberately, with the
-ledger verified against known balances before and after. Not a quick patch.
+The order matters and the previous version of this document had it backwards. Applying the
+window first does not fail loudly; it just makes every balance too small, on screen and on
+paper. Verify against known customer balances before and after, and print one invoice for a
+customer with debt older than the window as part of that check.
+
+**Not urgent.** A clean day measures 12% of the free limit at ~900 documents. This becomes
+necessary around 2,500–3,000 documents, and Route B is a decision about trusting a stored
+derived value — worth taking on its own merits rather than under quota pressure.
 
 ---
 
