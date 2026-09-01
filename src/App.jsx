@@ -3913,7 +3913,11 @@ const reportEngine = useMemo(() => {
   creditNotes.forEach(cn => {
     let cnRev = 0, cnCost = 0;
     (cn.items || []).forEach(item => {
-      if (item.isBonus) return;
+      // Bonus lines are NOT skipped. Free stock carries a real costPrice and no price, so
+      // giving it away is a loss of its cost — the billed loop above counts it that way —
+      // and taking it back must return that cost. Skipping it here expensed returned free
+      // stock forever, and left these breakdowns disagreeing with the headline P&L, which
+      // computePnL derives symmetrically a few lines below.
       const rev = (item.price || 0) * (item.quantity || 0);
       const cost = (item.costPrice || 0) * (item.quantity || 0);
       const gp = rev - cost;

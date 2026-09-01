@@ -176,8 +176,15 @@ QUERY, not the rows: a rule restricting invoices to their author denies that lis
 outright and the app goes blank. `viewAllInvoices`, `viewLedger`, `viewCustomers` and
 `viewDashboard` need the client query scoped first — which is D above.
 
-**I. Incremental `App.jsx` extraction.** One feature at a time, `npm run verify` between
-each. Last, and only once C exists.
+**I. Incremental `App.jsx` extraction.** Planned in detail in `docs/APP_EXTRACTION.md`
+(2026-09-01) — six phases, leaves first, one component per commit, each move proved by
+rendering the component through `react-dom/server` before and after and requiring
+byte-identical markup. The prerequisite (C, tests for the money maths) now exists.
+
+The rule that matters most is the one this project has not been bitten by yet: **nothing
+extracted may import from `App.jsx`**. That is a cycle, and ESM answers a cycle with an
+`undefined` binding at module-init time — a blank page, before React renders, that neither
+lint rule would catch. Shared helpers move into their own modules first.
 
 ### Optional, not on the path
 
