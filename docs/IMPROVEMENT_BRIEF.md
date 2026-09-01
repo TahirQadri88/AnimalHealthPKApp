@@ -63,6 +63,20 @@ remains is correctness and maintainability.
       export foots to the rows on screen — the bucket chip and search box filter the sheet
       as well, and `summariseAging` recomputes the totals over what is shown.
 
+- [x] **Audit log + void instead of delete** (2026-09-01, brief §11 and §12). `auditLogs` had
+      been append-only in the rules since the security cutover with nothing writing to it,
+      and invoices, payments and expenses were removed with `deleteDoc`. Creates, edits and
+      voids of invoices, payments, credit notes and expenses now write an entry; financial
+      records are voided rather than deleted and can be restored. Admin → Activity shows
+      both. Void is a separate `voided` flag, NOT `status:'void'` as the brief asked — that
+      field already carries the document type. The void filter is applied once, at the
+      provider, so it reaches every balance and report; `getNextSeqNum` deliberately keeps
+      reading the raw lists so a voided document never gives its number away.
+
+      Still open in this area: the void buttons are gated in the UI only. `firestore.rules`
+      allows `update: if active()` on all three collections, so a non-admin could set the
+      flag directly — the same UI-only gap as §H below, not a new one.
+
 ### Next, in this order
 
 **A. Verification pass — no code, ~20 minutes, do this first.**

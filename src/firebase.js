@@ -5,6 +5,7 @@ import {
   persistentLocalCache,
   persistentMultipleTabManager,
   collection, onSnapshot, doc, getDoc, setDoc, deleteDoc, runTransaction,
+  getDocs, query, orderBy, limit,
 } from "firebase/firestore";
 import {
   getAuth,
@@ -89,6 +90,12 @@ export {
   setDoc,
   deleteDoc,
   runTransaction,
+  // Bounded reads. auditLogs grows forever and must never get an unconstrained listener —
+  // see docs/FIRESTORE_READS.md; it is read on demand, newest first, with a limit.
+  getDocs,
+  query,
+  orderBy,
+  limit,
   getAuth,
   initializeApp,
   deleteApp,

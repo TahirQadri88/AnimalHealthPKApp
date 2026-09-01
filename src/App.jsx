@@ -12,8 +12,10 @@ AlignLeft, Bell, Star, Layers, Globe, PhoneCall, MapPin, Briefcase, ClipboardLis
 RotateCcw, FileText, Database, Clock
 } from 'lucide-react';
 import { db, auth, firebaseConfig, collection, onSnapshot, doc, getDoc, setDoc, deleteDoc, runTransaction,
+         getDocs, query, orderBy, limit,
          getAuth, initializeApp, deleteApp, signInWithEmailAndPassword,
          createUserWithEmailAndPassword, signOut, onAuthStateChanged, authEmailFor, loginSlug } from './firebase';
+import { AUDIT, auditEntry, changedFields, describeEntry, notVoided, isVoided, voidPatch, restorePatch } from './services/audit/auditLog';
 import { APP_NAME, VEHICLES, getPKTDate, getLocalDateStr, formatDateDisp, checkDateFilter, exportToCSV, shareOrDownload } from './helpers';
 import PrintView from './components/PrintView';
 import { invoiceTotal } from './services/accounting/invoiceTotals';
@@ -29,6 +31,9 @@ const AppContext = createContext(null);
 // and friends) instead of it being carried by one of our own riders. Kept in one place
 // because the invoice form, the prefill and the save path must all agree: if they don't,
 // a courier name can survive onto a rider delivery and print on the dispatch note.
+// One bounded page of the activity log. auditLogs grows forever; this is never a listener.
+const LOG_PAGE = 200;
+
 const isTransportMethod = (vehicleTypes, name) => {
   if (!name || name === 'Self-Pickup') return false;
   const vt = (vehicleTypes || []).find(v => v.name === name);
@@ -82,6 +87,11 @@ const claimDocNumber = async (prefix, fallbackStart) => {
   }
 };
 
+// Feed this the RAW collection, never the void-filtered one. A voided invoice still owns
+// its number — that number is printed on paper somewhere — so hiding it from the scan would
+// hand the same number to the next document. The Firestore counter in claimDocNumber only
+// ever moves up and would normally absorb this, but it falls back to this guess when the
+// transaction cannot run, and that is exactly when a duplicate would ship.
 const getNextSeqNum = (items, prefix) => {
   const LEGACY_THRESHOLD = 10000000;
   const nums = items.map(item => {
@@ -473,7 +483,7 @@ return (
 };
 
 const PaymentModal = () => {
-const { selectedCustomerForPayment, customers, payments, getCustomerBalance, saveToFirebase, showToast, setShowPaymentModal, editingPayment, setEditingPayment } = useContext(AppContext);
+const { selectedCustomerForPayment, customers, payments, getCustomerBalance, saveToFirebase, showToast, setShowPaymentModal, editingPayment, setEditingPayment, logSave, paymentsRaw } = useContext(AppContext);
 const isEdit = !!editingPayment;
 const [form, setForm] = useState(
   isEdit
@@ -488,11 +498,13 @@ if(!form.customerId || !form.amount) return showToast("Customer and Amount are r
 if (isEdit) {
   const updated = { ...editingPayment, customerId: Number(form.customerId), amount: Number(form.amount), discount, date: form.date, note: form.note };
   await saveToFirebase('payments', updated.id, updated);
+  await logSave('payments', editingPayment, updated, updated.id);
   showToast("Payment Receipt Updated!");
 } else {
-  const recNum = (await claimDocNumber('REC', getNextSeqNum(payments, 'REC'))) ?? getNextSeqNum(payments, 'REC');
+  const recNum = (await claimDocNumber('REC', getNextSeqNum(paymentsRaw, 'REC'))) ?? getNextSeqNum(paymentsRaw, 'REC');
   const newPayment = { id: `REC-${String(recNum).padStart(4, '0')}`, customerId: Number(form.customerId), amount: Number(form.amount), discount, date: form.date, note: form.note };
   await saveToFirebase('payments', newPayment.id, newPayment);
+  await logSave('payments', null, newPayment, newPayment.id);
   showToast("Payment Received & Ledger Updated!");
 }
 handleClose();
@@ -523,7 +535,7 @@ return (
 };
 
 const CustomerLedgerModal = () => {
-const { selectedLedgerId, getCustomerLedger, generateReceiptData, setPrintConfig, setShowPaymentModal, setSelectedCustomerForPayment, setShowLedgerModal, deleteFromFirebase, saveToFirebase, invoices, isAdmin, setEditingPayment, payments, setShowCreditNoteModal, setEditingCreditNote, showConfirm, setCurrentInvoice, setBillingView, setActiveTab } = useContext(AppContext);
+const { selectedLedgerId, getCustomerLedger, generateReceiptData, setPrintConfig, setShowPaymentModal, setSelectedCustomerForPayment, setShowLedgerModal, deleteFromFirebase, saveToFirebase, invoices, isAdmin, setEditingPayment, payments, setShowCreditNoteModal, setEditingCreditNote, showConfirm, setCurrentInvoice, setBillingView, setActiveTab, showPrompt, voidRecord, logSave, showToast } = useContext(AppContext);
 const [startDate, setStartDate] = useState(() => { const d = new Date(); d.setMonth(d.getMonth() - 1); return getLocalDateStr(d); });
 const [endDate, setEndDate] = useState(getLocalDateStr());
 const [ledgerMode, setLedgerMode] = useState('simple'); // 'simple' | 'detailed'
@@ -612,20 +624,29 @@ return (
 {isAdmin && row.debit > 0 && !row.isCreditNote && (<button onClick={() => { const inv = invoices.find(o => o.id === row.id); if(inv){ setCurrentInvoice(inv); setBillingView('form'); setActiveTab('billing'); setShowLedgerModal(false); }}} title="Edit Invoice" className="p-1.5 bg-amber-50 hover:bg-amber-100 focus:outline-none focus:ring-1 focus:ring-amber-400 text-amber-600 rounded-lg transition-colors"><Edit size={13}/></button>)}
 {row.isCreditNote && (<button onClick={() => { const cn = invoices.find(o => o.id === row.id); if(cn) setPrintConfig({docType:'creditnote', format:'a4', data: cn}); }} title="Print Credit Note" className="p-1.5 bg-rose-50 hover:bg-rose-100 focus:outline-none focus:ring-1 focus:ring-rose-400 text-rose-500 rounded-lg transition-colors"><FileText size={13}/></button>)}
 {row.isCreditNote && isAdmin && (<button onClick={() => { setEditingCreditNote({ customerId: fullLedger.id, id: row.id }); setShowLedgerModal(false); setShowCreditNoteModal(true); }} title="Edit Credit Note" className="p-1.5 bg-amber-50 hover:bg-amber-100 focus:outline-none focus:ring-1 focus:ring-amber-400 text-amber-600 rounded-lg transition-colors"><Edit size={13}/></button>)}
-{row.isCreditNote && isAdmin && (<button onClick={async () => { if (await showConfirm(`Delete ${row.id}?`)) await deleteFromFirebase('invoices', row.id); }} title="Delete Credit Note" className="p-1.5 bg-rose-50 hover:bg-rose-100 focus:outline-none focus:ring-1 focus:ring-rose-400 text-rose-500 rounded-lg transition-colors"><Trash2 size={13}/></button>)}
+{row.isCreditNote && isAdmin && (<button onClick={async () => { const cn = invoices.find(o => o.id === row.id); if (!cn) return; const reason = await showPrompt(`Void credit note ${row.id}?\n\nIt stays on file and drops out of the balance.`, { placeholder: 'e.g. entered twice' }); if (reason === null) return; await voidRecord('invoices', cn, { label: row.id, reason }); showToast(`${row.id} voided`); }} title="Void Credit Note" className="p-1.5 bg-rose-50 hover:bg-rose-100 focus:outline-none focus:ring-1 focus:ring-rose-400 text-rose-500 rounded-lg transition-colors"><Trash2 size={13}/></button>)}
 {row.credit > 0 && !row.isCreditNote && (<button onClick={() => setPrintConfig({docType: 'receipt', format: 'thermal', data: generateReceiptData(fullLedger, row.id)})} title="Print Receipt" className="p-1.5 bg-emerald-50 hover:bg-emerald-100 focus:outline-none focus:ring-1 focus:ring-emerald-400 text-emerald-600 rounded-lg transition-colors"><Receipt size={13}/></button>)}
 {isAdmin && row.credit > 0 && row.id.startsWith('REC-') && (
 <button title="Edit Payment" onClick={() => { const pay = payments.find(p => p.id === row.id); if(pay){ setEditingPayment(pay); setSelectedCustomerForPayment(fullLedger.id); setShowPaymentModal(true); }}} className="p-1.5 bg-amber-50 hover:bg-amber-100 focus:outline-none focus:ring-1 focus:ring-amber-400 text-amber-600 rounded-lg transition-colors"><Edit size={13}/></button>
 )}
 {isAdmin && row.credit > 0 && !row.isCreditNote && (
-<button title="Delete Payment" onClick={async () => {
-  if (!await showConfirm('Delete this payment record?')) return;
+<button title="Void Payment" onClick={async () => {
+  const reason = await showPrompt('Void this payment?\n\nIt stays on file and comes back out of the balance.', { placeholder: 'e.g. recorded against the wrong client' });
+  if (reason === null) return;
   if (row.id.startsWith('REC-')) {
-    await deleteFromFirebase('payments', row.id);
+    const pay = payments.find(p => p.id === row.id);
+    if (pay) await voidRecord('payments', pay, { label: row.id, reason });
   } else if (row.id.endsWith('-PAY')) {
+    // Cash taken at billing time is a field on the invoice, not a record of its own, so
+    // there is nothing to void — clearing it is an edit, and it is logged as one.
     const inv = invoices.find(i => i.id === row.ref);
-    if (inv) await saveToFirebase('invoices', inv.id, { ...inv, receivedAmount: 0, paymentStatus: 'Pending' });
+    if (inv) {
+      const after = { ...inv, receivedAmount: 0, paymentStatus: 'Pending' };
+      await saveToFirebase('invoices', inv.id, after);
+      await logSave('invoices', inv, after, inv.id);
+    }
   }
+  showToast('Payment voided');
 }} className="p-1.5 bg-rose-50 hover:bg-rose-100 focus:outline-none focus:ring-1 focus:ring-rose-400 text-rose-500 rounded-lg transition-colors"><Trash2 size={14}/></button>
 )}
 </div>
@@ -804,23 +825,44 @@ return data;
 
 const ConfirmDialog = () => {
 const { confirmDialog, setConfirmDialog } = useContext(AppContext);
-if (!confirmDialog) return null;
-const handle = (val) => { setConfirmDialog(null); confirmDialog.resolve(val); };
+// Reason text for the prompt variant. Declared BEFORE the early return: hooks may not sit
+// behind a conditional, and this component already had its effect below one.
+const [reason, setReason] = useState('');
+const prompt = confirmDialog?.prompt || null;
+// A void must say why. Cancel always resolves null/false so callers can tell the two apart.
+const blocked = !!(prompt?.required && !reason.trim());
+const handle = (val) => {
+  setConfirmDialog(null);
+  setReason('');
+  if (confirmDialog) confirmDialog.resolve(val);
+};
+const accept = () => { if (!blocked) handle(prompt ? reason.trim() : true); };
 useEffect(() => {
+  if (!confirmDialog) return undefined;
   const onKey = (e) => {
-    if (e.key === 'Escape') handle(false);
-    if (e.key === 'Enter') handle(true);
+    if (e.key === 'Escape') handle(prompt ? null : false);
+    if (e.key === 'Enter') accept();
   };
   window.addEventListener('keydown', onKey);
   return () => window.removeEventListener('keydown', onKey);
-}, []);
+});
+if (!confirmDialog) return null;
+const cancelValue = prompt ? null : false;
 return (
-<div className="fixed inset-0 bg-slate-900/70 z-[200] flex items-center justify-center p-6" onClick={() => handle(false)}>
+<div className="fixed inset-0 bg-slate-900/70 z-[200] flex items-center justify-center p-6" onClick={() => handle(cancelValue)}>
   <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl" onClick={e => e.stopPropagation()}>
     <p className="text-slate-800 font-semibold text-sm leading-relaxed whitespace-pre-line">{confirmDialog.message}</p>
+    {prompt && (
+      <div className="mt-4">
+        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">{prompt.label}</label>
+        <input autoFocus value={reason} onChange={e => setReason(e.target.value)} placeholder={prompt.placeholder || ''}
+          className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:border-indigo-500" />
+        {blocked && <p className="text-[10px] text-rose-500 font-bold mt-1">A reason is required — it goes in the audit log.</p>}
+      </div>
+    )}
     <div className="flex gap-3 mt-5">
-      <button type="button" onClick={() => handle(false)} className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-sm transition-colors">Cancel</button>
-      <button type="button" onClick={() => handle(true)} className="flex-1 py-2.5 bg-rose-500 hover:bg-rose-600 text-white font-bold rounded-xl text-sm transition-colors">Confirm</button>
+      <button type="button" onClick={() => handle(cancelValue)} className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-sm transition-colors">Cancel</button>
+      <button type="button" onClick={accept} disabled={blocked} className={`flex-1 py-2.5 text-white font-bold rounded-xl text-sm transition-colors ${blocked ? 'bg-rose-300 cursor-not-allowed' : 'bg-rose-500 hover:bg-rose-600'}`}>{prompt?.confirmLabel || 'Confirm'}</button>
     </div>
   </div>
 </div>
@@ -1224,7 +1266,7 @@ return (
 };
 
 const BillingTab = () => {
-const { getPaymentStatus, isAdmin, hasPermission, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, productPreFill, setProductPreFill, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig, setShowCreditNoteModal, setEditingCreditNote, showConfirm, riders, vehicleTypes, transportCompanies } = useContext(AppContext);
+const { getPaymentStatus, isAdmin, hasPermission, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, productPreFill, setProductPreFill, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig, setShowCreditNoteModal, setEditingCreditNote, showConfirm, riders, vehicleTypes, transportCompanies, showPrompt, voidRecord, logSave, invoicesRaw, logDelete } = useContext(AppContext);
 const [search, setSearch] = useState('');
 const [dateFilter, setDateFilter] = useState('All Time');
 const [statusFilter, setStatusFilter] = useState('All');
@@ -1295,12 +1337,14 @@ const finalInvoice = { ...currentInvoice,
   items: enrichedItems, total: grandTotal, status: status, salespersonId: currentUser.id, salespersonName: currentUser.name, customerDetails: activeCustomer ? { contactPerson: activeCustomer.contactPerson || '', phone: activeCustomer.phone || '', address1: activeCustomer.address1 || activeCustomer.address || '', map1: activeCustomer.map1 || '', address2: activeCustomer.address2 || '', map2: activeCustomer.map2 || '' } : {} };
 if (!finalInvoice.id) {
   const prefix = status === 'Estimate' ? 'EST' : status === 'Booked' ? 'ORD' : 'INV';
-  const clientGuess = getNextSeqNum(invoices, prefix);
+  const clientGuess = getNextSeqNum(invoicesRaw, prefix);
   const nextNum = (await claimDocNumber(prefix, clientGuess)) ?? clientGuess;
   finalInvoice.id = `${prefix}-${String(nextNum).padStart(4, '0')}`;
   if (!finalInvoice.date) finalInvoice.date = getLocalDateStr();
 }
 await saveToFirebase('invoices', finalInvoice.id, finalInvoice);
+// `currentInvoice.id` is only set when editing, which is also what decides the toast below.
+await logSave('invoices', currentInvoice.id ? invoices.find(o => o.id === finalInvoice.id) : null, finalInvoice, finalInvoice.id);
 const statusLabels = { Estimate: 'Estimate', Booked: 'Draft Order', Billed: 'Invoice' };
 const label = statusLabels[status] || status;
 showToast(currentInvoice.id ? `${label} Updated` : `${label} Saved`);
@@ -1612,7 +1656,7 @@ return (
 <p className="text-emerald-600 font-bold uppercase text-[10px] tracking-widest mb-1">Grand Total</p>
 <p className="text-4xl font-black text-emerald-800 tracking-tight">Rs. {grandTotal.toLocaleString('en-US')}</p>
 </div>
-{isEdit && isAdmin && (<button onClick={async () => { if(await showConfirm("Permanently delete?")) { await deleteFromFirebase('invoices', currentInvoice.id); setBillingView('list'); } }} className="w-full bg-white text-rose-600 font-bold p-4 rounded-xl flex justify-center items-center gap-2 border border-rose-200 hover:bg-rose-50 shadow-sm mt-4"><Trash2 size={18}/> Delete {editingStatus === 'Estimate' ? 'Estimate' : editingStatus === 'Booked' ? 'Draft Order' : 'Invoice'}</button>)}
+{isEdit && isAdmin && (<button onClick={async () => { const reason = await showPrompt(`Void ${currentInvoice.id}?\n\nIt stays on file and drops out of every balance and report.`, { placeholder: 'e.g. duplicate entry' }); if (reason === null) return; /* void what is stored, not the half-edited form state */ const stored = invoices.find(o => o.id === currentInvoice.id) || currentInvoice; await voidRecord('invoices', stored, { label: stored.id, reason }); showToast(`${currentInvoice.id} voided`); setBillingView('list'); }} className="w-full bg-white text-rose-600 font-bold p-4 rounded-xl flex justify-center items-center gap-2 border border-rose-200 hover:bg-rose-50 shadow-sm mt-4"><Trash2 size={18}/> Void {editingStatus === 'Estimate' ? 'Estimate' : editingStatus === 'Booked' ? 'Draft Order' : 'Invoice'}</button>)}
 </div>
 <div className="p-4 bg-white/80 backdrop-blur-md border-t border-slate-200 shrink-0 space-y-2">
 {canSaveAsEstimate && <button onClick={() => saveInvoice('Estimate')} className="w-full bg-violet-600 hover:bg-violet-700 text-white py-2.5 rounded-xl font-bold shadow-sm flex justify-center items-center gap-2 active:scale-95 transition-all text-sm"><FileText size={16}/> Save as Estimate / Quotation</button>}
@@ -1665,11 +1709,11 @@ return (
 <div className="flex items-center gap-2"><span className={`text-[9px] px-2 py-0.5 rounded font-bold uppercase tracking-wider ${getPaymentStatus(o)==='Paid'?'bg-emerald-100 text-emerald-700':o.paymentStatus==='Partial'?'bg-amber-100 text-amber-700':'bg-rose-100 text-rose-700'}`}>{o.paymentStatus}</span></div>
 <div className="flex gap-1.5">
 {o.status === 'Estimate' && hasPermission('issueInvoices') && <button onClick={async () => { await saveToFirebase('invoices', o.id, {...o, status: 'Booked'}); showToast('Converted to Draft Order'); }} title="Convert to Draft Order" className="p-2 bg-amber-50 text-amber-600 hover:bg-amber-100 border border-amber-200 rounded-lg"><Save size={14}/></button>}
-{(o.status === 'Estimate' || o.status === 'Booked') && hasPermission('issueInvoices') && <button onClick={async () => { const invGuess = getNextSeqNum(invoices, 'INV'); const invNum = (await claimDocNumber('INV', invGuess)) ?? invGuess; const newId = `INV-${String(invNum).padStart(4, '0')}`; await saveToFirebase('invoices', newId, {...o, id: newId, status: 'Billed', date: getLocalDateStr()}); await deleteFromFirebase('invoices', o.id); showToast(`Converted to Invoice: ${newId}`); }} title="Issue as Invoice" className="p-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-200 rounded-lg"><ReceiptText size={14}/></button>}
+{(o.status === 'Estimate' || o.status === 'Booked') && hasPermission('issueInvoices') && <button onClick={async () => { const invGuess = getNextSeqNum(invoicesRaw, 'INV'); const invNum = (await claimDocNumber('INV', invGuess)) ?? invGuess; const newId = `INV-${String(invNum).padStart(4, '0')}`; const issued = {...o, id: newId, status: 'Billed', date: getLocalDateStr()}; await saveToFirebase('invoices', newId, issued); await logSave('invoices', null, issued, newId); await deleteFromFirebase('invoices', o.id); await logDelete('invoices', o, `Issued as ${newId}`, o.id); showToast(`Converted to Invoice: ${newId}`); }} title="Issue as Invoice" className="p-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-200 rounded-lg"><ReceiptText size={14}/></button>}
 {o.status === 'Billed' && hasPermission('salesReturns') && <button onClick={() => { setEditingCreditNote({customerId: o.customerId, id: o.id}); setShowCreditNoteModal(true); }} title="Issue Credit Note / Return" className="p-2 bg-rose-50 text-rose-500 hover:bg-rose-100 border border-rose-200 rounded-lg"><RotateCcw size={14}/></button>}
 {(hasPermission('viewLedger') || String(o.salespersonId) === String(currentUser?.id)) && <button onClick={() => { setSelectedLedgerId(o.customerId); setShowLedgerModal(true); }} title="Customer Ledger" className="p-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-500 rounded-lg"><BookOpen size={14}/></button>}
 {(isAdmin || (hasPermission('editOwnInvoices') && String(o.salespersonId) === String(currentUser?.id))) && o.status !== 'CreditNote' && <button onClick={() => { setCurrentInvoice(o); setBillingView('form'); }} className="p-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 rounded-lg"><Edit size={16}/></button>}
-{isAdmin && <button onClick={async () => { if(await showConfirm(`Delete ${o.id}?`)) await deleteFromFirebase('invoices', o.id); }} title="Delete" className="p-2 bg-rose-50 text-rose-500 hover:bg-rose-100 rounded-lg"><Trash2 size={16}/></button>}
+{isAdmin && <button onClick={async () => { const reason = await showPrompt(`Void ${o.id}?\n\nIt stays on file and drops out of every balance and report.`, { placeholder: 'e.g. duplicate entry' }); if (reason === null) return; await voidRecord('invoices', o, { label: o.id, reason }); showToast(`${o.id} voided`); }} title="Void" className="p-2 bg-rose-50 text-rose-500 hover:bg-rose-100 rounded-lg"><Trash2 size={16}/></button>}
 {o.status === 'Estimate' ? <button onClick={() => setPrintConfig({docType: 'estimate', format: 'a4', data: o})} title="View Estimate" className="p-2 bg-violet-50 text-violet-600 hover:bg-violet-100 rounded-lg"><FileText size={16}/></button> : o.status === 'Booked' ? <><button onClick={() => setPrintConfig({docType: 'dispatch', format: 'thermal', data: o})} title="Dispatch Note" className="p-2 bg-amber-50 text-amber-600 rounded-lg"><Truck size={16}/></button><button onClick={() => setPrintConfig({docType: 'estimate', format: 'a4', data: o})} title="View Order" className="p-2 bg-slate-50 text-slate-600 rounded-lg"><FileText size={16}/></button></> : o.status === 'CreditNote' ? <button onClick={() => setPrintConfig({docType: 'creditnote', format: 'a4', data: o})} title="Print Credit Note" className="p-2 bg-rose-50 text-rose-600 rounded-lg"><FileText size={16}/></button> : <><button onClick={() => setPrintConfig({docType: 'dispatch', format: 'thermal', data: o})} title="Dispatch" className="p-2 bg-amber-50 text-amber-600 rounded-lg"><Truck size={16}/></button><button onClick={() => setPrintConfig({docType: 'invoice', format: 'thermal', data: o})} title="Print" className="p-2 bg-indigo-50 text-indigo-600 rounded-lg"><ReceiptText size={16}/></button></>}
 </div>
 </div>
@@ -1720,7 +1764,7 @@ return (
 };
 
 const CustomersTab = () => {
-const { isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, cities, areas, customerTypes, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig, showConfirm } = useContext(AppContext);
+const { isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, cities, areas, customerTypes, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig, showConfirm, showPrompt, voidRecord, logSave } = useContext(AppContext);
 const [search, setSearch] = useState('');
 const [filterCity, setFilterCity] = useState('');
 const [filterArea, setFilterArea] = useState('');
@@ -1786,10 +1830,12 @@ Bal: Rs. {bal.toLocaleString('en-US')} {bal > 0 ? '(Dr)' : bal < 0 ? '(Cr)' : ''
   const relPayments = payments.filter(p => p.customerId === c.id);
   const hasRecords = relInvoices.length > 0 || relPayments.length > 0;
   if (hasRecords) {
-    if (!await showConfirm(`${c.name} has ${relInvoices.length} invoice(s) and ${relPayments.length} payment(s).\n\nDelete this client AND all related records permanently?\n\nThis cannot be undone.`)) return;
+    if (!await showConfirm(`${c.name} has ${relInvoices.length} invoice(s) and ${relPayments.length} payment(s).\n\nDelete this client and VOID all related records?\n\nThe records stay on file and leave every balance.`)) return;
+    // The customer goes, but their financial history is voided rather than destroyed —
+    // otherwise deleting one client silently rewrites last year's revenue.
     await Promise.all([
-      ...relInvoices.map(o => deleteFromFirebase('invoices', o.id)),
-      ...relPayments.map(p => deleteFromFirebase('payments', p.id)),
+      ...relInvoices.map(o => voidRecord('invoices', o, { label: o.id, reason: `Client ${c.name} deleted` })),
+      ...relPayments.map(p => voidRecord('payments', p, { label: p.id, reason: `Client ${c.name} deleted` })),
     ]);
   } else {
     if (!await showConfirm(`Permanently delete ${c.name}?`)) return;
@@ -1807,7 +1853,7 @@ Bal: Rs. {bal.toLocaleString('en-US')} {bal > 0 ? '(Dr)' : bal < 0 ? '(Cr)' : ''
 
 // ─── Credit Note Modal ───
 const CreditNoteModal = () => {
-const { currentUser, products, customers, invoices, showToast, saveToFirebase, setShowCreditNoteModal, editingCreditNote, setEditingCreditNote, getCompanyName } = useContext(AppContext);
+const { currentUser, products, customers, invoices, showToast, saveToFirebase, setShowCreditNoteModal, editingCreditNote, setEditingCreditNote, getCompanyName, logSave, invoicesRaw } = useContext(AppContext);
 const inputClass = "w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all shadow-sm text-slate-800 placeholder-slate-400";
 
 // Editing an existing CN (id starts with 'CN-') vs new
@@ -1884,7 +1930,7 @@ const save = async () => {
   const cust = customers.find(c => c.id === Number(form.customerId));
   let cnId = existingCN ? existingCN.id : null;
   if (!cnId) {
-    const cnGuess = getNextSeqNum(invoices, 'CN');
+    const cnGuess = getNextSeqNum(invoicesRaw, 'CN');
     cnId = `CN-${String((await claimDocNumber('CN', cnGuess)) ?? cnGuess).padStart(4, '0')}`;
   }
   const cn = {
@@ -1903,6 +1949,7 @@ const save = async () => {
     customerDetails: cust ? { contactPerson: cust.contactPerson || '', phone: cust.phone || '', address1: cust.address1 || cust.address || '' } : {},
   };
   await saveToFirebase('invoices', cn.id, cn);
+  await logSave('invoices', existingCN || null, cn, cn.id);
   showToast(existingCN ? 'Credit Note Updated!' : 'Credit Note Saved!');
   setEditingCreditNote(null); setShowCreditNoteModal(false);
 };
@@ -2118,7 +2165,7 @@ return (
 
 // ─── Payments / Receipts Tab ───
 const PaymentsTab = () => {
-const { isAdmin, hasPermission, currentUser, customers, payments, invoices, deleteFromFirebase, saveToFirebase, showToast, setShowPaymentModal, setSelectedCustomerForPayment, setEditingPayment, showConfirm, setPrintConfig, getCustomerLedger, generateReceiptData } = useContext(AppContext);
+const { isAdmin, hasPermission, currentUser, customers, payments, invoices, deleteFromFirebase, saveToFirebase, showToast, setShowPaymentModal, setSelectedCustomerForPayment, setEditingPayment, showConfirm, setPrintConfig, getCustomerLedger, generateReceiptData, showPrompt, voidRecord, logSave } = useContext(AppContext);
 const canReceive = hasPermission('receivePayments');
 // Staff without viewAllInvoices only see payments from their own customers.
 // Wrapped in useMemo so the Set reference is stable between renders —
@@ -2200,12 +2247,14 @@ return (
               )}
               {isAdmin && (p.type === 'receipt' || p.type === 'invoice') && (
                 <button onClick={async()=>{
-                  if(!await showConfirm('Delete this payment record?')) return;
+                  const reason = await showPrompt('Void this payment?\n\nIt stays on file and comes back out of the balance.', { placeholder: 'e.g. recorded against the wrong client' });
+                  if(reason === null) return;
                   if(p.type === 'receipt'){
-                    await deleteFromFirebase('payments', p.id);
+                    await voidRecord('payments', p.raw, { label: p.id, reason });
                   } else {
+                    // Cash taken at billing time is a field on the invoice, so this is an edit.
                     const inv = invoices.find(i => i.id === p.raw.id);
-                    if(inv) await saveToFirebase('invoices', inv.id, {...inv, receivedAmount: 0, paymentStatus: 'Pending'});
+                    if(inv) { const after = {...inv, receivedAmount: 0, paymentStatus: 'Pending'}; await saveToFirebase('invoices', inv.id, after); await logSave('invoices', inv, after, inv.id); }
                   }
                   showToast('Payment deleted');
                 }} className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-500 rounded-lg border border-rose-100 transition-colors"><Trash2 size={13}/></button>
@@ -2340,7 +2389,7 @@ return (
 
 // ─── Master Records View ───
 const MastersView = () => {
-const { products, customers, invoices, payments, expenseCategories, getCompanyName, saveToFirebase, deleteFromFirebase, showToast, setEditingProduct, setShowProductModal, setEditingCustomer, setShowCustomerModal, setShowExpenseCatModal, showConfirm } = useContext(AppContext);
+const { products, customers, invoices, payments, expenseCategories, getCompanyName, saveToFirebase, deleteFromFirebase, showToast, setEditingProduct, setShowProductModal, setEditingCustomer, setShowCustomerModal, setShowExpenseCatModal, showConfirm, showPrompt, voidRecord, logSave } = useContext(AppContext);
 const [tab, setTab] = useState('products');
 const [search, setSearch] = useState('');
 const tabConfig = [
@@ -2420,10 +2469,12 @@ return (
   const relPayments = payments.filter(p => p.customerId === c.id);
   const hasRecords = relInvoices.length > 0 || relPayments.length > 0;
   if (hasRecords) {
-    if (!await showConfirm(`${c.name} has ${relInvoices.length} invoice(s) and ${relPayments.length} payment(s).\n\nDelete this client AND all related records permanently?\n\nThis cannot be undone.`)) return;
+    if (!await showConfirm(`${c.name} has ${relInvoices.length} invoice(s) and ${relPayments.length} payment(s).\n\nDelete this client and VOID all related records?\n\nThe records stay on file and leave every balance.`)) return;
+    // The customer goes, but their financial history is voided rather than destroyed —
+    // otherwise deleting one client silently rewrites last year's revenue.
     await Promise.all([
-      ...relInvoices.map(o => deleteFromFirebase('invoices', o.id)),
-      ...relPayments.map(p => deleteFromFirebase('payments', p.id)),
+      ...relInvoices.map(o => voidRecord('invoices', o, { label: o.id, reason: `Client ${c.name} deleted` })),
+      ...relPayments.map(p => voidRecord('payments', p, { label: p.id, reason: `Client ${c.name} deleted` })),
     ]);
   } else {
     if (!await showConfirm(`Permanently delete ${c.name}?`)) return;
@@ -2759,6 +2810,157 @@ return (
 );
 };
 
+// Activity log and voided records. Admin only — firestore.rules already restricts
+// auditLogs reads to admins, so this mirrors what the database will actually hand over.
+const AuditView = () => {
+const { adminView, invoicesRaw, paymentsRaw, expensesRaw, customers, restoreRecord, showConfirm, showToast } = useContext(AppContext);
+const [tab, setTab] = useState('activity');
+const [entries, setEntries] = useState(null);
+const [loading, setLoading] = useState(false);
+const [error, setError] = useState('');
+const [search, setSearch] = useState('');
+
+// auditLogs only ever grows, so it must never get a live listener — see
+// docs/FIRESTORE_READS.md. One bounded read when the tab is opened, newest first.
+const load = async () => {
+  setLoading(true); setError('');
+  try {
+    const snap = await getDocs(query(collection(db, 'auditLogs'), orderBy('at', 'desc'), limit(LOG_PAGE)));
+    setEntries(snap.docs.map(d => d.data()));
+  } catch (e) {
+    console.error('Audit log read failed:', e);
+    setError('Could not load the activity log.');
+    setEntries([]);
+  }
+  setLoading(false);
+};
+useEffect(() => { if (adminView === 'audit' && entries === null && !loading) load(); }, [adminView]);
+
+const custName = (id) => customers.find(c => c.id === id)?.name || '';
+const money = (n) => 'Rs. ' + Math.round(Number(n) || 0).toLocaleString('en-US');
+
+// Everything voided, across the three financial collections, worst-recent first.
+const voided = [
+  ...invoicesRaw.filter(isVoided).map(r => ({ ...r, kind: r.status === 'CreditNote' ? 'Credit Note' : r.status === 'Estimate' ? 'Estimate' : 'Invoice', collection: 'invoices', amount: r.total, who: custName(r.customerId) })),
+  ...paymentsRaw.filter(isVoided).map(r => ({ ...r, kind: 'Payment', collection: 'payments', amount: r.amount, who: custName(r.customerId) })),
+  ...expensesRaw.filter(isVoided).map(r => ({ ...r, kind: 'Expense', collection: 'expenses', amount: r.amount, who: r.category || '' })),
+].sort((a, b) => String(b.voidedAt || '').localeCompare(String(a.voidedAt || '')));
+
+const q = search.trim().toLowerCase();
+const matches = (hay) => !q || String(hay || '').toLowerCase().includes(q);
+const shownVoided = voided.filter(v => matches(v.id) || matches(v.who) || matches(v.voidReason) || matches(v.voidedBy));
+const shownEntries = (entries || []).filter(e => matches(e.recordId) || matches(e.label) || matches(e.userName) || matches(e.reason) || matches(e.collection));
+
+const restore = async (v) => {
+  if (!await showConfirm(`Restore ${v.kind} ${v.id}?\n\nIt goes back into every balance and report.`)) return;
+  await restoreRecord(v.collection, v, { label: v.id });
+  showToast(`${v.id} restored`);
+};
+
+const tone = { create: 'bg-emerald-50 text-emerald-700 border-emerald-200', update: 'bg-amber-50 text-amber-700 border-amber-200',
+  void: 'bg-rose-50 text-rose-700 border-rose-200', restore: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+  delete: 'bg-slate-100 text-slate-600 border-slate-200' };
+
+return (
+<div className="flex-1 overflow-y-auto p-4 pb-24 space-y-4">
+  <div className="flex items-start justify-between gap-3 flex-wrap">
+    <div>
+      <h3 className="text-xs font-bold text-slate-800 uppercase tracking-widest">Activity &amp; Voided Records</h3>
+      <p className="text-[11px] text-slate-500 mt-0.5">
+        {voided.length} voided record{voided.length !== 1 ? 's' : ''} · log shows the last {LOG_PAGE}
+      </p>
+    </div>
+    <button onClick={load} disabled={loading}
+      className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-800 disabled:bg-slate-400 text-white rounded-lg font-bold text-[11px] hover:bg-slate-900 transition-colors">
+      <Activity size={13}/> {loading ? 'Loading…' : 'Refresh'}
+    </button>
+  </div>
+
+  <div className="bg-slate-200 p-1 rounded-xl flex gap-1">
+    {[['activity', 'Activity'], ['voided', `Voided (${voided.length})`]].map(([k, label]) => (
+      <button key={k} onClick={() => setTab(k)}
+        className={`flex-1 py-2 rounded-lg font-bold text-xs transition-all ${tab === k ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}`}>{label}</button>
+    ))}
+  </div>
+
+  <div className="relative">
+    <Search className="absolute left-3 top-2.5 text-slate-400" size={14}/>
+    <input placeholder="Search id, client, user or reason..." value={search} onChange={e => setSearch(e.target.value)}
+      className="w-full pl-8 pr-3 py-2 bg-white border border-slate-200 rounded-xl font-semibold outline-none text-sm focus:border-indigo-400" />
+  </div>
+
+  {error && <p className="text-center py-6 text-sm text-rose-500 font-bold">{error}</p>}
+
+  {tab === 'activity' && !error && (
+    <div className="space-y-2">
+      {entries === null && <p className="text-center py-10 text-sm text-slate-400 font-medium">Loading…</p>}
+      {entries !== null && shownEntries.length === 0 && (
+        <p className="text-center py-10 text-sm text-slate-400 font-medium">
+          {entries.length === 0 ? 'Nothing logged yet. Entries appear as invoices, payments and expenses are created, edited or voided.' : 'No entries match that search.'}
+        </p>
+      )}
+      {shownEntries.map((e, i) => (
+        <div key={e.id || i} className="bg-white border border-slate-200 rounded-2xl p-3 shadow-sm">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className={`text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded border ${tone[e.action] || tone.delete}`}>{e.action}</span>
+                <span className="font-bold text-slate-800 text-sm truncate">{e.label || e.recordId}</span>
+                <span className="text-[10px] text-slate-400">{e.collection}</span>
+              </div>
+              <p className="text-[11px] text-slate-500 mt-1">{describeEntry(e)}</p>
+              {(e.changes || []).length > 0 && (
+                <div className="mt-1.5 space-y-0.5">
+                  {e.changes.slice(0, 6).map((c, j) => (
+                    <div key={j} className="text-[10px] text-slate-600">
+                      <span className="font-bold">{c.field}</span>: <span className="text-slate-400">{c.from}</span> → <span className="text-slate-800 font-semibold">{c.to}</span>
+                    </div>
+                  ))}
+                  {e.changes.length > 6 && <div className="text-[10px] text-slate-400">…and {e.changes.length - 6} more field{e.changes.length - 6 !== 1 ? 's' : ''}</div>}
+                </div>
+              )}
+            </div>
+            <span className="text-[10px] text-slate-400 shrink-0 text-right">{formatDateDisp((e.at || '').slice(0, 10))}<br/>{(e.at || '').slice(11, 16)}</span>
+          </div>
+        </div>
+      ))}
+    </div>
+  )}
+
+  {tab === 'voided' && (
+    <div className="space-y-2">
+      {shownVoided.length === 0 && (
+        <p className="text-center py-10 text-sm text-slate-400 font-medium">
+          {voided.length === 0 ? 'Nothing voided. Deleting an invoice, payment or expense voids it instead of removing it.' : 'No voided records match that search.'}
+        </p>
+      )}
+      {shownVoided.map(v => (
+        <div key={`${v.collection}-${v.id}`} className="bg-white border border-rose-200 rounded-2xl p-3 shadow-sm">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded border bg-rose-50 text-rose-700 border-rose-200">{v.kind}</span>
+                <span className="font-bold text-slate-800 text-sm truncate">{v.id}</span>
+              </div>
+              {v.who && <p className="text-[11px] text-slate-500 mt-0.5 truncate">{v.who}</p>}
+              <p className="text-[10px] text-slate-500 mt-1">
+                Voided by <span className="font-bold">{v.voidedBy || 'Unknown'}</span> on {formatDateDisp(String(v.voidedAt || '').slice(0, 10))}
+              </p>
+              {v.voidReason && <p className="text-[11px] text-slate-700 font-semibold mt-0.5">“{v.voidReason}”</p>}
+            </div>
+            <div className="shrink-0 text-right">
+              <p className="text-sm font-black text-slate-400 line-through">{money(v.amount)}</p>
+              <button onClick={() => restore(v)} className="mt-2 px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-[11px] rounded-lg transition-colors">Restore</button>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  )}
+</div>
+);
+};
+
 const RidersAdminView = () => {
 const { riders, vehicleTypes, saveToFirebase, deleteFromFirebase, showToast, showConfirm } = useContext(AppContext);
 const riderVehicleTypes = vehicleTypes.filter(vt => vt.requiresRider).map(vt => vt.name);
@@ -2847,10 +3049,10 @@ return (
 <h2 className="text-2xl font-extrabold text-slate-800 tracking-tight mb-4">Admin Hub</h2>
 <div className="bg-slate-200 p-1 rounded-xl">
 <ScrollableTabBar bgClass="bg-slate-200">
-{[['analytics','bg-white text-indigo-700',<BarChart3 size={14}/>,'Analytics'],['expenses','bg-white text-rose-600',<Wallet size={14}/>,'Expenses'],['masters','bg-white text-teal-600',<Archive size={14}/>,'Masters'],['bulk','bg-white text-emerald-600',<Upload size={14}/>,'Bulk Ops'],['segments','bg-white text-purple-600',<Globe size={14}/>,'Segments'],['users','bg-white text-amber-600',<Users size={14}/>,'Users'],['settings','bg-white text-slate-700',<Settings size={14}/>,'Settings'],['riders','bg-white text-indigo-600',<Truck size={14}/>,'Riders'],['transportCos','bg-white text-amber-700',<Truck size={14}/>,'Transport Cos'],['receivables','bg-white text-rose-600',<Wallet size={14}/>,'Receivables']].map(([v,activeClass,icon,label])=>(
+{[['analytics','bg-white text-indigo-700',<BarChart3 size={14}/>,'Analytics'],['expenses','bg-white text-rose-600',<Wallet size={14}/>,'Expenses'],['masters','bg-white text-teal-600',<Archive size={14}/>,'Masters'],['bulk','bg-white text-emerald-600',<Upload size={14}/>,'Bulk Ops'],['segments','bg-white text-purple-600',<Globe size={14}/>,'Segments'],['users','bg-white text-amber-600',<Users size={14}/>,'Users'],['settings','bg-white text-slate-700',<Settings size={14}/>,'Settings'],['riders','bg-white text-indigo-600',<Truck size={14}/>,'Riders'],['transportCos','bg-white text-amber-700',<Truck size={14}/>,'Transport Cos'],['receivables','bg-white text-rose-600',<Wallet size={14}/>,'Receivables'],['audit','bg-white text-slate-700',<Activity size={14}/>,'Activity']].map(([v,activeClass,icon,label])=>(
   <button key={v} data-admintab={v} tabIndex={adminView===v?0:-1}
     onClick={()=>setAdminView(v)}
-    onKeyDown={makeArrowNav(['analytics','expenses','masters','bulk','segments','users','settings','riders','transportCos','receivables'],adminView,setAdminView,'data-admintab')}
+    onKeyDown={makeArrowNav(['analytics','expenses','masters','bulk','segments','users','settings','riders','transportCos','receivables','audit'],adminView,setAdminView,'data-admintab')}
     className={`py-2 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 whitespace-nowrap ${adminView===v?activeClass+' shadow-sm':'text-slate-500'}`}>{icon} {label}</button>
 ))}
 </ScrollableTabBar>
@@ -2867,6 +3069,7 @@ return (
 <div style={{display: adminView === 'riders' ? 'flex' : 'none', flexDirection: 'column', height: '100%'}}><RidersAdminView /></div>
 <div style={{display: adminView === 'transportCos' ? 'flex' : 'none', flexDirection: 'column', height: '100%'}}><TransportCompaniesManager /></div>
 <div style={{display: adminView === 'receivables' ? 'flex' : 'none', flexDirection: 'column', height: '100%'}}><ReceivablesView /></div>
+<div style={{display: adminView === 'audit' ? 'flex' : 'none', flexDirection: 'column', height: '100%'}}><AuditView /></div>
 </div>
 </div>
 )
@@ -4681,7 +4884,7 @@ return (
 };
 
 const ExpensesView = () => {
-const { isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig, showConfirm } = useContext(AppContext);
+const { isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig, showConfirm, showPrompt, voidRecord, logSave } = useContext(AppContext);
 const [date, setDate] = useState(getLocalDateStr());
 const [amount, setAmount] = useState('');
 const [category, setCategory] = useState(expenseCategories[0]?.name || '');
@@ -4693,12 +4896,15 @@ const [expSearch, setExpSearch] = useState('');
 const saveExpense = async () => {
 if(!amount || !category) return showToast("Amount & Category required", "error");
 if (editingExpense) {
-await saveToFirebase('expenses', editingExpense.id, {...editingExpense, date, category, amount: Number(amount), note});
+const updatedExp = {...editingExpense, date, category, amount: Number(amount), note};
+await saveToFirebase('expenses', editingExpense.id, updatedExp);
+await logSave('expenses', editingExpense, updatedExp, category);
 setEditingExpense(null);
 showToast("Expense Updated");
 } else {
 const newExp = {id: Date.now(), date, category, amount: Number(amount), note};
 await saveToFirebase('expenses', newExp.id, newExp);
+await logSave('expenses', null, newExp, category);
 showToast("Expense Recorded");
 }
 setAmount(''); setNote(''); setDate(getLocalDateStr()); setCategory(expenseCategories[0]?.name || '');
@@ -4752,7 +4958,7 @@ return (
 <p className="font-extrabold text-rose-600 text-base">Rs.{exp.amount.toLocaleString('en-US')}</p>
 <div className="flex gap-2 mt-1 justify-end">
 <button onClick={() => startEdit(exp)} className="text-[10px] text-indigo-500 hover:text-indigo-700 font-bold uppercase">Edit</button>
-<button onClick={async ()=>{ if(await showConfirm("Delete expense?")) await deleteFromFirebase('expenses', exp.id) }} className="text-[10px] text-slate-400 hover:text-rose-500 font-bold uppercase">Del</button>
+<button onClick={async ()=>{ const reason = await showPrompt("Void this expense?\n\nIt stays on file and leaves the P&L.", { placeholder: 'e.g. entered twice' }); if(reason === null) return; await voidRecord('expenses', exp, { label: exp.category || exp.id, reason }); showToast('Expense voided'); }} className="text-[10px] text-slate-400 hover:text-rose-500 font-bold uppercase">Void</button>
 </div>
 </div>
 </div>
@@ -5055,10 +5261,17 @@ const appUsers = useLiveCollection('app_users', authUid);
 const companies = useLiveCollection('companies', authUid);
 const products = useLiveCollection('products', authUid);
 const customers = useLiveCollection('customers', authUid);
-const invoices = useLiveCollection('invoices', authUid);
-const expenses = useLiveCollection('expenses', authUid);
+// Financial collections come back raw and are filtered once, here. Every balance, report,
+// export and list downstream reads the filtered arrays, so voiding a record subtracts it
+// everywhere at once instead of in forty places one at a time. The raw arrays are exposed
+// separately and used only by the Voided view.
+const invoicesRaw = useLiveCollection('invoices', authUid);
+const expensesRaw = useLiveCollection('expenses', authUid);
+const paymentsRaw = useLiveCollection('payments', authUid);
+const invoices = useMemo(() => invoicesRaw.filter(notVoided), [invoicesRaw]);
+const expenses = useMemo(() => expensesRaw.filter(notVoided), [expensesRaw]);
+const payments = useMemo(() => paymentsRaw.filter(notVoided), [paymentsRaw]);
 const expenseCategories = useLiveCollection('expenseCategories', authUid);
-const payments = useLiveCollection('payments', authUid);
 const cities = useLiveCollection('cities', authUid);
 const areas = useLiveCollection('areas', authUid);
 const customerTypes = useLiveCollection('customerTypes', authUid);
@@ -5093,6 +5306,10 @@ const [showCreditNoteModal, setShowCreditNoteModal] = useState(false);
 const [editingCreditNote, setEditingCreditNote] = useState(null);
 const [confirmDialog, setConfirmDialog] = useState(null);
 const showConfirm = (message) => new Promise(resolve => setConfirmDialog({ message, resolve }));
+// Same dialog, with a text field. Resolves the trimmed string, or null if cancelled — a
+// caller must be able to tell "no reason given" from "changed my mind".
+const showPrompt = (message, prompt = {}) =>
+  new Promise(resolve => setConfirmDialog({ message, prompt: { label: 'Reason', required: true, ...prompt }, resolve }));
 
 const isAdmin = currentUser?.role === 'admin';
 const hasPermission = (key) => isAdmin || !!(currentUser?.permissions?.[key]);
@@ -5453,6 +5670,60 @@ showToast("Network Error - Could not delete", "error");
 }
 };
 
+// ── Audit log ──────────────────────────────────────────────────────────────
+// Append-only in firestore.rules: any active user may create, nobody may update or delete.
+// A failure here must never block the business action — a payment that saved and did not
+// log is bad; a payment refused because the log was unreachable is worse. So this swallows
+// its own errors and reports to the console only.
+const writeAudit = async (entry) => {
+  try {
+    const id = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    await setDoc(doc(db, 'auditLogs', id), { id, ...entry });
+  } catch (e) {
+    console.error('Audit write failed:', e);
+  }
+};
+
+const logAction = (action, collectionName, record, extra = {}) => writeAudit(auditEntry({
+  action,
+  collection: collectionName,
+  recordId: record?.id,
+  label: extra.label ?? record?.id ?? '',
+  reason: extra.reason || '',
+  changes: extra.changes || [],
+  user: currentUser,
+}));
+
+// Log a save, working out for itself whether this is a create or an edit and what moved.
+// `before` is the record as it was, or null/undefined for a new one.
+const logSave = (collectionName, before, after, label) => logAction(
+  before ? AUDIT.UPDATE : AUDIT.CREATE, collectionName, after,
+  { label, changes: before ? changedFields(before, after) : [] });
+
+// For the hard deletes that legitimately remain — an estimate consumed by being issued as
+// an invoice, say. Financial records are voided, not deleted, so this is deliberately rare.
+const logDelete = (collectionName, record, reason, label) =>
+  logAction(AUDIT.DELETE, collectionName, record, { label: label || record?.id, reason });
+
+// ── Void ───────────────────────────────────────────────────────────────────
+// Financial records are never removed. Voiding keeps the document, drops it out of every
+// balance (the filter above), and records who and why. `reason` is mandatory: a void with
+// no explanation answers none of the questions the log exists to answer.
+const voidRecord = async (collectionName, record, { label, reason } = {}) => {
+  if (!record?.id) return false;
+  const voided = { ...record, ...voidPatch({ user: currentUser, reason }) };
+  await saveToFirebase(collectionName, record.id, voided);
+  await logAction(AUDIT.VOID, collectionName, record, { label: label || record.id, reason });
+  return true;
+};
+
+const restoreRecord = async (collectionName, record, { label } = {}) => {
+  if (!record?.id) return false;
+  await saveToFirebase(collectionName, record.id, { ...record, ...restorePatch({ user: currentUser }) });
+  await logAction(AUDIT.RESTORE, collectionName, record, { label: label || record.id });
+  return true;
+};
+
 // — Ledger Engine —
 // Delegates to the tested service so every screen computes a balance identically.
 // Behaviour is unchanged from the inline version this replaced; ledger.test.js pins it.
@@ -5605,7 +5876,8 @@ const ctx = {
 isAdmin, hasPermission, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers,
 cities, areas, customerTypes, vehicleTypes,
 getPaymentStatus,
-showToast, showConfirm, confirmDialog, setConfirmDialog, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData,
+showToast, showConfirm, showPrompt, confirmDialog, setConfirmDialog, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData,
+voidRecord, restoreRecord, logSave, logDelete, invoicesRaw, paymentsRaw, expensesRaw,
 billingView, setBillingView, currentInvoice, setCurrentInvoice,
 activeTab, setActiveTab, adminView, setAdminView, analyticsView, setAnalyticsView,
 editingProduct, setEditingProduct, showProductModal, setShowProductModal, productPreFill, setProductPreFill,

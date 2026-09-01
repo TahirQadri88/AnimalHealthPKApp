@@ -254,6 +254,37 @@ saved — and the logistics block doesn't render for an unknown method, so nothi
 visible on screen either. The form now also keeps that block open when an unknown method
 still carries courier details, so orphaned invoices stay editable.
 
+## Voiding, not deleting — and one filter point
+
+Financial records are never removed. `voidRecord` writes `{voided, voidedAt, voidedBy,
+voidReason}` and the record stays in Firestore.
+
+Two decisions worth keeping:
+
+- **Void is its own flag, not `status: 'void'`.** The improvement brief asked for the
+  latter, but invoices already use `status` for the document TYPE — Billed, Booked,
+  CreditNote, Estimate — and nineteen places branch on it. Overwriting it would void a
+  credit note by erasing the fact that it ever was one.
+- **The filter is applied in exactly one place.** The provider turns `invoicesRaw` /
+  `paymentsRaw` / `expensesRaw` into `invoices` / `payments` / `expenses`, and every
+  balance, report, export and list downstream reads the filtered arrays. Voiding therefore
+  subtracts everywhere at once. Do not add a second filter in the accounting services —
+  `src/services/audit/void.integration.test.js` asserts the whole path instead, so dropping
+  the filter at the provider fails the test run.
+
+**Document numbering must read the RAW lists.** A voided invoice still owns its number; it
+is printed on paper somewhere. `getNextSeqNum(invoicesRaw, …)`, never `invoices`. The
+Firestore counter in `claimDocNumber` only moves upward and would normally absorb a low
+guess, but it falls back to this client-side scan when the transaction cannot run — which
+is exactly when a duplicate number would ship.
+
+**`auditLogs` is append-only and must never get a listener.** It only grows.
+`AuditView` reads it once per visit with `orderBy('at','desc')` and `limit(LOG_PAGE)`.
+A failed audit write is swallowed: a payment that saved without logging is bad, a payment
+refused because the log was unreachable is worse.
+
+---
+
 ## Firestore reads cost money — check before adding a listener
 
 The project blew through the 50,000 reads/day free tier on 2026-08-28. `useLiveCollection`
