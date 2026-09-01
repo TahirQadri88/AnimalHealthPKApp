@@ -129,3 +129,36 @@ Firebase Auth and rules address *who may read and write what*. They do not addre
 - Financial deletes being physical, with no audit trail.
 
 Those are in `docs/IMPROVEMENT_BRIEF.md`.
+
+---
+
+## Publishing a rules change (2026-09-01 and after)
+
+`firestore.rules` in this repo is a **copy** of what is in the Firebase console. Nothing
+deploys it — GitHub Actions builds and ships the app, and the app is a client. The rules
+are enforced by Google's servers, and the only thing that changes them is a human pressing
+Publish. So a rules edit that is committed and pushed is still not in force.
+
+**Before publishing:** `npm run test:rules`. It runs the file against the Firestore
+emulator with an admin, a staff member with every permission, one with none, a deactivated
+account and a signed-out visitor. All must pass.
+
+**To publish:** Firebase console → **Firestore Database** → **Rules** → select everything
+in the editor → paste the whole of `firestore.rules` → **Publish**. It takes effect within
+seconds; no redeploy of the app is needed, and no one is signed out.
+
+**To roll back:** the console keeps a version history beside the editor — open it, pick the
+previous version and republish. That is faster and safer than finding the old text. From
+the repo, `git show <commit>~1:firestore.rules` gives the same content.
+
+**Test immediately after, as the staff account, not as an admin.** An admin passes every
+rule in the file by definition, so testing as one proves nothing about a permission change:
+
+- raise and save an invoice
+- record a payment
+- register a customer from the billing screen
+- open a customer ledger
+
+If any of those fail with a permission error, roll back first and report what failed
+second. The business cannot wait while a rule is debugged.
+
