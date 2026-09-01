@@ -48,21 +48,36 @@ is Phase 0 work, not an exception.
 An extraction is behaviour-preserving by definition. That makes it unusually checkable —
 lean on that rather than on reading the diff.
 
-1. **Write the render test first, against the code where it is.** Mount the component
-   through `react-dom/server` inside a stubbed `AppContext.Provider` and snapshot the
-   markup. `useEffect` does not run under SSR, so no DOM stub is needed — this is the same
-   technique as `PrintView.docs.test.jsx` and `PrintView.aging.test.jsx`.
-2. **Move it.** Cut, paste, add imports and one export. Change nothing else — not
+**A render test cannot be written before the move.** The first draft of this plan said to
+snapshot the markup first; that is impossible. A component still inside `App.jsx` cannot be
+imported by a test, because `App.jsx` imports `src/firebase.js`, which initialises Auth at
+import time and throws without credentials. So the proof of purity works on the *source*,
+which is stronger anyway — it shows nothing changed at all, rather than that the output
+matched on whatever inputs a test happened to try.
+
+1. **Move it.** Cut, paste, add imports and one `export`. Change nothing else — not
    formatting, not a variable name, not "while I'm here".
-3. **The markup must be byte-identical.** That is the whole proof. Same technique as
-   diffing the thermal markup before and after a print change, and it is worth more than
-   any amount of careful reading.
+2. **Prove it was a pure move:**
+   `node tools/extraction-diff.mjs <Name> <newFile>` — takes the component's text out of
+   the previous commit's `App.jsx` and out of the new file, normalises only the `export`
+   keyword, and requires them byte-identical. Anything else prints the offending lines.
+3. **Add a render test in the new file** — `react-dom/server`, a stubbed
+   `AppContext.Provider` where the component needs one. `useEffect` does not run under
+   SSR, so no DOM stub is needed. This is the permanent net from that point on.
 4. `npm run verify` (lint → test → build), then `npm run lint:scope` and compare to 20.
 5. Load the built bundle: `npx serve -s dist -l 4173` and `node tools/smoke-test.mjs`. It
    only proves the bundle boots — but a cycle or a missing import kills the bundle, so for
    *this* work it is a real check rather than theatre.
 6. **One component per commit.** A revert has to be a single `git revert`, not an
    archaeology exercise.
+
+Do not trust `extraction-diff.mjs` blindly either: its first version located a component's
+end by the next line starting with `const`, which in this flat-formatted file is the
+component's own first local variable — it reported a 36-line component as "1 line
+identical". It now balances brackets, and cross-checks that result against the next
+capitalised declaration, because an apostrophe in JSX text ("Driver's") pairs with the next
+one hundreds of lines away and swallows every brace between. When the two disagree it says
+so out loud rather than printing a tick.
 
 If a component cannot be rendered under SSR (it touches `window` during render, not in an
 effect), say so in the commit and rely on steps 4–5. Do not skip step 1 silently.
