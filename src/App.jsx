@@ -30,6 +30,7 @@ import { isTransportMethod, isKnownVehicleType, usesCarrierPerson } from './lib/
 import { getNextSeqNum } from './lib/docNumbers';
 import { claimDocNumber } from './lib/claimDocNumber';
 import { makeArrowNav } from './lib/a11y';
+import { useLiveCollection } from './hooks/useLiveCollection';
 
 
 // One bounded page of the activity log. auditLogs grows forever; this is never a listener.
@@ -718,29 +719,6 @@ return (
 // permission is TERMINATED — Firestore does not retry it when the user later signs in.
 // Without this dependency every collection would be denied on the login screen and stay
 // dead afterwards, leaving a logged-in user staring at an empty app.
-function useLiveCollection(collectionName, authKey) {
-const [data, setData] = React.useState([]);
-useEffect(() => {
-// Do not subscribe until somebody is signed in. authKey is undefined until Firebase
-// reports, then null when signed out, then a uid.
-//
-// Subscribing earlier is pure waste and it was costing real money: the listener attached
-// on the login screen, pulled the whole collection, and was then torn down and replaced
-// the moment authKey changed to the uid — a second full read of every collection on every
-// page load. Nothing before sign-in needs this data; login reads its two documents
-// directly with getDoc.
-if (!authKey) { setData([]); return undefined; }
-const unsubscribe = onSnapshot(collection(db, collectionName), (snapshot) => {
-const items = [];
-snapshot.forEach((d) => items.push(d.data()));
-setData(items.sort((a, b) => (a.id > b.id ? 1 : -1)));
-}, (error) => { console.error('Error fetching ' + collectionName + ':', error); });
-return () => unsubscribe();
-}, [collectionName, authKey]);
-return data;
-}
-
-
 const ConfirmDialog = () => {
 const { confirmDialog, setConfirmDialog } = useContext(AppContext);
 // Reason text for the prompt variant. Declared BEFORE the early return: hooks may not sit
