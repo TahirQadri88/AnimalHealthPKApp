@@ -77,6 +77,17 @@ remains is correctness and maintainability.
       allows `update: if active()` on all three collections, so a non-admin could set the
       flag directly — the same UI-only gap as §H below, not a new one.
 
+- [x] **Dashboard nets sales returns** (2026-09-01). Home counted `status === 'Billed'`
+      only, so a credit note reduced nothing: the same period showed one figure on Home and
+      another in Analytics, and "Top 5 Products by Sales Value" still ranked goods that had
+      come back. Extracted to `services/analytics/dashboard.js` with tests, the way
+      `computePnL` was.
+
+      Home and Analytics still differ by design and by label: Home's **Sales** is what was
+      billed (invoice totals, so delivery charged and discount given are in it), while
+      Analytics' **Product Sales** is line-item level and excludes both. Both now net
+      returns; only the question differs.
+
 ### Next, in this order
 
 **A. Verification pass — no code, ~20 minutes, do this first.**

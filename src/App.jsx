@@ -23,6 +23,7 @@ import { buildCustomerLedger, allocateCredits, statusFromSettled } from './servi
 import { profitImpactOfCostChange, defaultEffectiveDate, firstSaleDate } from './services/accounting/costPriceChange';
 import { computePnL } from './services/analytics/profitAndLoss';
 import { buildAgingReport, summariseAging, AGING_BUCKETS } from './services/analytics/receivables';
+import { netBilled, topProducts, momChangePct } from './services/analytics/dashboard';
 import SearchableSelect from './components/SearchableSelect';
 
 const AppContext = createContext(null);
@@ -1069,35 +1070,35 @@ const [activitySearch, setActivitySearch] = useState('');
 const ownOnly = !isAdmin && !currentUser?.permissions?.viewAllInvoices;
 const visibleInvoices = ownOnly ? invoices.filter(o => String(o.salespersonId) === String(currentUser?.id)) : invoices;
 const filteredInvoices = visibleInvoices.filter(o => o.status === 'Billed' && checkDateFilter(o.date, dateFilter));
+// Returns belong to whoever's figures they came out of, so credit notes are filtered the
+// same way — same date window, same salesperson when a staff member sees only their own.
+// Without this the dashboard counted sales that had already come back, and Analytics —
+// which nets them — reported a different figure for the very same period.
+const filteredCreditNotes = visibleInvoices.filter(o => o.status === 'CreditNote' && checkDateFilter(o.date, dateFilter));
 const filteredExpenses = expenses.filter(e => checkDateFilter(e.date, dateFilter));
-const revenue = filteredInvoices.reduce((sum, o) => sum + o.total, 0);
+const revenue = netBilled({ billedInvoices: filteredInvoices, creditNotes: filteredCreditNotes });
 const totalReceivables = customers.reduce((sum, c) => sum + getCustomerBalance(c.id), 0);
 const totalExpenses = filteredExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
 const todayStr = getLocalDateStr();
+// The bill COUNT stays a count of bills raised — a return is not an un-issued invoice —
+// but the money beside it is netted like every other figure here.
 const todayInvoices = visibleInvoices.filter(o => o.status === 'Billed' && o.date === todayStr);
-const todayRevenue = todayInvoices.reduce((s,o)=>s+o.total,0);
+const todayRevenue = netBilled({
+  billedInvoices: todayInvoices,
+  creditNotes: visibleInvoices.filter(o => o.status === 'CreditNote' && o.date === todayStr),
+});
 const todayCollected = payments.filter(p => p.date === todayStr).reduce((s,p)=>s+Number(p.amount||0),0);
 const thisMonth = todayStr.slice(0,7);
 const mo = parseInt(thisMonth.slice(5,7)), yr = parseInt(thisMonth.slice(0,4));
 const lastMonth = mo === 1 ? `${yr-1}-12` : `${yr}-${String(mo-1).padStart(2,'0')}`;
-const thisMonthRevenue = invoices.filter(o=>o.status==='Billed'&&o.date.startsWith(thisMonth)).reduce((s,o)=>s+o.total,0);
-const lastMonthRevenue = invoices.filter(o=>o.status==='Billed'&&o.date.startsWith(lastMonth)).reduce((s,o)=>s+o.total,0);
-const momChange = lastMonthRevenue > 0 ? ((thisMonthRevenue - lastMonthRevenue)/lastMonthRevenue*100).toFixed(1) : null;
-const topStats = useMemo(() => {
-const byProduct = {};
-filteredInvoices.forEach(o => {
-o.items.forEach(item => {
-if(!byProduct[item.name]) byProduct[item.name] = { qty: 0, revenue: 0, profit: 0 };
-const rev = item.price * item.quantity;
-const cost = item.costPrice * item.quantity;
-byProduct[item.name].qty += item.quantity;
-byProduct[item.name].revenue += rev;
-byProduct[item.name].profit += (rev - cost);
+const monthNet = (month) => netBilled({
+  billedInvoices: invoices.filter(o => o.status === 'Billed' && o.date.startsWith(month)),
+  creditNotes: invoices.filter(o => o.status === 'CreditNote' && o.date.startsWith(month)),
 });
-});
-const arr = Object.entries(byProduct).map(([name, data]) => ({name, ...data}));
-return { topValue: [...arr].sort((a,b)=>b.revenue - a.revenue).slice(0,5), topQty: [...arr].sort((a,b)=>b.qty - a.qty).slice(0,5), topProfit: [...arr].sort((a,b)=>b.profit - a.profit).slice(0,5) };
-}, [filteredInvoices]);
+const momChange = momChangePct(monthNet(thisMonth), monthNet(lastMonth));
+const topStats = useMemo(
+  () => topProducts({ billedInvoices: filteredInvoices, creditNotes: filteredCreditNotes }),
+  [filteredInvoices, filteredCreditNotes]);
 
 // Receivables: top customers with outstanding balance
 const topReceivables = useMemo(() => {
