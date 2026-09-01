@@ -81,7 +81,8 @@ Six small commits. Nothing else can start safely until these exist.
 | New module | Contents | Notes |
 |---|---|---|
 | `src/context/AppContext.js` | `createContext` + a `useApp()` hook | Every component imports this instead of `App.jsx` |
-| `src/lib/docNumbers.js` | `getNextSeqNum`, `claimDocNumber` | `getNextSeqNum` is pure — **test the `LEGACY_THRESHOLD` behaviour**, and that it must be fed the RAW lists |
+| `src/lib/docNumbers.js` | `getNextSeqNum` | Pure. Test `LEGACY_THRESHOLD`, and that it must be fed the RAW lists |
+| `src/lib/claimDocNumber.js` | `claimDocNumber` | Separate **because** it imports `../firebase` — see the rule below |
 | `src/lib/transport.js` | `isTransportMethod`, `isKnownVehicleType`, `usesCarrierPerson` | Pure. Test the distinction that matters: unknown method ≠ "not a courier" (see CLAUDE.md) |
 | `src/lib/a11y.js` | `makeArrowNav` | Pure |
 | `src/hooks/useLiveCollection.js` | the hook | Keep the sign-in gate comment with it |
@@ -146,6 +147,11 @@ The provider, the collections, the auth and user functions, `ctx`, and tab routi
 
 ## Rules for the whole job
 
+- **Never put a pure helper in the same module as one that imports `../firebase`.**
+  `src/firebase.js` initialises Auth at import time and throws without credentials, so a
+  test importing that module cannot even load. `getNextSeqNum` and `claimDocNumber` were
+  extracted together on the first attempt and the pure half was instantly untestable; they
+  are two files now. Ask "can this be imported by a test?" before choosing the file.
 - **Move, do not improve.** Every extraction is a pure move. If something is obviously
   wrong on the way past, note it and fix it in a *separate* commit, before or after — never
   inside the move, because then the byte-identical markup check no longer holds and you have

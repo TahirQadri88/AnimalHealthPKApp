@@ -27,62 +27,13 @@ import { netBilled, topProducts, momChangePct } from './services/analytics/dashb
 import SearchableSelect from './components/SearchableSelect';
 import { AppContext } from './context/AppContext';
 import { isTransportMethod, isKnownVehicleType, usesCarrierPerson } from './lib/transport';
+import { getNextSeqNum } from './lib/docNumbers';
+import { claimDocNumber } from './lib/claimDocNumber';
 
 
 // One bounded page of the activity log. auditLogs grows forever; this is never a listener.
 const LOG_PAGE = 200;
 
-
-// Claim the next document number atomically.
-//
-// getNextSeqNum below takes max()+1 over the records this browser happens to hold, so two
-// people billing in the same moment both compute the same number and one invoice
-// overwrites the other. A Firestore transaction is the fix: the read and the increment
-// happen as one operation, and a second caller retries against the updated value.
-//
-// fallbackStart is the client-side guess, used two ways. It seeds the counter the first
-// time, so numbering continues from existing records rather than restarting at 1. And it
-// is a floor on every subsequent claim, so if anything was ever numbered while the counter
-// was unavailable, the counter catches up instead of reissuing numbers already in use.
-//
-// Returns null if the transaction cannot run — most likely the counters rule has not been
-// published yet — and the caller falls back to the old behaviour. Degraded, not broken.
-const claimDocNumber = async (prefix, fallbackStart) => {
-  try {
-    return await runTransaction(db, async (tx) => {
-      const ref = doc(db, 'counters', prefix);
-      const snap = await tx.get(ref);
-      const stored = snap.exists() ? Number(snap.data().next) || 0 : 0;
-      const next = Math.max(stored, fallbackStart);
-      tx.set(ref, { prefix, next: next + 1, updatedAt: new Date().toISOString() }, { merge: true });
-      return next;
-    });
-  } catch (err) {
-    console.warn(
-      `[numbering] counter transaction failed for ${prefix} — falling back to client-side ` +
-      `numbering, which can duplicate numbers if two people bill at once. ` +
-      `Publish the counters rule from firestore.rules.`,
-      err?.code || err
-    );
-    return null;
-  }
-};
-
-// Feed this the RAW collection, never the void-filtered one. A voided invoice still owns
-// its number — that number is printed on paper somewhere — so hiding it from the scan would
-// hand the same number to the next document. The Firestore counter in claimDocNumber only
-// ever moves up and would normally absorb this, but it falls back to this guess when the
-// transaction cannot run, and that is exactly when a duplicate would ship.
-const getNextSeqNum = (items, prefix) => {
-  const LEGACY_THRESHOLD = 10000000;
-  const nums = items.map(item => {
-    const s = String(item.id || '');
-    if (!s.startsWith(prefix + '-')) return 0;
-    const n = parseInt(s.slice(prefix.length + 1), 10);
-    return !isNaN(n) && n < LEGACY_THRESHOLD ? n : 0;
-  });
-  return Math.max(0, ...nums) + 1;
-};
 
 const EXPENSE_GROUPS = ['Transportation', 'Salary', 'Utilities', 'Office', 'Other'];
 const EXPENSE_GROUP_COLORS = { Transportation: 'bg-indigo-50 text-indigo-600 border-indigo-100', Salary: 'bg-amber-50 text-amber-600 border-amber-100', Utilities: 'bg-teal-50 text-teal-600 border-teal-100', Office: 'bg-purple-50 text-purple-600 border-purple-100', Other: 'bg-slate-100 text-slate-500 border-slate-200' };
