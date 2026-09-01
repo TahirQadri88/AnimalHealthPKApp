@@ -2,3 +2,9 @@ node_modules/
 dist/
 .env
 .env.local
+
+# Firestore emulator artefacts (npm run test:rules)
+firestore-debug.log
+ui-debug.log
+firebase-debug.log
+.firebase/

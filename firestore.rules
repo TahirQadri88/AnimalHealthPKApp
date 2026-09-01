@@ -2,6 +2,11 @@ rules_version = '2';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // LIVE. Published 2026-08-28, replacing rules that allowed public read and write.
+// Granular write permissions wired in 2026-09-01. Reads remain UI-only — see can().
+//
+// TESTED, not reasoned about: `npm run test:rules` runs this file against the Firestore
+// emulator with an admin, a fully-permissioned staff member, a staff member with no
+// permissions, a deactivated account and a signed-out visitor. Run it before publishing.
 //
 // This file is a copy of what is in the Firebase console. Editing it here changes
 // nothing — nothing deploys rules. Paste into console → Firestore → Rules → Publish,
@@ -33,15 +38,35 @@ service cloud.firestore {
     function isAdmin() {
       return active() && roleDoc().role == 'admin';
     }
-    // NOT WIRED UP. Every rule below uses active() or isAdmin(); none calls this.
+    // WIRED UP for writes (2026-09-01). See the note on reads below.
     //
-    // Stated plainly so nobody reads its presence as evidence that per-permission
-    // authorisation is enforced — it is not. Granular permissions (viewAllInvoices,
-    // viewLedger and the rest) are UI-only today: a staff member without them can still
-    // read those collections directly from the database. Kept as the shape the rules
-    // should take when that is tightened.
+    // `.get(key, default)` rather than `permissions[key]`: a missing map key is an ERROR in
+    // rules, not a false, and an error fails the whole expression. Role documents written
+    // before a permission existed — or by the admin bootstrap, which writes `permissions:
+    // {}` — would otherwise deny things they should allow, or blow up rules that should
+    // simply have returned false.
     function can(permission) {
-      return isAdmin() || (active() && roleDoc().permissions[permission] == true);
+      return isAdmin() || (active() && roleDoc().get('permissions', {}).get(permission, false) == true);
+    }
+
+    // ── READS ARE STILL UI-ONLY, and this is not an oversight ────────────────
+    // viewAllInvoices, viewLedger, viewCustomers and viewDashboard cannot be enforced here
+    // as the app stands. Every screen attaches an unconstrained `onSnapshot` to the whole
+    // collection, and Firestore evaluates a rule against the QUERY, not the returned rows:
+    // a rule saying "only your own invoices" denies that listener outright and the app goes
+    // blank. Enforcing them means first scoping the client query — see docs/FIRESTORE_READS.md,
+    // which wants that change anyway. Until then a staff member can still read these
+    // collections from the database, and this file must not be described as closing that.
+
+    // An invoice records its author as `salespersonId`, which holds the app_users id.
+    // userRoles mirrors that id as `appUserId` precisely so a rule can answer "is this
+    // mine" without a second document read. The defaults differ in TYPE as well as value,
+    // so a record with no author never matches a user with no mirrored id.
+    function ownsRecord() {
+      return resource.data.get('salespersonId', '__no_author__') == roleDoc().get('appUserId', '__no_id__');
+    }
+    function statusIs(status) {
+      return resource.data.get('status', '') == status;
     }
 
     // ── Login index ──────────────────────────────────────────────────────────
@@ -71,18 +96,36 @@ service cloud.firestore {
     }
 
     // ── Financial records ────────────────────────────────────────────────────
-    // Any signed-in active user may create and amend these; only admins may delete.
-    // Deletion is the destructive one and is where an audit gap would hurt most.
+    // Raising an invoice is the base job and needs no permission beyond being active.
+    // Everything the UI gates behind a named permission is gated here to match, so a
+    // staff member cannot do from the database what the app refuses them.
+    //
+    // Deletes stay admin-only and are now nearly unused: financial records are VOIDED,
+    // which is an update carrying `voided: true`. The exception is a draft consumed by
+    // being issued — see the invoice delete rule.
     match /invoices/{id} {
       allow read: if active();
-      allow create, update: if active();
-      allow delete: if isAdmin();
+      // A credit note gives money back, so it is not the same act as billing.
+      // Cash taken at the counter is `collectOnBill`, likewise separate.
+      allow create: if active()
+                    && (request.resource.data.get('status', '') != 'CreditNote' || can('salesReturns'))
+                    && (request.resource.data.get('receivedAmount', 0) == 0 || can('collectOnBill'));
+      // "Edit Own Invoices" means own. A colleague's invoice is an admin matter.
+      allow update: if isAdmin()
+                    || (can('editOwnInvoices') && ownsRecord()
+                        && (!statusIs('CreditNote') || can('salesReturns')));
+      // Issuing an estimate writes a new invoice and removes the draft, so that one
+      // delete has to be available to whoever may issue. A Billed invoice or a credit
+      // note is never deleted by anyone below admin — it is voided.
+      allow delete: if isAdmin()
+                    || (can('issueInvoices') && (statusIs('Estimate') || statusIs('Booked')));
     }
     match /payments/{id} {
       allow read: if active();
-      allow create, update: if active();
+      allow create, update: if can('receivePayments');
       allow delete: if isAdmin();
     }
+    // No permission governs expenses in the UI, so none is invented here.
     match /expenses/{id} {
       allow read: if active();
       allow create, update: if active();
@@ -92,12 +135,19 @@ service cloud.firestore {
     // ── Master data ──────────────────────────────────────────────────────────
     match /customers/{id} {
       allow read: if active();
-      allow create, update: if active();
+      allow create: if can('addCustomers');
+      // Whoever may register a client may correct one; removing a client is admin work.
+      allow update: if can('addCustomers');
       allow delete: if isAdmin();
     }
+    // This one LOOSENS. The billing screen offers "Add / Edit Products" to any staff
+    // member holding addEditProducts, and the rule refused them — the UI showed a button
+    // that could only ever produce a permission error. The permission now governs it, as
+    // it was always meant to. Deleting a product is still admin-only.
     match /products/{id} {
       allow read: if active();
-      allow write: if isAdmin();
+      allow create, update: if can('addEditProducts');
+      allow delete: if isAdmin();
     }
     match /companies/{id} {
       allow read: if active();
@@ -120,7 +170,7 @@ service cloud.firestore {
     match /appSettings/{id} { allow read: if active(); allow write: if isAdmin(); }
     match /backups/{id}     { allow read, write: if isAdmin(); }
 
-    // ── Audit log (not yet implemented) ──────────────────────────────────────
+    // ── Audit log ────────────────────────────────────────────────────────────
     // Append-only by design: anyone active may add an entry, nobody may rewrite history.
     match /auditLogs/{id} {
       allow read: if isAdmin();

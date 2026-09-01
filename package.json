@@ -11,7 +11,8 @@
     "verify": "npm run lint && npm run test && npm run build",
     "lint:scope": "eslint src --config eslint.scope.config.mjs --no-config-lookup",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:rules": "firebase emulators:exec --only firestore \"vitest run --config vitest.rules.config.js\""
   },
   "dependencies": {
     "firebase": "^10.8.0",
@@ -21,10 +22,12 @@
     "react-dom": "^18.2.0"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^3.0.4",
     "@vitejs/plugin-react": "^4.2.1",
     "autoprefixer": "^10.4.17",
     "eslint": "^9.39.5",
     "eslint-plugin-react-hooks": "^7.1.1",
+    "firebase-tools": "^15.28.2",
     "postcss": "^8.4.35",
     "tailwindcss": "^3.4.1",
     "vite": "^5.1.4",

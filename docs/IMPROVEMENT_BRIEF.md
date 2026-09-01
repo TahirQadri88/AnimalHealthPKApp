@@ -149,8 +149,21 @@ naturally with D — a deletion you cannot see is exactly what the audit log is 
 invoice, alongside a single customer-balance calculation used everywhere. Do this after C:
 it changes numbers on screen, and tests are what make that safe.
 
-**H. Enforce permissions in the rules.** `can()` is defined in `firestore.rules` and never
-called, so granular permissions gate the UI only.
+**H. Enforce permissions in the rules — DONE for writes (2026-09-01).** `can()` now governs
+`receivePayments`, `addCustomers`, `addEditProducts`, `salesReturns`, `editOwnInvoices`,
+`issueInvoices` and `collectOnBill`. `npm run test:rules` executes the file against the
+Firestore emulator; the suite was written against the old rules first, where six of it
+failed, and reverting the rules today makes eleven fail.
+
+One fix fell out of it: the billing screen offers "Add / Edit Products" to staff holding
+`addEditProducts`, and the rules refused them — a button that could only ever produce a
+permission error. The permission now governs that collection.
+
+**Reads remain UI-only, and cannot be closed from this file.** Every screen attaches an
+unconstrained `onSnapshot` to a whole collection, and Firestore evaluates a rule against the
+QUERY, not the rows: a rule restricting invoices to their author denies that listener
+outright and the app goes blank. `viewAllInvoices`, `viewLedger`, `viewCustomers` and
+`viewDashboard` need the client query scoped first — which is D above.
 
 **I. Incremental `App.jsx` extraction.** One feature at a time, `npm run verify` between
 each. Last, and only once C exists.

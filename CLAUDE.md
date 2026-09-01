@@ -254,6 +254,37 @@ saved — and the logistics block doesn't render for an unknown method, so nothi
 visible on screen either. The form now also keeps that block open when an unknown method
 still carries courier details, so orphaned invoices stay editable.
 
+## firestore.rules is executed, not reasoned about: `npm run test:rules`
+
+A mistake in that file locks three people out of their own business data, and it is the one
+file in the repo that nothing else checks — editing it here deploys nothing, so a wrong rule
+is only discovered by a person who cannot work.
+
+`npm run test:rules` starts the Firestore emulator and runs `tools/firestore-rules.test.mjs`
+against the real file, with the cast that actually exists: an admin, a staff member holding
+every permission, a staff member holding none, a deactivated account, and a signed-out
+visitor. Run it before pasting anything into the console.
+
+It is deliberately **not** part of `npm run verify` — it needs a JVM and a downloaded
+emulator jar — so it has its own vitest config, and the main config excludes it.
+
+The habit worth copying: the suite was written against the OLD rules first. Ten tests passed
+(what the rules already got right) and six failed (the gap), which is what a gap looks like
+when it is measured rather than asserted. After the change, all pass — and reverting just
+`firestore.rules` makes eleven fail again, which is the check that the tests discriminate at
+all. A test that passes before and after proves nothing.
+
+Two rules details worth keeping:
+
+- **`can()` uses `.get(key, default)`, never `permissions[key]`.** A missing map key is an
+  ERROR in rules, not `false`, and an error fails the whole expression. The admin bootstrap
+  writes `permissions: {}`, and role documents predate every permission ever added.
+- **Ownership compares `resource.data.salespersonId` to `roleDoc().appUserId`.** The mirror
+  carries the app_users id for exactly this reason. The two defaults differ in type as well
+  as value, so a record with no author never matches a user with no mirrored id.
+
+---
+
 ## Voiding, not deleting — and one filter point
 
 Financial records are never removed. `voidRecord` writes `{voided, voidedAt, voidedBy,
@@ -311,11 +342,14 @@ The short version of what is verified and unfixed:
   the `userRoles/{uid}` mirror the rules read, and the public `loginIndex` sign-in needs
   before authenticating. See `docs/SECURITY_CUTOVER.md`, and `docs/ADMIN_RECOVERY.md` for
   what to do when nobody can administer the app.
-- **Granular permissions are NOT enforced by the rules.** They gate the UI only. Every rule
-  checks `active()` or `isAdmin()`; the `can()` helper in `firestore.rules` is defined and
-  never called. A staff member without `viewAllInvoices` can still read every invoice
-  straight from the database. Do not describe permissions as enforced until `can()` is
-  actually wired into the rules.
+- **Granular permissions are enforced for WRITES, not reads** (2026-09-01). `can()` now
+  governs `receivePayments`, `addCustomers`, `addEditProducts`, `salesReturns`,
+  `editOwnInvoices`, `issueInvoices` and `collectOnBill`. Reads are still UI-only and this
+  is a structural limit, not an omission: every screen attaches an unconstrained
+  `onSnapshot` to a whole collection, and Firestore evaluates a rule against the QUERY
+  rather than the rows, so "only your own invoices" denies the listener outright and the
+  app goes blank. `viewAllInvoices` and `viewLedger` cannot be enforced until the client
+  query is scoped — which `docs/FIRESTORE_READS.md` wants anyway.
 - Document numbers come from `Math.max(...)+1` over client-side records, so two people
   billing at the same moment get the same invoice number.
 - All 15 collections are loaded in full by unconstrained `onSnapshot` listeners, including
