@@ -123,6 +123,21 @@ element, so changing the preview would silently change every PDF too.
 
 ---
 
+## A setting that nothing reads is a lie to the user
+
+Four Settings fields shipped doing nothing: `showBusinessNameOnReports` was read into a
+variable and never used, and `phone` / `email` / `address` were saved to Firestore, echoed
+back into the form, and never rendered — under a heading that reads *"Used on invoices,
+receipts, and all generated documents."* Both toggles and all three fields round-tripped
+perfectly, so nothing looked broken from the inside.
+
+`npm run lint` cannot catch this: the config is `no-undef` only, and an unused read is
+valid JavaScript. When adding a Settings field, grep for it in `PrintView.jsx` and assert
+it in `PrintView.docs.test.jsx` — the tests there now cover every business-profile field
+in both directions (present when set, absent when blank).
+
+---
+
 ## Sizing type to a box: measure the fill, don't eyeball the box
 
 "The masthead box is too wide" turned out to be the opposite problem. Measuring the

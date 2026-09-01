@@ -178,6 +178,44 @@ describe('the two business-name toggles govern what their labels say', () => {
   });
 });
 
+// Phone / Email / Address are Settings fields whose own heading promises they are "used on
+// invoices, receipts, and all generated documents". Nothing read them.
+describe('business contact details reach the page', () => {
+  const CONTACT = { phone: '0300-1234567', email: 'info@khybertraders.pk', address: 'Shop 4, Jodia Bazar, Karachi' };
+  const withSettings = (appSettings, format = 'a4', docType = 'invoice') => renderToStaticMarkup(
+    <PrintView printConfig={{ docType, format, data: DATA[docType] }}
+      setPrintConfig={() => {}} products={[]} customers={[]}
+      getCustomerLedger={() => LEDGER} getCustomerBalance={() => 105600}
+      showToast={() => {}} appSettings={appSettings} />
+  );
+
+  it('prints all three on every paper size', () => {
+    ['thermal', 'a5', 'a4'].forEach(format => {
+      const html = withSettings(CONTACT, format);
+      expect(html).toContain('0300-1234567');
+      expect(html).toContain('info@khybertraders.pk');
+      expect(html).toContain('Shop 4, Jodia Bazar, Karachi');
+    });
+  });
+
+  it('shows only the fields that are filled in, with no dangling separator', () => {
+    const html = withSettings({ phone: '0300-1234567' });
+    expect(html).toContain('0300-1234567');
+    expect(html).not.toContain('0300-1234567  ·');
+    expect(html).not.toContain('·  0300-1234567');
+  });
+
+  it('adds nothing when the fields are blank — the default today', () => {
+    // Whitespace must count as blank, or a stray space in Settings prints an empty strip.
+    expect(withSettings({})).not.toContain('letter-spacing:0.3px');
+    expect(withSettings({ phone: '   ', email: '', address: null })).not.toContain('letter-spacing:0.3px');
+  });
+
+  it('goes away with the business name, since it is part of the letterhead', () => {
+    expect(withSettings({ ...CONTACT, showBusinessNameOnDocs: false })).not.toContain('0300-1234567');
+  });
+});
+
 describe('no document leaks a missing value onto paper', () => {
   ['invoice', 'creditnote', 'dispatch'].forEach(docType => {
     ['thermal', 'a5', 'a4'].forEach(format => {

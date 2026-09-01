@@ -28,6 +28,14 @@ const showOnReports = biz.showBusinessNameOnReports !== false;
 // one renderer draws both, so the choice is made here. The reports flag used to be read
 // into a variable and never used, which left that toggle doing nothing at all.
 const showBizName = docType === 'report' ? showOnReports : showOnDocs;
+// Phone, email and address are Settings fields under a heading that reads "Used on
+// invoices, receipts, and all generated documents" — and nothing read them, so a customer
+// holding an invoice had no way to call back or find the shop. Joined into one line, with
+// only the fields that are filled in, so an unset field leaves no dangling separator.
+const bizContact = [biz.phone, biz.email, biz.address]
+  .map(v => String(v || '').trim())
+  .filter(Boolean)
+  .join('  ·  ');
 const isThermal = format === 'thermal';
 const isA5 = format === 'a5';
 // The receivables aging report is a report, but it is a name-and-amount list rather than an
@@ -992,6 +1000,12 @@ return (
           </div>
           {bizTagline && <div style={{ fontSize: `${taglineFontPx}px`, textTransform: 'uppercase', letterSpacing: '2px', fontWeight: 600, color: '#94a3b8', marginTop: '4px' }}>
             {bizTagline}
+          </div>}
+          {/* Contact line. Brighter than the tagline because it is the actionable part —
+              a phone number someone squints at, not decoration. overflowWrap keeps a long
+              address inside the 68mm box instead of overrunning the head. */}
+          {bizContact && <div style={{ fontSize: `${taglineFontPx}px`, letterSpacing: '0.3px', fontWeight: 600, color: '#cbd5e1', marginTop: '3px', lineHeight: 1.5, overflowWrap: 'anywhere' }}>
+            {bizContact}
           </div>}
         </div>
       )}
