@@ -1,12 +1,14 @@
 import React, { useState, useMemo, useRef, useContext } from 'react';
 import { X, Search, Package, Users, RotateCcw } from 'lucide-react';
+// claimDocNumber comes through context, not by import: ../../lib/claimDocNumber pulls in
+// ../firebase, which initialises Auth on import and makes this component impossible to
+// load from a test. A credit note gives money back — it should be testable.
 import { AppContext } from '../../context/AppContext';
 import { getLocalDateStr } from '../../helpers';
 import { getNextSeqNum } from '../../lib/docNumbers';
-import { claimDocNumber } from '../../lib/claimDocNumber';
 
 export const CreditNoteModal = () => {
-const { currentUser, products, customers, invoices, showToast, saveToFirebase, setShowCreditNoteModal, editingCreditNote, setEditingCreditNote, getCompanyName, logSave, invoicesRaw } = useContext(AppContext);
+const { currentUser, products, customers, invoices, showToast, saveToFirebase, setShowCreditNoteModal, editingCreditNote, setEditingCreditNote, getCompanyName, logSave, invoicesRaw, claimDocNumber } = useContext(AppContext);
 const inputClass = "w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all shadow-sm text-slate-800 placeholder-slate-400";
 
 // Editing an existing CN (id starts with 'CN-') vs new

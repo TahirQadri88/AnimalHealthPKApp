@@ -125,14 +125,23 @@ recipe — not the component.
 (`app_users`, `userRoles`, `loginIndex` — see `docs/SECURITY_CUTOVER.md`). Move them, do
 not refactor them, and sign in afterwards.
 
-### Phase 3 — modals
+### Phase 3 — modals — DONE (2026-09-02)
 
-`ProductModal` (114), `CustomerModal` (70), `RidersModal` (107), `SegmentsModal` (192),
-`CustomerLedgerModal` (132), `CreditNoteModal` (312), and the user modal that owns `PERMS`.
+Nine, not the seven listed here originally: `PaymentModal` and `ExpenseCategoryModal` were
+missed when this was written.
 
-`CreditNoteModal` and `CustomerLedgerModal` are money. Their figures are already covered by
-`ledger.test.js` — but the tests exercise the service, not the modal, so print one credit
-note and open one ledger by hand after each.
+Two things this phase taught, both now rules:
+
+- **`UserModal` nearly broke the tooling.** It carries `PERMS` declared at column zero
+  inside its own body, and both `move.py` and `extraction-diff` treated any capitalised
+  declaration as the next component — so the move would have cut it in half and the diff
+  would have compared two identically-truncated slices and printed a tick. The boundary now
+  recognises `const X = (` or `function X(`; `const X = [` is data. Check this before
+  trusting a line count.
+- **A component that imports `../firebase` cannot be tested,** and three modals hit it.
+  `claimDocNumber` now comes through the context, as `fetchAuditLog` already did. Do the
+  pure move first with the import, then switch to context in a follow-up commit, so the
+  move stays provable.
 
 ### Phase 4 — the big tabs
 
