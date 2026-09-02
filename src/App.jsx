@@ -1,56 +1,22 @@
-import React, { useState, useMemo, useEffect, useRef, useContext } from 'react';
-import { createPortal } from 'react-dom';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
-LayoutDashboard, Package, ReceiptText, BarChart3, Settings,
-Plus, Search, Truck, CheckCircle2, AlertCircle, Users,
-Share2, Printer, Trash2, Edit, X, Lock, DollarSign,
-TrendingUp, Receipt, FileSpreadsheet, Calendar, Save, ChevronRight, ChevronLeft,
-Wallet, Download, Upload, TrendingDown, Filter, ArrowUpDown, Award, CreditCard,
-FileDown, BookOpen, ShoppingCart, Tag, Building2, BarChart2, PieChart, Activity,
-Percent, Hash, Zap, Archive, RefreshCw, Eye, EyeOff, ChevronDown, ChevronUp,
-AlignLeft, Bell, Star, Layers, Globe, PhoneCall, MapPin, Briefcase, ClipboardList, Copy,
-RotateCcw, FileText, Database, Clock
+  LayoutDashboard, Package, ReceiptText, Settings, Plus, CheckCircle2, AlertCircle, Users, Wallet
 } from 'lucide-react';
-import { db, auth, firebaseConfig, collection, onSnapshot, doc, getDoc, setDoc, deleteDoc, runTransaction,
-         getDocs, query, orderBy, limit,
-         getAuth, initializeApp, deleteApp, signInWithEmailAndPassword,
-         createUserWithEmailAndPassword, signOut, onAuthStateChanged, authEmailFor, loginSlug } from './firebase';
-import { AUDIT, auditEntry, changedFields, describeEntry, notVoided, isVoided, voidPatch, restorePatch } from './services/audit/auditLog';
-import { APP_NAME, VEHICLES, getPKTDate, getLocalDateStr, formatDateDisp, checkDateFilter, exportToCSV, shareOrDownload } from './helpers';
+import {
+  db, auth, firebaseConfig, collection, doc, getDoc, setDoc, deleteDoc, getDocs, query, orderBy, limit, getAuth, initializeApp, deleteApp, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, authEmailFor, loginSlug
+} from './firebase';
+import { AUDIT, auditEntry, changedFields, notVoided, voidPatch, restorePatch } from './services/audit/auditLog';
+import { APP_NAME, VEHICLES } from './helpers';
 import PrintView from './components/PrintView';
-import { invoiceTotal } from './services/accounting/invoiceTotals';
 import { buildCustomerLedger, allocateCredits, statusFromSettled } from './services/accounting/ledger';
-import { profitImpactOfCostChange, defaultEffectiveDate, firstSaleDate } from './services/accounting/costPriceChange';
-import { computePnL } from './services/analytics/profitAndLoss';
-import { buildAgingReport, summariseAging, AGING_BUCKETS } from './services/analytics/receivables';
-import { netBilled, topProducts, momChangePct } from './services/analytics/dashboard';
-import { buildReport } from './services/analytics/reportEngine';
-import SearchableSelect from './components/SearchableSelect';
 import { AppContext } from './context/AppContext';
-import { isTransportMethod, isKnownVehicleType, usesCarrierPerson } from './lib/transport';
-import { getNextSeqNum } from './lib/docNumbers';
 import { claimDocNumber } from './lib/claimDocNumber';
 import { makeArrowNav } from './lib/a11y';
-import { getISOWeekFilename, uploadToDrive, getDriveScript } from './lib/driveBackup';
-import { EXPENSE_GROUPS, EXPENSE_GROUP_COLORS, RIDER_VEHICLE_TYPES, LOG_PAGE } from './lib/constants';
+import { uploadToDrive } from './lib/driveBackup';
+import { LOG_PAGE } from './lib/constants';
 import { useLiveCollection } from './hooks/useLiveCollection';
-import { ModalWrapper } from './components/ui/ModalWrapper';
-import { ScrollableTabBar } from './components/ui/ScrollableTabBar';
 import { ConfirmDialog } from './components/ui/ConfirmDialog';
-import { MultiPicker } from './components/ui/MultiPicker';
-import { RidersAdminView } from './components/admin/RidersAdminView';
-import { CompanyManager } from './components/admin/CompanyManager';
-import { ExpensesView } from './components/admin/ExpensesView';
 import { CustomersTab } from './components/tabs/CustomersTab';
-import { TransportCompaniesManager } from './components/admin/TransportCompaniesManager';
-import { AuditView } from './components/admin/AuditView';
-import { ReceivablesView } from './components/admin/ReceivablesView';
-import { MastersView } from './components/admin/MastersView';
-import { SegmentsAdminView } from './components/admin/SegmentsAdminView';
-import { UserManagementView } from './components/admin/UserManagementView';
-import { BulkOpsView } from './components/admin/BulkOpsView';
-import { FixInvoiceUnitsButton } from './components/admin/FixInvoiceUnitsButton';
-import { AppSettingsView } from './components/admin/AppSettingsView';
 import { ExpenseCategoryModal } from './components/modals/ExpenseCategoryModal';
 import { PaymentModal } from './components/modals/PaymentModal';
 import { CustomerModal } from './components/modals/CustomerModal';
@@ -63,7 +29,6 @@ import { CreditNoteModal } from './components/modals/CreditNoteModal';
 import { PaymentsTab } from './components/tabs/PaymentsTab';
 import { DashboardTab } from './components/tabs/DashboardTab';
 import { BillingTab } from './components/tabs/BillingTab';
-import { AnalyticsView } from './components/admin/AnalyticsView';
 import { ProductsTab } from './components/tabs/ProductsTab';
 import { AdminTab } from './components/tabs/AdminTab';
 
