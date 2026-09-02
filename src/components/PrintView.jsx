@@ -965,14 +965,18 @@ return (
     </div>
 
     {/* File name hint.
-        The preview below deliberately shows the PAPER version — the PDF button clones
-        that same element, so a yellow preview would mean yellow PDFs. The image is
-        repainted on its own clone at share time, so it looks different on purpose. That
-        used to be obvious from the Boxes toggle; with the toggle gone it has to be said. */}
+        Four destinations, three looks, and the preview is only one of them:
+          Save / Share and PDF  — clone the live document, so they match the preview exactly
+          Print                 — buildHtmlDoc(screenHide) bakes monochrome; black and white
+          Image                 — applyYellowBlocks repaints the blocks yellow
+        An earlier version of this line said "preview shows the print version", which was
+        simply wrong: print is black and white and the preview is not. */}
     <div className="text-center pb-1.5 no-print">
       <span className="text-[10px] text-slate-500 font-mono">{getFileName()}</span>
-      <span className="block text-[10px] text-slate-400 mt-0.5">
-        Preview shows the print version · <span className="text-yellow-300 font-bold">Image</span> shares with yellow boxes
+      <span className="block text-[10px] text-slate-400 mt-0.5 px-3 leading-relaxed">
+        Preview matches <span className="text-indigo-300 font-bold">Save / Share</span> and PDF ·
+        {' '}<span className="text-emerald-300 font-bold">Print</span> is black &amp; white ·
+        {' '}<span className="text-yellow-300 font-bold">Image</span> has yellow boxes
       </span>
     </div>
   </div>

@@ -96,7 +96,10 @@ The same document is painted three different ways, and each one exists because t
 destination is different:
 
 1. **Screen preview** — the document as written in `PrintView.jsx`: navy blocks carrying
-   yellow text, on white. Source of truth for the other two.
+   yellow text, on white. Source of truth for the other two, and the exact look of both
+   **Save / Share** and **PDF**, which clone the live document. The control bar says so:
+   it once said "preview shows the print version", which was plainly wrong — print is
+   black and white and the preview is not.
 2. **Print / HTML share** — `buildHtmlDoc(screenHide=true)` bakes monochrome onto the
    clone's inline styles, then restores `data-dk="1"` blocks to black-with-white-text.
    White paper, black toner: colour here costs money and prints muddy. Only six elements
