@@ -43,7 +43,7 @@ export const buildReport = ({
     if(!bySalesperson[spName]) bySalesperson[spName] = { revenue: 0, profit: 0, orders: 0 };
     bySalesperson[spName].orders += 1;
     let orderItemRevenue = 0; let orderItemCost = 0;
-    o.items.forEach(item => {
+    (o.items || []).forEach(item => {
       const itemCompanyId = products.find(p=>p.id===item.productId)?.companyId;
       if(filterCompanies.size > 0 && !filterCompanies.has(String(itemCompanyId))) return;
       const itemRev = item.price * item.quantity;
@@ -85,7 +85,7 @@ export const buildReport = ({
   const prevPeriod = getPrevDates();
   let prevRevenue = 0, prevProfit = 0;
   invoices.filter(o => o.status === 'Billed' && o.date >= prevPeriod.start && o.date <= prevPeriod.end).forEach(o => {
-    o.items.forEach(item => { prevRevenue += item.price * item.quantity; prevProfit += (item.price - (item.costPrice||0)) * item.quantity; });
+    (o.items || []).forEach(item => { prevRevenue += item.price * item.quantity; prevProfit += (item.price - (item.costPrice||0)) * item.quantity; });
   });
   const trends = {
     revenue: prevRevenue > 0 ? ((kpis.productRevenue - prevRevenue) / prevRevenue * 100).toFixed(1) : null,
@@ -96,7 +96,7 @@ export const buildReport = ({
   billedForPnL.forEach(o => {
     if (!dailyBreakdown[o.date]) dailyBreakdown[o.date] = { revenue: 0, profit: 0, orders: 0 };
     let dayRevenue = 0, dayCost = 0;
-    o.items.forEach(item => { dayRevenue += item.price * item.quantity; dayCost += (item.costPrice||0) * item.quantity; });
+    (o.items || []).forEach(item => { dayRevenue += item.price * item.quantity; dayCost += (item.costPrice||0) * item.quantity; });
     dailyBreakdown[o.date].revenue += dayRevenue; dailyBreakdown[o.date].profit += (dayRevenue - dayCost); dailyBreakdown[o.date].orders += 1;
   });
   // Receivables aging
@@ -118,7 +118,7 @@ export const buildReport = ({
   invoices.filter(o => o.status === 'Billed').forEach(o => {
     const month = o.date.slice(0, 7);
     if (!monthlyData[month]) monthlyData[month] = { revenue: 0, profit: 0, orders: 0, cost: 0 };
-    o.items.forEach(item => { monthlyData[month].revenue += item.price * item.quantity; monthlyData[month].cost += (item.costPrice||0) * item.quantity; monthlyData[month].profit += (item.price - (item.costPrice||0)) * item.quantity; });
+    (o.items || []).forEach(item => { monthlyData[month].revenue += item.price * item.quantity; monthlyData[month].cost += (item.costPrice||0) * item.quantity; monthlyData[month].profit += (item.price - (item.costPrice||0)) * item.quantity; });
     monthlyData[month].orders += 1;
   });
   // Credit Note impact — subtract returned values from all metrics (after monthlyData is built)

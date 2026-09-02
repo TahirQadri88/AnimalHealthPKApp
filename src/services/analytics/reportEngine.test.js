@@ -156,10 +156,17 @@ describe('buildReport — nothing reaches the screen as NaN', () => {
     expect(Number.isNaN(r.kpis.netProfit)).toBe(false);
   });
 
-  // Found by the first test this engine has ever had, and deliberately NOT fixed in the
-  // same commit as the extraction — a guard would have broken the byte-identical proof
-  // that the figures cannot have moved. Documented here, fixed in the commit that follows.
-  it('currently THROWS on an invoice with no items array', () => {
-    expect(() => run({ invoices: [{ id: 'INV-X', date: '2026-08-01', status: 'Billed', customerId: 1 }] })).toThrow();
+  // Found by the first test this engine ever had. A record with no items array threw and
+  // took the whole Analytics screen with it — every figure on the page, not just that row.
+  it('survives an invoice with no items array at all', () => {
+    expect(() => run({ invoices: [{ id: 'INV-X', date: '2026-08-01', status: 'Billed', customerId: 1 }] })).not.toThrow();
+  });
+
+  it('and still counts the invoices around it correctly', () => {
+    const r = run({ invoices: [
+      { id: 'INV-X', date: '2026-08-01', status: 'Billed', customerId: 1 },
+      billed('INV-1', '2026-08-01', [line('Antox 9', 10, 7500, 6000)]),
+    ] });
+    expect(r.kpis.productRevenue).toBe(75000);
   });
 });
