@@ -1,16 +1,18 @@
 import { useState, useEffect, useRef, useContext } from 'react';
 import { Plus, Search, X, Edit, Trash2, Save, Users, Package, Truck, MapPin, Calendar,
          AlertCircle, AlignLeft, BookOpen, FileText, ReceiptText, RotateCcw } from 'lucide-react';
+// claimDocNumber comes through context, not by import: ../../lib/claimDocNumber pulls in
+// ../firebase, which initialises Auth on import and would make this — the screen that
+// bills every invoice — impossible to load from a test.
 import { AppContext } from '../../context/AppContext';
 import { VEHICLES, getLocalDateStr, formatDateDisp, checkDateFilter } from '../../helpers';
 import { makeArrowNav } from '../../lib/a11y';
 import { getNextSeqNum } from '../../lib/docNumbers';
-import { claimDocNumber } from '../../lib/claimDocNumber';
 import { isTransportMethod, isKnownVehicleType, usesCarrierPerson } from '../../lib/transport';
 import { invoiceTotal } from '../../services/accounting/invoiceTotals';
 
 export const BillingTab = () => {
-const { getPaymentStatus, isAdmin, hasPermission, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, productPreFill, setProductPreFill, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig, setShowCreditNoteModal, setEditingCreditNote, showConfirm, riders, vehicleTypes, transportCompanies, showPrompt, voidRecord, logSave, invoicesRaw, logDelete } = useContext(AppContext);
+const { getPaymentStatus, isAdmin, hasPermission, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, productPreFill, setProductPreFill, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig, setShowCreditNoteModal, setEditingCreditNote, showConfirm, riders, vehicleTypes, transportCompanies, showPrompt, voidRecord, logSave, invoicesRaw, logDelete, claimDocNumber } = useContext(AppContext);
 const [search, setSearch] = useState('');
 const [dateFilter, setDateFilter] = useState('All Time');
 const [statusFilter, setStatusFilter] = useState('All');

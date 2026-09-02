@@ -143,7 +143,7 @@ Two things this phase taught, both now rules:
   pure move first with the import, then switch to context in a follow-up commit, so the
   move stays provable.
 
-### Phase 4 — the big tabs
+### Phase 4 — the big tabs — DONE (2026-09-02)
 
 `DashboardTab` (204), `PaymentsTab` (112), `BillingTab` (459).
 
