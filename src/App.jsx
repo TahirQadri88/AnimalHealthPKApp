@@ -50,6 +50,9 @@ import { UserManagementView } from './components/admin/UserManagementView';
 import { BulkOpsView } from './components/admin/BulkOpsView';
 import { FixInvoiceUnitsButton } from './components/admin/FixInvoiceUnitsButton';
 import { AppSettingsView } from './components/admin/AppSettingsView';
+import { ExpenseCategoryModal } from './components/modals/ExpenseCategoryModal';
+import { PaymentModal } from './components/modals/PaymentModal';
+import { CustomerModal } from './components/modals/CustomerModal';
 
 
 
@@ -276,128 +279,6 @@ return (
 );
 };
 
-const CustomerModal = () => {
-const { editingCustomer, customers, invoices, billingView, currentInvoice, isAdmin, checkDuplicate, saveToFirebase, showToast, setShowCustomerModal, setCurrentInvoice, cities, areas, customerTypes, setShowSegmentsModal } = useContext(AppContext);
-const isEdit = !!editingCustomer;
-const [form, setForm] = useState(isEdit ? editingCustomer : { name: '', contactPerson: '', phone: '', address1: '', map1: '', address2: '', map2: '', openingBalance: 0, city: '', area: '', customerType: '', registrationDate: getLocalDateStr() });
-useEffect(() => { if (isEdit && editingCustomer.address && !editingCustomer.address1) { setForm(prev => ({...prev, address1: editingCustomer.address})); } }, [isEdit, editingCustomer]);
-const save = async () => {
-if(!form.name) return showToast("Customer Name required", "error");
-if(checkDuplicate(customers, form.name, form.id)) return showToast("Customer Name must be unique", "error");
-if(isEdit) {
-const updatedCustomer = {...form, openingBalance: Number(form.openingBalance)};
-if(updatedCustomer.address) delete updatedCustomer.address;
-await saveToFirebase('customers', form.id, updatedCustomer);
-if(form.name !== editingCustomer.name) { for (const o of invoices) { if (o.customerId === form.id) await saveToFirebase('invoices', o.id, {...o, customerName: form.name}); } }
-showToast("Customer Updated");
-} else {
-const newId = Date.now();
-const newCust = { ...form, openingBalance: Number(form.openingBalance), id: newId };
-await saveToFirebase('customers', newId, newCust);
-if (billingView === 'form' && currentInvoice) { setCurrentInvoice({...currentInvoice, customerId: newCust.id, customerName: newCust.name}); }
-showToast("Customer Added");
-}
-setShowCustomerModal(false);
-};
-const inputClass = "w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-sm text-slate-800 placeholder-slate-400";
-return (
-<ModalWrapper title={isEdit ? "Edit Customer Profile" : "Add New Customer"} onClose={() => setShowCustomerModal(false)}>
-<form onSubmit={e => { e.preventDefault(); save(); }} className="space-y-5 pb-8">
-<div className="space-y-3">
-<h3 className="text-xs font-bold text-slate-800 uppercase tracking-widest border-b border-slate-200 pb-1">Basic Details</h3>
-<div className="grid grid-cols-2 gap-3">
-<div className="col-span-2"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Customer / Business Name *</label><input placeholder="e.g. Karachi Vet Clinic" className={inputClass} value={form.name} onChange={e => setForm({...form, name: e.target.value})} /></div>
-<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Registration Date</label><input type="date" className={inputClass} value={form.registrationDate || getLocalDateStr()} onChange={e => setForm({...form, registrationDate: e.target.value})} /></div>
-<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Phone Number</label><input placeholder="03XXXXXXXXX" className={inputClass} value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} /></div>
-</div>
-<div className="grid grid-cols-2 gap-3">
-<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Contact Person</label><input placeholder="Name" className={inputClass} value={form.contactPerson || ''} onChange={e => setForm({...form, contactPerson: e.target.value})} /></div>
-<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Alt. Phone (Optional)</label><input placeholder="03XXXXXXXXX" className={inputClass} value={form.altPhone || ''} onChange={e => setForm({...form, altPhone: e.target.value})} /></div>
-</div>
-<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Email (Optional)</label><input type="email" placeholder="clinic@example.com" className={inputClass} value={form.email || ''} onChange={e => setForm({...form, email: e.target.value})} /></div>
-</div>
-<div className="space-y-3 bg-slate-100 p-3 rounded-xl border border-slate-200">
-<h3 className="text-xs font-bold text-slate-800 uppercase tracking-widest flex items-center gap-1"><MapPin size={14}/> Primary Location</h3>
-<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Address 1</label><textarea placeholder="Complete Delivery Address..." rows="2" className={inputClass} value={form.address1} onChange={e => setForm({...form, address1: e.target.value})} /></div>
-<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Google Maps Link 1</label><input placeholder="https://maps.app.goo.gl/..." className={inputClass} value={form.map1 || ''} onChange={e => setForm({...form, map1: e.target.value})} /></div>
-</div>
-<div className="space-y-3 p-3 rounded-xl border border-slate-200 border-dashed">
-<h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1"><MapPin size={14}/> Secondary Location (Optional)</h3>
-<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Address 2</label><textarea placeholder="Alternative Address..." rows="2" className={inputClass} value={form.address2 || ''} onChange={e => setForm({...form, address2: e.target.value})} /></div>
-<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Google Maps Link 2</label><input placeholder="https://maps.app.goo.gl/..." className={inputClass} value={form.map2 || ''} onChange={e => setForm({...form, map2: e.target.value})} /></div>
-</div>
-<div className="space-y-3 bg-indigo-50/50 p-3 rounded-xl border border-indigo-100">
-<div className="flex justify-between items-center"><h3 className="text-xs font-bold text-slate-800 uppercase tracking-widest flex items-center gap-1"><Globe size={14}/> Segment / Classification</h3><button type="button" onClick={()=>setShowSegmentsModal(true)} className="text-[10px] font-bold text-indigo-600 bg-indigo-100 hover:bg-indigo-200 px-2 py-1 rounded-md transition-colors">+ Manage</button></div>
-<div className="grid grid-cols-3 gap-2">
-<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">City</label><SearchableSelect className={inputClass} value={form.city||''} onChange={e=>setForm({...form,city:e.target.value,area:''})} placeholder="–" options={cities.map(c=>({value:c.name,label:c.name}))} /></div>
-<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Area</label><SearchableSelect className={inputClass} value={form.area||''} onChange={e=>setForm({...form,area:e.target.value})} placeholder="–" options={areas.filter(a=>!form.city||!a.cityName||a.cityName===form.city).map(a=>({value:a.name,label:a.name}))} /></div>
-<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Type</label><SearchableSelect className={inputClass} value={form.customerType||''} onChange={e=>setForm({...form,customerType:e.target.value})} placeholder="–" options={customerTypes.map(t=>({value:t.name,label:t.name}))} /></div>
-</div>
-</div>
-{isAdmin && (
-<div className="bg-rose-50 p-3 rounded-xl border border-rose-100 mt-2 space-y-3">
-<div><label className="text-[10px] font-bold text-rose-500 uppercase tracking-wider ml-1 mb-1 block">Opening Balance (Dr)</label><input type="number" placeholder="0.00" className={`${inputClass} !border-rose-200 focus:!border-rose-500`} value={form.openingBalance} onChange={e => setForm({...form, openingBalance: e.target.value})} /></div>
-<div><label className="text-[10px] font-bold text-amber-600 uppercase tracking-wider ml-1 mb-1 block">Credit Limit (Rs) — 0 = no limit</label><input type="number" placeholder="0 = unlimited" className={`${inputClass} !border-amber-200 !bg-amber-50/50 focus:!border-amber-500`} value={form.creditLimit||0} onChange={e => setForm({...form, creditLimit: e.target.value})} /></div>
-</div>
-)}
-<button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 rounded-xl mt-4 shadow-md shadow-indigo-600/20 active:scale-[0.98] transition-all">Save Customer Profile</button>
-</form>
-</ModalWrapper>
-);
-};
-
-const PaymentModal = () => {
-const { selectedCustomerForPayment, customers, payments, getCustomerBalance, saveToFirebase, showToast, setShowPaymentModal, editingPayment, setEditingPayment, logSave, paymentsRaw } = useContext(AppContext);
-const isEdit = !!editingPayment;
-const [form, setForm] = useState(
-  isEdit
-    ? { customerId: editingPayment.customerId, amount: editingPayment.amount, discount: editingPayment.discount || 0, date: editingPayment.date, note: editingPayment.note || 'Cash Payment' }
-    : { customerId: selectedCustomerForPayment || '', amount: '', discount: 0, date: getLocalDateStr(), note: 'Cash Payment' }
-);
-const handleClose = () => { setEditingPayment(null); setShowPaymentModal(false); };
-const discount = Number(form.discount) || 0;
-const totalCredit = (Number(form.amount) || 0) + discount;
-const save = async () => {
-if(!form.customerId || !form.amount) return showToast("Customer and Amount are required", "error");
-if (isEdit) {
-  const updated = { ...editingPayment, customerId: Number(form.customerId), amount: Number(form.amount), discount, date: form.date, note: form.note };
-  await saveToFirebase('payments', updated.id, updated);
-  await logSave('payments', editingPayment, updated, updated.id);
-  showToast("Payment Receipt Updated!");
-} else {
-  const recNum = (await claimDocNumber('REC', getNextSeqNum(paymentsRaw, 'REC'))) ?? getNextSeqNum(paymentsRaw, 'REC');
-  const newPayment = { id: `REC-${String(recNum).padStart(4, '0')}`, customerId: Number(form.customerId), amount: Number(form.amount), discount, date: form.date, note: form.note };
-  await saveToFirebase('payments', newPayment.id, newPayment);
-  await logSave('payments', null, newPayment, newPayment.id);
-  showToast("Payment Received & Ledger Updated!");
-}
-handleClose();
-};
-const inputClass = "w-full p-3.5 bg-white border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-sm text-slate-800 placeholder-slate-400";
-return (
-<ModalWrapper title={isEdit ? "Edit Payment Receipt" : "Receive Payment"} onClose={handleClose}>
-<form onSubmit={e => { e.preventDefault(); save(); }} className="space-y-4 pb-10">
-<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Select Client</label><SearchableSelect className={inputClass} value={form.customerId} onChange={e=>setForm({...form, customerId: e.target.value})} placeholder="– Choose Client –" options={customers.map(c=>({value:c.id,label:c.name}))} disabled={isEdit && customers.some(c => c.id === Number(form.customerId) || String(c.id) === String(form.customerId))} />
-{isEdit && !customers.some(c => String(c.id) === String(form.customerId)) && (
-  <p className="text-[10px] text-amber-600 font-bold mt-1 flex items-center gap-1"><AlertCircle size={11}/> Original client was deleted — please re-assign to an existing client or delete this receipt.</p>
-)}</div>
-{form.customerId && (<div className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-center"><p className="text-[10px] uppercase font-bold text-slate-500 tracking-widest">Current Outstanding Balance</p><p className="text-xl font-black text-rose-600 mt-1">Rs. {getCustomerBalance(Number(form.customerId)).toLocaleString('en-US')}</p></div>)}
-<div className="grid grid-cols-2 gap-3">
-<div className="col-span-2"><label className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider ml-1 mb-1 block">Amount Received (Cash / Cheque)</label><input type="number" placeholder="0.00" className={`${inputClass} !border-emerald-200 !text-emerald-700 !font-extrabold text-lg`} value={form.amount} onChange={e=>setForm({...form, amount: e.target.value})} /></div>
-<div><label className="text-[10px] font-bold text-amber-600 uppercase tracking-wider ml-1 mb-1 block">Round-off Discount</label><input type="number" placeholder="0" className={`${inputClass} !border-amber-200 !text-amber-700 !font-bold`} value={form.discount || ''} onChange={e=>setForm({...form, discount: Number(e.target.value)||0})} /></div>
-<div className="bg-amber-50 border border-amber-100 rounded-xl p-3 flex flex-col justify-center">
-  <p className="text-[10px] font-bold text-amber-600 uppercase tracking-widest">Total Credit</p>
-  <p className="text-lg font-black text-amber-800">Rs. {totalCredit.toLocaleString('en-US')}</p>
-</div>
-<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Date</label><input type="date" className={inputClass} value={form.date} onChange={e=>setForm({...form, date: e.target.value})} /></div>
-<div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Mode / Note</label><input type="text" placeholder="e.g. Cash / Cheque No." className={inputClass} value={form.note} onChange={e=>setForm({...form, note: e.target.value})} /></div>
-</div>
-<button type="submit" className={`w-full text-white font-bold py-4 rounded-xl mt-6 shadow-md active:scale-[0.98] transition-all ${isEdit ? 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-500/20' : 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/20'}`}>{isEdit ? 'Update Payment' : 'Process Payment'}</button>
-</form>
-</ModalWrapper>
-);
-};
-
 const CustomerLedgerModal = () => {
 const { selectedLedgerId, getCustomerLedger, generateReceiptData, setPrintConfig, setShowPaymentModal, setSelectedCustomerForPayment, setShowLedgerModal, deleteFromFirebase, saveToFirebase, invoices, isAdmin, setEditingPayment, payments, setShowCreditNoteModal, setEditingCreditNote, showConfirm, setCurrentInvoice, setBillingView, setActiveTab, showPrompt, voidRecord, logSave, showToast } = useContext(AppContext);
 const [startDate, setStartDate] = useState(() => { const d = new Date(); d.setMonth(d.getMonth() - 1); return getLocalDateStr(d); });
@@ -529,56 +410,6 @@ return (
 </ModalWrapper>
 );
 };
-
-const ExpenseCategoryModal = () => {
-const { expenseCategories, saveToFirebase, deleteFromFirebase, showToast, setShowExpenseCatModal, showConfirm } = useContext(AppContext);
-const [newCat, setNewCat] = useState('');
-const [newGroup, setNewGroup] = useState('Transportation');
-const inputCls = "w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:border-indigo-500 shadow-sm";
-const addCat = async () => {
-if(!newCat) return;
-if(expenseCategories.some(c => c.name.toLowerCase() === newCat.toLowerCase())) return showToast("Category exists", "error");
-const catObj = { id: Date.now(), name: newCat, group: newGroup };
-await saveToFirebase('expenseCategories', catObj.id, catObj);
-setNewCat('');
-showToast("Category Added");
-};
-return (
-<ModalWrapper title="Manage Expense Labels" onClose={() => setShowExpenseCatModal(false)}>
-<div className="space-y-4 pb-10">
-<form onSubmit={e=>{e.preventDefault();addCat();}} className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-3">
-  <div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Category Name</label><input type="text" placeholder="e.g. Bike Ride, Petrol..." className={inputCls} value={newCat} onChange={e=>setNewCat(e.target.value)} /></div>
-  <div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Group / Type</label><select className={inputCls} value={newGroup} onChange={e=>setNewGroup(e.target.value)}>{EXPENSE_GROUPS.map(g=><option key={g} value={g}>{g}</option>)}</select></div>
-  <button type="submit" className="w-full bg-indigo-600 text-white font-bold py-2.5 rounded-xl hover:bg-indigo-700 transition-colors">Add Category</button>
-</form>
-<div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-{expenseCategories.length === 0 && <p className="text-center py-6 text-sm text-slate-400">No categories yet.</p>}
-<ul className="divide-y divide-slate-100">
-{EXPENSE_GROUPS.map(g => {
-  const cats = expenseCategories.filter(c => (c.group||'Other') === g);
-  if (cats.length === 0) return null;
-  return (
-    <li key={g}>
-      <div className={`px-3 py-1.5 text-[9px] font-black uppercase tracking-widest border-b border-slate-100 ${EXPENSE_GROUP_COLORS[g]}`}>{g}</div>
-      <ul>
-        {cats.map(c => (
-          <li key={c.id} className="flex justify-between items-center px-3 py-2.5 hover:bg-slate-50">
-            <span className="font-semibold text-slate-700 text-sm flex items-center gap-2"><Tag size={13} className="text-slate-400"/> {c.name}</span>
-            <button type="button" onClick={async () => { if(await showConfirm(`Delete category "${c.name}"?`)) await deleteFromFirebase('expenseCategories', c.id); }} className="p-2 text-slate-400 hover:text-rose-500 transition-colors"><Trash2 size={15}/></button>
-          </li>
-        ))}
-      </ul>
-    </li>
-  );
-})}
-</ul>
-</div>
-</div>
-</ModalWrapper>
-);
-};
-
-// ─────────────────────────────────────────────────────────────────────────────
 
 const RidersModal = () => {
 const { riders, vehicleTypes, saveToFirebase, deleteFromFirebase, showToast, setShowRidersModal, showConfirm } = useContext(AppContext);
