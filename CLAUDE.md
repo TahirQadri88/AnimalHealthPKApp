@@ -90,66 +90,34 @@ actually works.
 
 ---
 
-## Three colour passes, three destinations — don't merge them
+## Two looks, not three: screen and paper
 
-The same document is painted three different ways, and each one exists because the
-destination is different:
+Every screen destination shows the same document — **preview, Save / Share, PDF and Image
+are identical**, yellow blocks with black lettering. Paper is the only exception:
+`buildHtmlDoc(screenHide=true)` bakes monochrome onto the clone's inline styles, and the
+print stylesheet carries `#doc [data-dk]{background-color:black!important}` as the belt to
+that braces.
 
-1. **Screen preview** — the document as written in `PrintView.jsx`: navy blocks carrying
-   yellow text, on white. Source of truth for the other two, and the exact look of both
-   **Save / Share** and **PDF**, which clone the live document. The control bar says so:
-   it once said "preview shows the print version", which was plainly wrong — print is
-   black and white and the preview is not.
-2. **Print / HTML share** — `buildHtmlDoc(screenHide=true)` bakes monochrome onto the
-   clone's inline styles, then restores `data-dk="1"` blocks to black-with-white-text.
-   White paper, black toner: colour here costs money and prints muddy. Only six elements
-   carry `data-dk` in the JSX, so `buildHtmlDoc` tags the rest by luminance first —
-   originally for thermal only, which is why every table header (invoice items, ledger,
-   report, aging) once printed as bare text with no bar on A4/A5 while the PDF kept it.
-   The two tagging passes are deliberately **not** merged: the thermal one also pins
-   backgrounds with `!important` against the receipt stylesheet and keeps its own local
-   colour maths, so a change to the paper path cannot reach the 68mm path.
-3. **Image share** — `applyYellowBlocks()` in `printTheme.js` flips the dark blocks to
-   yellow fill with black text. A shared image is read at thumbnail size in a chat, where
-   navy slabs read as heavy dark bands and the yellow is the half of the brand that carries.
+It used to be three looks. The blocks were navy with yellow text, and the image share
+repainted them on its own clone — which made the image the odd one out against the very
+preview it was generated from, and produced a genuinely confusing UI. The colours live in
+the document now and there is nothing to repaint.
 
-Pass 3 finds the blocks **by colour, not by selector** — any element whose computed
-background is below `BLOCK_MAX_LUM`, plus anything tagged `data-dk="1"`. Add a new dark
-section to any document type and it is picked up without coming back here. It runs on the
-clone **after** it is appended to the document, because it reads computed styles and a
-detached node has none, and it reads every element's colours before writing any, or nested
-elements report the yellow just set instead of the navy the document actually had.
+**Every block MUST carry `data-dk="1"`.** This is the load-bearing rule of the new
+arrangement. `buildHtmlDoc` used to find blocks by darkness so print could restore them as
+black bars; a yellow block is light, so that test no longer finds one. Fourteen elements
+carry the attribute and the print pass reads nothing else. Add a block without it and it
+prints as bare text with no bar — which is exactly the regression that had every A4 table
+header printing flat before 2026-09-01.
 
-Keep the passes independent, and note that pass 3 is **not optional**. It briefly had a
-`Boxes: Yellow` / `Boxes: Dark` toggle; that was removed because the two destinations never
-overlap — paper wants ink-cheap dark blocks, a phone wants the brand — so the choice was
-one nobody would ever make twice. It must also never reach the live document: the PDF path
-clones that same element, so repainting the preview would silently change every PDF too.
+The luminance test (`isBlockBackground`) is still there and still earns its place: it
+catches the two **coloured status bars** — the purple estimate notice and the rose credit
+note — which keep their own colour on screen because they carry meaning rather than
+branding, and are dark enough to be tagged automatically for paper.
 
----
-
-## Writing a whole document back is how an edit gets undone
-
-`saveToFirebase` used `setDoc` with no merge, so every write REPLACED the document. Two
-consequences, both of which cost a real edit:
-
-- **The auto-backup reverted Settings.** It captured `appSettings` on load, spent several
-  seconds uploading fifteen collections, then wrote `{ ...appSettings, lastBackupAt }`
-  back. Anything changed in Settings during those seconds was overwritten by the stale
-  snapshot — silently, because the backup's own toast looks like success.
-- **Saving Settings wiped the backup timestamps.** The form does not hold `lastBackupAt` or
-  `lastDriveBackupAt`, so a full write deleted them, the auto-backup then believed it was
-  overdue, and it ran on the next load — re-opening the window above.
-
-Both now write only the fields they own, with `{ merge: true }`. The rule: **a background
-job may stamp its own field and nothing else.** If a write includes `...someState` captured
-in a closure, ask what else has changed since it was captured.
-
-Related, and the reason this went unreported for a day: `setDoc` resolves when the SERVER
-acknowledges, not when the local cache applies. On a bad connection the promise stays
-pending, the caller's success toast never runs, and the save looks like it did nothing at
-all — no tick, no error. `saveToFirebase` now says "Still saving — check your connection"
-after six seconds rather than leaving silence.
+Verify a change here by simulating the print pass rather than reading it: render the
+document, apply the whiten-then-restore-`[data-dk]` sequence, and count the bars. Fifteen
+elements come back black on an invoice, and nothing overflows the 68mm box.
 
 ---
 

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { FileDown, Printer, Share2, X, MessageCircle, Image } from 'lucide-react';
 import { formatDateDisp, getLocalDateStr, APP_NAME } from '../helpers';
-import { applyYellowBlocks, isBlockBackground } from './printTheme';
+import { YELLOW, isBlockBackground } from './printTheme';
 
 // Format: 'thermal' | 'a5' | 'a4'
 //
@@ -709,13 +709,6 @@ const handleImageShare = async () => {
   });
   document.body.appendChild(clone);
   await new Promise(r => setTimeout(r, 400));
-  // A shared image is read at thumbnail size in a chat, where the navy slabs read as heavy
-  // dark bands, so the blocks go yellow with black text. Not a choice — paper wants the
-  // ink-cheap dark blocks and a phone wants the brand, and the two destinations never
-  // overlap. Repainted AFTER the clone is in the document: applyYellowBlocks reads
-  // computed styles and a detached node has none. The live document is untouched, so
-  // print and PDF keep the dark blocks.
-  applyYellowBlocks(clone);
   const captureH = clone.scrollHeight > 0 ? clone.scrollHeight : originalH;
 
   try {
@@ -965,18 +958,17 @@ return (
     </div>
 
     {/* File name hint.
-        Four destinations, three looks, and the preview is only one of them:
-          Save / Share and PDF  — clone the live document, so they match the preview exactly
-          Print                 — buildHtmlDoc(screenHide) bakes monochrome; black and white
-          Image                 — applyYellowBlocks repaints the blocks yellow
-        An earlier version of this line said "preview shows the print version", which was
-        simply wrong: print is black and white and the preview is not. */}
+        One look everywhere on a screen, one on paper:
+          Preview, Save / Share, PDF, Image — all the same document, yellow blocks
+          Print — buildHtmlDoc(screenHide) bakes monochrome; black and white
+        The blocks are yellow in the document itself now, rather than being repainted on
+        the image's clone, which is why those four finally agree. */}
     <div className="text-center pb-1.5 no-print">
       <span className="text-[10px] text-slate-500 font-mono">{getFileName()}</span>
       <span className="block text-[10px] text-slate-400 mt-0.5 px-3 leading-relaxed">
-        Preview matches <span className="text-indigo-300 font-bold">Save / Share</span> and PDF ·
-        {' '}<span className="text-emerald-300 font-bold">Print</span> is black &amp; white ·
-        {' '}<span className="text-yellow-300 font-bold">Image</span> has yellow boxes
+        Preview matches <span className="text-indigo-300 font-bold">Save / Share</span>,
+        {' '}PDF and <span className="text-yellow-300 font-bold">Image</span> ·
+        {' '}<span className="text-emerald-300 font-bold">Print</span> is black &amp; white
       </span>
     </div>
   </div>
@@ -992,17 +984,17 @@ return (
     {/* ── Header ── */}
     <div className="keep-together" style={{ textAlign: 'center', marginBottom: sz('14px','18px','22px'), borderRadius: isThermal ? '0' : sz('','6px 6px 0 0','8px 8px 0 0'), overflow: 'hidden', border: '2px solid #0f172a' }}>
       {showBizName && (
-        <div data-dk="1" style={{ background: '#0f172a', padding: sz('12px 10px','18px 20px','22px 24px') }}>
-          <div style={{ fontSize: `${mastheadFontPx}px`, fontWeight: 900, letterSpacing: '1px', textTransform: 'uppercase', color: '#FFF200', lineHeight: 1.2 }}>
+        <div data-dk="1" style={{ background: YELLOW.fill, padding: sz('12px 10px','18px 20px','22px 24px') }}>
+          <div style={{ fontSize: `${mastheadFontPx}px`, fontWeight: 900, letterSpacing: '1px', textTransform: 'uppercase', color: YELLOW.ink, lineHeight: 1.2 }}>
             {bizName}
           </div>
-          {bizTagline && <div style={{ fontSize: `${taglineFontPx}px`, textTransform: 'uppercase', letterSpacing: '2px', fontWeight: 600, color: '#94a3b8', marginTop: '4px' }}>
+          {bizTagline && <div style={{ fontSize: `${taglineFontPx}px`, textTransform: 'uppercase', letterSpacing: '2px', fontWeight: 600, color: YELLOW.inkMuted, marginTop: '4px' }}>
             {bizTagline}
           </div>}
           {/* Contact line. Brighter than the tagline because it is the actionable part —
               a phone number someone squints at, not decoration. overflowWrap keeps a long
               address inside the 68mm box instead of overrunning the head. */}
-          {bizContact && <div style={{ fontSize: `${taglineFontPx}px`, letterSpacing: '0.3px', fontWeight: 600, color: '#cbd5e1', marginTop: '3px', lineHeight: 1.5, overflowWrap: 'anywhere' }}>
+          {bizContact && <div style={{ fontSize: `${taglineFontPx}px`, letterSpacing: '0.3px', fontWeight: 600, color: YELLOW.inkMuted, marginTop: '3px', lineHeight: 1.5, overflowWrap: 'anywhere' }}>
             {bizContact}
           </div>}
         </div>
@@ -1010,8 +1002,8 @@ return (
       <div style={{ textAlign: 'center', padding: sz('5px 8px','7px 10px','8px 12px'), background: 'white' }}>
         <span data-dk="1" style={{
           display: 'inline-block',
-          background: '#0f172a',
-          color: '#FFF200',
+          background: YELLOW.fill,
+          color: YELLOW.ink,
           padding: sz('3px 12px','4px 16px','5px 20px'),
           borderRadius: '4px',
           fontWeight: 800,
@@ -1179,7 +1171,7 @@ return (
           const grandTotal = (
             <div className="keep-together" style={{
               display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px',
-              background: '#1e293b', color: 'white', borderRadius: '8px',
+              background: YELLOW.fill, color: YELLOW.ink, borderRadius: '8px',
               padding: sz('6px 8px','8px 12px','10px 14px'), marginTop: sz('8px','10px','12px'),
               fontWeight: 900, fontSize: sz('9px','12px','14px'),
             }} data-dk="1">
@@ -1227,7 +1219,7 @@ return (
               {summary}
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: sz('8px','8.5px','10px') }}>
                 <thead>
-                  <tr style={{ background: '#1e293b', color: 'white' }}>
+                  <tr data-dk="1" style={{ background: YELLOW.fill, color: YELLOW.ink }}>
                     <th style={{ padding: sz('5px 4px','6px 5px','8px 8px'), textAlign: 'left', fontWeight: 800 }}>Customer</th>
                     <th style={{ padding: sz('5px 4px','6px 5px','8px 8px'), textAlign: 'center', fontWeight: 800, whiteSpace: 'nowrap' }}>Oldest</th>
                     {agingBuckets.map(b => (
@@ -1256,7 +1248,7 @@ return (
                   ))}
                 </tbody>
                 <tfoot>
-                  <tr style={{ background: '#1e293b', color: 'white', fontWeight: 900 }} data-dk="1">
+                  <tr data-dk="1" style={{ background: YELLOW.fill, color: YELLOW.ink, fontWeight: 900 }}>
                     <td style={{ padding: sz('6px 4px','7px 5px','9px 8px') }}>TOTAL ({aging.customerCount ?? rows.length})</td>
                     <td />
                     {agingBuckets.map(b => (
@@ -1270,7 +1262,7 @@ return (
           );
         })() : data.view === 'Overview' ? (
           <div className="keep-together" style={{ border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden' }}>
-            <div style={{ background: '#1e293b', color: 'white', padding: sz('8px 12px','10px 16px','12px 20px'), fontSize: sz('9px','10px','11px'), fontWeight: 800, letterSpacing: '1px', textTransform: 'uppercase' }}>
+            <div data-dk="1" style={{ background: YELLOW.fill, color: YELLOW.ink, padding: sz('8px 12px','10px 16px','12px 20px'), fontSize: sz('9px','10px','11px'), fontWeight: 800, letterSpacing: '1px', textTransform: 'uppercase' }}>
               Profit & Loss Summary
             </div>
             <div style={{ padding: sz('12px','16px','20px') }}>
@@ -1307,7 +1299,7 @@ return (
           </div>
         ) : data.view === 'Insights' ? (
           <div className="keep-together" style={{ border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden' }}>
-            <div style={{ background: '#1e293b', color: 'white', padding: sz('8px 12px','10px 16px','12px 20px'), fontSize: sz('9px','10px','11px'), fontWeight: 800, letterSpacing: '1px', textTransform: 'uppercase' }}>
+            <div data-dk="1" style={{ background: YELLOW.fill, color: YELLOW.ink, padding: sz('8px 12px','10px 16px','12px 20px'), fontSize: sz('9px','10px','11px'), fontWeight: 800, letterSpacing: '1px', textTransform: 'uppercase' }}>
               P&L Insights Report
             </div>
             <div style={{ padding: sz('12px','16px','20px') }}>
@@ -1347,7 +1339,7 @@ return (
         ) : (
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: sz('8px','9px','10px') }}>
             <thead>
-              <tr style={{ background: '#1e293b', color: 'white' }}>
+              <tr data-dk="1" style={{ background: YELLOW.fill, color: YELLOW.ink }}>
                 <th style={{ padding: sz('5px 4px','7px 6px','8px 8px'), textAlign: 'left', fontWeight: 800 }}>Name</th>
                 {data.view !== 'Receivables' && <th style={{ padding: sz('5px 4px','7px 6px','8px 8px'), textAlign: 'center', fontWeight: 800 }}>Qty</th>}
                 {data.view !== 'Receivables' && <th style={{ padding: sz('5px 4px','7px 6px','8px 8px'), textAlign: 'right', fontWeight: 800 }}>Revenue</th>}
@@ -1387,7 +1379,7 @@ return (
               const totalGP = safeRows.reduce((s,r) => s + (Number(r['Gross Profit (Rs)']||r['Outstanding (Rs)']||r.GrossProfit||r.Amount)||0), 0);
               return (
                 <tfoot>
-                  <tr style={{ background: '#1e293b', color: 'white', fontWeight: 900, fontSize: sz('8px','9px','10px') }}>
+                  <tr data-dk="1" style={{ background: YELLOW.fill, color: YELLOW.ink, fontWeight: 900, fontSize: sz('8px','9px','10px') }}>
                     <td style={{ padding: sz('6px 4px','8px 6px','9px 8px') }}>TOTAL ({safeRows.length})</td>
                     {data.view !== 'Receivables' && <td style={{ padding: sz('6px','8px','9px'), textAlign: 'center', whiteSpace: 'nowrap' }}>{totalQty.toLocaleString('en-US')}</td>}
                     {data.view !== 'Receivables' && <td style={{ padding: sz('6px','8px','9px'), textAlign: 'right', whiteSpace: 'nowrap' }}>Rs.{totalRev.toLocaleString('en-US')}</td>}
@@ -1406,20 +1398,20 @@ return (
       <>
         <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', marginBottom: sz('16px','20px','24px'), fontSize: sz('9.5px','11px','12px') }}>
           <thead>
-            <tr style={{ background: '#1e293b' }}>
-              <th style={{ padding: sz('6px 2px 6px 0','8px 4px 8px 0','9px 6px 9px 0'), textAlign: 'left', fontWeight: 800, color: '#FFF200', textTransform: 'uppercase', fontSize: sz('7.5px','8.5px','9px'), letterSpacing: '0.5px', width: isThermal ? (docType === 'dispatch' ? '65%' : '48%') : (docType === 'dispatch' ? '65%' : '50%') }}>
+            <tr data-dk="1" style={{ background: YELLOW.fill }}>
+              <th style={{ padding: sz('6px 2px 6px 0','8px 4px 8px 0','9px 6px 9px 0'), textAlign: 'left', fontWeight: 800, color: YELLOW.ink, textTransform: 'uppercase', fontSize: sz('7.5px','8.5px','9px'), letterSpacing: '0.5px', width: isThermal ? (docType === 'dispatch' ? '65%' : '48%') : (docType === 'dispatch' ? '65%' : '50%') }}>
                 Description
               </th>
-              <th style={{ padding: sz('6px 2px','8px 4px','9px 6px'), textAlign: 'center', fontWeight: 800, color: '#FFF200', textTransform: 'uppercase', fontSize: sz('7.5px','8.5px','9px'), letterSpacing: '0.5px', whiteSpace: 'nowrap', width: isThermal ? (docType === 'dispatch' ? '35%' : '10%') : (docType === 'dispatch' ? '35%' : '9%') }}>
+              <th style={{ padding: sz('6px 2px','8px 4px','9px 6px'), textAlign: 'center', fontWeight: 800, color: YELLOW.ink, textTransform: 'uppercase', fontSize: sz('7.5px','8.5px','9px'), letterSpacing: '0.5px', whiteSpace: 'nowrap', width: isThermal ? (docType === 'dispatch' ? '35%' : '10%') : (docType === 'dispatch' ? '35%' : '9%') }}>
                 {docType === 'dispatch' ? 'Qty / Pack' : 'Qty'}
               </th>
               {showRateCol && (
-                <th style={{ padding: sz('6px 2px','8px 4px','9px 6px'), textAlign: 'right', fontWeight: 800, color: '#FFF200', textTransform: 'uppercase', fontSize: sz('7.5px','8.5px','9px'), letterSpacing: '0.5px', whiteSpace: 'nowrap', width: isThermal ? '42%' : '17%' }}>
+                <th style={{ padding: sz('6px 2px','8px 4px','9px 6px'), textAlign: 'right', fontWeight: 800, color: YELLOW.ink, textTransform: 'uppercase', fontSize: sz('7.5px','8.5px','9px'), letterSpacing: '0.5px', whiteSpace: 'nowrap', width: isThermal ? '42%' : '17%' }}>
                   Rate
                 </th>
               )}
               {showAmountCol && (
-                <th style={{ padding: sz('','8px 4px 8px 0','9px 0 9px 4px'), textAlign: 'right', fontWeight: 800, color: '#FFF200', textTransform: 'uppercase', fontSize: sz('','8.5px','9px'), letterSpacing: '0.5px', whiteSpace: 'nowrap', width: '24%' }}>
+                <th style={{ padding: sz('','8px 4px 8px 0','9px 0 9px 4px'), textAlign: 'right', fontWeight: 800, color: YELLOW.ink, textTransform: 'uppercase', fontSize: sz('','8.5px','9px'), letterSpacing: '0.5px', whiteSpace: 'nowrap', width: '24%' }}>
                   Amount
                 </th>
               )}
@@ -1616,7 +1608,7 @@ return (
                   <span style={{ color: row.color || '#0f172a', fontVariantNumeric: 'tabular-nums' }}>{row.val}</span>
                 </div>
               ))}
-              <div data-dk="1" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#0f172a', borderRadius: sz('4px','5px','6px'), marginTop: sz('6px','8px','10px'), padding: sz('6px 8px','8px 12px','10px 14px'), fontWeight: 900, fontSize: sz('12px','13px','15px'), color: '#FFF200', fontVariantNumeric: 'tabular-nums' }}>
+              <div data-dk="1" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: YELLOW.fill, borderRadius: sz('4px','5px','6px'), marginTop: sz('6px','8px','10px'), padding: sz('6px 8px','8px 12px','10px 14px'), fontWeight: 900, fontSize: sz('12px','13px','15px'), color: YELLOW.ink, fontVariantNumeric: 'tabular-nums' }}>
                 <span>Net Balance:</span>
                 <span>Rs. {(showPrevBal ? netBalance : ((data.total || 0) - received)).toLocaleString('en-US')}</span>
               </div>
@@ -1696,7 +1688,7 @@ return (
 
         {/* ── Return / Exchange Policy ── */}
         {docType !== 'estimate' && docType !== 'creditnote' && <div className="keep-together" style={{ marginTop: sz('12px','16px','20px'), border: '1.5px solid #1e293b', borderRadius: '8px', fontSize: sz('6.5px','7.5px','8.5px') }}>
-          <div data-dk="1" style={{ background: '#1e293b', color: '#FFF200', padding: sz('4px 8px','5px 12px','6px 14px'), fontWeight: 900, textAlign: 'center', letterSpacing: '0.5px', textTransform: 'uppercase', fontSize: sz('6.5px','7px','8px'), borderRadius: '6px 6px 0 0' }}>
+          <div data-dk="1" style={{ background: YELLOW.fill, color: YELLOW.ink, padding: sz('4px 8px','5px 12px','6px 14px'), fontWeight: 900, textAlign: 'center', letterSpacing: '0.5px', textTransform: 'uppercase', fontSize: sz('6.5px','7px','8px'), borderRadius: '6px 6px 0 0' }}>
             "No" Return / Exchange Policy on Some Items
           </div>
           <div style={{ padding: sz('6px 8px','8px 12px','10px 14px'), background: '#f8fafc', borderRadius: '0 0 6px 6px' }}>
@@ -1780,7 +1772,7 @@ return (
         {/* Ledger table */}
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: sz('8.5px','9px','10px'), tableLayout: 'fixed' }}>
           <thead>
-            <tr style={{ background: '#1e293b', color: 'white' }}>
+            <tr data-dk="1" style={{ background: YELLOW.fill, color: YELLOW.ink }}>
               <th style={{ padding: sz('6px 2px','8px 4px','9px 6px'), textAlign: 'left', fontWeight: 800, textTransform: 'uppercase', fontSize: sz('6.5px','7px','7.5px'), letterSpacing: '0.5px', width: isThermal ? '14%' : '13%' }}>Date</th>
               <th style={{ padding: sz('6px 2px','8px 4px','9px 6px'), textAlign: 'left', fontWeight: 800, textTransform: 'uppercase', fontSize: sz('6.5px','7px','7.5px'), letterSpacing: '0.5px' }}>Particulars</th>
               <th style={{ padding: sz('6px 2px','8px 4px','9px 6px'), textAlign: 'right', fontWeight: 800, textTransform: 'uppercase', fontSize: sz('6.5px','7px','7.5px'), letterSpacing: '0.5px', whiteSpace: 'nowrap', width: isThermal ? '15%' : '15%' }}>Dr</th>
@@ -1825,7 +1817,7 @@ return (
             )}
           </tbody>
           <tfoot>
-            <tr style={{ background: '#1e293b', color: 'white' }}>
+            <tr data-dk="1" style={{ background: YELLOW.fill, color: YELLOW.ink }}>
               <td colSpan={2} style={{ padding: sz('6px 2px','8px 4px','9px 6px'), textAlign: 'right', fontWeight: 700, textTransform: 'uppercase', fontSize: sz('6.5px','7px','7.5px'), letterSpacing: '0.5px' }}>
                 Totals:
               </td>

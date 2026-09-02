@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseRgb, luminance, isBlockBackground, blockTextColor, YELLOW } from './printTheme';
+import { parseRgb, luminance, isBlockBackground, YELLOW } from './printTheme';
 
 describe('parseRgb', () => {
   it('reads the shapes getComputedStyle actually returns', () => {
@@ -17,10 +17,16 @@ describe('parseRgb', () => {
 
 // Every dark slab in every document type must be caught, and nothing else may be.
 describe('isBlockBackground', () => {
-  it('catches the blocks the documents actually use', () => {
-    expect(isBlockBackground('rgb(15, 23, 42)')).toBe(true);   // #0f172a masthead, pill, net balance
-    expect(isBlockBackground('rgb(30, 41, 59)')).toBe(true);   // #1e293b table header, policy strip
+  // The brand blocks are yellow now and are found by their data-dk attribute instead.
+  // What is left for this test is the two coloured status bars, which stay dark.
+  it('catches the coloured status bars, which print as bars', () => {
+    expect(isBlockBackground('rgb(124, 58, 237)')).toBe(true);  // #7c3aed estimate notice
+    expect(isBlockBackground('rgb(225, 29, 72)')).toBe(true);   // #e11d48 credit note
     expect(isBlockBackground('rgb(0, 0, 0)')).toBe(true);
+  });
+
+  it('does NOT catch a yellow block — that is why every block carries data-dk', () => {
+    expect(isBlockBackground('rgb(255, 242, 0)')).toBe(false);
   });
 
   it('leaves the page and its light panels alone', () => {
@@ -37,27 +43,7 @@ describe('isBlockBackground', () => {
   });
 });
 
-describe('blockTextColor', () => {
-  it('turns the yellow lettering black — that is the whole point', () => {
-    expect(blockTextColor('rgb(255, 242, 0)')).toBe(YELLOW.ink);
-  });
-
-  it('turns white lettering black too', () => {
-    expect(blockTextColor('rgb(255, 255, 255)')).toBe(YELLOW.ink);
-  });
-
-  it('keeps secondary text a step below the heading it sits under', () => {
-    expect(blockTextColor('rgb(148, 163, 184)')).toBe(YELLOW.inkMuted);  // #94a3b8 tagline
-    expect(blockTextColor('rgb(203, 213, 225)')).toBe(YELLOW.inkMuted);  // #cbd5e1
-  });
-
-  it('falls back to black rather than leaving text unreadable', () => {
-    expect(blockTextColor('')).toBe(YELLOW.ink);
-    expect(blockTextColor('inherit')).toBe(YELLOW.ink);
-  });
-});
-
-describe('the result is black on yellow', () => {
+describe('the block palette', () => {
   it('fills with the brand yellow and writes in black', () => {
     expect(YELLOW.fill).toBe('#FFF200');
     expect(YELLOW.ink).toBe('#000000');
