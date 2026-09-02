@@ -7,3 +7,7 @@ export const EXPENSE_GROUP_COLORS = { Transportation: 'bg-indigo-50 text-indigo-
 // The vehicle types that carry one of our own riders, used as the fallback before the
 // vehicleTypes registry has loaded. The registry is the source of truth once it exists.
 export const RIDER_VEHICLE_TYPES = ['Rider', 'Rickshaw', 'Suzuki'];
+
+// One bounded page of the activity log. auditLogs grows forever and must never get a
+// listener — AuditView reads it once per visit, newest first, with this limit.
+export const LOG_PAGE = 200;
