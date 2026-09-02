@@ -2682,7 +2682,10 @@ React.useEffect(() => {
     driveFreq: appSettings.driveFreq || 'weekly',
   });
 }, [appSettings?.id, appSettings?.businessName, appSettings?.showBusinessNameOnDocs, appSettings?.showBusinessNameOnReports, appSettings?.backupFreq, appSettings?.githubFreq, appSettings?.driveScriptUrl, appSettings?.driveFolderId, appSettings?.driveFreq]);
-const saveSettings = async () => { await saveToFirebase('appSettings', 'main', form); showToast('Settings saved!'); };
+// Merged, not replaced. The form does not hold lastBackupAt or lastDriveBackupAt, so a
+// full write wiped them — which told the auto-backup it was overdue and set it running on
+// the next load, re-opening the very window in which it used to overwrite this save.
+const saveSettings = async () => { await saveToFirebase('appSettings', 'main', form, { merge: true }); showToast('Settings saved!'); };
 const downloadBackup = async () => {
   const backup = { exportedAt: new Date().toISOString(), collections: { app_users: appUsers, appSettings: appSettings ? [appSettings] : [], companies, products, customers, invoices, expenses, expenseCategories, payments, riders, transportCompanies, cities, areas, customerTypes, vehicleTypes } };
   const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
@@ -4944,9 +4947,21 @@ const migrateUsersToAuth = async () => {
   return { done, failed };
 };
 
-const saveToFirebase = async (collectionName, id, dataObj) => {
+// `merge` writes only the fields given, leaving the rest of the document alone. Default is
+// a full replace, which is what almost every caller wants — but see the auto-backup below
+// for the case where a replace silently undid somebody's edit.
+const saveToFirebase = async (collectionName, id, dataObj, { merge = false } = {}) => {
 try {
-await setDoc(doc(db, collectionName, String(id)), dataObj);
+  const ack = setDoc(doc(db, collectionName, String(id)), dataObj, { merge });
+  // Persistence is on, so the write applies locally at once but this promise only settles
+  // when the SERVER acknowledges. On a bad connection it can stay pending indefinitely,
+  // and the caller's success toast never runs — a save that appears to do nothing at all,
+  // with no error either. Saying so is better than silence.
+  let slow = false;
+  const warn = setTimeout(() => { slow = true; showToast('Still saving — check your connection', 'error'); }, 6000);
+  await ack;
+  clearTimeout(warn);
+  if (slow) showToast('Saved.');
 } catch (e) {
 console.error("Firebase Write Error:", e);
 showToast("Network Error - Could not save", "error");
@@ -4974,7 +4989,7 @@ React.useEffect(() => {
 
 React.useEffect(() => {
   if (appSettings?.id === 'main' && appSettings.showBusinessNameOnDocs === undefined) {
-    saveToFirebase('appSettings', 'main', { ...appSettings, showBusinessNameOnDocs: true, showBusinessNameOnReports: true });
+    saveToFirebase('appSettings', 'main', { showBusinessNameOnDocs: true, showBusinessNameOnReports: true }, { merge: true });
   }
 }, [appSettings?.id, appSettings?.showBusinessNameOnDocs]);
 
@@ -5005,14 +5020,17 @@ React.useEffect(() => {
     Promise.all(Object.entries(cols).map(([col, items]) =>
       saveToFirebase('backups', `${date}_${col}`, { items: items || [], backedUpAt: exportedAt })
     ))
-      .then(() => saveToFirebase('appSettings', 'main', { ...appSettings, lastBackupAt: exportedAt }))
+      // Stamp ONLY the timestamp, merged. This used to write { ...appSettings } back — a
+      // snapshot captured before fifteen collections were uploaded — so anything the user
+      // changed in Settings during those seconds was silently reverted to the old value.
+      .then(() => saveToFirebase('appSettings', 'main', { lastBackupAt: exportedAt }, { merge: true }))
       .then(() => showToast('Auto-backup saved to Firebase'))
       .catch(e => console.warn('Firebase auto-backup failed:', e));
   }
 
   if (driveDue) {
     uploadToDrive(appSettings.driveScriptUrl, backupObj, appSettings.driveFolderId)
-      .then(() => saveToFirebase('appSettings', 'main', { ...appSettings, lastDriveBackupAt: exportedAt }))
+      .then(() => saveToFirebase('appSettings', 'main', { lastDriveBackupAt: exportedAt }, { merge: true }))
       .then(() => showToast('Auto-backup sent to Google Drive'))
       .catch(e => console.warn('Drive auto-backup failed:', e));
   }

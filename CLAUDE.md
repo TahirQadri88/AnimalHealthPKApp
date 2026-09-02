@@ -128,6 +128,31 @@ clones that same element, so repainting the preview would silently change every 
 
 ---
 
+## Writing a whole document back is how an edit gets undone
+
+`saveToFirebase` used `setDoc` with no merge, so every write REPLACED the document. Two
+consequences, both of which cost a real edit:
+
+- **The auto-backup reverted Settings.** It captured `appSettings` on load, spent several
+  seconds uploading fifteen collections, then wrote `{ ...appSettings, lastBackupAt }`
+  back. Anything changed in Settings during those seconds was overwritten by the stale
+  snapshot — silently, because the backup's own toast looks like success.
+- **Saving Settings wiped the backup timestamps.** The form does not hold `lastBackupAt` or
+  `lastDriveBackupAt`, so a full write deleted them, the auto-backup then believed it was
+  overdue, and it ran on the next load — re-opening the window above.
+
+Both now write only the fields they own, with `{ merge: true }`. The rule: **a background
+job may stamp its own field and nothing else.** If a write includes `...someState` captured
+in a closure, ask what else has changed since it was captured.
+
+Related, and the reason this went unreported for a day: `setDoc` resolves when the SERVER
+acknowledges, not when the local cache applies. On a bad connection the promise stays
+pending, the caller's success toast never runs, and the save looks like it did nothing at
+all — no tick, no error. `saveToFirebase` now says "Still saving — check your connection"
+after six seconds rather than leaving silence.
+
+---
+
 ## A setting that nothing reads is a lie to the user
 
 Four Settings fields shipped doing nothing: `showBusinessNameOnReports` was read into a
