@@ -176,7 +176,9 @@ QUERY, not the rows: a rule restricting invoices to their author denies that lis
 outright and the app goes blank. `viewAllInvoices`, `viewLedger`, `viewCustomers` and
 `viewDashboard` need the client query scoped first — which is D above.
 
-**I. Incremental `App.jsx` extraction.** Planned in detail in `docs/APP_EXTRACTION.md`
+**I. Incremental `App.jsx` extraction — DONE (2026-09-02).** 6,033 lines to 882, 263 tests
+to 421, no regression reaching the app. Account and rules in `docs/APP_EXTRACTION.md`.
+Originally planned in detail in `docs/APP_EXTRACTION.md`
 (2026-09-01) — six phases, leaves first, one component per commit, each move proved by
 rendering the component through `react-dom/server` before and after and requiring
 byte-identical markup. The prerequisite (C, tests for the money maths) now exists.

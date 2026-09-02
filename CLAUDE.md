@@ -326,6 +326,42 @@ collection and whether it needs realtime at all. `invoices` and `payments` grow 
 still stream in full — see `docs/FIRESTORE_READS.md` for why they cannot simply be
 date-bounded (the ledger needs full history) and what the proper fix looks like.
 
+## Where the code lives
+
+`src/App.jsx` was 6,033 lines and is now 882 — one component, `App`: the provider, the
+fifteen collection subscriptions, the auth and user-account functions, `ctx`, and tab
+routing. Everything else moved out over six phases in September 2026, each move proved
+byte-identical by `tools/extraction-diff.mjs`. The full account, including the five rules
+it produced, is in `docs/APP_EXTRACTION.md`.
+
+```
+src/
+  App.jsx                 composition root — provider, collections, auth, routing
+  context/AppContext.js   the one context; import it from here, never from App.jsx
+  hooks/                  useLiveCollection
+  lib/                    pure helpers: transport, docNumbers, a11y, constants, loginNames,
+                          driveBackup — and claimDocNumber, kept apart because it needs firebase
+  services/               the money: ledger, invoiceTotals, costPriceChange, profitAndLoss,
+                          receivables, dashboard, reportEngine, audit
+  components/ui/          ModalWrapper, ConfirmDialog, ScrollableTabBar, MultiPicker
+  components/modals/      nine modals
+  components/tabs/        Dashboard, Billing, Customers, Payments, Products, Admin
+  components/admin/       eleven admin views
+  components/PrintView.jsx    the documents — finished, do not reorganise
+```
+
+Two rules carry most of the weight:
+
+- **Nothing may import from `App.jsx`.** That is a cycle, and ESM answers a cycle with an
+  `undefined` binding at module-initialisation time — a blank page before React renders,
+  which neither lint rule reports.
+- **A module that imports `src/firebase.js` cannot be loaded by a test**, because that file
+  initialises Auth on import and throws without credentials. Pure helpers live in their own
+  module; components take what they need from the context (`claimDocNumber`, `fetchAuditLog`).
+  This came up five separate times during the extraction.
+
+---
+
 ## Roadmap and known weaknesses
 
 `docs/IMPROVEMENT_BRIEF.md` holds an external review of the app plus my verification of its

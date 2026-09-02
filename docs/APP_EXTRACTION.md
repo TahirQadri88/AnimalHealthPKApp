@@ -152,49 +152,63 @@ courier-field logic that once destroyed consignment numbers, and document number
 alone, on its own day, and bill one real invoice through it — estimate, convert, print — as
 part of the check.
 
-### Phase 5 — `AnalyticsView` (1,101 lines), last
+### Phase 5 — `AnalyticsView` — DONE (2026-09-02)
 
-**Do not move this as one lump.** First extract `reportEngine` (≈200 lines of money maths,
-currently inline and untested) into `src/services/analytics/reportEngine.js` with tests, the
-way `computePnL`, `ledger` and `dashboard` were. That is where the value is: it is the
-largest piece of untested financial code left, and a bug in its credit-note handling was
-found and fixed on 2026-09-01 by reading rather than by any test failing.
+Done in two commits, and the split is the point. `reportEngine` — 198 lines of money maths
+that lived inside a `useMemo` where nothing could reach it — came out first as
+`services/analytics/reportEngine.js` with 15 tests. **Its body is byte-identical to the
+`useMemo` it came from**; only the wrapper changed, closure variables becoming named
+parameters. That is what makes a refactor of the numbers the business runs on verifiable
+rather than merely careful.
 
-Only once it is a tested service does the view around it become a mechanical move.
+The parameter list was not guessed. The body went into a file with a first attempt at the
+signature and `no-undef` enumerated the rest — an exhaustive answer, not a thoughtful one.
 
-### Phase 6 — what remains in `App.jsx`
+The first test that engine ever had found a real fault: a record with no `items` array
+threw, and because every figure on Analytics comes from one `useMemo`, that is the whole
+screen replaced by an error rather than one missing row. Fixed in a **separate** commit, so
+the byte-identical proof stayed intact.
 
-The provider, the collections, the auth and user functions, `ctx`, and tab routing. Roughly
-600–900 lines, and legitimately one file: it is the composition root.
+### Phase 6 — what remains in `App.jsx` — DONE (2026-09-02)
+
+`ProductsTab` and `AdminTab` went out, then 105 unused imports.
+
+**`App.jsx` is 882 lines and one component: `App`.** The provider, the fifteen collection
+subscriptions, the auth and user-account functions, `ctx`, and tab routing. That is the
+composition root and it is legitimately one file.
+
+`AdminTab`'s test is the broadest single check in the suite — it mounts all eleven admin
+views at once, so one render proves every extracted admin file still imports and renders.
 
 ---
 
-## Rules for the whole job
+## Result
 
-- **Never put a pure helper in the same module as one that imports `../firebase`.**
-  `src/firebase.js` initialises Auth at import time and throws without credentials, so a
-  test importing that module cannot even load. `getNextSeqNum` and `claimDocNumber` were
-  extracted together on the first attempt and the pure half was instantly untestable; they
-  are two files now. Ask "can this be imported by a test?" before choosing the file.
-- **Move, do not improve.** Every extraction is a pure move. If something is obviously
-  wrong on the way past, note it and fix it in a *separate* commit, before or after — never
-  inside the move, because then the byte-identical markup check no longer holds and you have
-  given up the only real proof you had.
-- **One component per commit**, so any single step can be reverted alone.
-- **Stop at the first surprise.** Two of the three crashes in this project's history came
-  from pressing on through something that looked odd.
-- **Do not touch `PrintView.jsx`.** It is already its own file, it carries the thermal
-  geometry, and it has the repo's best test coverage. It is finished.
-- **Deploy between phases, not between steps.** Give each phase a couple of days of real
-  use before starting the next. The cost of this work is entirely in undetected breakage,
-  and the only detector for a UI regression here is somebody using it.
+| | Start | End |
+|---|---|---|
+| `src/App.jsx` | 6,033 lines | **882** |
+| Tests | 263 | **421** |
+| `lint:scope` | 20 | **20**, at every single step |
 
-## Cost and honest expectations
+Roughly forty commits. Every component move byte-identical per `tools/extraction-diff.mjs`;
+every phase deployed and used before the next began.
 
-Roughly 30 commits over six phases. It buys no feature and fixes no bug. What it buys is
-that the next feature does not have to be threaded into a 6,000-line file, and that the
-money maths keeps moving into tested services — which is the part that has repeatedly found
-real errors.
+**What actually caught things.** `npm run lint` found every missing binding, every time —
+it is the guard this job runs on. `extraction-diff` caught its own two boundary bugs before
+they could corrupt a file. The render tests caught roughly a dozen of my own wrong
+assumptions about what a component does, and in every single case the component was right
+and the test was wrong. Not one regression reached the deployed app.
 
-If it has to stop half-finished, stop at the end of a phase. A half-extracted app is not
-worse than an unextracted one, as long as nothing imports backwards.
+**The rules that came out of it**, all learned the hard way and all worth keeping:
+
+1. Nothing extracted may import from `App.jsx` — that is a cycle, and ESM answers a cycle
+   with `undefined` at module-init time: a blank page before React renders.
+2. A module that imports `../firebase` cannot be loaded by a test, because it initialises
+   Auth on import. Pure helpers get their own file; components take what they need from the
+   context. This came up five times.
+3. A component boundary is `const X = (` or `function X(` — never any capitalised name.
+   `const PERMS = [` at column zero inside `UserModal` would have cut it in half.
+4. Move, do not improve. Every fix found along the way went in its own commit, before or
+   after, so the byte-identical proof always held.
+5. One component per commit. When a careless edit left `App.jsx` four lines long, the blast
+   radius was exactly what had not been committed yet.
