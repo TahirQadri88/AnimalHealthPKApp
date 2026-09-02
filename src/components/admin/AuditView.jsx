@@ -1,31 +1,27 @@
 import { useState, useEffect, useContext } from 'react';
 import { Activity, Search } from 'lucide-react';
 import { AppContext } from '../../context/AppContext';
-import { db, collection, getDocs, query, orderBy, limit } from '../../firebase';
+// Pure constants module — no firebase import, so this stays testable.
 import { LOG_PAGE } from '../../lib/constants';
 import { formatDateDisp } from '../../helpers';
 import { describeEntry, isVoided } from '../../services/audit/auditLog';
 
 export const AuditView = () => {
-const { adminView, invoicesRaw, paymentsRaw, expensesRaw, customers, restoreRecord, showConfirm, showToast } = useContext(AppContext);
+const { adminView, invoicesRaw, paymentsRaw, expensesRaw, customers, restoreRecord, showConfirm, showToast, fetchAuditLog } = useContext(AppContext);
 const [tab, setTab] = useState('activity');
 const [entries, setEntries] = useState(null);
 const [loading, setLoading] = useState(false);
 const [error, setError] = useState('');
 const [search, setSearch] = useState('');
 
-// auditLogs only ever grows, so it must never get a live listener — see
-// docs/FIRESTORE_READS.md. One bounded read when the tab is opened, newest first.
+// The read itself lives in the provider with the rest of the data access. Not a style
+// choice: importing ../firebase here initialises Auth at module load, which throws without
+// credentials and makes this component impossible to import from a test.
 const load = async () => {
   setLoading(true); setError('');
-  try {
-    const snap = await getDocs(query(collection(db, 'auditLogs'), orderBy('at', 'desc'), limit(LOG_PAGE)));
-    setEntries(snap.docs.map(d => d.data()));
-  } catch (e) {
-    console.error('Audit log read failed:', e);
-    setError('Could not load the activity log.');
-    setEntries([]);
-  }
+  const rows = await fetchAuditLog();
+  if (rows === null) setError('Could not load the activity log.');
+  setEntries(rows || []);
   setLoading(false);
 };
 useEffect(() => { if (adminView === 'audit' && entries === null && !loading) load(); }, [adminView]);

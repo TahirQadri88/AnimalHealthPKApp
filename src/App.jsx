@@ -4767,6 +4767,19 @@ showToast("Network Error - Could not delete", "error");
 // A failure here must never block the business action — a payment that saved and did not
 // log is bad; a payment refused because the log was unreachable is worse. So this swallows
 // its own errors and reports to the console only.
+// auditLogs only ever grows, so it must never get a live listener — see
+// docs/FIRESTORE_READS.md. One bounded read, newest first, when the tab is opened.
+// Returns null on failure so the caller can tell "could not read" from "nothing logged".
+const fetchAuditLog = async () => {
+  try {
+    const snap = await getDocs(query(collection(db, 'auditLogs'), orderBy('at', 'desc'), limit(LOG_PAGE)));
+    return snap.docs.map(d => d.data());
+  } catch (e) {
+    console.error('Audit log read failed:', e);
+    return null;
+  }
+};
+
 const writeAudit = async (entry) => {
   try {
     const id = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -4969,7 +4982,7 @@ isAdmin, hasPermission, currentUser, companies, products, customers, invoices, e
 cities, areas, customerTypes, vehicleTypes,
 getPaymentStatus,
 showToast, showConfirm, showPrompt, confirmDialog, setConfirmDialog, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData,
-voidRecord, restoreRecord, logSave, logDelete, invoicesRaw, paymentsRaw, expensesRaw,
+voidRecord, restoreRecord, logSave, logDelete, fetchAuditLog, invoicesRaw, paymentsRaw, expensesRaw,
 billingView, setBillingView, currentInvoice, setCurrentInvoice,
 activeTab, setActiveTab, adminView, setAdminView, analyticsView, setAnalyticsView,
 editingProduct, setEditingProduct, showProductModal, setShowProductModal, productPreFill, setProductPreFill,
