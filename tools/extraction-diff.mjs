@@ -62,10 +62,15 @@ const slice = (source, wanted) => {
   // and eats every brace between them, so brace balance alone once reported a 459-line
   // component as 4,770 lines. Where the two disagree, the component boundary wins and the
   // tool says so, because a boundary you cannot trust must not print a tick.
+  // A COMPONENT, not merely a capitalised name. `const PERMS = [` sits at column 0 inside
+  // UserModal, and treating it as a boundary cut that component in half — with the tool
+  // then comparing two identically-truncated slices and printing a tick. A component is
+  // `const X = (` or `function X(`; `const X = [` is data.
   let nextComponent = lines.length;
   for (let i = start + 1; i < lines.length; i++) {
-    const m = lines[i].match(DECL);
-    if (m && /^[A-Z]/.test(m[1])) { nextComponent = i; break; }
+    if (/^(?:export\s+)?(?:const\s+[A-Z][\w$]*\s*=\s*\(|function\s+[A-Z][\w$]*\s*\()/.test(lines[i])) {
+      nextComponent = i; break;
+    }
   }
   if (end > nextComponent) {
     console.warn(`  note: brace balance was unreliable for ${wanted} (probably an apostrophe in JSX text); using the next component as the boundary`);
