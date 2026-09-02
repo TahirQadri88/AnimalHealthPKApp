@@ -88,7 +88,16 @@ remains is correctness and maintainability.
       Analytics' **Product Sales** is line-item level and excludes both. Both now net
       returns; only the question differs.
 
-### Next, in this order
+### Next
+
+**Analytics and Reports** — audited 2026-09-02, plan in `docs/ANALYTICS_AUDIT.md`. The audit
+found one real error: receivables aging is computed twice, and the Analytics copy ages a
+customer by their most recent INVOICE rather than by the age of the unpaid debt, so a
+200-day-old balance is reported as current the moment they buy anything. Measured, the two
+screens put the same Rs 120,000 in opposite buckets. Fix that first, then the drill-down
+and the missing Collections and Returns dimensions.
+
+### Previously, in this order
 
 **A. Verification pass — no code, ~20 minutes, do this first.**
 Everything built for the closed-rules path was reasoned through rather than executed; it
