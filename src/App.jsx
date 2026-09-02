@@ -30,6 +30,7 @@ import { isTransportMethod, isKnownVehicleType, usesCarrierPerson } from './lib/
 import { getNextSeqNum } from './lib/docNumbers';
 import { claimDocNumber } from './lib/claimDocNumber';
 import { makeArrowNav } from './lib/a11y';
+import { EXPENSE_GROUPS, EXPENSE_GROUP_COLORS, RIDER_VEHICLE_TYPES } from './lib/constants';
 import { useLiveCollection } from './hooks/useLiveCollection';
 import { ModalWrapper } from './components/ui/ModalWrapper';
 import { ScrollableTabBar } from './components/ui/ScrollableTabBar';
@@ -43,9 +44,6 @@ import { CompanyManager } from './components/admin/CompanyManager';
 const LOG_PAGE = 200;
 
 
-const EXPENSE_GROUPS = ['Transportation', 'Salary', 'Utilities', 'Office', 'Other'];
-const EXPENSE_GROUP_COLORS = { Transportation: 'bg-indigo-50 text-indigo-600 border-indigo-100', Salary: 'bg-amber-50 text-amber-600 border-amber-100', Utilities: 'bg-teal-50 text-teal-600 border-teal-100', Office: 'bg-purple-50 text-purple-600 border-purple-100', Other: 'bg-slate-100 text-slate-500 border-slate-200' };
-const RIDER_VEHICLE_TYPES = ['Rider', 'Rickshaw', 'Suzuki'];
 
 // ─── TOP-LEVEL MODAL COMPONENTS (outside App to prevent focus-loss on re-render) ───
 
