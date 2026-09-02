@@ -69,14 +69,10 @@ setPersistence(auth, browserLocalPersistence).catch(() => {});
 // created with. That is why the address is stored on the user document during migration
 // instead of being recomputed at every sign-in — recomputing would silently lock out
 // anyone whose name was later corrected.
-const loginSlug = (name) =>
-  String(name || '')
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '.')
-    .replace(/^\.+|\.+$/g, '') || 'user';
-
-const authEmailFor = (name) => `${loginSlug(name)}@animalhealthpk.app`;
+// Defined in src/lib/loginNames.js so a test — or a component — can use them without
+// importing this file, which initialises Auth on import. Re-exported here because callers
+// have always taken them from firebase.js.
+import { loginSlug, authEmailFor } from './lib/loginNames';
 
 export {
   db,
