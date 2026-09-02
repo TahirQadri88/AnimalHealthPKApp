@@ -3638,7 +3638,7 @@ isAdmin, hasPermission, currentUser, companies, products, customers, invoices, e
 cities, areas, customerTypes, vehicleTypes,
 getPaymentStatus,
 showToast, showConfirm, showPrompt, confirmDialog, setConfirmDialog, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData,
-voidRecord, restoreRecord, logSave, logDelete, fetchAuditLog, invoicesRaw, paymentsRaw, expensesRaw,
+voidRecord, restoreRecord, logSave, logDelete, fetchAuditLog, claimDocNumber, invoicesRaw, paymentsRaw, expensesRaw,
 billingView, setBillingView, currentInvoice, setCurrentInvoice,
 activeTab, setActiveTab, adminView, setAdminView, analyticsView, setAnalyticsView,
 editingProduct, setEditingProduct, showProductModal, setShowProductModal, productPreFill, setProductPreFill,

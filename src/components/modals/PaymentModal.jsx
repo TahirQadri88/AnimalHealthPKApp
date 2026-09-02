@@ -1,14 +1,16 @@
 import { useState, useContext } from 'react';
 import { AlertCircle } from 'lucide-react';
+// claimDocNumber arrives through context rather than being imported: ../../lib/claimDocNumber
+// pulls in ../firebase, which initialises Auth on import and makes this component
+// impossible to load from a test.
 import { AppContext } from '../../context/AppContext';
 import { ModalWrapper } from '../ui/ModalWrapper';
 import SearchableSelect from '../SearchableSelect';
 import { getLocalDateStr } from '../../helpers';
 import { getNextSeqNum } from '../../lib/docNumbers';
-import { claimDocNumber } from '../../lib/claimDocNumber';
 
 export const PaymentModal = () => {
-const { selectedCustomerForPayment, customers, payments, getCustomerBalance, saveToFirebase, showToast, setShowPaymentModal, editingPayment, setEditingPayment, logSave, paymentsRaw } = useContext(AppContext);
+const { selectedCustomerForPayment, customers, payments, getCustomerBalance, saveToFirebase, showToast, setShowPaymentModal, editingPayment, setEditingPayment, logSave, paymentsRaw, claimDocNumber } = useContext(AppContext);
 const isEdit = !!editingPayment;
 const [form, setForm] = useState(
   isEdit
