@@ -88,7 +88,7 @@ const getSortedExportData = () => {
    }));
    const nameKey = segmentKey || 'Customer Name';
    return arr.map(r => ({
-     [nameKey]: r.key,
+     [nameKey]: r.label || r.key,
      'Orders': r.orders || 0, 'Revenue (Rs)': r.revenue || r.productRevenue || 0, 'Cost (Rs)': r.cost || 0,
      'Gross Profit (Rs)': r.profit || 0,
    }));
@@ -157,11 +157,11 @@ const handleExport = (format) => {
           if (reportEngine.avgDaysToPay !== null) text += `Avg Days to Pay: ${reportEngine.avgDaysToPay} days\n`;
           text += `Customers:       ${reportEngine.newCustCount + reportEngine.repeatCustCount} (${reportEngine.newCustCount} new, ${reportEngine.repeatCustCount} repeat)\n`;
           const topProduct = Object.entries(reportEngine.byProduct).sort((a,b) => b[1].profit - a[1].profit)[0];
-          const topCustomer = Object.entries(reportEngine.byCustomer).sort((a,b) => b[1].productRevenue - a[1].productRevenue)[0];
+          const topCustomer = Object.values(reportEngine.byCustomer).sort((a,b) => b.productRevenue - a.productRevenue)[0];
           if (topProduct || topCustomer || reportEngine.trends.revenue !== null) {
             text += `\n⭐ *Smart Callouts*\n`;
             if (topProduct) text += `Top Product: ${topProduct[0]} — Rs.${topProduct[1].profit.toLocaleString('en-US')} GP\n`;
-            if (topCustomer) text += `Top Customer: ${topCustomer[0]} — Rs.${(topCustomer[1].productRevenue||0).toLocaleString('en-US')} revenue\n`;
+            if (topCustomer) text += `Top Customer: ${topCustomer.label} — Rs.${(topCustomer.productRevenue||0).toLocaleString('en-US')} revenue\n`;
             if (reportEngine.trends.revenue !== null) text += `Revenue Trend: ${Number(reportEngine.trends.revenue) >= 0 ? '+' : ''}${reportEngine.trends.revenue}% vs prev period\n`;
             if (reportEngine.agingBuckets.days90plus.length > 0) text += `⚠️ ${reportEngine.agingBuckets.days90plus.length} customer(s) overdue 90+ days\n`;
           }
@@ -265,9 +265,9 @@ const renderTable = (dataObj, type) => {
                       <div className="flex items-center gap-1.5">
                         <span className={`text-[9px] font-black px-1 py-0.5 rounded border ${tierColors[row.abcTier]}`}>{row.abcTier}</span>
                         {type === 'Customer' ? (
-                          <button className="font-bold text-slate-800 hover:text-indigo-600 text-left transition-colors" onClick={() => { const c = customers.find(c => c.name === row.key); if(c){ setSelectedLedgerId(c.id); setShowLedgerModal(true); } }}>{row.key}</button>
+                          <button className="font-bold text-slate-800 hover:text-indigo-600 text-left transition-colors" onClick={() => { if (row.id !== undefined) { setSelectedLedgerId(row.id); setShowLedgerModal(true); } }}>{row.label || row.key}</button>
                         ) : (
-                          <div className="font-bold text-slate-800">{row.key}</div>
+                          <div className="font-bold text-slate-800">{row.label || row.key}</div>
                         )}
                       </div>
                       {row.company && <div className="text-[9px] text-slate-400 uppercase tracking-widest mt-0.5">{row.company}</div>}
@@ -795,7 +795,7 @@ return (
         const gpMargin = kpis.productRevenue > 0 ? ((kpis.grossMargin / kpis.productRevenue) * 100).toFixed(1) : '0.0';
         const netMargin = kpis.productRevenue > 0 ? ((kpis.netProfit / kpis.productRevenue) * 100).toFixed(1) : '0.0';
         const topProduct = Object.entries(reportEngine.byProduct).sort((a,b)=>b[1].profit-a[1].profit)[0];
-        const topCustomer = Object.entries(reportEngine.byCustomer).sort((a,b)=>b[1].productRevenue-a[1].productRevenue)[0];
+        const topCustomer = Object.values(reportEngine.byCustomer).sort((a,b)=>b.productRevenue-a.productRevenue)[0];
         const aProducts = Object.entries(reportEngine.byProduct).filter(([,v]) => {
           let cum = 0; const total = Object.values(reportEngine.byProduct).reduce((s,r)=>s+r.revenue,0);
           return (Object.entries(reportEngine.byProduct).sort((a,b)=>b[1].revenue-a[1].revenue).every(([k,d]) => { cum += d.revenue; return cum / total <= 0.8 || k === Object.keys(reportEngine.byProduct)[0]; }));
@@ -822,7 +822,7 @@ return (
             <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
               <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5"><Zap size={12} className="text-amber-500"/> Smart Callouts</p>
               {topProduct && <div className="flex items-start gap-2 text-sm"><span className="text-emerald-600 font-black shrink-0">★</span><p className="text-slate-700"><span className="font-bold">{topProduct[0]}</span> is your most profitable product — Rs.{topProduct[1].profit.toLocaleString('en-US')} GP ({topProduct[1].qty} units sold)</p></div>}
-              {topCustomer && <div className="flex items-start gap-2 text-sm"><span className="text-indigo-600 font-black shrink-0">★</span><p className="text-slate-700"><button className="font-bold hover:text-indigo-600 transition-colors" onClick={() => { const c = customers.find(c => c.name === topCustomer[0]); if(c){ setSelectedLedgerId(c.id); setShowLedgerModal(true); } }}>{topCustomer[0]}</button> is your top customer — Rs.{(topCustomer[1].productRevenue||0).toLocaleString('en-US')} revenue in {topCustomer[1].orders} orders</p></div>}
+              {topCustomer && <div className="flex items-start gap-2 text-sm"><span className="text-indigo-600 font-black shrink-0">★</span><p className="text-slate-700"><button className="font-bold hover:text-indigo-600 transition-colors" onClick={() => { if (topCustomer.id !== undefined) { setSelectedLedgerId(topCustomer.id); setShowLedgerModal(true); } }}>{topCustomer.label}</button> is your top customer — Rs.{(topCustomer.productRevenue||0).toLocaleString('en-US')} revenue in {topCustomer.orders} orders</p></div>}
               {reportEngine.agingBuckets.days90plus.length > 0 && <div className="flex items-start gap-2 text-sm"><span className="text-rose-600 font-black shrink-0">!</span><p className="text-slate-700"><span className="font-bold text-rose-600">{reportEngine.agingBuckets.days90plus.length} customer{reportEngine.agingBuckets.days90plus.length>1?'s':''}</span> overdue 90+ days — Rs.{reportEngine.agingBuckets.days90plus.reduce((s,r)=>s+r.amount,0).toLocaleString('en-US')} at risk</p></div>}
               {reportEngine.trends.revenue !== null && <div className="flex items-start gap-2 text-sm"><span className={`font-black shrink-0 ${Number(reportEngine.trends.revenue)>=0?'text-emerald-600':'text-rose-600'}`}>{Number(reportEngine.trends.revenue)>=0?'↑':'↓'}</span><p className="text-slate-700">Revenue is <span className="font-bold">{Number(reportEngine.trends.revenue)>=0?'up':'down'} {Math.abs(reportEngine.trends.revenue)}%</span> vs previous period</p></div>}
               {kpis.deliveryBilled > kpis.transportExpense && <div className="flex items-start gap-2 text-sm"><span className="text-emerald-600 font-black shrink-0">+</span><p className="text-slate-700">Delivery net contribution: <span className="font-bold text-emerald-700">Rs.{(kpis.deliveryBilled - kpis.transportExpense).toLocaleString('en-US')}</span></p></div>}

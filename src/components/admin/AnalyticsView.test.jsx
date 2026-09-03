@@ -66,4 +66,64 @@ describe('AnalyticsView', () => {
   it('leaks no undefined into the markup', () => {
     expect(render()).not.toMatch(/undefined|NaN/);
   });
+
+  // byCustomer is keyed by customer ID now, so the screen must print the label. Getting this
+  // wrong shows a bare "1" where the customer's name belongs.
+  it('names the customer on the By Customer table rather than printing its id', () => {
+    const html = render({ analyticsView: 'By Customer' });
+    expect(html).toContain('Al Shaheer');
+    expect(html).not.toMatch(/>\s*1\s*<\/button>/);
+  });
+
+  it('does not merge two customers who happen to share a name', () => {
+    const html = render({
+      analyticsView: 'By Customer',
+      customers: [{ id: 1, name: 'Al Shaheer' }, { id: 2, name: 'Al Shaheer' }],
+      invoices: [
+        { id: 'INV-1', date: today, status: 'Billed', customerId: 1, customerName: 'Al Shaheer', total: 75000, items: [line('Antox 9', 10, 7500, 6000)] },
+        { id: 'INV-2', date: today, status: 'Billed', customerId: 2, customerName: 'Al Shaheer', total: 4000, items: [line('Ratava', 2, 2000, 1500)] },
+      ],
+    });
+    expect(html).toContain('2 Customers');
+  });
+});
+
+// Aging was computed twice and the Analytics copy aged a balance by the last SALE. It is
+// buildAgingReport now, so a fresh purchase can no longer pull an old debt into "Current".
+describe('AnalyticsView — Receivables', () => {
+  const daysAgo = (n) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
+  const OLD_AND_NEW = {
+    analyticsView: 'Receivables',
+    customers: [{ id: 1, name: 'Ghousia Farms', phone: '0300-1234567' }],
+    getCustomerBalance: () => 120000,
+    invoices: [
+      { id: 'INV-OLD', date: daysAgo(200), status: 'Billed', customerId: 1, customerName: 'Ghousia Farms', total: 118500, items: [line('Antox 9', 1, 118500, 90000)] },
+      { id: 'INV-NEW', date: daysAgo(2), status: 'Billed', customerId: 1, customerName: 'Ghousia Farms', total: 1500, items: [line('Ratava', 1, 1500, 1000)] },
+    ],
+  };
+
+  it('leaves a 200-day-old debt in the 90+ bucket after a purchase yesterday', () => {
+    const html = render(OLD_AND_NEW);
+    const bucket = html.slice(html.indexOf('90+ days'));
+    expect(bucket).toContain('118,500');
+  });
+
+  it('splits the same customer across buckets rather than filing them under one', () => {
+    const html = render(OLD_AND_NEW);
+    expect(html).toContain('0–30 days');
+    expect(html).toContain('90+ days');
+    expect(html).toContain('1,500');
+  });
+
+  it('says how old the debt is, not how long since the last invoice', () => {
+    expect(render(OLD_AND_NEW)).not.toContain('since last invoice');
+  });
+
+  it('still offers a WhatsApp reminder against the balance', () => {
+    expect(render(OLD_AND_NEW)).toContain('wa.me/923001234567');
+  });
+
+  it('leaks no undefined into the markup', () => {
+    expect(render(OLD_AND_NEW)).not.toMatch(/undefined|NaN/);
+  });
 });

@@ -115,10 +115,12 @@ describe('buildReport — breakdowns', () => {
     expect(Object.keys(r.byProduct).sort()).toEqual(['Antox 9', 'Ratava']);
   });
 
-  it('splits by customer', () => {
+  it('splits by customer, keyed by id and labelled with the name', () => {
     const r = run(data);
-    expect(r.byCustomer['Al Shaheer'].productRevenue).toBe(75000);
-    expect(r.byCustomer['Ghousia'].productRevenue).toBe(4000);
+    expect(r.byCustomer['1'].productRevenue).toBe(75000);
+    expect(r.byCustomer['1'].label).toBe('Al Shaheer');
+    expect(r.byCustomer['2'].productRevenue).toBe(4000);
+    expect(r.byCustomer['2'].label).toBe('Ghousia');
   });
 
   it('splits by salesperson', () => {
@@ -240,5 +242,80 @@ describe('buildReport — aging agrees with the Receivables screen', () => {
   it('leaves the buckets empty when nobody owes anything', () => {
     const b = run().agingBuckets;
     expect([b.current, b.days30, b.days60, b.days90plus].every(x => x.length === 0)).toBe(true);
+  });
+});
+
+// ── Keyed by id, not by name ────────────────────────────────────────────────
+//
+// byCustomer and the city/area/type segments were keyed by customerName. Two customers with
+// the same name — common enough in a market where several shops are "Al Shaheer" — merged
+// into one row. And a rename relies on a cascade that rewrites customerName on every past
+// invoice; if that ever partially fails, one customer's history splits in two.
+describe('buildReport — customer breakdowns are keyed by id', () => {
+  const twoOfTheSameName = {
+    customers: [
+      { id: 1, name: 'Al Shaheer', city: 'Karachi', area: 'Sohrab Goth', customerType: 'Retail' },
+      { id: 2, name: 'Al Shaheer', city: 'Hyderabad', area: 'Latifabad', customerType: 'Wholesale' },
+    ],
+    invoices: [
+      billed('INV-1', '2026-08-01', [line('Antox 9', 10, 7500, 6000)], { customerId: 1, customerName: 'Al Shaheer' }),
+      billed('INV-2', '2026-08-02', [line('Ratava', 2, 2000, 1500)], { customerId: 2, customerName: 'Al Shaheer' }),
+    ],
+  };
+
+  it('does not merge two customers who share a name', () => {
+    const r = run(twoOfTheSameName);
+    expect(Object.keys(r.byCustomer).sort()).toEqual(['1', '2']);
+    expect(r.byCustomer['1'].productRevenue).toBe(75000);
+    expect(r.byCustomer['2'].productRevenue).toBe(4000);
+  });
+
+  it('keeps their cities apart, which a name key could not', () => {
+    const r = run(twoOfTheSameName);
+    expect(r.byCity.Karachi.revenue).toBe(75000);
+    expect(r.byCity.Hyderabad.revenue).toBe(4000);
+  });
+
+  it('carries the id so a row can open that customer\'s ledger', () => {
+    const r = run(twoOfTheSameName);
+    expect(r.byCustomer['1'].id).toBe(1);
+    expect(r.byCustomer['2'].id).toBe(2);
+  });
+
+  // The cascade that rewrites customerName on past invoices is the thing being distrusted.
+  it('holds a renamed customer together even when old invoices carry the old name', () => {
+    const r = run({
+      customers: [{ id: 1, name: 'Al Shaheer Cattle', city: 'Karachi' }],
+      invoices: [
+        billed('INV-1', '2026-08-01', [line('Antox 9', 10, 7500, 6000)], { customerName: 'Al Shaheer' }),
+        billed('INV-2', '2026-08-02', [line('Ratava', 2, 2000, 1500)], { customerName: 'Al Shaheer Cattle' }),
+      ],
+    });
+    expect(Object.keys(r.byCustomer)).toEqual(['1']);
+    expect(r.byCustomer['1'].productRevenue).toBe(79000);
+    // And the label is the customer's CURRENT name, not whichever invoice was seen first.
+    expect(r.byCustomer['1'].label).toBe('Al Shaheer Cattle');
+    expect(r.byCity.Karachi.revenue).toBe(79000);
+  });
+
+  it('files an invoice with no customer id under Unknown rather than dropping it', () => {
+    const r = run({
+      customers: [],
+      invoices: [billed('INV-1', '2026-08-01', [line('Antox 9', 1, 100, 60)], { customerId: undefined, customerName: 'Walk-in' })],
+    });
+    expect(Object.values(r.byCustomer)[0].productRevenue).toBe(100);
+    expect(Object.values(r.byCustomer)[0].label).toBe('Walk-in');
+  });
+
+  it('nets a credit note off the same customer the invoice was billed to', () => {
+    const r = run({
+      customers: [{ id: 1, name: 'Al Shaheer Cattle' }],
+      invoices: [
+        billed('INV-1', '2026-08-01', [line('Antox 9', 10, 7500, 6000)], { customerName: 'Al Shaheer' }),
+        creditNote('CN-1', '2026-08-05', [line('Antox 9', 2, 7500, 6000)], { customerName: 'Al Shaheer Cattle' }),
+      ],
+    });
+    expect(Object.keys(r.byCustomer)).toEqual(['1']);
+    expect(r.byCustomer['1'].productRevenue).toBe(60000);
   });
 });

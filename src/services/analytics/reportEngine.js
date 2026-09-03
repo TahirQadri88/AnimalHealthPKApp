@@ -39,15 +39,32 @@ export const buildReport = ({
   const byProduct = {}; const byCompany = {}; const byCustomer = {}; const receivablesList = [];
   const bySalesperson = {};
   const byCity = {}; const byArea = {}; const byType = {};
-  // Build customer segment lookup
+  // Customer lookups, keyed by ID.
+  //
+  // These were keyed by customerName, which merged two customers who share a name into one
+  // row — common enough in this market, where several shops are "Al Shaheer" — and split one
+  // customer's history in two whenever the rename cascade that rewrites customerName on past
+  // invoices only half-succeeded. The id is the only stable handle.
+  //
+  // The label therefore comes from the CUSTOMER record, not from the invoice: whatever the
+  // customer is called today, not whatever they were called when the oldest invoice was
+  // raised. custKey falls back to the name for a record with no customerId at all, so such
+  // an invoice is still counted rather than dropped into a single 'undefined' bucket.
   const custSegment = {};
-  customers.forEach(c => { custSegment[c.name] = { city: c.city || '', area: c.area || '', type: c.customerType || '' }; });
+  const custName = {};
+  customers.forEach(c => {
+    custSegment[String(c.id)] = { city: c.city || '', area: c.area || '', type: c.customerType || '' };
+    custName[String(c.id)] = c.name;
+  });
+  const custKey = (o) => String(o.customerId ?? o.customerName ?? 'Unknown');
+  const custLabel = (o) => custName[custKey(o)] || o.customerName || 'Unknown';
   customers.forEach(c => { const bal = getCustomerBalance(c.id); if(bal > 0) { kpis.totalReceivables += bal; receivablesList.push({ name: c.name, id: c.id, amount: bal, phone: c.phone || '' }); } });
   billedForPnL.forEach(o => {
     kpis.deliveryBilled += Number(o.deliveryBilled || 0);
     kpis.transportExpense += Number(o.transportExpense || 0);
-    if(!byCustomer[o.customerName]) byCustomer[o.customerName] = { productRevenue: 0, cost: 0, profit: 0, orders: 0 };
-    byCustomer[o.customerName].orders += 1;
+    const cKey = custKey(o);
+    if(!byCustomer[cKey]) byCustomer[cKey] = { id: o.customerId, label: custLabel(o), productRevenue: 0, cost: 0, profit: 0, orders: 0 };
+    byCustomer[cKey].orders += 1;
     const spName = o.salespersonName || 'Unknown';
     if(!bySalesperson[spName]) bySalesperson[spName] = { revenue: 0, profit: 0, orders: 0 };
     bySalesperson[spName].orders += 1;
@@ -64,9 +81,9 @@ export const buildReport = ({
       byCompany[item.company || 'Unknown'].qty += item.quantity; byCompany[item.company || 'Unknown'].revenue += itemRev; byCompany[item.company || 'Unknown'].cost += itemCost; byCompany[item.company || 'Unknown'].profit += (itemRev - itemCost);
     });
     kpis.productRevenue += orderItemRevenue; kpis.totalCOGS += orderItemCost;
-    byCustomer[o.customerName].productRevenue += orderItemRevenue; byCustomer[o.customerName].cost += orderItemCost; byCustomer[o.customerName].profit += (orderItemRevenue - orderItemCost);
+    byCustomer[cKey].productRevenue += orderItemRevenue; byCustomer[cKey].cost += orderItemCost; byCustomer[cKey].profit += (orderItemRevenue - orderItemCost);
     bySalesperson[spName].revenue += orderItemRevenue; bySalesperson[spName].profit += (orderItemRevenue - orderItemCost);
-    const seg = custSegment[o.customerName] || {};
+    const seg = custSegment[cKey] || {};
     const gp = orderItemRevenue - orderItemCost;
     ['city','area','type'].forEach(k => {
       const val = seg[k] || 'Unknown';
@@ -171,16 +188,17 @@ export const buildReport = ({
     });
     const cnGP = cnRev - cnCost;
     // Customer breakdown
-    if (!byCustomer[cn.customerName]) byCustomer[cn.customerName] = { productRevenue: 0, cost: 0, profit: 0, orders: 0 };
-    byCustomer[cn.customerName].productRevenue -= cnRev;
-    byCustomer[cn.customerName].cost -= cnCost;
-    byCustomer[cn.customerName].profit -= cnGP;
+    const cnKey = custKey(cn);
+    if (!byCustomer[cnKey]) byCustomer[cnKey] = { id: cn.customerId, label: custLabel(cn), productRevenue: 0, cost: 0, profit: 0, orders: 0 };
+    byCustomer[cnKey].productRevenue -= cnRev;
+    byCustomer[cnKey].cost -= cnCost;
+    byCustomer[cnKey].profit -= cnGP;
     // Salesperson breakdown
     const cnSp = cn.salespersonName || 'Unknown';
     if (!bySalesperson[cnSp]) bySalesperson[cnSp] = { revenue: 0, profit: 0, orders: 0 };
     bySalesperson[cnSp].revenue -= cnRev; bySalesperson[cnSp].profit -= cnGP;
     // Segment breakdowns
-    const cnSeg = custSegment[cn.customerName] || {};
+    const cnSeg = custSegment[cnKey] || {};
     ['city', 'area', 'type'].forEach(k => {
       const val = cnSeg[k] || 'Unknown';
       const map = k === 'city' ? byCity : k === 'area' ? byArea : byType;
