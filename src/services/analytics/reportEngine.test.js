@@ -319,3 +319,55 @@ describe('buildReport — customer breakdowns are keyed by id', () => {
     expect(r.byCustomer['1'].productRevenue).toBe(60000);
   });
 });
+
+// ── The brand filter and returns ────────────────────────────────────────────
+//
+// The billed loop gates each line on filterCompanies; the credit-note loop did not. With a
+// brand filter on, a return of some OTHER brand was still subtracted from the breakdowns —
+// and it invented a row for the brand that was filtered out. computePnL got this right via
+// includeItem, so the headline P&L and the tables underneath it disagreed.
+describe('buildReport — a brand filter applies to returns too', () => {
+  const PRODUCTS = [
+    { id: 1, name: 'Antox 9', companyId: 10 },
+    { id: 2, name: 'Ratava', companyId: 20 },
+  ];
+  const selmore = (n, qty, price, cost) => ({ productId: 1, name: n, quantity: qty, price, costPrice: cost, company: 'Selmore' });
+  const other = (n, qty, price, cost) => ({ productId: 2, name: n, quantity: qty, price, costPrice: cost, company: 'Star' });
+
+  const r = () => run({
+    products: PRODUCTS,
+    filterCompanies: new Set(['10']),
+    invoices: [
+      billed('INV-1', '2026-08-01', [selmore('Antox 9', 10, 7500, 6000), other('Ratava', 5, 2000, 1500)]),
+      creditNote('CN-1', '2026-08-05', [other('Ratava', 5, 2000, 1500)]),
+    ],
+  });
+
+  it('does not subtract another brand\'s return from the filtered totals', () => {
+    expect(r().byCompany.Selmore.revenue).toBe(75000);
+    expect(r().byCustomer['1'].productRevenue).toBe(75000);
+    expect(r().bySalesperson.Owais.revenue).toBe(75000);
+  });
+
+  it('does not invent a row for a brand the filter excluded', () => {
+    expect(Object.keys(r().byCompany)).toEqual(['Selmore']);
+    expect(Object.keys(r().byProduct)).toEqual(['Antox 9']);
+  });
+
+  it('agrees with the headline P&L, which always filtered returns correctly', () => {
+    expect(r().kpis.creditNotesTotal).toBe(0);
+    expect(r().kpis.productRevenue).toBe(75000);
+  });
+
+  it('still subtracts the return when no brand filter is applied', () => {
+    const all = run({
+      products: PRODUCTS,
+      invoices: [
+        billed('INV-1', '2026-08-01', [selmore('Antox 9', 10, 7500, 6000), other('Ratava', 5, 2000, 1500)]),
+        creditNote('CN-1', '2026-08-05', [other('Ratava', 5, 2000, 1500)]),
+      ],
+    });
+    expect(all.byCompany.Star.revenue).toBe(0);
+    expect(all.kpis.productRevenue).toBe(75000);
+  });
+});

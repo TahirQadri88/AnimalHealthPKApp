@@ -168,6 +168,12 @@ export const buildReport = ({
   creditNotes.forEach(cn => {
     let cnRev = 0, cnCost = 0;
     (cn.items || []).forEach(item => {
+      // The brand filter applies to a return exactly as it does to a sale. It did not, so
+      // with a filter on, another brand's return was subtracted from these breakdowns and
+      // invented a row for the brand the filter had excluded. computePnL always got this
+      // right through includeItem, so the headline P&L disagreed with the tables under it.
+      const cnCompanyId = products.find(p => p.id === item.productId)?.companyId;
+      if (filterCompanies.size > 0 && !filterCompanies.has(String(cnCompanyId))) return;
       // Bonus lines are NOT skipped. Free stock carries a real costPrice and no price, so
       // giving it away is a loss of its cost — the billed loop above counts it that way —
       // and taking it back must return that cost. Skipping it here expensed returned free
