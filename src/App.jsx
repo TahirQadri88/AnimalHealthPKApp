@@ -411,7 +411,16 @@ const migrateUsersToAuth = async () => {
 // `merge` writes only the fields given, leaving the rest of the document alone. Default is
 // a full replace, which is what almost every caller wants — but see the auto-backup below
 // for the case where a replace silently undid somebody's edit.
-const saveToFirebase = async (collectionName, id, dataObj, { merge = false } = {}) => {
+// Returns true if the server acknowledged the write, false if it did not.
+//
+// It used to return nothing, and callers had no way to tell a save from a failure. That is
+// fine for a form — the user sees the toast — but the restore loop counted its own
+// iterations and reported "412 records written" for a restore in which every write failed.
+// A safety net that reports success when the data did not land is worse than none.
+//
+// `silent` suppresses the toasts for a caller doing many writes at once, which would
+// otherwise stack one "Network Error" per record.
+const saveToFirebase = async (collectionName, id, dataObj, { merge = false, silent = false } = {}) => {
 try {
   const ack = setDoc(doc(db, collectionName, String(id)), dataObj, { merge });
   // Persistence is on, so the write applies locally at once but this promise only settles
@@ -419,13 +428,15 @@ try {
   // and the caller's success toast never runs — a save that appears to do nothing at all,
   // with no error either. Saying so is better than silence.
   let slow = false;
-  const warn = setTimeout(() => { slow = true; showToast('Still saving — check your connection', 'error'); }, 6000);
+  const warn = silent ? null : setTimeout(() => { slow = true; showToast('Still saving — check your connection', 'error'); }, 6000);
   await ack;
-  clearTimeout(warn);
+  if (warn) clearTimeout(warn);
   if (slow) showToast('Saved.');
+  return true;
 } catch (e) {
 console.error("Firebase Write Error:", e);
-showToast("Network Error - Could not save", "error");
+if (!silent) showToast("Network Error - Could not save", "error");
+return false;
 }
 };
 

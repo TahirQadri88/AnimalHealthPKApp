@@ -63,3 +63,28 @@ describe('AppSettingsView', () => {
     expect(() => render({ appSettings: null })).not.toThrow();
   });
 });
+
+// The restore half of "Backup & Data Safety" had never been run. It wrote straight from the
+// file picker on any JSON at all, and reported success whether or not anything landed.
+describe('AppSettingsView — restore', () => {
+  it('offers the restore control', () => {
+    expect(render()).toContain('Choose Backup .json File');
+  });
+
+  // "Overwrites all existing data" was not what the code did. It writes the file's records
+  // over the live ones and leaves anything created since the backup exactly where it is.
+  it('describes what a restore actually does, not a wipe-and-replace', () => {
+    const html = render();
+    expect(html).toContain('is left alone');
+    expect(html).toContain('not a wipe-and-replace');
+    expect(html).not.toContain('Overwrites all existing data.');
+  });
+
+  it('promises the file is shown before anything is written', () => {
+    expect(render()).toContain('before anything is written');
+  });
+
+  it('leaks no undefined into the markup', () => {
+    expect(render()).not.toMatch(/undefined|NaN/);
+  });
+});

@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { Save, Download, Upload, Database, ChevronDown } from 'lucide-react';
+import { Save, Download, Upload, Database, ChevronDown, AlertTriangle, ShieldCheck, X } from 'lucide-react';
 import { AppContext } from '../../context/AppContext';
 import { shareOrDownload } from '../../helpers';
 import { uploadToDrive, getDriveScript } from '../../lib/driveBackup';
+import { inspectBackupText, planWrites, backupAgeDays } from '../../services/backup/restore';
 import { FixInvoiceUnitsButton } from './FixInvoiceUnitsButton';
 
 export const AppSettingsView = () => {
@@ -23,6 +24,11 @@ const [form, setForm] = useState({
   driveFreq: appSettings?.driveFreq || 'weekly',
 });
 const [restoring, setRestoring] = useState(false);
+// A restore is inspected and shown before a single record is written. It used to write
+// straight from the file picker, on any JSON at all, and report success either way.
+const [pending, setPending] = useState(null);   // { inspection, fileName }
+const [restoreProgress, setRestoreProgress] = useState(null);
+const [safetyTaken, setSafetyTaken] = useState(false);
 const [firebaseBacking, setFirebaseBacking] = useState(false);
 const [driveBacking, setDriveBacking] = useState(false);
 const [showDriveSetup, setShowDriveSetup] = useState(false);
@@ -79,18 +85,51 @@ const manualDriveBackup = async () => {
   } catch(e) { showToast(`Drive backup failed: ${e.message}`, 'error'); }
   finally { setDriveBacking(false); }
 };
+// Step one: read the file and show what is in it. Nothing is written here.
 const handleRestoreFile = async (e) => {
-  const file = e.target.files[0]; if (!file) return;
-  if (!await showConfirm('This will overwrite ALL existing data with the backup file. Are you sure?')) { e.target.value=''; return; }
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  const inspection = inspectBackupText(await file.text());
+  setSafetyTaken(false);
+  setRestoreProgress(null);
+  if (!inspection.ok) {
+    setPending(null);
+    return showToast(inspection.errors[0] || 'That file cannot be restored', 'error');
+  }
+  setPending({ inspection, fileName: file.name });
+};
+
+// Step two, after the person has seen the contents and confirmed.
+//
+// The old loop counted its own iterations, and saveToFirebase swallowed every error, so a
+// restore where nothing landed still said every record was written. It reports what the
+// server actually acknowledged now, and names the first few failures.
+const runRestore = async () => {
+  if (!pending) return;
+  const writes = planWrites(pending.inspection);
+  if (!await showConfirm(
+    `Write ${writes.length} records over your live data? Records created since this backup will NOT be removed.`)) return;
+
   setRestoring(true);
-  try {
-    const backup = JSON.parse(await file.text()); let count = 0;
-    for (const [col, docs] of Object.entries(backup.collections || {})) {
-      for (const d of (docs || [])) { await saveToFirebase(col, d.id, d); count++; }
-    }
-    showToast(`Restore complete! ${count} records written. Please refresh.`, 'success');
-  } catch { showToast('Restore failed — invalid backup file', 'error'); }
-  setRestoring(false); e.target.value = '';
+  let written = 0;
+  const failed = [];
+  for (let i = 0; i < writes.length; i++) {
+    const w = writes[i];
+    const ok = await saveToFirebase(w.collection, w.id, w.data, { silent: true });
+    if (ok) written += 1; else failed.push(`${w.collection}/${w.id}`);
+    if (i % 25 === 0 || i === writes.length - 1) setRestoreProgress({ done: i + 1, total: writes.length });
+  }
+  setRestoring(false);
+  setPending(null);
+  setRestoreProgress(null);
+
+  if (failed.length === 0) {
+    showToast(`Restored ${written} records. Please refresh.`, 'success');
+  } else {
+    console.error('[restore] writes the server did not acknowledge:', failed);
+    showToast(`${written} of ${writes.length} restored — ${failed.length} failed. See the console.`, 'error');
+  }
 };
 const inputCls = "w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100";
 const labelCls = "block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5";
@@ -140,11 +179,96 @@ return (
     </div>
     <div className="bg-rose-50 border border-rose-200 rounded-xl p-4">
       <div className="font-black text-rose-900 text-sm mb-1">Restore from Backup ⚠</div>
-      <p className="text-[11px] text-rose-700 mb-3">Overwrites all existing data. Only use to recover from data loss.</p>
+      {/* "Overwrites all existing data" was not true and is not what a person should be
+          told before a restore. It writes the backup's records over the live ones; a
+          record created since the backup is left exactly where it is. */}
+      <p className="text-[11px] text-rose-700 mb-3">
+        Writes the records in the file over your live data. Anything created <em>since</em> the
+        backup is left alone — this is not a wipe-and-replace. You will see what is in the file
+        before anything is written.
+      </p>
       <label className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold cursor-pointer ${restoring?'bg-slate-200 text-slate-400':'bg-rose-600 hover:bg-rose-700 text-white'}`}>
         <Upload size={13}/> {restoring?'Restoring…':'Choose Backup .json File'}
         <input type="file" accept=".json" onChange={handleRestoreFile} disabled={restoring} className="hidden" />
       </label>
+
+      {pending && (() => {
+        const { inspection, fileName } = pending;
+        const age = backupAgeDays(inspection.exportedAt);
+        return (
+          <div className="mt-3 bg-white border border-rose-200 rounded-xl overflow-hidden">
+            <div className="flex justify-between items-center gap-2 p-3 border-b border-rose-100 bg-rose-100/50">
+              <div className="min-w-0">
+                <p className="text-xs font-black text-rose-900 truncate">{fileName}</p>
+                <p className="text-[10px] text-rose-700">
+                  {inspection.exportedAt
+                    ? `Exported ${new Date(inspection.exportedAt).toLocaleString()}${age !== null ? ` · ${age} day${age === 1 ? '' : 's'} old` : ''}`
+                    : 'No export date in the file'}
+                </p>
+              </div>
+              <button onClick={() => { setPending(null); setSafetyTaken(false); }} title="Cancel" className="p-1.5 bg-white rounded-lg text-slate-400 hover:text-slate-700 border border-slate-200 shrink-0"><X size={14}/></button>
+            </div>
+
+            <div className="p-3 space-y-2">
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                {inspection.totalRecords.toLocaleString('en-US')} records will be written
+              </p>
+              <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+                {inspection.collections.map(c => (
+                  <div key={c.name} className="flex justify-between text-[11px]">
+                    <span className="font-semibold text-slate-600 truncate">{c.name}</span>
+                    <span className="font-black text-slate-800 ml-2 shrink-0">{c.count.toLocaleString('en-US')}</span>
+                  </div>
+                ))}
+              </div>
+
+              {inspection.refused.length > 0 && (
+                <div className="pt-2 border-t border-slate-100">
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 flex items-center gap-1"><ShieldCheck size={11}/> Not restored</p>
+                  {inspection.refused.map(r => (
+                    <p key={r.name} className="text-[10px] text-slate-500"><span className="font-bold text-slate-700">{r.name}</span> — {r.reason}</p>
+                  ))}
+                </div>
+              )}
+
+              {inspection.warnings.length > 0 && (
+                <div className="pt-2 border-t border-slate-100 space-y-1">
+                  {inspection.warnings.map((w, i) => (
+                    <p key={i} className="text-[10px] text-amber-700 flex items-start gap-1"><AlertTriangle size={11} className="shrink-0 mt-0.5"/><span>{w}</span></p>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {restoreProgress ? (
+              <div className="p-3 border-t border-rose-100">
+                <p className="text-[11px] font-bold text-slate-600 mb-1">Writing {restoreProgress.done.toLocaleString('en-US')} of {restoreProgress.total.toLocaleString('en-US')}…</p>
+                <div className="w-full bg-slate-100 rounded-full h-1.5"><div className="bg-rose-500 h-1.5 rounded-full" style={{ width: `${(restoreProgress.done / restoreProgress.total) * 100}%` }}></div></div>
+              </div>
+            ) : (
+              <div className="p-3 border-t border-rose-100 space-y-2">
+                {/* The brief asks for this and it was never there: a restore is itself a
+                    destructive write, and the state before it should be recoverable. */}
+                <button
+                  onClick={async () => { await downloadBackup(); setSafetyTaken(true); }}
+                  disabled={restoring}
+                  className={`w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-xs font-bold border ${safetyTaken ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'}`}
+                >
+                  {safetyTaken ? <><ShieldCheck size={13}/> Current data downloaded</> : <><Download size={13}/> 1. Download current data first</>}
+                </button>
+                <button
+                  onClick={runRestore}
+                  disabled={restoring}
+                  className="w-full px-4 py-2 rounded-lg text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white disabled:bg-slate-200 disabled:text-slate-400"
+                >
+                  2. Restore {inspection.totalRecords.toLocaleString('en-US')} records
+                </button>
+                {!safetyTaken && <p className="text-[10px] text-slate-400 text-center">Downloading first is not required, but it is the only way back.</p>}
+              </div>
+            )}
+          </div>
+        );
+      })()}
     </div>
     <div className="mt-4 p-3 bg-slate-50 rounded-xl border border-slate-100 text-[11px] text-slate-500">
       <strong className="text-slate-600">Also:</strong> Firebase Console → Firestore → Automated Backups for server-side backups (requires Blaze plan).
