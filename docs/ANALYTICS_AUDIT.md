@@ -1,5 +1,8 @@
 # Analytics and Reports — audit before redesign
 
+**Implemented 2026-09-03. All eight items in §4 are done; what shipped, and the faults the
+work uncovered along the way, are recorded in §5 at the foot of this file.**
+
 Written 2026-09-02, before any implementation. The brief was: map what exists, find what is
 missing, design the target — and change no accounting calculation unless a failing test
 demonstrates an error.
@@ -195,3 +198,69 @@ demonstrates the old behaviour was wrong. Items 3–8 are additive.
 - **Reuse the tested services.** `buildAgingReport`, `computePnL`, `buildCustomerLedger` and
   `allocateCredits` already exist and agree with each other. A second implementation of any
   of them is how §1 happened.
+
+---
+
+## 5. What shipped — 2026-09-03
+
+Eleven commits. The plan's order held: the two corrections first, each with a test that
+failed on the old code, then the additions.
+
+| # | Work | Landed as |
+|---|---|---|
+| 1 | Aging computed once, by `buildAgingReport` | `Analytics: age the debt, not the last sale` |
+| 2 | Customer breakdowns keyed by id | `Analytics: key customer breakdowns by id, not by name` |
+| 3 | Drill-down from any breakdown row | `Analytics: drill down from any breakdown row to its transactions` |
+| 4 | Collections view | `Analytics: a Collections view — money in` |
+| 5 | Returns view | `Analytics: a Returns view — what is coming back, and why` |
+| 6 | Margin as a ranking, and a margin trend | `Analytics: rank by margin, and show whether it is eroding` |
+| 7 | One export matrix | `Analytics: one export matrix, and two tabs that threw when pressed` |
+| 8 | Expense trend and drill-down | `Analytics: an Expenses view, and two figures that were never shown` |
+
+Tests went from 421 to 585. `lint:scope` stayed at 20 at every step.
+
+### Three faults the work found that this audit did not
+
+All three came out of building the drill-down, because a drill-down has to reach the same
+transactions the row above it counted — so every row that could not be reconciled to a list
+of documents had to be squared first. That requirement is a better bug-finder than reading
+the code was.
+
+1. **The brand filter did not apply to returns.** The billed loop gated each line on
+   `filterCompanies`; the credit-note loop did not. With a brand selected, another brand's
+   return was subtracted from every breakdown and invented a row for the brand just
+   excluded. `computePnL` always got this right via `includeItem`, so the headline P&L and
+   the tables underneath it disagreed.
+2. **`byCompany` left `qty` gross on a return** while `byProduct` subtracted it, so a
+   brand's units sold never came down when stock came back.
+3. **City/area/type adjusted a return only `if (map[val])`** — only when a billed invoice had
+   already opened the row. A period with returns and no sales in a city lost them silently.
+
+And one that was a crash rather than a wrong number: **Item Sales carried CSV and WhatsApp
+buttons while `getSortedExportData` returned `null` for that tab.** Pressing either threw.
+Its rows lived inside the view's own IIFE where no export could reach them; they are
+`services/analytics/itemSales.js` now.
+
+### New services, all tested
+
+`drilldown.js` · `collections.js` · `returns.js` · `expenses.js` · `itemSales.js` ·
+`keys.js` (shared keying) · `periods.js` (shared previous-period window).
+
+The last two exist because of the rule this audit opened with. `keys.js` means the
+drill-down files a transaction under exactly the row that counted it; `periods.js` means the
+expense comparison and the revenue trend cannot mean different things by "vs previous
+period" on one screen. **Two implementations of one idea is how §1 happened.**
+
+### What is deliberately still open
+
+- **Reads are still unenforced in `firestore.rules`**, so the whole Analytics area stays
+  admin-only via `AdminTab`. Showing any of it to staff needs the query scoping in
+  `docs/FIRESTORE_READS.md` first.
+- **Payment method is inferred from free text.** There is no method field on a payment, only
+  a "Mode / Note" box. Every screen showing a method says where it came from. Adding a real
+  field is a Billing change, not an Analytics one.
+- **Who collected a receipt is not recorded.** Counter cash carries the salesperson on the
+  bill; a standalone receipt carries nobody, and the Collections view names that gap rather
+  than guessing.
+- **`monthlyData` and the two all-time trends still ignore the period filter** — on purpose,
+  and each now says so on screen.
