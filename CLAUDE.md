@@ -283,6 +283,33 @@ Two rules details worth keeping:
 
 ---
 
+## Dates are date-only, so the ledger's tie-break IS its order
+
+`buildCustomerLedger` sorts by `new Date(row.date).getTime()`. Every entry on a given day
+therefore shares a timestamp, and what actually decides the sequence is the tie-break. That
+sequence is not cosmetic: **`getInvoiceLedger` in `PrintView` reads `rows[idx - 1].balance`
+as the invoice's printed "Previous Balance"**, and three other places do the same.
+
+The original code expressed "invoice, then the cash taken on it, then a receipt, then a
+credit note" as +0/+1/+2/+3 nudges on the day's timestamp. Those slots are per-DAY, not
+per-invoice, so two bills on one day sorted `INV-8475, INV-8476, INV-8475-PAY`: the row
+before the second bill was the *unpaid* first bill. A customer who settled their morning
+bill in cash was handed an afternoon bill claiming Rs. 136,000 still outstanding.
+
+Cash taken at billing now shares its invoice's timestamp **and its group**, one slot below
+it, so it travels with the invoice wherever that invoice sorts. Standalone receipts still
+land after every invoice of the day — a payment carries no invoice id, so there is nothing
+better to pair it with.
+
+Two things to keep:
+
+- **Adding an entry type means giving it a `group` and a `slot`, not a new nudge.** A nudge
+  orders it against the whole day; a group orders it against the document it belongs to.
+- **This class of fault is only visible on paper.** `src/components/PrintView.prevbalance.test.jsx`
+  renders the real `PrintView` through the real `buildCustomerLedger` — no stubbed ledger —
+  with the reported figures, at all three sizes. Reverting `ledger.js` alone makes it fail
+  with the exact figure from the screenshot, which is the check that it discriminates.
+
 ## Voiding, not deleting — and one filter point
 
 Financial records are never removed. `voidRecord` writes `{voided, voidedAt, voidedBy,

@@ -90,6 +90,40 @@ describe('buildCustomerLedger', () => {
     expect(l.rows.map(r => r.id)).toEqual(['INV-1', 'INV-1-PAY', 'REC-1', 'CN-1']);
   });
 
+  // Reported 2026-09-03: two bills for one customer on one day, the first paid in full at
+  // the counter, and the second still printed "Previous Balance Rs. 136,000".
+  //
+  // The +0/+1/+2/+3 same-day nudges are per-DAY slots, so every invoice of the day sorted
+  // ahead of every on-invoice payment of the day: INV-8475, INV-8476, INV-8475-PAY. The row
+  // immediately before INV-8476 was therefore the unpaid INV-8475 debit, and that row is
+  // exactly what the printed Previous Balance reads. Cash taken at billing belongs to ITS
+  // OWN invoice, not to a slot shared with every other invoice that day.
+  it('keeps cash taken at billing directly under its own invoice, not after later bills', () => {
+    const l = buildCustomerLedger(1, data({
+      invoices: [
+        billed('INV-8475', '2026-09-03', 136000, 136000),
+        billed('INV-8476', '2026-09-03', 27000),
+      ],
+    }));
+    expect(l.rows.map(r => r.id)).toEqual(['INV-8475', 'INV-8475-PAY', 'INV-8476']);
+    // The balance carried into the second bill is nil — the first one was settled.
+    expect(l.rows.map(r => r.balance)).toEqual([136000, 0, 27000]);
+    expect(l.closingBal).toBe(27000);
+  });
+
+  it('pairs each invoice with its own cash when three bills land on one day', () => {
+    const l = buildCustomerLedger(1, data({
+      invoices: [
+        billed('INV-3', '2026-09-03', 3000, 3000),
+        billed('INV-1', '2026-09-03', 1000, 400),
+        billed('INV-2', '2026-09-03', 2000),
+      ],
+    }));
+    expect(l.rows.map(r => r.id))
+      .toEqual(['INV-1', 'INV-1-PAY', 'INV-2', 'INV-3', 'INV-3-PAY']);
+    expect(l.rows.map(r => r.balance)).toEqual([1000, 600, 2600, 5600, 2600]);
+  });
+
   it('runs the balance forward across several dates', () => {
     const l = buildCustomerLedger(1, data({
       customers: [{ ...CUST, openingBalance: 1000 }],

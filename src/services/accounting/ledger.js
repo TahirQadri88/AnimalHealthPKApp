@@ -17,13 +17,33 @@ const num = (v) => {
   return Number.isFinite(n) ? n : 0;
 };
 
-// Same-day ordering matters: an invoice must appear before the cash taken against it, and a
-// credit note after both, or the running balance reads oddly on screen. The original code
-// encoded that as +1/+2/+3 nudges on the timestamp; kept exactly.
+// ── Same-day ordering ───────────────────────────────────────────────────────
+//
+// Dates are date-only strings, so several entries share a timestamp and the tie-break IS
+// the ledger's order. An invoice must appear before the cash taken against it, a later
+// receipt after both, and a credit note last, or the running balance reads oddly on screen.
+//
+// The original code encoded that as +1/+2/+3 nudges on the day's timestamp, which made the
+// slots per-DAY: with two bills on one day every invoice sorted ahead of every on-invoice
+// payment — INV-8475, INV-8476, INV-8475-PAY. So the row immediately preceding the second
+// bill was the *unpaid* first bill, and PrintView reads exactly that row for the invoice's
+// "Previous Balance". A customer who settled their morning bill in cash still saw it as a
+// prior balance on the afternoon one. (Reported 2026-09-03, INV-8475 / INV-8476.)
+//
+// Cash taken at billing belongs to ITS OWN invoice, so it shares that invoice's timestamp
+// and group and sits one slot below it. Grouping is by document id, which is why the id
+// comparison moved above the slot: invoices still order among themselves by id, and each
+// one's cash row travels with it.
+//
+// Standalone receipts still land after every invoice of the day — a receipt carries no
+// invoice reference, so there is nothing better to pair it with.
 const AT_INVOICE = 0;
-const AT_ON_INVOICE_PAYMENT = 1;
 const AT_PAYMENT = 2;
 const AT_CREDIT_NOTE = 3;
+
+// Where an entry sits within its own group. Only the on-invoice payment uses a second slot.
+const SLOT_MAIN = 0;
+const SLOT_ON_INVOICE_PAYMENT = 1;
 
 export const buildCustomerLedger = (customerId, { customers = [], invoices = [], payments = [] } = {}) => {
   const customer = customers.find(c => c.id === customerId);
@@ -45,12 +65,14 @@ export const buildCustomerLedger = (customerId, { customers = [], invoices = [],
       debit: num(inv.total), credit: 0, lineItems: itemLines,
       deliveryBilled: num(inv.deliveryBilled),
       timestamp: new Date(inv.date).getTime() + AT_INVOICE,
+      group: inv.id, slot: SLOT_MAIN,
     });
     if (num(inv.receivedAmount) > 0) {
       entries.push({
         id: `${inv.id}-PAY`, date: inv.date, ref: inv.id, desc: 'Payment (On Invoice)',
         debit: 0, credit: num(inv.receivedAmount),
-        timestamp: new Date(inv.date).getTime() + AT_ON_INVOICE_PAYMENT,
+        timestamp: new Date(inv.date).getTime() + AT_INVOICE,
+        group: inv.id, slot: SLOT_ON_INVOICE_PAYMENT,
       });
     }
   });
@@ -66,6 +88,7 @@ export const buildCustomerLedger = (customerId, { customers = [], invoices = [],
       desc: `Credit Note / Sales Return${cn.reason ? ` — ${cn.reason}` : ''}`,
       debit: 0, credit: num(cn.total), lineItems: cnLines, isCreditNote: true,
       timestamp: new Date(cn.date).getTime() + AT_CREDIT_NOTE,
+      group: cn.id, slot: SLOT_MAIN,
     });
   });
 
@@ -77,11 +100,14 @@ export const buildCustomerLedger = (customerId, { customers = [], invoices = [],
       id: pay.id, date: pay.date, ref: pay.id, desc: payDesc,
       debit: 0, credit: num(pay.amount) + payDiscount, discount: payDiscount,
       timestamp: new Date(pay.date).getTime() + AT_PAYMENT,
+      group: pay.id, slot: SLOT_MAIN,
     });
   });
 
   entries.sort((a, b) =>
-    a.timestamp === b.timestamp ? String(a.id).localeCompare(String(b.id)) : a.timestamp - b.timestamp);
+    a.timestamp - b.timestamp
+    || String(a.group).localeCompare(String(b.group))
+    || a.slot - b.slot);
 
   let runningBal = openingBal;
   let totalDebit = 0;
