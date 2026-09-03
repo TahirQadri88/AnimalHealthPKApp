@@ -14,7 +14,8 @@
 //
 // The parameter list was not guessed: it is exactly what `no-undef` reported once the body
 // was on its own, which is an exhaustive answer rather than a careful one.
-import { getPKTDate, getLocalDateStr } from '../../helpers';
+import { getLocalDateStr } from '../../helpers';
+import { previousPeriod } from './periods';
 import { computePnL } from './profitAndLoss';
 import { buildAgingReport } from './receivables';
 import { custKey, buildCustomerIndex } from './keys';
@@ -96,15 +97,9 @@ export const buildReport = ({
   const byExpenseCategory = {};
   filteredExpenses.forEach(e => { if(!byExpenseCategory[e.category]) byExpenseCategory[e.category] = 0; byExpenseCategory[e.category] += Number(e.amount); });
   // Previous period for comparison
-  const getPrevDates = () => {
-    const now = getPKTDate(); let days = 30;
-    if (dateFilter === 'Today') days = 1; else if (dateFilter === 'This Week') days = 7; else if (dateFilter === 'This Month') days = 30; else if (dateFilter === 'This Year') days = 365;
-    else if (dateFilter === 'Custom' && customStart) { const ms = new Date(customEnd) - new Date(customStart); days = Math.ceil(ms / 86400000) + 1; }
-    const end = new Date(now); end.setDate(end.getDate() - days);
-    const start = new Date(end); start.setDate(start.getDate() - days);
-    return { start: getLocalDateStr(start), end: getLocalDateStr(end) };
-  };
-  const prevPeriod = getPrevDates();
+  // services/analytics/periods.js — shared with the expense comparison, so the two cannot
+  // mean different things by "vs previous period" on the same screen.
+  const prevPeriod = previousPeriod(dateFilter, customStart, customEnd);
   let prevRevenue = 0, prevProfit = 0;
   invoices.filter(o => o.status === 'Billed' && o.date >= prevPeriod.start && o.date <= prevPeriod.end).forEach(o => {
     (o.items || []).forEach(item => { prevRevenue += item.price * item.quantity; prevProfit += (item.price - (item.costPrice||0)) * item.quantity; });

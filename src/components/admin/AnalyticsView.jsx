@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useContext } from 'react';
 import { Search, Calendar, Download, Printer, Share2, Users, Package, Zap, PhoneCall,
          AlertCircle, CheckCircle2, X,
-         Award, Clock, DollarSign, Filter, TrendingUp, Wallet } from 'lucide-react';
+         Award, Clock, DollarSign, Filter, Receipt, TrendingUp, Wallet } from 'lucide-react';
 import { AppContext } from '../../context/AppContext';
 import { ScrollableTabBar } from '../ui/ScrollableTabBar';
 import { MultiPicker } from '../ui/MultiPicker';
@@ -12,6 +12,8 @@ import { drillDown, marginTrend } from '../../services/analytics/drilldown';
 import { buildCollections } from '../../services/analytics/collections';
 import { buildReturns } from '../../services/analytics/returns';
 import { buildItemSales } from '../../services/analytics/itemSales';
+import { buildExpenses } from '../../services/analytics/expenses';
+import { previousPeriod } from '../../services/analytics/periods';
 import { DrillDownModal } from '../modals/DrillDownModal';
 
 export const AnalyticsView = () => {
@@ -63,6 +65,13 @@ const itemSalesRows = useMemo(() => buildItemSales({
   invoices, productQuery: itemProdFilter, customerQuery: itemCustFilter, checkCustomFilter,
 }), [invoices, itemProdFilter, itemCustFilter, dateFilter, customStart, customEnd]);
 
+// Where the money goes. The previous period comes from the same helper reportEngine uses
+// for the revenue trend, so the two cannot mean different things by "vs previous period".
+const expenseReport = useMemo(() => buildExpenses({
+  expenses, expenseCategories, checkCustomFilter,
+  prevPeriod: previousPeriod(dateFilter, customStart, customEnd),
+}), [expenses, expenseCategories, dateFilter, customStart, customEnd]);
+
 // What is coming back, and why. The reason is typed onto every credit note and was never
 // read by anything.
 const returns = useMemo(() => buildReturns({
@@ -90,6 +99,7 @@ const getSortedExportData = () => {
      rows.push({ 'P&L Item': 'Transport Expense', 'Amount (Rs)': -kpis.transportExpense, 'Notes': '' });
      rows.push({ 'P&L Item': 'Operational Expenses', 'Amount (Rs)': -kpis.totalExpenses, 'Notes': '' });
      rows.push({ 'P&L Item': 'Net Profit', 'Amount (Rs)': kpis.netProfit, 'Notes': `${netMargin}% net margin` });
+     rows.push({ 'P&L Item': 'Billed This Period', 'Amount (Rs)': reportEngine.totalBilledAmt, 'Notes': 'invoice totals, delivery included' });
      rows.push({ 'P&L Item': 'Outstanding Receivables', 'Amount (Rs)': kpis.totalReceivables, 'Notes': `${reportEngine.collectionRate}% collected` });
      if (reportEngine.avgDaysToPay !== null) rows.push({ 'P&L Item': 'Avg Days to Pay', 'Amount (Rs)': '', 'Notes': `${reportEngine.avgDaysToPay} days` });
      rows.push({ 'P&L Item': `Active Customers: ${reportEngine.newCustCount + reportEngine.repeatCustCount}`, 'Amount (Rs)': '', 'Notes': `${reportEngine.newCustCount} new · ${reportEngine.repeatCustCount} repeat` });
@@ -113,6 +123,10 @@ const getSortedExportData = () => {
      'Customer': r.customerName, 'Reason': r.reason,
      'Units': r.units, 'Value (Rs)': r.value, 'Cost (Rs)': r.cost,
      'Days Since Sale': r.daysSinceSale ?? '',
+   }));
+   if (view === 'Expenses') return expenseReport.rows.map(r => ({
+     'Date': r.date, 'Category': r.category, 'Group': r.group,
+     'Amount (Rs)': r.amount, 'Note': r.note,
    }));
    if (view === 'By Salesperson') return Object.entries(reportEngine.bySalesperson)
      .map(([key,val]) => ({ 'Staff Name': key, 'Orders': val.orders, 'Revenue (Rs)': val.revenue, 'Gross Profit (Rs)': val.profit,
@@ -224,6 +238,15 @@ const handleExport = (format) => {
             const total = exportData.reduce((s,r)=>s+(r['Outstanding (Rs)']||0),0);
             text += `${'─'.repeat(30)}\nTotal Outstanding: Rs.${total.toLocaleString('en-US')}\n`;
           }
+        } else if (view === 'Expenses') {
+          const t = expenseReport.totals;
+          text += `Spent: Rs.${t.amount.toLocaleString('en-US')} across ${t.count} entr${t.count === 1 ? 'y' : 'ies'}\n`;
+          if (t.changePct !== null) text += `vs previous period: ${t.changePct >= 0 ? '+' : ''}${t.changePct}% (Rs.${t.prevAmount.toLocaleString('en-US')})\n`;
+          text += `\n*By category*\n`;
+          expenseReport.byCategory.forEach(c => {
+            const move = c.changePct === null ? '' : ` (${c.changePct >= 0 ? '+' : ''}${c.changePct}%)`;
+            text += `${c.key}: Rs.${c.amount.toLocaleString('en-US')}${move}\n`;
+          });
         } else if (view === 'Returns') {
           const t = returns.totals;
           text += `Returned: Rs.${t.value.toLocaleString('en-US')} across ${t.count} credit note${t.count === 1 ? '' : 's'}\n`;
@@ -495,10 +518,10 @@ return (
 
     {/* View Tabs */}
     <ScrollableTabBar className="pb-2 shrink-0">
-       {['Overview','Insights','Monthly Trend','By Product','By Company','By Customer','By City','By Area','By Type','By Salesperson','Receivables','Collections','Returns','Item Sales'].map(v => (
+       {['Overview','Insights','Monthly Trend','By Product','By Company','By Customer','By City','By Area','By Type','By Salesperson','Receivables','Collections','Returns','Expenses','Item Sales'].map(v => (
          <button key={v} data-analytictab={v} tabIndex={view===v?0:-1}
            onClick={() => setView(v)}
-           onKeyDown={makeArrowNav(['Overview','Insights','Monthly Trend','By Product','By Company','By Customer','By City','By Area','By Type','By Salesperson','Receivables','Collections','Returns','Item Sales'],view,setView,'data-analytictab')}
+           onKeyDown={makeArrowNav(['Overview','Insights','Monthly Trend','By Product','By Company','By Customer','By City','By Area','By Type','By Salesperson','Receivables','Collections','Returns','Expenses','Item Sales'],view,setView,'data-analytictab')}
            className={`px-3 py-1.5 rounded-xl font-bold text-[11px] whitespace-nowrap shadow-sm transition-colors ${view === v ? 'bg-slate-800 text-white' : 'bg-white text-slate-600 border border-slate-200'}`}>{v}</button>
        ))}
     </ScrollableTabBar>
@@ -881,6 +904,134 @@ return (
         </div>
       )}
 
+      {view === 'Expenses' && (() => {
+        const t = expenseReport.totals;
+        const maxCat = expenseReport.byCategory.reduce((m, c) => Math.max(m, c.amount), 0) || 1;
+        const maxMonth = expenseReport.byMonth.reduce((m, c) => Math.max(m, c.amount), 0) || 1;
+        const move = (pct) => pct === null ? null : (
+          <span className={`text-[10px] font-black ${pct > 0 ? 'text-rose-600' : pct < 0 ? 'text-emerald-600' : 'text-slate-400'}`}>
+            {pct > 0 ? '↑' : pct < 0 ? '↓' : '='} {Math.abs(pct)}%
+          </span>
+        );
+        return (
+          <div className="space-y-3 mt-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Spent · {filterLabel}</p>
+                <p className="text-2xl font-black mt-1 text-rose-600">Rs.{t.amount.toLocaleString('en-US')}</p>
+                <p className="text-[10px] text-slate-400 mt-1">{t.count} entr{t.count === 1 ? 'y' : 'ies'}</p>
+              </div>
+              <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">vs Previous Period</p>
+                {t.changePct === null ? (
+                  <p className="text-sm font-bold text-slate-400 mt-2">Nothing spent in the period before this one</p>
+                ) : (
+                  <>
+                    <p className={`text-2xl font-black mt-1 ${t.changePct > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>{t.changePct >= 0 ? '+' : ''}{t.changePct}%</p>
+                    <p className="text-[10px] text-slate-400 mt-1">was Rs.{t.prevAmount.toLocaleString('en-US')}</p>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {t.count === 0 && (
+              <div className="bg-white p-8 rounded-2xl text-center border border-slate-200">
+                <p className="font-bold text-slate-400">Nothing was spent in this period.</p>
+              </div>
+            )}
+
+            {expenseReport.byMonth.length > 1 && (
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="bg-slate-50 border-b border-slate-200 p-3">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Month by month <span className="text-slate-400 normal-case font-medium">· all time, not the selected period</span></span>
+                </div>
+                <div className="flex items-end gap-1 p-3 overflow-x-auto">
+                  {expenseReport.byMonth.map(m => (
+                    <div key={m.key} className="flex-1 min-w-[44px] text-center">
+                      <div className="text-[9px] font-black text-slate-600">{Math.round(m.amount / 1000)}k</div>
+                      <div className="bg-slate-100 rounded mt-1" style={{ height: 44 }}>
+                        <div className="bg-rose-400 rounded" style={{ height: `${Math.max((m.amount / maxMonth) * 44, 2)}px`, marginTop: `${44 - Math.max((m.amount / maxMonth) * 44, 2)}px` }}></div>
+                      </div>
+                      <div className="text-[8px] text-slate-400 font-bold mt-1">{m.key.slice(2).replace('-', '/')}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {expenseReport.byCategory.length > 0 && (
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="bg-slate-50 border-b border-slate-200 p-3">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">By category, and how it moved</span>
+                </div>
+                <div className="divide-y divide-slate-100">
+                  {expenseReport.byCategory.map(c => (
+                    <div key={c.key} className="p-3">
+                      <div className="flex justify-between items-center gap-2">
+                        <span className="text-xs font-bold text-slate-700 truncate">{c.key} <span className="text-slate-400 font-medium">({c.count})</span></span>
+                        <span className="flex items-center gap-2 shrink-0">
+                          {move(c.changePct)}
+                          <span className="text-xs font-black text-slate-800">Rs.{c.amount.toLocaleString('en-US')}</span>
+                        </span>
+                      </div>
+                      <div className="w-full bg-slate-100 rounded-full h-1 mt-1"><div className="bg-rose-400 h-1 rounded-full" style={{ width: `${Math.max((c.amount / maxCat) * 100, 1)}%` }}></div></div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {expenseReport.byGroup.length > 1 && (
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="bg-slate-50 border-b border-slate-200 p-3">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">By group</span>
+                </div>
+                <div className="divide-y divide-slate-100">
+                  {expenseReport.byGroup.map(g => (
+                    <div key={g.key} className="flex justify-between items-center p-3">
+                      <span className="text-xs font-bold text-slate-700">{g.key} <span className="text-slate-400 font-medium">({g.count})</span></span>
+                      <span className="text-xs font-black text-slate-800">Rs.{g.amount.toLocaleString('en-US')}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {expenseReport.rows.length > 0 && (
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="bg-slate-50 border-b border-slate-200 p-3">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Every expense · newest first</span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs whitespace-nowrap">
+                    <thead className="bg-slate-50 text-slate-500 uppercase font-bold tracking-wider border-b border-slate-200">
+                      <tr><th className="p-3">Date</th><th className="p-3">Category</th><th className="p-3">Group</th><th className="p-3">Note</th><th className="p-3 text-right">Amount</th></tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
+                      {expenseReport.rows.map(r => (
+                        <tr key={r.id} className="hover:bg-slate-50">
+                          <td className="p-3 text-slate-500">{formatDateDisp(r.date)}</td>
+                          <td className="p-3 font-bold text-slate-800">{r.category}</td>
+                          <td className="p-3 text-slate-500">{r.group}</td>
+                          <td className="p-3 text-slate-400 max-w-[180px] truncate">{r.note}</td>
+                          <td className="p-3 text-right font-black text-rose-600">Rs.{r.amount.toLocaleString('en-US')}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot className="bg-slate-50 border-t-2 border-slate-300 font-black text-slate-800 text-xs">
+                      <tr>
+                        <td className="p-3 uppercase tracking-wider text-slate-600" colSpan={4}>Total spent</td>
+                        <td className="p-3 text-right text-rose-700">Rs.{t.amount.toLocaleString('en-US')}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
       {view === 'Returns' && (() => {
         const t = returns.totals;
         const maxReason = returns.byReason.reduce((m, x) => Math.max(m, x.value), 0) || 1;
@@ -1146,6 +1297,7 @@ return (
           { label: 'Net Profit Margin', value: `${netMargin}%`, sub: `Rs.${kpis.netProfit.toLocaleString('en-US')} after all expenses`, color: Number(netMargin) >= 15 ? 'emerald' : Number(netMargin) >= 5 ? 'amber' : 'rose', icon: DollarSign },
           { label: 'Collection Rate', value: `${reportEngine.collectionRate}%`, sub: `all-time billed vs outstanding`, color: Number(reportEngine.collectionRate) >= 80 ? 'emerald' : Number(reportEngine.collectionRate) >= 50 ? 'amber' : 'rose', icon: Wallet },
           { label: 'Active Customers', value: `${reportEngine.newCustCount + reportEngine.repeatCustCount}`, sub: `${reportEngine.newCustCount} new · ${reportEngine.repeatCustCount} repeat`, color: 'indigo', icon: Users },
+          { label: 'Billed This Period', value: `Rs.${reportEngine.totalBilledAmt.toLocaleString('en-US')}`, sub: 'invoice totals, delivery included', color: 'slate', icon: Receipt },
           ...(reportEngine.avgDaysToPay !== null ? [{ label: 'Avg Days to Pay', value: `${reportEngine.avgDaysToPay}d`, sub: reportEngine.avgDaysToPay <= 7 ? 'Excellent payment speed' : reportEngine.avgDaysToPay <= 21 ? 'Acceptable turnaround' : 'Slow — follow up needed', color: reportEngine.avgDaysToPay <= 7 ? 'emerald' : reportEngine.avgDaysToPay <= 21 ? 'amber' : 'rose', icon: Clock }] : []),
         ];
         return (
@@ -1203,6 +1355,11 @@ return (
         const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
         return (
           <div className="space-y-4 mt-2">
+            {/* The trend is deliberately all-time. Nothing said so, and the chart therefore
+                disagreed silently with every other figure on the page. */}
+            <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+              <p className="text-[10px] font-bold text-amber-700">Last {months.length} months, all time — this view ignores the <span className="underline">{filterLabel}</span> filter above.</p>
+            </div>
             {/* Chart */}
             <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
               <div className="flex justify-between items-center mb-3">

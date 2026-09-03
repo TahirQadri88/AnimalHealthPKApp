@@ -276,3 +276,54 @@ describe('AnalyticsView — margin as a ranking', () => {
     expect(html).toContain('Sort: Best Margin');
   });
 });
+
+// A bar list on Insights was everything Analytics had to say about expenses.
+describe('AnalyticsView — Expenses', () => {
+  const WORLD = {
+    analyticsView: 'Expenses',
+    expenseCategories: [{ id: 1, name: 'Petrol', group: 'Transportation' }],
+    expenses: [
+      { id: 1, date: today, category: 'Petrol', amount: 5000 },
+      { id: 2, date: today, category: 'Chai', amount: 800 },
+    ],
+  };
+
+  it('totals the period and lists every entry', () => {
+    const html = render(WORLD);
+    expect(html).toContain('Rs.5,800');
+    expect(html).toContain('Petrol');
+    expect(html).toContain('Chai');
+  });
+
+  it('rolls a category up into its group, and names one with no record', () => {
+    const html = render(WORLD);
+    expect(html).toContain('Transportation');
+    expect(html).toContain('Ungrouped');
+  });
+
+  it('offers a comparison to the period before', () => {
+    expect(render(WORLD)).toContain('vs Previous Period');
+  });
+
+  it('says so plainly when nothing was spent', () => {
+    expect(render({ analyticsView: 'Expenses', expenses: [] }))
+      .toContain('Nothing was spent in this period');
+  });
+
+  it('leaks no undefined into the markup', () => {
+    expect(render(WORLD)).not.toMatch(/undefined|NaN/);
+  });
+});
+
+describe('AnalyticsView — two figures that were computed and never shown', () => {
+  it('shows what was billed in the period, which totalBilledAmt already knew', () => {
+    expect(render({ analyticsView: 'Insights' })).toContain('Billed This Period');
+  });
+
+  // The monthly chart deliberately ignores the filter and said nothing, so it disagreed
+  // silently with every other figure on the page.
+  it('says the monthly trend ignores the period filter', () => {
+    expect(render({ analyticsView: 'Monthly Trend' }))
+      .toContain('this view ignores the');
+  });
+});
