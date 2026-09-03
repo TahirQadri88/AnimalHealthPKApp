@@ -11,6 +11,7 @@ import { buildReport } from '../../services/analytics/reportEngine';
 import { drillDown, marginTrend } from '../../services/analytics/drilldown';
 import { buildCollections } from '../../services/analytics/collections';
 import { buildReturns } from '../../services/analytics/returns';
+import { buildItemSales } from '../../services/analytics/itemSales';
 import { DrillDownModal } from '../modals/DrillDownModal';
 
 export const AnalyticsView = () => {
@@ -55,6 +56,13 @@ const collections = useMemo(() => buildCollections({
   invoices, payments, customers, checkCustomFilter, filterCustomers,
 }), [invoices, payments, customers, dateFilter, customStart, customEnd, ...[...filterCustomers]]);
 
+// Item Sales, lifted out of the view's own IIFE so an export can reach it. It could not
+// before, so `getSortedExportData` returned null for this tab while the CSV and WhatsApp
+// buttons stayed on screen — both threw on `null.some` / `null.forEach` when pressed.
+const itemSalesRows = useMemo(() => buildItemSales({
+  invoices, productQuery: itemProdFilter, customerQuery: itemCustFilter, checkCustomFilter,
+}), [invoices, itemProdFilter, itemCustFilter, dateFilter, customStart, customEnd]);
+
 // What is coming back, and why. The reason is typed onto every credit note and was never
 // read by anything.
 const returns = useMemo(() => buildReturns({
@@ -63,8 +71,13 @@ const returns = useMemo(() => buildReturns({
 }), [invoices, products, customers, dateFilter, customStart, customEnd, ...[...filterCompanies], ...[...filterCustomers], ...[...filterSalespersons]]);
 
 const getSortedExportData = () => {
-   if (view === 'Overview' || view === 'Item Sales') return null;
-   if (view === 'Insights') {
+   if (view === 'Item Sales') return itemSalesRows.map(r => ({
+     'Date': r.date, 'Invoice': r.invoiceId, 'Customer': r.customerName,
+     'Product': r.name, 'Qty': r.qty, 'Rate (Rs)': r.rate, 'Amount (Rs)': r.sub,
+   }));
+   // Overview shows the same P&L as Insights, so it exports the same rows rather than
+   // refusing with a toast — which is what "cannot export Overview as CSV" really meant.
+   if (view === 'Insights' || view === 'Overview') {
      const kpis = reportEngine.kpis;
      const gpMargin = kpis.productRevenue > 0 ? ((kpis.grossMargin / kpis.productRevenue) * 100).toFixed(1) : '0.0';
      const netMargin = kpis.productRevenue > 0 ? ((kpis.netProfit / kpis.productRevenue) * 100).toFixed(1) : '0.0';
@@ -130,7 +143,7 @@ const handleExport = (format) => {
     const title = `Analytics - ${view}`;
     const exportData = getSortedExportData();
     if (format === 'csv') {
-        if(view === 'Overview') return showToast("Cannot export Overview as CSV", "error");
+        if (!exportData || !exportData.length) return showToast("Nothing to export on this tab yet", "error");
         const numericKeys = ['Revenue (Rs)', 'Gross Profit (Rs)', 'Cost (Rs)', 'Outstanding (Rs)', 'Qty Sold', 'Orders'];
         const csvTotals = {};
         numericKeys.forEach(k => { if (exportData.some(r => r[k] !== undefined)) csvTotals[k] = exportData.reduce((s,r)=>s+(Number(r[k])||0),0); });
@@ -233,7 +246,18 @@ const handleExport = (format) => {
           collections.byCustomer.slice(0, 10).forEach((c, i) => {
             text += `${i+1}. ${c.name} — Rs.${c.amount.toLocaleString('en-US')}\n`;
           });
+        } else if (view === 'Item Sales') {
+          if (!exportData.length) return showToast("Search a product or customer first", "error");
+          exportData.slice(0, 40).forEach((r, i) => {
+            text += `${i+1}. ${r['Date']} · ${r['Invoice']} · ${r['Customer']}\n`;
+            text += `   ${r['Product']} — ${r['Qty']} × Rs.${Number(r['Rate (Rs)']).toLocaleString('en-US')} = Rs.${Number(r['Amount (Rs)']).toLocaleString('en-US')}\n`;
+          });
+          if (exportData.length > 40) text += `... and ${exportData.length - 40} more lines\n`;
+          const units = exportData.reduce((s,r)=>s+Number(r['Qty']||0),0);
+          const amt = exportData.reduce((s,r)=>s+Number(r['Amount (Rs)']||0),0);
+          text += `${'─'.repeat(30)}\nTotal: ${units.toLocaleString('en-US')} units · Rs.${amt.toLocaleString('en-US')}\n`;
         } else {
+          if (!exportData || !exportData.length) return showToast("Nothing to export on this tab yet", "error");
           exportData.forEach((r, i) => {
             const name = r['Product Name'] || r['Brand Name'] || r['Customer Name'] || r['Staff Name'] || r['City'] || r['Area'] || r['Type'] || '?';
             const brand = r['Brand'] || '';
@@ -502,8 +526,8 @@ return (
         <span className="text-[10px] font-bold text-indigo-700 ml-1 uppercase tracking-widest truncate">{filterLabel}</span>
         <div className="flex gap-1.5">
            <button onClick={()=>handleExport('text')} title="WhatsApp" className="p-2 bg-green-500 text-white rounded-lg shadow-sm"><Share2 size={15}/></button>
-           {view !== 'Overview' && <button onClick={()=>handleExport('csv')} title="CSV" className="p-2 bg-white text-slate-600 rounded-lg shadow-sm border border-slate-200"><Download size={15}/></button>}
-           <button onClick={()=>handleExport('pdf')} title="PDF" className="p-2 bg-indigo-600 text-white rounded-lg shadow-sm"><Printer size={15}/></button>
+           <button onClick={()=>handleExport('csv')} title="CSV" className="p-2 bg-white text-slate-600 rounded-lg shadow-sm border border-slate-200"><Download size={15}/></button>
+           <button onClick={()=>handleExport('pdf')} title="PDF, Image or Save — opens the document" className="p-2 bg-indigo-600 text-white rounded-lg shadow-sm"><Printer size={15}/></button>
         </div>
     </div>
 
@@ -650,20 +674,8 @@ return (
       {view === 'By Type' && renderSegmentTable(reportEngine.byType, 'Type', 'type')}
 
       {view === 'Item Sales' && (() => {
-        const prodQ = itemProdFilter.toLowerCase().trim();
-        const custQ = itemCustFilter.toLowerCase().trim();
-        const hasFilter = prodQ || custQ;
-        const rows = hasFilter ? (() => {
-          const out = [];
-          invoices.filter(o => o.status === 'Billed' && checkCustomFilter(o.date)).forEach(inv => {
-            if (custQ && !inv.customerName.toLowerCase().includes(custQ)) return;
-            (inv.items || []).filter(i => !i.isBonus).forEach(item => {
-              if (prodQ && !(item.name || '').toLowerCase().includes(prodQ)) return;
-              out.push({ date: inv.date, customerId: inv.customerId, customerName: inv.customerName, invoiceId: inv.id, inv, name: item.name, qty: item.quantity || 0, rate: item.price || 0, sub: (item.price || 0) * (item.quantity || 0) });
-            });
-          });
-          return out.sort((a, b) => b.date.localeCompare(a.date));
-        })() : [];
+        const hasFilter = itemProdFilter.trim() || itemCustFilter.trim();
+        const rows = itemSalesRows;
         const totalUnits = rows.reduce((s, r) => s + r.qty, 0);
         const totalAmt = rows.reduce((s, r) => s + r.sub, 0);
         return (

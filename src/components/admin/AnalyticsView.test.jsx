@@ -52,11 +52,15 @@ describe('AnalyticsView', () => {
   // The export buttons are icon-only, identified by their title. CSV is deliberately absent
   // on Overview — there is nothing tabular to export there, and the handler says so with a
   // toast if it is ever reached.
-  it('offers WhatsApp and PDF export, and withholds CSV on the Overview tab', () => {
-    const html = render();
-    expect(html).toContain('title="WhatsApp"');
-    expect(html).toContain('title="PDF"');
-    expect(html).not.toContain('title="CSV"');
+  // Every tab offers the same three now. Overview used to hide CSV and answer a press with
+  // an error toast; it exports the same P&L rows Insights does.
+  it('offers WhatsApp, CSV and the document on every tab', () => {
+    ['Overview', 'Insights', 'By Product', 'Receivables', 'Collections', 'Returns', 'Item Sales'].forEach(v => {
+      const html = render({ analyticsView: v });
+      expect(html).toContain('title="WhatsApp"');
+      expect(html).toContain('title="CSV"');
+      expect(html).toContain('title="PDF, Image or Save — opens the document"');
+    });
   });
 
   it('renders for a business with no data', () => {
