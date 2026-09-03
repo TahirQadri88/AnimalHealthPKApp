@@ -456,15 +456,24 @@ The short version of what is verified and unfixed:
   rather than the rows, so "only your own invoices" denies the listener outright and the
   app goes blank. `viewAllInvoices` and `viewLedger` cannot be enforced until the client
   query is scoped — which `docs/FIRESTORE_READS.md` wants anyway.
-- Document numbers come from `Math.max(...)+1` over client-side records, so two people
-  billing at the same moment get the same invoice number.
+- **Analytics and Reports are done** (2026-09-03). All eight items of
+  `docs/ANALYTICS_AUDIT.md` shipped; §5 of that file records what landed and the four things
+  left deliberately open.
+- **Document numbering is atomic** (`lib/claimDocNumber.js`, a transaction over
+  `counters/`), with the client-side `getNextSeqNum` kept only as the seed and the floor.
+- **`paymentStatus` is derived** — `paymentStatusById` in `App.jsx` runs `allocateCredits`
+  over the real records; the stored field is now only a fallback for a record the
+  allocation does not reach.
+- **585 tests**, and the money maths all live in `services/`.
+
+Still open, and each for a reason:
+
 - All 15 collections are loaded in full by unconstrained `onSnapshot` listeners, including
-  invoices and payments.
-- `paymentStatus` is stored and editable rather than derived from payment transactions.
-- No audit log, no void mechanism — financial deletes are physical.
-- No tests. Write these **before** refactoring `App.jsx`, not after: the brief's own phase
-  order gets this backwards, and there is nothing else to catch a regression in a
-  4,900-line file.
+  invoices and payments. `docs/FIRESTORE_READS.md` has the audit; the rolling-window plan in
+  it would understate every customer balance, so it is parked rather than pending.
+- Read permissions cannot be enforced in `firestore.rules` until that query scoping exists —
+  Firestore evaluates a rule against the QUERY, not the rows.
+- The restore path has never been exercised. See the section above it.
 
 ## Deploying
 

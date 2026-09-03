@@ -90,12 +90,26 @@ remains is correctness and maintainability.
 
 ### Next
 
-**Analytics and Reports** — audited 2026-09-02, plan in `docs/ANALYTICS_AUDIT.md`. The audit
-found one real error: receivables aging is computed twice, and the Analytics copy ages a
-customer by their most recent INVOICE rather than by the age of the unpaid debt, so a
-200-day-old balance is reported as current the moment they buy anything. Measured, the two
-screens put the same Rs 120,000 in opposite buckets. Fix that first, then the drill-down
-and the missing Collections and Returns dimensions.
+**Backup and restore** (brief §33). The backup half works and is used weekly. The restore
+half has never been run, and reading it is enough to know it would not do what the button
+says. See the audit below.
+
+### Done since this list was written
+
+- [x] **Analytics and Reports** (2026-09-03). All eight items of `docs/ANALYTICS_AUDIT.md`;
+  §5 of that file records what shipped, the three breakdown faults the drill-down work
+  uncovered, and what is deliberately left open. The aging duplication that prompted the
+  audit — a 200-day-old balance reported as current because the customer bought yesterday —
+  is fixed and both screens now read from `buildAgingReport`.
+- [x] **B. Atomic document numbering.** `lib/claimDocNumber.js` claims the number in a
+  Firestore transaction over `counters/{prefix}`, seeded and floored by the old client-side
+  guess so numbering continues from existing records and can never reissue. The format is
+  unchanged, as this file argued it should be. Degrades to the old behaviour with a console
+  warning if the transaction cannot run.
+- [x] **G. Derive `paymentStatus`.** `paymentStatusById` in `App.jsx` runs `allocateCredits`
+  over the real invoices and payments; the stored field survives only as a fallback for a
+  record the allocation does not reach. `getCustomerBalance` has been the single
+  customer-balance calculation since the ledger was extracted.
 
 ### Previously, in this order
 
