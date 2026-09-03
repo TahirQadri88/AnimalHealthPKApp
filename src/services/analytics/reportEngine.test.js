@@ -371,3 +371,32 @@ describe('buildReport — a brand filter applies to returns too', () => {
     expect(all.kpis.productRevenue).toBe(75000);
   });
 });
+
+// ── Two ways a return did not reach a breakdown ─────────────────────────────
+//
+// Both found while building the drill-down, which has to reach the same transactions a
+// breakdown row counted. A row whose figure cannot be reconciled to a list of documents is
+// a row nobody can check.
+describe('buildReport — a return reaches every breakdown it belongs to', () => {
+  it('takes the returned units off the brand as well as off the product', () => {
+    const r = run({ invoices: [
+      billed('INV-1', '2026-08-01', [line('Antox 9', 10, 7500, 6000)]),
+      creditNote('CN-1', '2026-08-05', [line('Antox 9', 2, 7500, 6000)]),
+    ] });
+    expect(r.byProduct['Antox 9'].qty).toBe(8);
+    // byCompany subtracted revenue, cost and profit but left qty gross.
+    expect(r.byCompany.Selmore.qty).toBe(8);
+  });
+
+  it('opens a segment row for a period that saw only returns', () => {
+    const r = run({
+      customers: [{ id: 1, name: 'Al Shaheer', city: 'Karachi', area: 'Sohrab Goth', customerType: 'Retail' }],
+      invoices: [creditNote('CN-1', '2026-08-05', [line('Antox 9', 2, 7500, 6000)])],
+    });
+    // The city existed in the data and the money moved; the row was dropped because no
+    // billed invoice had created it first.
+    expect(r.byCity.Karachi.revenue).toBe(-15000);
+    expect(r.byArea['Sohrab Goth'].revenue).toBe(-15000);
+    expect(r.byType.Retail.revenue).toBe(-15000);
+  });
+});

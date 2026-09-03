@@ -17,6 +17,7 @@
 import { getPKTDate, getLocalDateStr } from '../../helpers';
 import { computePnL } from './profitAndLoss';
 import { buildAgingReport } from './receivables';
+import { custKey, buildCustomerIndex } from './keys';
 
 // buildAgingReport's bucket keys, mapped to the names the Analytics screen has always used.
 const BUCKET_LISTS = [
@@ -50,14 +51,9 @@ export const buildReport = ({
   // customer is called today, not whatever they were called when the oldest invoice was
   // raised. custKey falls back to the name for a record with no customerId at all, so such
   // an invoice is still counted rather than dropped into a single 'undefined' bucket.
-  const custSegment = {};
-  const custName = {};
-  customers.forEach(c => {
-    custSegment[String(c.id)] = { city: c.city || '', area: c.area || '', type: c.customerType || '' };
-    custName[String(c.id)] = c.name;
-  });
-  const custKey = (o) => String(o.customerId ?? o.customerName ?? 'Unknown');
-  const custLabel = (o) => custName[custKey(o)] || o.customerName || 'Unknown';
+  const custIndex = buildCustomerIndex(customers);
+  const custSegment = custIndex.segment;
+  const custLabel = custIndex.labelFor;
   customers.forEach(c => { const bal = getCustomerBalance(c.id); if(bal > 0) { kpis.totalReceivables += bal; receivablesList.push({ name: c.name, id: c.id, amount: bal, phone: c.phone || '' }); } });
   billedForPnL.forEach(o => {
     kpis.deliveryBilled += Number(o.deliveryBilled || 0);
@@ -190,6 +186,9 @@ export const buildReport = ({
       byProduct[pKey].qty -= (item.quantity || 0); byProduct[pKey].revenue -= rev; byProduct[pKey].cost -= cost; byProduct[pKey].profit -= gp;
       const cmpKey = item.company || 'Unknown';
       if (!byCompany[cmpKey]) byCompany[cmpKey] = { qty: 0, revenue: 0, cost: 0, profit: 0 };
+      // qty was left gross here while byProduct subtracted it, so a brand's units sold
+      // never came down when stock came back.
+      byCompany[cmpKey].qty -= (item.quantity || 0);
       byCompany[cmpKey].revenue -= rev; byCompany[cmpKey].cost -= cost; byCompany[cmpKey].profit -= gp;
     });
     const cnGP = cnRev - cnCost;
@@ -208,7 +207,11 @@ export const buildReport = ({
     ['city', 'area', 'type'].forEach(k => {
       const val = cnSeg[k] || 'Unknown';
       const map = k === 'city' ? byCity : k === 'area' ? byArea : byType;
-      if (map[val]) { map[val].revenue -= cnRev; map[val].profit -= cnGP; }
+      // The row is created if missing, as byCustomer and bySalesperson already do. It used
+      // to be adjusted only when a billed invoice had opened it first, so a period with
+      // returns and no sales in a city simply lost them.
+      if (!map[val]) map[val] = { revenue: 0, profit: 0, orders: 0 };
+      map[val].revenue -= cnRev; map[val].profit -= cnGP;
     });
     // Monthly trend
     const month = cn.date.slice(0, 7);
