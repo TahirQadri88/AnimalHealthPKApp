@@ -341,6 +341,51 @@ refused because the log was unreachable is worse.
 
 ---
 
+## A drill-down is the best test a report has
+
+Analytics gained a drill-down from every breakdown row to the transactions behind it. The
+capability was the point, but the *requirement* turned out to be the valuable part: a
+drill-down must list exactly the documents the figure above it counted, and squaring that
+found three faults nobody had spotted by reading the code.
+
+- The brand filter gated the billed loop and not the credit-note loop, so with a brand
+  selected another brand's return was subtracted from every breakdown — and invented a row
+  for the brand just excluded. `computePnL` was right all along, so the headline P&L and the
+  tables beneath it disagreed.
+- `byCompany` subtracted a return's money but not its `qty`, while `byProduct` subtracted
+  both.
+- The city/area/type breakdowns adjusted a return only `if (map[val])`, so a period with
+  returns and no sales in a city lost them.
+
+`src/services/analytics/drilldown.test.js` walks every key of every breakdown and asserts the
+drill-down totals equal the row — under a brand filter, a period filter and a customer
+filter. **Write that test for any new breakdown.** It is a reconciliation, and a
+reconciliation catches what an example-based test never will.
+
+Two modules exist purely so the two sides cannot drift:
+
+- **`services/analytics/keys.js`** — `custKey`, `productKey`, `companyKey`, `salespersonKey`,
+  `buildCustomerIndex`. One answer to "which customer is this invoice for". Two answers is
+  how the aging report ended up disagreeing with the Receivables screen.
+- **`services/analytics/periods.js`** — `previousPeriod`. The expense comparison and the
+  revenue trend must not mean different things by "vs previous period" on one screen.
+
+**Customers are keyed by ID; the name is a label.** `byCustomer[o.customerName]` merged two
+shops that share a name and split one customer's history whenever the rename cascade
+half-succeeded. The label comes from the customer record — what they are called today — not
+from whichever invoice was seen first.
+
+## An export that a view cannot reach is a crash waiting for a press
+
+Item Sales computed its rows inside the view's own IIFE. `getSortedExportData` returned
+`null` for that tab, and the CSV and WhatsApp buttons stayed on screen — so pressing either
+threw on `null.some` / `null.forEach`. No test could reach it: SSR renders the button, it
+does not click it.
+
+The rule that follows: **anything a view computes that an export also needs goes in a
+service.** `services/analytics/itemSales.js` now, with tests. And both export paths refuse an
+empty tab with a toast rather than assuming there is something there.
+
 ## Firestore reads cost money — check before adding a listener
 
 The project blew through the 50,000 reads/day free tier on 2026-08-28. `useLiveCollection`
