@@ -8,6 +8,8 @@ import { MultiPicker } from '../ui/MultiPicker';
 import { APP_NAME, getPKTDate, getLocalDateStr, formatDateDisp, checkDateFilter, exportToCSV } from '../../helpers';
 import { makeArrowNav } from '../../lib/a11y';
 import { buildReport } from '../../services/analytics/reportEngine';
+import { drillDown } from '../../services/analytics/drilldown';
+import { DrillDownModal } from '../modals/DrillDownModal';
 
 export const AnalyticsView = () => {
 const { getPaymentStatus, isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, cities, areas, customerTypes, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, analyticsView, setAnalyticsView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig, showConfirm } = useContext(AppContext);
@@ -24,6 +26,10 @@ const clearFilter = (setter) => setter(new Set());
 const [sortBy, setSortBy] = useState('profit');
 const [itemProdFilter, setItemProdFilter] = useState('');
 const [itemCustFilter, setItemCustFilter] = useState('');
+// Which breakdown row the drill-down is open on: { dimension, key, label }. Every table row
+// is a button now — the figure and the documents behind it are one click apart.
+const [drill, setDrill] = useState(null);
+const openDrill = (dimension, key, label) => setDrill({ dimension, key, label: label ?? key });
 
 const checkCustomFilter = (dateStr) => {
   if (dateFilter !== 'Custom') return checkDateFilter(dateStr, dateFilter);
@@ -205,7 +211,7 @@ const handleExport = (format) => {
     }
 };
 
-const renderTable = (dataObj, type) => {
+const renderTable = (dataObj, type, dimension) => {
   let arr = Object.entries(dataObj).map(([key, val]) => ({ key, ...val })).sort((a,b) => {
     if (sortBy === 'qty') return b.qty - a.qty;
     if (sortBy === 'revenue') return (b.revenue||b.productRevenue||0) - (a.revenue||a.productRevenue||0);
@@ -264,11 +270,11 @@ const renderTable = (dataObj, type) => {
                     <td className="p-3">
                       <div className="flex items-center gap-1.5">
                         <span className={`text-[9px] font-black px-1 py-0.5 rounded border ${tierColors[row.abcTier]}`}>{row.abcTier}</span>
-                        {type === 'Customer' ? (
-                          <button className="font-bold text-slate-800 hover:text-indigo-600 text-left transition-colors" onClick={() => { if (row.id !== undefined) { setSelectedLedgerId(row.id); setShowLedgerModal(true); } }}>{row.label || row.key}</button>
-                        ) : (
-                          <div className="font-bold text-slate-800">{row.label || row.key}</div>
-                        )}
+                        <button
+                          className="font-bold text-slate-800 hover:text-indigo-600 text-left transition-colors underline decoration-dotted decoration-slate-300 underline-offset-2"
+                          title={`Show the transactions behind ${row.label || row.key}`}
+                          onClick={() => openDrill(dimension, row.key, row.label || row.key)}
+                        >{row.label || row.key}</button>
                       </div>
                       {row.company && <div className="text-[9px] text-slate-400 uppercase tracking-widest mt-0.5">{row.company}</div>}
                       <div className="w-full bg-slate-100 rounded-full h-1 mt-1.5 max-w-[100px]"><div className="bg-emerald-400 h-1 rounded-full" style={{width:`${barW}%`}}></div></div>
@@ -299,7 +305,7 @@ const renderTable = (dataObj, type) => {
   );
 };
 
-const renderSegmentTable = (dataObj, label) => {
+const renderSegmentTable = (dataObj, label, dimension) => {
   const arr = Object.entries(dataObj).map(([key, val]) => ({ key, ...val })).sort((a,b) => b.revenue - a.revenue);
   const maxRev = arr[0]?.revenue || 1;
   return (
@@ -321,7 +327,11 @@ const renderSegmentTable = (dataObj, label) => {
               return (
                 <tr key={i} className="hover:bg-slate-50">
                   <td className="p-3">
-                    <div className="font-bold text-slate-800">{row.key || '—'}</div>
+                    <button
+                      className="font-bold text-slate-800 hover:text-indigo-600 text-left transition-colors underline decoration-dotted decoration-slate-300 underline-offset-2"
+                      title={`Show the transactions behind ${row.key}`}
+                      onClick={() => openDrill(dimension, row.key)}
+                    >{row.key || '—'}</button>
                     <div className="w-full bg-slate-100 rounded-full h-1 mt-1.5 max-w-[100px]"><div className="bg-indigo-400 h-1 rounded-full" style={{width:`${barW}%`}}></div></div>
                   </td>
                   <td className="p-3 text-center bg-slate-50/50 font-bold">{row.orders||0}</td>
@@ -562,12 +572,12 @@ return (
         </div>
       )}
 
-      {view === 'By Product' && renderTable(reportEngine.byProduct, 'Product')}
-      {view === 'By Company' && renderTable(reportEngine.byCompany, 'Company')}
-      {view === 'By Customer' && renderTable(reportEngine.byCustomer, 'Customer')}
-      {view === 'By City' && renderSegmentTable(reportEngine.byCity, 'City')}
-      {view === 'By Area' && renderSegmentTable(reportEngine.byArea, 'Area')}
-      {view === 'By Type' && renderSegmentTable(reportEngine.byType, 'Type')}
+      {view === 'By Product' && renderTable(reportEngine.byProduct, 'Product', 'product')}
+      {view === 'By Company' && renderTable(reportEngine.byCompany, 'Company', 'company')}
+      {view === 'By Customer' && renderTable(reportEngine.byCustomer, 'Customer', 'customer')}
+      {view === 'By City' && renderSegmentTable(reportEngine.byCity, 'City', 'city')}
+      {view === 'By Area' && renderSegmentTable(reportEngine.byArea, 'Area', 'area')}
+      {view === 'By Type' && renderSegmentTable(reportEngine.byType, 'Type', 'type')}
 
       {view === 'Item Sales' && (() => {
         const prodQ = itemProdFilter.toLowerCase().trim();
@@ -926,6 +936,20 @@ return (
           </div>
         );
       })()}
+
+      {drill && (
+        <DrillDownModal
+          result={drillDown({
+            dimension: drill.dimension, key: drill.key,
+            invoices, products, customers,
+            checkCustomFilter, filterCompanies, filterCustomers, filterSalespersons,
+          })}
+          label={drill.label}
+          periodLabel={filterLabel}
+          onClose={() => setDrill(null)}
+          onOpenLedger={(id) => { setDrill(null); setSelectedLedgerId(id); setShowLedgerModal(true); }}
+        />
+      )}
 
     </div>
   </div>

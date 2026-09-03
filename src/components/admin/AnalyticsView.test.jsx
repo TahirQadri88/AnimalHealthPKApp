@@ -127,3 +127,26 @@ describe('AnalyticsView — Receivables', () => {
     expect(render(OLD_AND_NEW)).not.toMatch(/undefined|NaN/);
   });
 });
+
+// Every breakdown row is a button now. The row's figure and the documents behind it should
+// be one click apart, in every dimension — before this, only the customer rows led anywhere
+// and only to the ledger.
+describe('AnalyticsView — drill-down', () => {
+  ['By Product', 'By Company', 'By Customer', 'By City', 'By Area', 'By Type'].forEach(v => {
+    it(`offers a drill-down from the ${v} table`, () => {
+      const html = render({
+        analyticsView: v,
+        customers: [{ id: 1, name: 'Al Shaheer', city: 'Karachi', area: 'Sohrab Goth', customerType: 'Retail' }],
+      });
+      expect(html).toContain('Show the transactions behind');
+    });
+  });
+
+  it('leaks no undefined into a segment table', () => {
+    const html = render({
+      analyticsView: 'By City',
+      customers: [{ id: 1, name: 'Al Shaheer', city: 'Karachi', area: 'Sohrab Goth', customerType: 'Retail' }],
+    });
+    expect(html).not.toMatch(/undefined|NaN/);
+  });
+});
