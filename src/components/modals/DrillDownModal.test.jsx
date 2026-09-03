@@ -6,7 +6,7 @@
 import { describe, it, expect } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { DrillDownModal } from './DrillDownModal';
-import { drillDown } from '../../services/analytics/drilldown';
+import { drillDown, marginTrend } from '../../services/analytics/drilldown';
 
 const PRODUCTS = [{ id: 1, name: 'Antox 9', companyId: 10 }];
 const CUSTOMERS = [{ id: 1, name: 'Al Shaheer', city: 'Karachi' }];
@@ -90,5 +90,31 @@ describe('DrillDownModal', () => {
 
   it('leaks no undefined into the markup', () => {
     expect(render()).not.toMatch(/undefined|NaN/);
+  });
+
+  // "Is this product's margin eroding?" was not answerable anywhere before this.
+  it('draws the margin by month when there is more than one', () => {
+    const trend = marginTrend([
+      { date: '2026-06-04', revenue: 20000, cost: 15000, profit: 5000, qty: 8 },
+      { date: '2026-07-04', revenue: 20000, cost: 19000, profit: 1000, qty: 8 },
+    ]);
+    const html = render({ trend });
+    expect(html).toContain('Margin by month');
+    expect(html).toContain('25%');
+    expect(html).toContain('5%');
+    expect(html).toContain('↓ 20pts');
+  });
+
+  it('says the trend is all-time, not the selected period', () => {
+    const trend = marginTrend([
+      { date: '2026-06-04', revenue: 100, cost: 50, profit: 50, qty: 1 },
+      { date: '2026-07-04', revenue: 100, cost: 50, profit: 50, qty: 1 },
+    ]);
+    expect(render({ trend })).toContain('all time, not the selected period');
+  });
+
+  it('draws no trend from a single month, which is not a trend', () => {
+    const trend = marginTrend([{ date: '2026-06-04', revenue: 100, cost: 50, profit: 50, qty: 1 }]);
+    expect(render({ trend })).not.toContain('Margin by month');
   });
 });

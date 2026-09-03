@@ -254,3 +254,21 @@ describe('AnalyticsView — Returns', () => {
     expect(render(WORLD)).not.toMatch(/undefined|NaN/);
   });
 });
+
+// Ranking on revenue or profit alone makes a high-turnover low-margin line look like the
+// best in the business.
+describe('AnalyticsView — margin as a ranking', () => {
+  it('offers best and worst margin as sorts on a breakdown table', () => {
+    const html = render({ analyticsView: 'By Product' });
+    expect(html).toContain('Sort: Best Margin');
+    expect(html).toContain('Sort: Worst Margin');
+  });
+
+  it('offers them on a segment table too, which had no sort at all', () => {
+    const html = render({
+      analyticsView: 'By City',
+      customers: [{ id: 1, name: 'Al Shaheer', city: 'Karachi' }],
+    });
+    expect(html).toContain('Sort: Best Margin');
+  });
+});

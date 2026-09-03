@@ -12,7 +12,7 @@ import { APP_NAME, formatDateDisp, exportToCSV, getLocalDateStr } from '../../he
 
 const money = (n) => `Rs.${Math.round(Number(n) || 0).toLocaleString('en-US')}`;
 
-export const DrillDownModal = ({ result, label, periodLabel = '', onClose, onOpenLedger }) => {
+export const DrillDownModal = ({ result, label, periodLabel = '', trend = [], onClose, onOpenLedger }) => {
 const [openRow, setOpenRow] = useState(null);
 const { dimension, rows = [], totals = {} } = result || {};
 const dimLabel = DIMENSIONS[dimension]?.label || 'Breakdown';
@@ -49,6 +49,39 @@ return (
       </div>
     ))}
   </div>
+
+  {/* Is the margin eroding? Not answerable anywhere before this. All-time, deliberately —
+      a trend confined to the selected period is one bar, and the header says so. */}
+  {trend.length > 1 && (() => {
+    const maxRev = trend.reduce((m, t) => Math.max(m, t.revenue), 0) || 1;
+    const first = trend[0].marginPct, last = trend[trend.length - 1].marginPct;
+    const drift = +(last - first).toFixed(1);
+    return (
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="bg-slate-50 border-b border-slate-200 p-3 flex justify-between items-center gap-2">
+          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Margin by month <span className="text-slate-400 normal-case font-medium">· all time, not the selected period</span></span>
+          <span className={`text-[10px] font-black shrink-0 ${drift >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+            {drift >= 0 ? '↑' : '↓'} {Math.abs(drift)}pts
+          </span>
+        </div>
+        <div className="flex items-end gap-1 p-3 overflow-x-auto">
+          {trend.map(t => (
+            <div key={t.month} className="flex-1 min-w-[38px] text-center">
+              <div className={`text-[9px] font-black ${t.marginPct >= 20 ? 'text-emerald-600' : t.marginPct >= 10 ? 'text-amber-600' : 'text-rose-600'}`}>{t.marginPct}%</div>
+              <div className="bg-slate-100 rounded mt-1" style={{ height: 40 }}>
+                <div
+                  className={`rounded ${t.marginPct >= 20 ? 'bg-emerald-400' : t.marginPct >= 10 ? 'bg-amber-400' : 'bg-rose-400'}`}
+                  style={{ height: `${Math.max((t.revenue / maxRev) * 40, 2)}px`, marginTop: `${40 - Math.max((t.revenue / maxRev) * 40, 2)}px` }}
+                ></div>
+              </div>
+              <div className="text-[8px] text-slate-400 font-bold mt-1">{t.month.slice(2).replace('-', '/')}</div>
+            </div>
+          ))}
+        </div>
+        <p className="px-3 pb-3 text-[9px] text-slate-400 font-medium">Bar height is revenue; the figure above it is that month&apos;s margin.</p>
+      </div>
+    );
+  })()}
 
   <div className="flex items-center justify-between px-1">
     <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">

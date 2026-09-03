@@ -109,3 +109,29 @@ export const drillDown = ({
 
   return { dimension, key: wanted, rows, totals };
 };
+
+// Margin over time for a set of drill-down rows.
+//
+// "Is this product's margin eroding?" was not answerable anywhere: every breakdown ranks on
+// revenue or profit, so a high-turnover low-margin line looks like the best in the business
+// and a slow slide in margin looks like nothing at all.
+//
+// Fed the drill-down's own rows, so the trend is the same transactions as the list above it.
+// Call it on an UNFILTERED drill-down: a trend confined to the selected period is one bar.
+export const marginTrend = (rows = [], months = 12) => {
+  const byMonth = {};
+  rows.forEach(r => {
+    const m = String(r.date || '').slice(0, 7);
+    if (m.length !== 7) return;
+    if (!byMonth[m]) byMonth[m] = { month: m, revenue: 0, cost: 0, profit: 0, qty: 0, docs: 0 };
+    byMonth[m].revenue += r.revenue;
+    byMonth[m].cost += r.cost;
+    byMonth[m].profit += r.profit;
+    byMonth[m].qty += r.qty;
+    byMonth[m].docs += 1;
+  });
+  return Object.values(byMonth)
+    .sort((a, b) => a.month.localeCompare(b.month))
+    .slice(-months)
+    .map(m => ({ ...m, marginPct: m.revenue > 0 ? +((m.profit / m.revenue) * 100).toFixed(1) : 0 }));
+};

@@ -8,7 +8,7 @@ import { MultiPicker } from '../ui/MultiPicker';
 import { APP_NAME, getPKTDate, getLocalDateStr, formatDateDisp, checkDateFilter, exportToCSV } from '../../helpers';
 import { makeArrowNav } from '../../lib/a11y';
 import { buildReport } from '../../services/analytics/reportEngine';
-import { drillDown } from '../../services/analytics/drilldown';
+import { drillDown, marginTrend } from '../../services/analytics/drilldown';
 import { buildCollections } from '../../services/analytics/collections';
 import { buildReturns } from '../../services/analytics/returns';
 import { DrillDownModal } from '../modals/DrillDownModal';
@@ -260,21 +260,29 @@ const handleExport = (format) => {
 };
 
 const renderTable = (dataObj, type, dimension) => {
+  // Ranking on revenue or profit alone makes a high-turnover low-margin line look like the
+  // best in the business. Margin is a sort now, with revenue as the tie-break so a single
+  // Rs 100 sale at 90% does not head the list.
+  const marginOf = (r) => { const rev = r.revenue || r.productRevenue || 0; return rev > 0 ? (r.profit || 0) / rev : 0; };
   let arr = Object.entries(dataObj).map(([key, val]) => ({ key, ...val })).sort((a,b) => {
     if (sortBy === 'qty') return b.qty - a.qty;
     if (sortBy === 'revenue') return (b.revenue||b.productRevenue||0) - (a.revenue||a.productRevenue||0);
+    if (sortBy === 'margin') return marginOf(b) - marginOf(a) || (b.revenue||b.productRevenue||0) - (a.revenue||a.productRevenue||0);
+    if (sortBy === 'marginWorst') return marginOf(a) - marginOf(b) || (b.revenue||b.productRevenue||0) - (a.revenue||a.productRevenue||0);
     return b.profit - a.profit;
   });
-  // ABC classification by cumulative revenue share
+  // ABC classification by cumulative revenue share. Computed on a revenue ranking of its
+  // own, not on `arr`: the tier means "this line is in the top 80% of revenue", and reading
+  // it off whatever order the user last chose made it mean nothing under any other sort.
   const totalRevAll = arr.reduce((s, r) => s + (r.revenue || r.productRevenue || 0), 0);
+  const tierByKey = {};
   let cumRev = 0;
-  const arrWithABC = arr.map(r => {
-    const rev = r.revenue || r.productRevenue || 0;
-    cumRev += rev;
+  [...arr].sort((a, b) => (b.revenue||b.productRevenue||0) - (a.revenue||a.productRevenue||0)).forEach(r => {
+    cumRev += (r.revenue || r.productRevenue || 0);
     const pct = totalRevAll > 0 ? cumRev / totalRevAll : 1;
-    const tier = pct <= 0.8 ? 'A' : pct <= 0.95 ? 'B' : 'C';
-    return { ...r, abcTier: tier };
+    tierByKey[r.key] = pct <= 0.8 ? 'A' : pct <= 0.95 ? 'B' : 'C';
   });
+  const arrWithABC = arr.map(r => ({ ...r, abcTier: tierByKey[r.key] }));
   const maxProfit = arrWithABC[0]?.profit || 1;
   const totalRev = arrWithABC.reduce((s, r) => s + (r.revenue || r.productRevenue || 0), 0);
   const totalGP = arrWithABC.reduce((s, r) => s + (r.profit || 0), 0);
@@ -290,6 +298,8 @@ const renderTable = (dataObj, type, dimension) => {
          <select value={sortBy} onChange={e=>setSortBy(e.target.value)} className="bg-white border border-slate-200 rounded px-2 py-1 text-xs font-bold text-slate-600 outline-none">
            <option value="profit">Sort: Highest GP</option>
            <option value="revenue">Sort: Highest Revenue</option>
+           <option value="margin">Sort: Best Margin</option>
+           <option value="marginWorst">Sort: Worst Margin</option>
            {type !== 'Customer' && <option value="qty">Sort: Highest Qty</option>}
          </select>
        </div>
@@ -354,12 +364,24 @@ const renderTable = (dataObj, type, dimension) => {
 };
 
 const renderSegmentTable = (dataObj, label, dimension) => {
-  const arr = Object.entries(dataObj).map(([key, val]) => ({ key, ...val })).sort((a,b) => b.revenue - a.revenue);
+  const segMargin = (r) => (r.revenue > 0 ? (r.profit || 0) / r.revenue : 0);
+  const arr = Object.entries(dataObj).map(([key, val]) => ({ key, ...val })).sort((a,b) => {
+    if (sortBy === 'profit') return b.profit - a.profit;
+    if (sortBy === 'margin') return segMargin(b) - segMargin(a) || b.revenue - a.revenue;
+    if (sortBy === 'marginWorst') return segMargin(a) - segMargin(b) || b.revenue - a.revenue;
+    return b.revenue - a.revenue;
+  });
   const maxRev = arr[0]?.revenue || 1;
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mt-3">
       <div className="bg-slate-50 border-b border-slate-200 p-2 flex justify-between items-center">
         <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-2">{arr.length} {label}s</span>
+        <select value={sortBy} onChange={e=>setSortBy(e.target.value)} className="bg-white border border-slate-200 rounded px-2 py-1 text-xs font-bold text-slate-600 outline-none">
+          <option value="revenue">Sort: Highest Revenue</option>
+          <option value="profit">Sort: Highest GP</option>
+          <option value="margin">Sort: Best Margin</option>
+          <option value="marginWorst">Sort: Worst Margin</option>
+        </select>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-left text-xs whitespace-nowrap">
@@ -1243,6 +1265,11 @@ return (
           })}
           label={drill.label}
           periodLabel={filterLabel}
+          trend={marginTrend(drillDown({
+            dimension: drill.dimension, key: drill.key,
+            invoices, products, customers,
+            filterCompanies, filterCustomers, filterSalespersons,
+          }).rows)}
           onClose={() => setDrill(null)}
           onOpenLedger={(id) => { setDrill(null); setSelectedLedgerId(id); setShowLedgerModal(true); }}
         />

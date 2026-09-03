@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { drillDown, DIMENSIONS } from './drilldown';
+import { drillDown, DIMENSIONS, marginTrend } from './drilldown';
 import { buildReport } from './reportEngine';
 
 // A rich enough world that the dimensions genuinely differ: two brands, two cities, two
@@ -188,5 +188,36 @@ describe('drillDown — what the list actually says', () => {
   it('names every dimension the screen can open', () => {
     expect(Object.keys(DIMENSIONS).sort())
       .toEqual(['area', 'city', 'company', 'customer', 'product', 'salesperson', 'type']);
+  });
+});
+
+describe('marginTrend', () => {
+  const rows = [
+    { date: '2026-06-04', revenue: 10000, cost: 7000, profit: 3000, qty: 4 },
+    { date: '2026-06-20', revenue: 10000, cost: 8000, profit: 2000, qty: 4 },
+    { date: '2026-07-02', revenue: 20000, cost: 17000, profit: 3000, qty: 8 },
+    { date: '2026-08-02', revenue: 20000, cost: 19000, profit: 1000, qty: 8 },
+  ];
+
+  it('reports margin per month, oldest first', () => {
+    expect(marginTrend(rows).map(m => [m.month, m.marginPct]))
+      .toEqual([['2026-06', 25], ['2026-07', 15], ['2026-08', 5]]);
+  });
+
+  it('sums the months rather than averaging their percentages', () => {
+    expect(marginTrend(rows)[0]).toMatchObject({ revenue: 20000, profit: 5000, qty: 8, docs: 2 });
+  });
+
+  it('keeps only the most recent months asked for', () => {
+    expect(marginTrend(rows, 2).map(m => m.month)).toEqual(['2026-07', '2026-08']);
+  });
+
+  it('does not divide by zero in a month that was all returns', () => {
+    expect(marginTrend([{ date: '2026-06-01', revenue: 0, cost: 0, profit: 0, qty: 0 }])[0].marginPct).toBe(0);
+  });
+
+  it('ignores a row with no usable date, and is empty for nothing', () => {
+    expect(marginTrend([{ date: '', revenue: 1, cost: 0, profit: 1, qty: 1 }])).toEqual([]);
+    expect(marginTrend()).toEqual([]);
   });
 });
