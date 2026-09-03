@@ -90,9 +90,22 @@ remains is correctness and maintainability.
 
 ### Next
 
-**Backup and restore** (brief §33). The backup half works and is used weekly. The restore
-half has never been run, and reading it is enough to know it would not do what the button
-says. See the audit below.
+**A. The verification pass below** — it is the only item left that needs the live app rather
+than this repo, and it has been outstanding since the security cutover.
+
+Everything else on this list is either done or deliberately parked. The two parked items —
+Firestore query scoping (D) and read permissions in the rules, which depends on it — are
+parked with reasons written down, not forgotten.
+
+- [x] **Backup and restore** (2026-09-03, brief §33). The backup half had been running
+  weekly for months; the restore half had never been executed, and it accepted any JSON at
+  all, wrote to any collection named in the file including the append-only audit log, wrote
+  records with no id to a document called "undefined", and — because `saveToFirebase`
+  swallowed its own errors and returned nothing — counted its own iterations, so a restore
+  in which every write failed still reported every record written. Now inspected before
+  anything is written (`services/backup/restore.js`, 27 tests), shown to the person with
+  what is refused and why, offered a "download current data first" step, and reported
+  afterwards on what the server actually acknowledged.
 
 ### Done since this list was written
 

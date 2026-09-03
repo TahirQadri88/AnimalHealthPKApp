@@ -310,6 +310,38 @@ Two things to keep:
   with the reported figures, at all three sizes. Reverting `ledger.js` alone makes it fail
   with the exact figure from the screenshot, which is the check that it discriminates.
 
+## A function that swallows its errors cannot be counted
+
+`saveToFirebase` catches every write failure, toasts, and used to return nothing. That is
+right for a form — the person sees the toast and tries again — and wrong for anything that
+writes in a loop and reports a total.
+
+The restore button counted its own iterations:
+
+```js
+for (const d of docs) { await saveToFirebase(col, d.id, d); count++; }
+showToast(`Restore complete! ${count} records written.`);
+```
+
+A restore in which **every single write failed** reported every record written. For a safety
+net that is the worst available failure: it says the data is back when it is not.
+
+`saveToFirebase` returns `true`/`false` now and takes `silent` so a bulk caller does not
+stack one error toast per record. Every existing caller ignores the return, so nothing else
+moved. **If you write in a loop, count what came back — never the iterations.**
+
+Three more things the same button got wrong, all of which also ended in a success message:
+any JSON at all was accepted (`{}` writes nothing and reports success), `d.id` was never
+checked (a record without one writes to a document named `"undefined"`), and any key under
+`collections` was written to — including `auditLogs`, `loginIndex`, `userRoles` and
+`counters`. `src/services/backup/restore.js` is the pure "before" pass that refuses all of
+that, and it is tested; the screen shows what is in the file and offers to download the
+current data before overwriting it.
+
+**A backup is only half a safety net.** The Drive and Firebase backups here run weekly and
+have run for months; the restore had never once been executed. If you add a backup path,
+exercise the restore.
+
 ## Voiding, not deleting — and one filter point
 
 Financial records are never removed. `voidRecord` writes `{voided, voidedAt, voidedBy,
