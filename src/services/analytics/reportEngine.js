@@ -16,6 +16,15 @@
 // was on its own, which is an exhaustive answer rather than a careful one.
 import { getPKTDate, getLocalDateStr } from '../../helpers';
 import { computePnL } from './profitAndLoss';
+import { buildAgingReport } from './receivables';
+
+// buildAgingReport's bucket keys, mapped to the names the Analytics screen has always used.
+const BUCKET_LISTS = [
+  { from: 'current', to: 'current' },
+  { from: 'd31_60', to: 'days30' },
+  { from: 'd61_90', to: 'days60' },
+  { from: 'd90plus', to: 'days90plus' },
+];
 
 export const buildReport = ({
   invoices, expenses, payments, products, customers,
@@ -33,7 +42,7 @@ export const buildReport = ({
   // Build customer segment lookup
   const custSegment = {};
   customers.forEach(c => { custSegment[c.name] = { city: c.city || '', area: c.area || '', type: c.customerType || '' }; });
-  customers.forEach(c => { const bal = getCustomerBalance(c.id); if(bal > 0) { kpis.totalReceivables += bal; receivablesList.push({ name: c.name, id: c.id, amount: bal }); } });
+  customers.forEach(c => { const bal = getCustomerBalance(c.id); if(bal > 0) { kpis.totalReceivables += bal; receivablesList.push({ name: c.name, id: c.id, amount: bal, phone: c.phone || '' }); } });
   billedForPnL.forEach(o => {
     kpis.deliveryBilled += Number(o.deliveryBilled || 0);
     kpis.transportExpense += Number(o.transportExpense || 0);
@@ -99,20 +108,36 @@ export const buildReport = ({
     (o.items || []).forEach(item => { dayRevenue += item.price * item.quantity; dayCost += (item.costPrice||0) * item.quantity; });
     dailyBreakdown[o.date].revenue += dayRevenue; dailyBreakdown[o.date].profit += (dayRevenue - dayCost); dailyBreakdown[o.date].orders += 1;
   });
-  // Receivables aging
+  // Receivables aging — buildAgingReport, not a second implementation.
+  //
+  // This used to age a customer's whole balance by the date of their most recent INVOICE,
+  // which is the age of the last sale, not of the debt. Anything a customer bought reset
+  // their entire outstanding balance to "current": on the same data, the Receivables screen
+  // put Rs 118,500 in 90+ while this one put Rs 120,000 in current.
+  //
+  // buildAgingReport settles each debt oldest-first with the same rule as payment status,
+  // and receivables.test.js asserts its totals equal the ledger exactly. Using it means the
+  // two screens cannot disagree — and a customer's debt now SPLITS across buckets, because
+  // an old unpaid bill and a fresh one are different ages.
   const today = getLocalDateStr();
+  const aging = buildAgingReport({ customers, invoices, payments, asOf: today });
   const agingBuckets = { current: [], days30: [], days60: [], days90plus: [] };
-  receivablesList.forEach(r => {
-    const lastInv = invoices.filter(o => o.customerId === r.id && o.status === 'Billed').sort((a,b) => b.date.localeCompare(a.date))[0];
-    const daysDiff = lastInv ? Math.floor((new Date(today) - new Date(lastInv.date)) / 86400000) : 999;
-    r.daysSince = daysDiff;
-    r.lastInvDate = lastInv?.date;
-    r.phone = customers.find(c => c.id === r.id)?.phone || '';
-    if (daysDiff <= 30) agingBuckets.current.push(r);
-    else if (daysDiff <= 60) agingBuckets.days30.push(r);
-    else if (daysDiff <= 90) agingBuckets.days60.push(r);
-    else agingBuckets.days90plus.push(r);
+  aging.rows.forEach(row => {
+    BUCKET_LISTS.forEach(({ from, to }) => {
+      const amount = row.buckets[from] || 0;
+      if (amount <= 0.5) return;
+      // Age the portion by the oldest debt sitting in THAT bucket, so the label under a
+      // customer's name says how overdue this slice is rather than how long since they
+      // last bought something.
+      const ageDays = row.open.filter(d => d.bucket === from)
+        .reduce((max, d) => Math.max(max, d.ageDays), 0);
+      agingBuckets[to].push({
+        id: row.customerId, name: row.name, phone: row.phone || '',
+        amount, ageDays, oldestAgeDays: row.oldestAgeDays,
+      });
+    });
   });
+  Object.values(agingBuckets).forEach(list => list.sort((a, b) => b.amount - a.amount));
   // All-time monthly breakdown (last 24 months, ignores current date filter)
   const monthlyData = {};
   invoices.filter(o => o.status === 'Billed').forEach(o => {
@@ -218,5 +243,5 @@ export const buildReport = ({
   const periodCustIds = [...new Set(billedForPnL.map(o => o.customerId))];
   let newCustCount = 0, repeatCustCount = 0;
   periodCustIds.forEach(id => { if (billedForPnL.some(o => o.customerId === id && o.date === custFirstOrderDate[id])) newCustCount++; else repeatCustCount++; });
-  return { kpis, byProduct, byCompany, byCustomer, bySalesperson, byCity, byArea, byType, receivablesList: receivablesList.sort((a,b)=>b.amount-a.amount), trends, dailyBreakdown, byExpenseCategory, agingBuckets, monthlyData, collectionRate, newCustCount, repeatCustCount, totalBilledAmt, avgDaysToPay };
+  return { kpis, byProduct, byCompany, byCustomer, bySalesperson, byCity, byArea, byType, receivablesList: receivablesList.sort((a,b)=>b.amount-a.amount), trends, dailyBreakdown, byExpenseCategory, aging, agingBuckets, monthlyData, collectionRate, newCustCount, repeatCustCount, totalBilledAmt, avgDaysToPay };
 };

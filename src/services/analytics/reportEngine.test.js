@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildReport } from './reportEngine';
+import { buildAgingReport } from './receivables';
+import { getLocalDateStr } from '../../helpers';
 
 // The engine behind the Analytics screen. Extracted with its body byte-identical, so these
 // tests describe the behaviour that has always been there rather than behaviour just
@@ -168,5 +170,75 @@ describe('buildReport — nothing reaches the screen as NaN', () => {
       billed('INV-1', '2026-08-01', [line('Antox 9', 10, 7500, 6000)]),
     ] });
     expect(r.kpis.productRevenue).toBe(75000);
+  });
+});
+
+// ── Receivables aging ───────────────────────────────────────────────────────
+//
+// This engine aged a customer's whole balance by the date of their MOST RECENT invoice,
+// which is not the age of the debt but the age of the last sale. Buying anything reset the
+// entire outstanding balance to "current". Measured on the same customer and the same data,
+// the Receivables screen put Rs 118,500 in 90+ while Analytics put Rs 120,000 in current —
+// on the screen a person uses to decide who to chase.
+//
+// buildAgingReport is the tested implementation: it settles each debt oldest-first with the
+// same rule as payment status, and receivables.test.js asserts its totals equal the ledger.
+// Analytics now uses it, so the two screens cannot disagree.
+describe('buildReport — aging agrees with the Receivables screen', () => {
+  const daysAgo = (n) => getLocalDateStr(new Date(Date.now() - n * 86400000));
+
+  const world = {
+    customers: [{ id: 1, name: 'Al Shaheer', phone: '0300-1234567' }],
+    invoices: [
+      billed('INV-OLD', daysAgo(200), [line('Antox 9', 1, 118500, 90000)], { total: 118500 }),
+      billed('INV-NEW', daysAgo(2), [line('Ratava', 1, 1500, 1000)], { total: 1500 }),
+    ],
+    payments: [],
+  };
+
+  const engine = () => run({ ...world, getCustomerBalance: () => 120000 });
+  const screen = () => buildAgingReport({ ...world, asOf: getLocalDateStr() });
+
+  it('does not call a 200-day-old debt current because the customer bought yesterday', () => {
+    const b = engine().agingBuckets;
+    expect(b.days90plus.reduce((s, r) => s + r.amount, 0)).toBe(118500);
+    expect(b.current.reduce((s, r) => s + r.amount, 0)).toBe(1500);
+  });
+
+  it('splits one customer across buckets instead of filing them under one', () => {
+    const b = engine().agingBuckets;
+    expect(b.current.map(r => r.name)).toEqual(['Al Shaheer']);
+    expect(b.days90plus.map(r => r.name)).toEqual(['Al Shaheer']);
+  });
+
+  it('every bucket total equals the Receivables screen, bucket for bucket', () => {
+    const b = engine().agingBuckets;
+    const t = screen().totals;
+    const sum = (rows) => rows.reduce((s, r) => s + r.amount, 0);
+    expect(sum(b.current)).toBe(t.current);
+    expect(sum(b.days30)).toBe(t.d31_60);
+    expect(sum(b.days60)).toBe(t.d61_90);
+    expect(sum(b.days90plus)).toBe(t.d90plus);
+  });
+
+  it('carries the phone number a reminder needs', () => {
+    expect(engine().agingBuckets.days90plus[0].phone).toBe('0300-1234567');
+  });
+
+  it('ages each portion by how old THAT debt is, not by the last sale', () => {
+    const b = engine().agingBuckets;
+    expect(b.days90plus[0].ageDays).toBeGreaterThanOrEqual(199);
+    expect(b.current[0].ageDays).toBeLessThanOrEqual(3);
+  });
+
+  it('exposes the full aging report so a screen can show the split', () => {
+    const r = engine();
+    expect(r.aging.grandTotal).toBe(120000);
+    expect(r.aging.rows).toHaveLength(1);
+  });
+
+  it('leaves the buckets empty when nobody owes anything', () => {
+    const b = run().agingBuckets;
+    expect([b.current, b.days30, b.days60, b.days90plus].every(x => x.length === 0)).toBe(true);
   });
 });

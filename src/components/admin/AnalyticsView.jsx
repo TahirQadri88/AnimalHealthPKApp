@@ -61,9 +61,13 @@ const getSortedExportData = () => {
      rows.push({ 'P&L Item': `Active Customers: ${reportEngine.newCustCount + reportEngine.repeatCustCount}`, 'Amount (Rs)': '', 'Notes': `${reportEngine.newCustCount} new · ${reportEngine.repeatCustCount} repeat` });
      return rows;
    }
-   if (view === 'Receivables') return reportEngine.receivablesList.map(r => ({
-     'Customer Name': r.name, 'Outstanding (Rs)': r.amount,
-     'Days Since Last Invoice': r.daysSince || 0, 'Last Invoice Date': r.lastInvDate || ''
+   // Aged by the debt, not by the last sale — and split, because an old unpaid bill and a
+   // fresh one are different ages. Same figures as the Receivables admin screen.
+   if (view === 'Receivables') return reportEngine.aging.rows.map(r => ({
+     'Customer Name': r.name, 'Phone': r.phone || '',
+     'Outstanding (Rs)': r.totalOutstanding, 'Oldest Debt (days)': r.oldestAgeDays,
+     'Current 0-30 (Rs)': r.buckets.current || 0, '31-60 (Rs)': r.buckets.d31_60 || 0,
+     '61-90 (Rs)': r.buckets.d61_90 || 0, '90+ (Rs)': r.buckets.d90plus || 0,
    }));
    if (view === 'By Salesperson') return Object.entries(reportEngine.bySalesperson)
      .map(([key,val]) => ({ 'Staff Name': key, 'Orders': val.orders, 'Revenue (Rs)': val.revenue, 'Gross Profit (Rs)': val.profit,
@@ -704,7 +708,15 @@ return (
           </div>
           {/* Top Overdue Balances */}
           {(() => {
-            const overdue = [...reportEngine.agingBuckets.days30, ...reportEngine.agingBuckets.days60, ...reportEngine.agingBuckets.days90plus].sort((a,b)=>b.amount-a.amount).slice(0,5);
+            // One customer can now hold debt in several buckets, so sum their 31+ slices
+            // rather than listing the same name once per bucket.
+            const byCust = new Map();
+            [...reportEngine.agingBuckets.days30, ...reportEngine.agingBuckets.days60, ...reportEngine.agingBuckets.days90plus].forEach(r => {
+              const prev = byCust.get(r.id);
+              if (prev) { prev.amount += r.amount; prev.ageDays = Math.max(prev.ageDays, r.ageDays); }
+              else byCust.set(r.id, { ...r });
+            });
+            const overdue = [...byCust.values()].sort((a,b)=>b.amount-a.amount).slice(0,5);
             if (!overdue.length) return null;
             return (
               <div className="bg-white rounded-2xl shadow-sm border border-rose-300 overflow-hidden">
@@ -717,7 +729,7 @@ return (
                     <div key={i} className="flex justify-between items-center p-3">
                       <div className="flex-1 min-w-0">
                         <button className="font-semibold text-sm text-slate-800 truncate hover:text-indigo-600 text-left w-full" onClick={()=>{setSelectedLedgerId(r.id);setShowLedgerModal(true);}}>{r.name}</button>
-                        <p className="text-[10px] text-rose-400 font-semibold">{r.daysSince} days overdue</p>
+                        <p className="text-[10px] text-rose-400 font-semibold">{r.ageDays} days overdue</p>
                       </div>
                       <div className="flex items-center gap-2 ml-2 shrink-0">
                         <span className="font-extrabold text-rose-600 text-sm">Rs.{r.amount.toLocaleString('en-US')}</span>
@@ -741,7 +753,7 @@ return (
             return (
               <div key={key} className={`bg-white rounded-2xl shadow-sm border border-${color}-100 overflow-hidden`}>
                 <div className={`bg-${color}-50 border-b border-${color}-100 p-3 flex justify-between items-center`}>
-                  <span className={`text-xs font-bold text-${color}-700 uppercase tracking-widest`}>{label} ({bucket.length})</span>
+                  <span className={`text-xs font-bold text-${color}-700 uppercase tracking-widest`}>{label} ({bucket.length} account{bucket.length === 1 ? '' : 's'})</span>
                   <span className={`text-xs font-black text-${color}-700`}>Rs.{total.toLocaleString('en-US')}</span>
                 </div>
                 <div className="divide-y divide-slate-100">
@@ -751,7 +763,7 @@ return (
                       <div key={i} className="flex justify-between items-center p-3">
                         <div className="flex-1 min-w-0">
                           <button className="font-semibold text-sm text-slate-800 truncate hover:text-indigo-600 transition-colors text-left w-full" onClick={() => { setSelectedLedgerId(r.id); setShowLedgerModal(true); }}>{r.name}</button>
-                          <p className="text-[10px] text-slate-400">{r.daysSince} days since last invoice {r.lastInvDate ? `(${formatDateDisp(r.lastInvDate)})` : ''}</p>
+                          <p className="text-[10px] text-slate-400">{r.ageDays} days old{r.oldestAgeDays > r.ageDays ? ` · oldest debt ${r.oldestAgeDays}d` : ''}</p>
                         </div>
                         <div className="flex items-center gap-2 ml-2 shrink-0">
                           <span className="font-extrabold text-rose-600 text-sm">Rs.{r.amount.toLocaleString('en-US')}</span>
