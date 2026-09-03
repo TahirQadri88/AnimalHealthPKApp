@@ -9,6 +9,7 @@ import { APP_NAME, getPKTDate, getLocalDateStr, formatDateDisp, checkDateFilter,
 import { makeArrowNav } from '../../lib/a11y';
 import { buildReport } from '../../services/analytics/reportEngine';
 import { drillDown } from '../../services/analytics/drilldown';
+import { buildCollections } from '../../services/analytics/collections';
 import { DrillDownModal } from '../modals/DrillDownModal';
 
 export const AnalyticsView = () => {
@@ -47,6 +48,12 @@ const reportEngine = useMemo(() => buildReport({
   dateFilter, customStart, customEnd,
 }), [invoices, expenses, payments, dateFilter, customStart, customEnd, ...[...filterCompanies], ...[...filterCustomers], ...[...filterSalespersons], products, customers]);
 
+// Money in. Deliberately its own service rather than another slab inside the engine above:
+// it reads payments and the cash taken at billing, and none of the P&L inputs.
+const collections = useMemo(() => buildCollections({
+  invoices, payments, customers, checkCustomFilter, filterCustomers,
+}), [invoices, payments, customers, dateFilter, customStart, customEnd, ...[...filterCustomers]]);
+
 const getSortedExportData = () => {
    if (view === 'Overview' || view === 'Item Sales') return null;
    if (view === 'Insights') {
@@ -74,6 +81,11 @@ const getSortedExportData = () => {
      'Outstanding (Rs)': r.totalOutstanding, 'Oldest Debt (days)': r.oldestAgeDays,
      'Current 0-30 (Rs)': r.buckets.current || 0, '31-60 (Rs)': r.buckets.d31_60 || 0,
      '61-90 (Rs)': r.buckets.d61_90 || 0, '90+ (Rs)': r.buckets.d90plus || 0,
+   }));
+   if (view === 'Collections') return collections.rows.map(r => ({
+     'Date': r.date, 'Reference': r.id, 'Customer': r.customerName,
+     'Received (Rs)': r.received, 'Discount (Rs)': r.discount,
+     'Method': r.method, 'Note': r.note, 'Collected By': r.collectedBy,
    }));
    if (view === 'By Salesperson') return Object.entries(reportEngine.bySalesperson)
      .map(([key,val]) => ({ 'Staff Name': key, 'Orders': val.orders, 'Revenue (Rs)': val.revenue, 'Gross Profit (Rs)': val.profit,
@@ -175,7 +187,7 @@ const handleExport = (format) => {
           exportData.forEach((r, i) => {
             const name = r['Customer Name'] || '?';
             const outstanding = r['Outstanding (Rs)'] || 0;
-            const days = r['Days Since Last Invoice'];
+            const days = r['Oldest Debt (days)'];
             text += `${i+1}. *${name}*\n`;
             text += `   Outstanding: Rs.${Number(outstanding).toLocaleString('en-US')}`;
             if (days != null) text += ` | ${days} days overdue`;
@@ -185,6 +197,17 @@ const handleExport = (format) => {
             const total = exportData.reduce((s,r)=>s+(r['Outstanding (Rs)']||0),0);
             text += `${'─'.repeat(30)}\nTotal Outstanding: Rs.${total.toLocaleString('en-US')}\n`;
           }
+        } else if (view === 'Collections') {
+          const t = collections.totals;
+          text += `Received: Rs.${t.received.toLocaleString('en-US')} in ${t.count} collection${t.count === 1 ? '' : 's'}\n`;
+          text += `  At billing: Rs.${t.atBilling.toLocaleString('en-US')} | Receipts: Rs.${t.receipts.toLocaleString('en-US')}\n`;
+          if (t.discount > 0) text += `  Round-off discount given: Rs.${t.discount.toLocaleString('en-US')}\n`;
+          text += `\n*By method*\n`;
+          collections.byMethod.forEach(m => { text += `${m.key}: Rs.${m.amount.toLocaleString('en-US')} (${m.count})\n`; });
+          text += `\n*Top payers*\n`;
+          collections.byCustomer.slice(0, 10).forEach((c, i) => {
+            text += `${i+1}. ${c.name} — Rs.${c.amount.toLocaleString('en-US')}\n`;
+          });
         } else {
           exportData.forEach((r, i) => {
             const name = r['Product Name'] || r['Brand Name'] || r['Customer Name'] || r['Staff Name'] || r['City'] || r['Area'] || r['Type'] || '?';
@@ -401,10 +424,10 @@ return (
 
     {/* View Tabs */}
     <ScrollableTabBar className="pb-2 shrink-0">
-       {['Overview','Insights','Monthly Trend','By Product','By Company','By Customer','By City','By Area','By Type','By Salesperson','Receivables','Item Sales'].map(v => (
+       {['Overview','Insights','Monthly Trend','By Product','By Company','By Customer','By City','By Area','By Type','By Salesperson','Receivables','Collections','Item Sales'].map(v => (
          <button key={v} data-analytictab={v} tabIndex={view===v?0:-1}
            onClick={() => setView(v)}
-           onKeyDown={makeArrowNav(['Overview','Insights','Monthly Trend','By Product','By Company','By Customer','By City','By Area','By Type','By Salesperson','Receivables','Item Sales'],view,setView,'data-analytictab')}
+           onKeyDown={makeArrowNav(['Overview','Insights','Monthly Trend','By Product','By Company','By Customer','By City','By Area','By Type','By Salesperson','Receivables','Collections','Item Sales'],view,setView,'data-analytictab')}
            className={`px-3 py-1.5 rounded-xl font-bold text-[11px] whitespace-nowrap shadow-sm transition-colors ${view === v ? 'bg-slate-800 text-white' : 'bg-white text-slate-600 border border-slate-200'}`}>{v}</button>
        ))}
     </ScrollableTabBar>
@@ -798,6 +821,153 @@ return (
           )}
         </div>
       )}
+
+      {view === 'Collections' && (() => {
+        const t = collections.totals;
+        const maxDay = collections.byDay.reduce((m, d) => Math.max(m, d.amount), 0) || 1;
+        const bar = (val, max, cls) => (
+          <div className="w-full bg-slate-100 rounded-full h-1.5 mt-1">
+            <div className={`${cls} h-1.5 rounded-full`} style={{ width: `${max > 0 ? Math.max((val / max) * 100, 1) : 0}%` }}></div>
+          </div>
+        );
+        return (
+          <div className="space-y-3 mt-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Received · {filterLabel}</p>
+                <p className="text-2xl font-black mt-1 text-emerald-600">Rs.{t.received.toLocaleString('en-US')}</p>
+                <p className="text-[10px] text-slate-400 mt-1">{t.count} collection{t.count === 1 ? '' : 's'}</p>
+              </div>
+              <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">At Counter vs Receipts</p>
+                <p className="text-base font-black mt-1 text-slate-800">Rs.{t.atBilling.toLocaleString('en-US')}</p>
+                <p className="text-[10px] text-slate-400">taken when the bill was raised</p>
+                <p className="text-base font-black mt-1 text-slate-800">Rs.{t.receipts.toLocaleString('en-US')}</p>
+                <p className="text-[10px] text-slate-400">collected later</p>
+              </div>
+            </div>
+
+            {t.discount > 0 && (
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 flex justify-between items-center">
+                <span className="text-[11px] font-bold text-amber-700">Round-off discount given — reduces the balance but was never received</span>
+                <span className="text-sm font-black text-amber-700 shrink-0 ml-2">Rs.{t.discount.toLocaleString('en-US')}</span>
+              </div>
+            )}
+
+            {t.count === 0 && (
+              <div className="bg-white p-8 rounded-2xl text-center border border-slate-200">
+                <p className="font-bold text-slate-400">Nothing came in during this period.</p>
+              </div>
+            )}
+
+            {collections.byDay.length > 0 && (
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="bg-slate-50 border-b border-slate-200 p-3">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Day by day</span>
+                </div>
+                <div className="divide-y divide-slate-100 max-h-72 overflow-y-auto">
+                  {[...collections.byDay].reverse().map(d => (
+                    <div key={d.key} className="p-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs font-bold text-slate-700">{formatDateDisp(d.key)}</span>
+                        <span className="text-xs font-black text-emerald-600">Rs.{d.amount.toLocaleString('en-US')}</span>
+                      </div>
+                      {bar(d.amount, maxDay, 'bg-emerald-400')}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="grid sm:grid-cols-2 gap-3">
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="bg-slate-50 border-b border-slate-200 p-3">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">By method</span>
+                  <span className="block text-[9px] text-slate-400 font-medium mt-0.5">Read from the payment note — there is no method field to record one</span>
+                </div>
+                <div className="divide-y divide-slate-100">
+                  {collections.byMethod.map(m => (
+                    <div key={m.key} className="flex justify-between items-center p-3">
+                      <span className="text-xs font-bold text-slate-700">{m.key} <span className="text-slate-400 font-medium">({m.count})</span></span>
+                      <span className="text-xs font-black text-slate-800">Rs.{m.amount.toLocaleString('en-US')}</span>
+                    </div>
+                  ))}
+                  {collections.byMethod.length === 0 && <p className="p-4 text-center text-xs text-slate-400">—</p>}
+                </div>
+              </div>
+
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="bg-slate-50 border-b border-slate-200 p-3">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Who collected it</span>
+                  <span className="block text-[9px] text-slate-400 font-medium mt-0.5">Counter cash goes to the salesperson on the bill; a receipt records no one</span>
+                </div>
+                <div className="divide-y divide-slate-100">
+                  {collections.byCollector.map(c => (
+                    <div key={c.key} className="flex justify-between items-center p-3">
+                      <span className="text-xs font-bold text-slate-700">{c.key} <span className="text-slate-400 font-medium">({c.count})</span></span>
+                      <span className="text-xs font-black text-slate-800">Rs.{c.amount.toLocaleString('en-US')}</span>
+                    </div>
+                  ))}
+                  {collections.byCollector.length === 0 && <p className="p-4 text-center text-xs text-slate-400">—</p>}
+                </div>
+              </div>
+            </div>
+
+            {collections.byCustomer.length > 0 && (
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="bg-slate-50 border-b border-slate-200 p-3">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Who paid</span>
+                </div>
+                <div className="divide-y divide-slate-100 max-h-96 overflow-y-auto">
+                  {collections.byCustomer.map(c => (
+                    <div key={c.key} className="flex justify-between items-center p-3 gap-2">
+                      <button
+                        className="flex-1 min-w-0 text-left text-xs font-bold text-slate-800 truncate hover:text-indigo-600"
+                        onClick={() => { if (c.id !== undefined) { setSelectedLedgerId(c.id); setShowLedgerModal(true); } }}
+                      >{c.name} <span className="text-slate-400 font-medium">({c.count})</span></button>
+                      <span className="text-xs font-black text-emerald-600 shrink-0">Rs.{c.amount.toLocaleString('en-US')}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {collections.rows.length > 0 && (
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="bg-slate-50 border-b border-slate-200 p-3">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Every collection · newest first</span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs whitespace-nowrap">
+                    <thead className="bg-slate-50 text-slate-500 uppercase font-bold tracking-wider border-b border-slate-200">
+                      <tr><th className="p-3">Date</th><th className="p-3">Reference</th><th className="p-3">Customer</th><th className="p-3">Method</th><th className="p-3 text-right">Received</th></tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
+                      {collections.rows.map(r => (
+                        <tr key={r.id} className="hover:bg-slate-50">
+                          <td className="p-3 text-slate-500">{formatDateDisp(r.date)}</td>
+                          <td className="p-3 font-bold text-slate-800">{r.ref}</td>
+                          <td className="p-3">
+                            <button className="hover:text-indigo-600 text-left" onClick={() => { if (r.customerId !== undefined) { setSelectedLedgerId(r.customerId); setShowLedgerModal(true); } }}>{r.customerName}</button>
+                          </td>
+                          <td className="p-3 text-slate-500">{r.method}{r.note ? ` · ${r.note}` : ''}</td>
+                          <td className="p-3 text-right font-black text-emerald-600">Rs.{r.received.toLocaleString('en-US')}{r.discount > 0 && <span className="block text-[10px] font-bold text-amber-600">+ Rs.{r.discount.toLocaleString('en-US')} disc.</span>}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot className="bg-slate-50 border-t-2 border-slate-300 font-black text-slate-800 text-xs">
+                      <tr>
+                        <td className="p-3 uppercase tracking-wider text-slate-600" colSpan={4}>Total received</td>
+                        <td className="p-3 text-right text-emerald-700">Rs.{t.received.toLocaleString('en-US')}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* ── Insights View ── */}
       {view === 'Insights' && (() => {

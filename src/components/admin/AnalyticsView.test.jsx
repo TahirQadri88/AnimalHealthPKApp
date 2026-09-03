@@ -150,3 +150,58 @@ describe('AnalyticsView — drill-down', () => {
     expect(html).not.toMatch(/undefined|NaN/);
   });
 });
+
+// Money in. For a business run on credit this was the largest missing dimension: two
+// numbers about collection existed and no view of the cash itself.
+describe('AnalyticsView — Collections', () => {
+  const WORLD = {
+    analyticsView: 'Collections',
+    customers: [{ id: 1, name: 'Al Shaheer' }],
+    invoices: [
+      { id: 'INV-1', date: today, status: 'Billed', customerId: 1, customerName: 'Al Shaheer',
+        salespersonName: 'Owais', total: 136000, receivedAmount: 136000, items: [line('Antox 9', 10, 13600, 10000)] },
+    ],
+    payments: [{ id: 'REC-1', date: today, customerId: 1, amount: 20000, discount: 500, note: 'Cheque No. 88213' }],
+  };
+
+  it('counts the cash taken at the counter, not only the receipts', () => {
+    const html = render(WORLD);
+    expect(html).toContain('Rs.156,000');   // 136,000 at billing + 20,000 receipt
+    expect(html).toContain('Rs.136,000');
+    expect(html).toContain('Rs.20,000');
+  });
+
+  it('shows the round-off discount apart, as money never received', () => {
+    expect(render(WORLD)).toContain('never received');
+  });
+
+  it('breaks the money down by method, and says where the method came from', () => {
+    const html = render(WORLD);
+    expect(html).toContain('Cheque');
+    expect(html).toContain('At billing');
+    expect(html).toContain('there is no method field');
+  });
+
+  it('attributes counter cash to the salesperson on the bill', () => {
+    expect(render(WORLD)).toContain('Owais');
+  });
+
+  it('lists every collection with its reference', () => {
+    const html = render(WORLD);
+    expect(html).toContain('INV-1');
+    expect(html).toContain('REC-1');
+  });
+
+  it('offers the list as CSV', () => {
+    expect(render(WORLD)).toContain('title="CSV"');
+  });
+
+  it('says so plainly when nothing came in', () => {
+    const html = render({ analyticsView: 'Collections', invoices: [], payments: [], customers: [] });
+    expect(html).toContain('Nothing came in during this period');
+  });
+
+  it('leaks no undefined into the markup', () => {
+    expect(render(WORLD)).not.toMatch(/undefined|NaN/);
+  });
+});
