@@ -205,3 +205,52 @@ describe('AnalyticsView — Collections', () => {
     expect(render(WORLD)).not.toMatch(/undefined|NaN/);
   });
 });
+
+// The reason a return came back is typed onto every credit note and nothing read it.
+describe('AnalyticsView — Returns', () => {
+  const WORLD = {
+    analyticsView: 'Returns',
+    customers: [{ id: 1, name: 'Al Shaheer' }],
+    invoices: [
+      { id: 'INV-1', date: today, status: 'Billed', customerId: 1, customerName: 'Al Shaheer', total: 75000, items: [line('Antox 9', 10, 7500, 6000)] },
+      { id: 'CN-1', date: today, status: 'CreditNote', customerId: 1, customerName: 'Al Shaheer', reason: 'Expired', originalInvoiceId: 'INV-1', total: 15000, items: [line('Antox 9', 2, 7500, 6000)] },
+      { id: 'CN-2', date: today, status: 'CreditNote', customerId: 1, customerName: 'Al Shaheer', reason: '', total: 7500, items: [line('Antox 9', 1, 7500, 6000)] },
+    ],
+  };
+
+  it('shows what came back and what it was worth', () => {
+    const html = render(WORLD);
+    expect(html).toContain('Rs.22,500');
+    expect(html).toContain('CN-1');
+    expect(html).toContain('CN-2');
+  });
+
+  it('states the return rate against gross sales', () => {
+    // 22,500 of 75,000 billed.
+    expect(render(WORLD)).toContain('30%');
+  });
+
+  it('shows the reason, and names the ones left blank', () => {
+    const html = render(WORLD);
+    expect(html).toContain('Expired');
+    expect(html).toContain('No reason recorded');
+    expect(html).toContain('with no reason recorded');
+  });
+
+  it('links a credit note back to the invoice it came from', () => {
+    expect(render(WORLD)).toContain('ref INV-1');
+  });
+
+  it('offers the list as CSV', () => {
+    expect(render(WORLD)).toContain('title="CSV"');
+  });
+
+  it('says so plainly when nothing came back', () => {
+    const html = render({ analyticsView: 'Returns', invoices: [], customers: [] });
+    expect(html).toContain('Nothing came back this period');
+  });
+
+  it('leaks no undefined into the markup', () => {
+    expect(render(WORLD)).not.toMatch(/undefined|NaN/);
+  });
+});

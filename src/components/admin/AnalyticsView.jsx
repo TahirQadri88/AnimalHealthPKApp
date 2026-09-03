@@ -10,6 +10,7 @@ import { makeArrowNav } from '../../lib/a11y';
 import { buildReport } from '../../services/analytics/reportEngine';
 import { drillDown } from '../../services/analytics/drilldown';
 import { buildCollections } from '../../services/analytics/collections';
+import { buildReturns } from '../../services/analytics/returns';
 import { DrillDownModal } from '../modals/DrillDownModal';
 
 export const AnalyticsView = () => {
@@ -54,6 +55,13 @@ const collections = useMemo(() => buildCollections({
   invoices, payments, customers, checkCustomFilter, filterCustomers,
 }), [invoices, payments, customers, dateFilter, customStart, customEnd, ...[...filterCustomers]]);
 
+// What is coming back, and why. The reason is typed onto every credit note and was never
+// read by anything.
+const returns = useMemo(() => buildReturns({
+  invoices, products, customers, checkCustomFilter,
+  filterCompanies, filterCustomers, filterSalespersons,
+}), [invoices, products, customers, dateFilter, customStart, customEnd, ...[...filterCompanies], ...[...filterCustomers], ...[...filterSalespersons]]);
+
 const getSortedExportData = () => {
    if (view === 'Overview' || view === 'Item Sales') return null;
    if (view === 'Insights') {
@@ -86,6 +94,12 @@ const getSortedExportData = () => {
      'Date': r.date, 'Reference': r.id, 'Customer': r.customerName,
      'Received (Rs)': r.received, 'Discount (Rs)': r.discount,
      'Method': r.method, 'Note': r.note, 'Collected By': r.collectedBy,
+   }));
+   if (view === 'Returns') return returns.rows.map(r => ({
+     'Date': r.date, 'Credit Note': r.id, 'Original Invoice': r.originalInvoiceId,
+     'Customer': r.customerName, 'Reason': r.reason,
+     'Units': r.units, 'Value (Rs)': r.value, 'Cost (Rs)': r.cost,
+     'Days Since Sale': r.daysSinceSale ?? '',
    }));
    if (view === 'By Salesperson') return Object.entries(reportEngine.bySalesperson)
      .map(([key,val]) => ({ 'Staff Name': key, 'Orders': val.orders, 'Revenue (Rs)': val.revenue, 'Gross Profit (Rs)': val.profit,
@@ -197,6 +211,17 @@ const handleExport = (format) => {
             const total = exportData.reduce((s,r)=>s+(r['Outstanding (Rs)']||0),0);
             text += `${'─'.repeat(30)}\nTotal Outstanding: Rs.${total.toLocaleString('en-US')}\n`;
           }
+        } else if (view === 'Returns') {
+          const t = returns.totals;
+          text += `Returned: Rs.${t.value.toLocaleString('en-US')} across ${t.count} credit note${t.count === 1 ? '' : 's'}\n`;
+          text += `Return rate: ${t.ratePct}% of Rs.${t.grossSales.toLocaleString('en-US')} gross sales\n`;
+          if (t.withoutReason > 0) text += `⚠️ ${t.withoutReason} with no reason recorded\n`;
+          text += `\n*By reason*\n`;
+          returns.byReason.forEach(x => { text += `${x.key}: Rs.${x.value.toLocaleString('en-US')} (${x.count})\n`; });
+          text += `\n*Most returned*\n`;
+          returns.byProduct.slice(0, 10).forEach((p, i) => {
+            text += `${i+1}. ${p.key} — ${p.units} units, Rs.${p.value.toLocaleString('en-US')}\n`;
+          });
         } else if (view === 'Collections') {
           const t = collections.totals;
           text += `Received: Rs.${t.received.toLocaleString('en-US')} in ${t.count} collection${t.count === 1 ? '' : 's'}\n`;
@@ -424,10 +449,10 @@ return (
 
     {/* View Tabs */}
     <ScrollableTabBar className="pb-2 shrink-0">
-       {['Overview','Insights','Monthly Trend','By Product','By Company','By Customer','By City','By Area','By Type','By Salesperson','Receivables','Collections','Item Sales'].map(v => (
+       {['Overview','Insights','Monthly Trend','By Product','By Company','By Customer','By City','By Area','By Type','By Salesperson','Receivables','Collections','Returns','Item Sales'].map(v => (
          <button key={v} data-analytictab={v} tabIndex={view===v?0:-1}
            onClick={() => setView(v)}
-           onKeyDown={makeArrowNav(['Overview','Insights','Monthly Trend','By Product','By Company','By Customer','By City','By Area','By Type','By Salesperson','Receivables','Collections','Item Sales'],view,setView,'data-analytictab')}
+           onKeyDown={makeArrowNav(['Overview','Insights','Monthly Trend','By Product','By Company','By Customer','By City','By Area','By Type','By Salesperson','Receivables','Collections','Returns','Item Sales'],view,setView,'data-analytictab')}
            className={`px-3 py-1.5 rounded-xl font-bold text-[11px] whitespace-nowrap shadow-sm transition-colors ${view === v ? 'bg-slate-800 text-white' : 'bg-white text-slate-600 border border-slate-200'}`}>{v}</button>
        ))}
     </ScrollableTabBar>
@@ -821,6 +846,108 @@ return (
           )}
         </div>
       )}
+
+      {view === 'Returns' && (() => {
+        const t = returns.totals;
+        const maxReason = returns.byReason.reduce((m, x) => Math.max(m, x.value), 0) || 1;
+        const rateColor = t.ratePct >= 10 ? 'rose' : t.ratePct >= 5 ? 'amber' : 'emerald';
+        const list = (title, note, items, unit) => (
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="bg-slate-50 border-b border-slate-200 p-3">
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{title}</span>
+              {note && <span className="block text-[9px] text-slate-400 font-medium mt-0.5">{note}</span>}
+            </div>
+            <div className="divide-y divide-slate-100 max-h-72 overflow-y-auto">
+              {items.map(x => (
+                <div key={x.key} className="p-3">
+                  <div className="flex justify-between items-center gap-2">
+                    <span className="text-xs font-bold text-slate-700 truncate">{x.key} <span className="text-slate-400 font-medium">({x.count})</span></span>
+                    <span className="text-xs font-black text-rose-600 shrink-0">Rs.{x.value.toLocaleString('en-US')}</span>
+                  </div>
+                  {unit && <p className="text-[10px] text-slate-400 mt-0.5">{x.units.toLocaleString('en-US')} units</p>}
+                  <div className="w-full bg-slate-100 rounded-full h-1 mt-1"><div className="bg-rose-400 h-1 rounded-full" style={{ width: `${Math.max((x.value / maxReason) * 100, 1)}%` }}></div></div>
+                </div>
+              ))}
+              {items.length === 0 && <p className="p-4 text-center text-xs text-slate-400">—</p>}
+            </div>
+          </div>
+        );
+        return (
+          <div className="space-y-3 mt-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Returned · {filterLabel}</p>
+                <p className="text-2xl font-black mt-1 text-rose-600">Rs.{t.value.toLocaleString('en-US')}</p>
+                <p className="text-[10px] text-slate-400 mt-1">{t.count} credit note{t.count === 1 ? '' : 's'} · {t.units.toLocaleString('en-US')} units</p>
+              </div>
+              <div className={`bg-${rateColor}-50 p-4 rounded-2xl border border-${rateColor}-100 shadow-sm`}>
+                <p className={`text-[10px] font-bold text-${rateColor}-600 uppercase tracking-wider`}>Return Rate</p>
+                <p className={`text-2xl font-black mt-1 text-${rateColor}-700`}>{t.ratePct}%</p>
+                <p className={`text-[10px] text-${rateColor}-500 mt-1`}>of Rs.{t.grossSales.toLocaleString('en-US')} gross sales</p>
+              </div>
+            </div>
+
+            {t.withoutReason > 0 && (
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 flex justify-between items-center gap-2">
+                <span className="text-[11px] font-bold text-amber-700">{t.withoutReason} credit note{t.withoutReason === 1 ? '' : 's'} with no reason recorded — the field is on the form and was left blank</span>
+              </div>
+            )}
+
+            {t.count === 0 && (
+              <div className="bg-emerald-50 p-6 rounded-2xl text-center border border-emerald-100">
+                <CheckCircle2 className="mx-auto text-emerald-500 mb-2" size={32}/>
+                <p className="font-bold text-emerald-700">Nothing came back this period.</p>
+              </div>
+            )}
+
+            {t.count > 0 && (
+              <>
+                {list('Why it came back', 'Free text on the credit note, grouped without regard to case', returns.byReason, false)}
+                <div className="grid sm:grid-cols-2 gap-3">
+                  {list('Most returned products', '', returns.byProduct, true)}
+                  {list('Who returns most', '', returns.byCustomer, false)}
+                </div>
+
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                  <div className="bg-slate-50 border-b border-slate-200 p-3">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Every credit note · newest first</span>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs whitespace-nowrap">
+                      <thead className="bg-slate-50 text-slate-500 uppercase font-bold tracking-wider border-b border-slate-200">
+                        <tr><th className="p-3">Date</th><th className="p-3">Credit Note</th><th className="p-3">Customer</th><th className="p-3">Reason</th><th className="p-3 text-center">Days Out</th><th className="p-3 text-right">Value</th></tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
+                        {returns.rows.map(r => (
+                          <tr key={r.id} className="hover:bg-slate-50">
+                            <td className="p-3 text-slate-500">{formatDateDisp(r.date)}</td>
+                            <td className="p-3">
+                              <span className="font-bold text-slate-800">{r.id}</span>
+                              {r.originalInvoiceId && <span className="block text-[10px] text-slate-400">ref {r.originalInvoiceId}</span>}
+                            </td>
+                            <td className="p-3">
+                              <button className="hover:text-indigo-600 text-left" onClick={() => { if (r.customerId !== undefined) { setSelectedLedgerId(r.customerId); setShowLedgerModal(true); } }}>{r.customerName}</button>
+                            </td>
+                            <td className={`p-3 ${r.hasReason ? 'text-slate-600' : 'text-amber-600 font-bold'}`}>{r.reason}</td>
+                            <td className="p-3 text-center text-slate-500">{r.daysSinceSale ?? '—'}</td>
+                            <td className="p-3 text-right font-black text-rose-600">Rs.{r.value.toLocaleString('en-US')}<span className="block text-[10px] font-bold text-slate-400">{r.units} units</span></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot className="bg-slate-50 border-t-2 border-slate-300 font-black text-slate-800 text-xs">
+                        <tr>
+                          <td className="p-3 uppercase tracking-wider text-slate-600" colSpan={5}>Total returned</td>
+                          <td className="p-3 text-right text-rose-700">Rs.{t.value.toLocaleString('en-US')}</td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        );
+      })()}
 
       {view === 'Collections' && (() => {
         const t = collections.totals;
