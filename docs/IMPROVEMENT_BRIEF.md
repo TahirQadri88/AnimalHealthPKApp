@@ -90,6 +90,12 @@ remains is correctness and maintainability.
 
 ### Next
 
+- [x] **Global search** (2026-09-03, brief §21) and the **UI/UX sections** (§14, §24, §25,
+  §35, §36) — audited and fixed in `docs/UI_AUDIT.md`, which counts each claim rather than
+  eyeballing it. The one item deliberately left open is form labels: 149 inputs with no
+  `aria-label` and no `htmlFor` between them, which is a 149-site mechanical sweep and is
+  written up with a safe order to do it in.
+
 **A. The verification pass below** — it is the only item left that needs the live app rather
 than this repo, and it has been outstanding since the security cutover.
 
