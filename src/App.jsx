@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
-  LayoutDashboard, Package, ReceiptText, Settings, Plus, CheckCircle2, AlertCircle, Users, Wallet
+  LayoutDashboard, Package, ReceiptText, Settings, Plus, CheckCircle2, AlertCircle, Users, Wallet, Search
 } from 'lucide-react';
 import {
   db, auth, firebaseConfig, collection, doc, getDoc, setDoc, deleteDoc, getDocs, query, orderBy, limit, getAuth, initializeApp, deleteApp, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, authEmailFor, loginSlug
@@ -20,6 +20,7 @@ import { CustomersTab } from './components/tabs/CustomersTab';
 import { ExpenseCategoryModal } from './components/modals/ExpenseCategoryModal';
 import { PaymentModal } from './components/modals/PaymentModal';
 import { CustomerModal } from './components/modals/CustomerModal';
+import { GlobalSearchModal } from './components/modals/GlobalSearchModal';
 import { RidersModal } from './components/modals/RidersModal';
 import { UserModal } from './components/modals/UserModal';
 import { ProductModal } from './components/modals/ProductModal';
@@ -57,6 +58,9 @@ window.localStorage.removeItem('app_currentUser');
 
 const [loginForm, setLoginForm] = useState({ name: '', password: '' });
 const [activeTab, setActiveTab] = useState('dashboard');
+// One search box over customers, invoices, receipts, products and brands. Alt+S, or the
+// magnifier in either header.
+const [showSearchModal, setShowSearchModal] = useState(false);
 const [adminView, setAdminView] = useState('analytics');
 const [analyticsView, setAnalyticsView] = useState('Overview');
 const [toast, setToast] = useState(null);
@@ -647,11 +651,14 @@ useEffect(() => {
   if (!currentUser) return;
   const handler = (e) => {
     if (e.altKey) {
+      if (e.key === 's') { e.preventDefault(); setShowSearchModal(true); return; }
       const map = { d: 'dashboard', i: 'products', b: 'billing', c: 'customers', a: 'admin' };
       if (map[e.key]) { e.preventDefault(); setActiveTab(map[e.key]); }
     }
     if (e.key === 'Escape') {
-      if (printConfig) setPrintConfig(null);
+      // Search sits above everything else it can open, so it closes first.
+      if (showSearchModal) setShowSearchModal(false);
+      else if (printConfig) setPrintConfig(null);
       else if (showProductModal) setShowProductModal(false);
       else if (showCustomerModal) setShowCustomerModal(false);
       else if (showPaymentModal) { setEditingPayment(null); setShowPaymentModal(false); }
@@ -666,7 +673,7 @@ useEffect(() => {
   };
   window.addEventListener('keydown', handler);
   return () => window.removeEventListener('keydown', handler);
-}, [currentUser, printConfig, showProductModal, showCustomerModal, showPaymentModal, showCreditNoteModal, showLedgerModal, showUserModal, showExpenseCatModal, showSegmentsModal, showRidersModal, billingView]);
+}, [currentUser, showSearchModal, printConfig, showProductModal, showCustomerModal, showPaymentModal, showCreditNoteModal, showLedgerModal, showUserModal, showExpenseCatModal, showSegmentsModal, showRidersModal, billingView]);
 
 // Tab list & permission helpers — defined here so the redirect effect below can use them
 // while still being BEFORE any conditional return (Rules of Hooks)
@@ -786,7 +793,7 @@ return (
       })}
     </nav>
     <div className="px-3 py-3 border-t border-slate-100">
-      <div className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mb-2 px-1">Shortcuts: Alt+B=Billing, Alt+C=Clients</div>
+      <div className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mb-2 px-1">Shortcuts: Alt+S=Search, Alt+B=Billing, Alt+C=Clients</div>
       <button onClick={logout} className="w-full text-xs font-bold uppercase tracking-widest text-slate-500 bg-slate-100 px-3 py-2 rounded-lg hover:bg-slate-200 transition-colors">Log Out</button>
     </div>
   </aside>
@@ -799,12 +806,26 @@ return (
         <h1 className="text-xl font-extrabold bg-gradient-to-r from-indigo-700 to-blue-500 bg-clip-text text-transparent tracking-tight leading-none pb-0.5">{APP_NAME}</h1>
         <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1.5 flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>{currentUser?.name}</p>
       </div>
-      <button onClick={logout} className="text-[10px] font-bold uppercase tracking-widest text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg hover:bg-slate-200">Log Out</button>
+      <div className="flex items-center gap-2">
+        <button onClick={() => setShowSearchModal(true)} aria-label="Search everything" title="Search everything" className="p-2 bg-slate-100 rounded-lg text-slate-600 hover:bg-slate-200"><Search size={16}/></button>
+        <button onClick={logout} className="text-[10px] font-bold uppercase tracking-widest text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg hover:bg-slate-200">Log Out</button>
+      </div>
     </header>
 
     {/* Desktop top bar */}
     <header className="hidden lg:flex bg-white border-b border-slate-200 px-6 py-3 items-center justify-between shadow-sm z-10">
-      <h2 className="text-base font-bold text-slate-800 capitalize">{TABS.find(t=>t.id===activeTab)?.label || ''}</h2>
+      <div className="flex items-center gap-4 min-w-0">
+        <h2 className="text-base font-bold text-slate-800 capitalize shrink-0">{TABS.find(t=>t.id===activeTab)?.label || ''}</h2>
+        <button
+          onClick={() => setShowSearchModal(true)}
+          aria-label="Search everything"
+          className="flex items-center gap-2 w-72 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-400 hover:bg-slate-100 hover:border-slate-300 transition-colors"
+        >
+          <Search size={14} className="shrink-0"/>
+          <span className="text-xs font-semibold truncate">Customer, invoice no., product…</span>
+          <kbd className="ml-auto text-[9px] bg-white border border-slate-200 px-1.5 py-0.5 rounded font-mono shrink-0">Alt+S</kbd>
+        </button>
+      </div>
       <div className="flex items-center gap-3">
         {activeTab === 'billing' && billingView === 'list' && (
           <button onClick={() => { setCurrentInvoice({ id: null, customerId: '', customerName: '', customerDetails: {}, items: [], deliveryBilled: 0, transportExpense: 0, discount: 0, vehicle: VEHICLES[0], paymentStatus: 'Pending', receivedAmount: 0, transportCompany: '', biltyNumber: '', driverName: '', driverPhone: '', riderId: '', deliveryAddressKey: 'address1', notes: '' }); setBillingView('form'); }} className="flex items-center gap-1.5 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700 transition-colors shadow-sm"><Plus size={16}/> New Invoice <kbd className="ml-1 text-[9px] bg-indigo-500 px-1.5 py-0.5 rounded font-mono">Alt+B</kbd></button>
@@ -864,6 +885,7 @@ return (
 
   {showProductModal && <ProductModal />}
   {showCustomerModal && <CustomerModal />}
+  {showSearchModal && <GlobalSearchModal onClose={() => setShowSearchModal(false)} />}
   {showLedgerModal && <CustomerLedgerModal />}
   {showPaymentModal && <PaymentModal />}
   {showCreditNoteModal && <CreditNoteModal />}
