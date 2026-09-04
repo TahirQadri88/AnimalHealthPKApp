@@ -1,11 +1,13 @@
 import { useState, useMemo, useContext } from 'react';
-import { Plus, Search, X, Edit, Trash2, Wallet, AlertCircle } from 'lucide-react';
+import { Plus, Search, X, Edit, Trash2, Wallet, AlertCircle, BookOpen, ReceiptText, PhoneCall } from 'lucide-react';
 import { AppContext } from '../../context/AppContext';
 import { ScrollableTabBar } from '../ui/ScrollableTabBar';
 import SearchableSelect from '../SearchableSelect';
+import { buildCustomerCard, balanceReminderText, waNumber } from '../../services/customers/customerCard';
+import { APP_NAME, VEHICLES, formatDateDisp } from '../../helpers';
 
 export const CustomersTab = () => {
-const { isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, cities, areas, customerTypes, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig, showConfirm, showPrompt, voidRecord, logSave } = useContext(AppContext);
+const { isAdmin, hasPermission, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, cities, areas, customerTypes, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig, showConfirm, showPrompt, voidRecord, logSave } = useContext(AppContext);
 const [search, setSearch] = useState('');
 const [filterCity, setFilterCity] = useState('');
 const [filterArea, setFilterArea] = useState('');
@@ -53,9 +55,14 @@ const incompleteMatch = !showIncompleteOnly || incompleteIds.has(c.id);
 return nameMatch && cityMatch && areaMatch && typeMatch && balMatch && incompleteMatch;
 }).map(c => {
 const bal = getCustomerBalance(c.id);
+// Last invoice, last payment and last activity — brief §14. The card had the name and the
+// balance, and everything else meant opening the ledger to find out.
+const card = buildCustomerCard(c.id, { invoices, payments });
+const wa = waNumber(c.phone);
 return (
-<div key={c.id} className="bg-white p-4 rounded-2xl border border-slate-200 flex justify-between items-center shadow-sm hover:border-indigo-200 transition-colors">
-<button type="button" className="flex-1 text-left" onClick={() => { setSelectedLedgerId(c.id); setShowLedgerModal(true); }}>
+<div key={c.id} className="bg-white p-4 rounded-2xl border border-slate-200 flex justify-between items-start shadow-sm hover:border-indigo-200 transition-colors">
+<div className="flex-1 min-w-0">
+<button type="button" className="w-full text-left" onClick={() => { setSelectedLedgerId(c.id); setShowLedgerModal(true); }}>
 <h4 className="font-bold text-slate-800 text-sm hover:text-indigo-600">{c.name}</h4>
 <p className="text-[11px] font-medium text-slate-500 mt-0.5">{c.contactPerson ? `${c.contactPerson} - ` : ''}{c.phone}</p>
 {incompleteIds.has(c.id) && <div className="flex flex-wrap gap-1 mt-1">{!c.city && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">No City</span>}{!c.area && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">No Area</span>}{!c.customerType && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">No Type</span>}</div>}
@@ -64,8 +71,63 @@ return (
 Bal: Rs. {bal.toLocaleString('en-US')} {bal > 0 ? '(Dr)' : bal < 0 ? '(Cr)' : ''}
 </span>
 </div>
+<div className="mt-2 space-y-0.5">
+  {card.isNew ? (
+    <p className="text-[10px] font-bold text-slate-400">No transactions yet</p>
+  ) : (
+    <>
+      {card.lastInvoice && (
+        <p className="text-[10px] text-slate-500">
+          <span className="font-bold text-slate-600">Last bill</span> {card.lastInvoice.id} · {formatDateDisp(card.lastInvoice.date)} · Rs.{card.lastInvoice.amount.toLocaleString('en-US')}
+        </p>
+      )}
+      {card.lastPayment && (
+        <p className="text-[10px] text-slate-500">
+          <span className="font-bold text-slate-600">Last paid</span> {formatDateDisp(card.lastPayment.date)} · Rs.{card.lastPayment.amount.toLocaleString('en-US')}
+          {card.lastPayment.atBilling ? ' (at billing)' : ''}
+        </p>
+      )}
+      {!card.lastPayment && <p className="text-[10px] font-bold text-amber-600">Never paid</p>}
+      {card.daysSinceActivity !== null && card.daysSinceActivity > 30 && (
+        <p className="text-[10px] font-bold text-amber-600">Quiet for {card.daysSinceActivity} days</p>
+      )}
+    </>
+  )}
+</div>
 </button>
-{isAdmin && (<div className="flex flex-col gap-2 ml-3"><button onClick={(e) => { e.stopPropagation(); setEditingCustomer(c); setShowCustomerModal(true); }} className="p-2 bg-slate-50 text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"><Edit size={16}/></button><button onClick={async (e) => {
+{/* The four actions §14 asks for. Ledger is the card itself; these are the other three. */}
+<div className="flex flex-wrap gap-1.5 mt-2.5">
+  <button
+    onClick={() => { setSelectedLedgerId(c.id); setShowLedgerModal(true); }}
+    className="flex items-center gap-1 text-[10px] font-bold px-2 py-1.5 rounded-lg bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100"
+  ><BookOpen size={11}/> Ledger</button>
+  {(isAdmin || hasPermission('issueInvoices')) && (
+    <button
+      onClick={() => {
+        setCurrentInvoice({ id: null, customerId: c.id, customerName: c.name, customerDetails: {}, items: [], deliveryBilled: 0, transportExpense: 0, discount: 0, vehicle: VEHICLES[0], paymentStatus: 'Pending', receivedAmount: 0, transportCompany: '', biltyNumber: '', driverName: '', driverPhone: '', riderId: '', deliveryAddressKey: 'address1', notes: '' });
+        setBillingView('form');
+        setActiveTab('billing');
+      }}
+      className="flex items-center gap-1 text-[10px] font-bold px-2 py-1.5 rounded-lg bg-indigo-50 text-indigo-600 border border-indigo-100 hover:bg-indigo-100"
+    ><ReceiptText size={11}/> New Invoice</button>
+  )}
+  {(isAdmin || hasPermission('receivePayments')) && (
+    <button
+      onClick={() => { setSelectedCustomerForPayment(c.id); setShowPaymentModal(true); }}
+      className="flex items-center gap-1 text-[10px] font-bold px-2 py-1.5 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-100 hover:bg-emerald-100"
+    ><Wallet size={11}/> Receive</button>
+  )}
+  {wa && (
+    <a
+      href={`https://wa.me/${wa}?text=${encodeURIComponent(balanceReminderText(c, bal, APP_NAME))}`}
+      target="_blank" rel="noopener noreferrer"
+      title={`WhatsApp ${c.name}`}
+      className="flex items-center gap-1 text-[10px] font-bold px-2 py-1.5 rounded-lg bg-green-50 text-green-600 border border-green-100 hover:bg-green-100"
+    ><PhoneCall size={11}/> WhatsApp</a>
+  )}
+</div>
+</div>
+{isAdmin && (<div className="flex flex-col gap-2 ml-3 shrink-0"><button onClick={(e) => { e.stopPropagation(); setEditingCustomer(c); setShowCustomerModal(true); }} className="p-2 bg-slate-50 text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"><Edit size={16}/></button><button onClick={async (e) => {
   e.stopPropagation();
   const relInvoices = invoices.filter(o => o.customerId === c.id);
   const relPayments = payments.filter(p => p.customerId === c.id);

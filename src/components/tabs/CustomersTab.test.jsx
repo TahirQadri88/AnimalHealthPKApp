@@ -29,6 +29,7 @@ const render = (over = {}) => renderToStaticMarkup(
     setEditingCustomer: () => {}, setShowCustomerModal: () => {},
     setSelectedLedgerId: () => {}, setShowLedgerModal: () => {},
     setSelectedCustomerForPayment: () => {}, setShowPaymentModal: () => {}, setEditingPayment: () => {},
+    setCurrentInvoice: () => {}, setBillingView: () => {}, setActiveTab: () => {},
     ...over,
   }}>
     <CustomersTab />
@@ -77,5 +78,71 @@ describe('CustomersTab', () => {
   // would be guessing at a contract rather than recording the one that exists.
   it('renders a zero balance as zero rather than hiding the customer', () => {
     expect(render()).toContain('Settled Vet Store');
+  });
+});
+
+// Brief §14: the card should expose name, outstanding, last invoice, last payment and last
+// transaction, with actions Ledger / New Invoice / Receive Payment / WhatsApp. It had the
+// first two and one action; everything else meant opening the ledger to find out.
+describe('CustomersTab — the customer card', () => {
+  const TRADED = {
+    invoices: [
+      { id: 'INV-8475', date: '2026-09-03', customerId: 1, status: 'Billed', total: 136000, receivedAmount: 136000 },
+      { id: 'INV-8476', date: '2026-09-03', customerId: 1, status: 'Billed', total: 27000, receivedAmount: 0 },
+    ],
+    payments: [{ id: 'REC-1', date: '2026-08-20', customerId: 1, amount: 20000 }],
+  };
+
+  it('names the last bill, with its number and what it was worth', () => {
+    const html = render(TRADED);
+    expect(html).toContain('Last bill');
+    expect(html).toContain('INV-8476');
+    expect(html).toContain('Rs.27,000');
+  });
+
+  // Counter cash is a payment. A card built from the payments collection alone would say
+  // this customer last paid in August.
+  it('counts cash taken at the counter as the last payment', () => {
+    const html = render(TRADED);
+    expect(html).toContain('Last paid');
+    expect(html).toContain('Rs.136,000');
+    expect(html).toContain('(at billing)');
+  });
+
+  it('says plainly when a customer has never paid', () => {
+    expect(render({ invoices: [{ id: 'INV-1', date: '2026-09-03', customerId: 1, status: 'Billed', total: 5000 }], payments: [] }))
+      .toContain('Never paid');
+  });
+
+  it('distinguishes a brand-new customer from one who is up to date', () => {
+    expect(render()).toContain('No transactions yet');
+  });
+
+  it('offers the four actions', () => {
+    const html = render(TRADED);
+    expect(html).toContain('Ledger');
+    expect(html).toContain('New Invoice');
+    expect(html).toContain('Receive');
+    expect(html).toContain('WhatsApp');
+  });
+
+  it('sends the WhatsApp reminder to a number wa.me will accept', () => {
+    expect(render(TRADED)).toContain('wa.me/923001234567');
+  });
+
+  it('hides WhatsApp for a customer with no phone number', () => {
+    const html = render({ customers: [{ id: 3, name: 'Settled Vet Store', phone: '' }] });
+    expect(html).not.toContain('WhatsApp');
+  });
+
+  it('withholds the write actions from staff who lack the permission', () => {
+    const html = render({ ...TRADED, isAdmin: false, hasPermission: () => false });
+    expect(html).toContain('Ledger');
+    expect(html).not.toContain('New Invoice');
+    expect(html).not.toContain('Receive<');
+  });
+
+  it('leaks no undefined into the markup', () => {
+    expect(render(TRADED)).not.toMatch(/undefined|NaN/);
   });
 });
