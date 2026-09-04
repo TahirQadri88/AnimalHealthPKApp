@@ -243,6 +243,102 @@ stops at the login screen.
 
 ---
 
+## Reviewed against an external assessment — 2026-09-04
+
+An external review of this plan was commissioned. It is a good review and it corroborates
+most of it; three of its suggestions are adopted below. Two of its recommendations are wrong
+for **this** codebase, and it holds two positions that cannot both be true. Recorded here
+because the reasoning matters more than the verdict, and because the same suggestions will
+be made again.
+
+### Adopted
+
+- **B3 — Offline-aware empty states.** A search that finds nothing offline must not say "not
+  found"; it must say *"Not available offline — this is not in your saved local data."*
+  Genuinely new, cheap, and it prevents a dangerous wrong conclusion about a customer's
+  balance. Add to `GlobalSearchModal` and to the customer and product lists.
+- **B4 — "Saved locally" is not "Saved".** The toast after a queued write should say
+  *"Invoice saved on this device — will sync when the connection returns"*, not "Invoice
+  saved". A1 makes this possible; make it explicit rather than leaving it to the pill.
+  For financial software this distinction is the whole point of the tri-state.
+- **E1 — Age on the customer card.** The card shows last bill and last paid; the review is
+  right that *"oldest debt: 74 days"* belongs beside them. `buildAgingReport` already
+  computes `oldestAgeDays` per customer, so this is a lookup, not a calculation.
+- **E2 — `Ctrl+K` as an alias for `Alt+S`.** No cost. Keep Alt+S, which matches the existing
+  Alt+B / Alt+C.
+
+Also confirmed by the review and worth writing down: **a listener disconnected for more than
+30 minutes may be billed as a fresh query on reconnect.** Firestore's own pricing
+documentation says so. That is directly relevant here — a long offline period means a full
+re-read when the connection returns, so the offline work does not reduce read cost and may
+briefly increase it. `src/firebase.js` already says persistent cache is not a quota bypass;
+this is the specific mechanism.
+
+### Rejected, with the reason
+
+**1. "Do not keep realtime listeners on entire invoice and payment history; bound them."**
+
+This is the query-scoping proposal already refused on 2026-09-02 with evidence, and offline
+makes the case against it *stronger*, not weaker:
+
+- `buildCustomerLedger` walks **full history** to reach a closing balance. So does
+  `buildAgingReport`, and so does the **Previous Balance printed on every invoice**. Bound
+  the listener to 90 days and every customer balance in the app is understated by whatever
+  came before the window.
+- Offline, the app computes every figure from the cache. **If only 90 days is cached, no
+  balance can be computed offline at all.** Bounding the listeners does not make the app
+  more offline-capable; it is the single change that would break offline outright.
+
+The review recommends bounding these listeners *and* offline-first billing in the same
+document. Those two cannot both hold. `docs/FIRESTORE_READS.md` has the full argument and
+the shape of the real fix — a stored balance per customer, so history is not needed to
+answer "what do they owe" — which is a data-model change, not a listener change.
+
+**2. "Make Dashboard and Analytics on-demand rather than realtime, to reduce Firestore
+pressure."**
+
+Factually wrong about this codebase, and checkable in one command. Every Firestore read in
+the app is one of:
+
+- the **15** `useLiveCollection` calls in `App.jsx`,
+- **2** `getDoc` calls at login (`loginIndex`, `userRoles`),
+- **1** bounded `getDocs` for the audit log, on demand, newest first.
+
+There are **no per-screen queries anywhere**. Dashboard, Analytics, Receivables, Billing and
+the ledger all read the same in-memory arrays. Making Analytics "on demand" therefore saves
+**exactly zero reads** — the data is already loaded because Billing needs it.
+
+There is a real point buried underneath: `buildReport` runs over every invoice inside a
+`useMemo` on every filter change, which is **CPU on a phone**, not reads. If Analytics feels
+slow on a device with thousands of invoices, that is worth measuring and fixing. It is a
+different problem with a different fix, and it should not be justified as a Firestore saving.
+
+*(The review's listener count would also have come out at sixteen: `src/useFirestore.js` was
+seventeen dead lines with its own unbounded `onSnapshot`, imported by nothing. Deleted, so
+that grep now tells the truth.)*
+
+**3. "Do not redesign numbering to be offline; have the UI say 'waiting for server
+confirmation'."**
+
+This is the important disagreement, and it is the same contradiction as (1). Invoice
+numbering is on the critical path of billing. If a number requires the server, then **billing
+requires the server**, and "make Billing genuinely offline-first" — the review's own P0 #3 —
+is not achievable. You cannot hand a customer a printed invoice with "waiting for server
+confirmation" where the number goes.
+
+Commit set C resolves it rather than choosing a side: numbers are claimed **atomically, in a
+transaction, while online**, ten at a time, and consumed offline without a transaction. The
+guarantee is unchanged — no two devices can be issued the same number — and the format is
+unchanged. The cost is gaps, which are strictly better than duplicates.
+
+### What did not change
+
+The order in this file. The review ranks the sync indicator as P0 alongside the write fix,
+which is defensible, but a save that hangs is a **functional break** and an indicator is
+information about one. A1 and A2 stay first.
+
+---
+
 ## Order and effort
 
 | # | Step | Size | Do it because |
@@ -252,7 +348,11 @@ stops at the login screen.
 | A3 | Persistent storage | One line + a wrapper | Free, and decisive on a phone |
 | B1 | Status pill | Small–medium | Nobody trusts an offline app that will not say it is offline |
 | B2 | Service worker timeout | Small | A bad signal is the common failure here, not a clean one |
+| B3 | Offline-aware empty states | Small | Stops "not found" being read as "owes nothing" |
+| B4 | "Saved locally", not "Saved" | Very small | The distinction the tri-state exists for |
 | C1 | Reserved number blocks | Medium | Only if two devices might bill at once offline — but then, essential |
 | D1 | Readiness panel | Small | Diagnostic; it tells you A3 was refused |
+| E1 | Oldest-debt age on the customer card | Very small | A lookup; buildAgingReport already has it |
+| E2 | Ctrl+K alias for search | Trivial | Free |
 
 **Start with A1 → A2 → A3.** They are independent of each other and of everything after them.
