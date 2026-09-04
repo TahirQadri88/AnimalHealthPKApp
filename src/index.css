@@ -2,6 +2,47 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Keyboard focus ──────────────────────────────────────────────────────────
+ *
+ * 46 controls in this app carry Tailwind's `outline-none` with nothing put back,
+ * which removes the browser's focus ring and leaves a keyboard user with no idea
+ * where they are. Most of them are inputs where the ring was dropped for looks and
+ * a `focus:border` added instead — fine for a text field, useless for a button.
+ *
+ * One rule instead of 46 edits, and `:focus-visible` is what makes that safe: it
+ * fires for keyboard focus and not for a mouse click, so nothing changes for
+ * anyone using a pointer. `!important` is needed because `outline-none` is a
+ * utility class in this same stylesheet and would otherwise win on source order.
+ *
+ * indigo-500 rather than the darker brand indigo: this has to be visible on the
+ * slate-900 sidebar as well as on white. */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 3px solid #6366f1 !important;
+  outline-offset: 2px !important;
+}
+
+/* ── Modal entrance ──────────────────────────────────────────────────────────
+ *
+ * ModalWrapper has always asked for `animate-slide-up` and nothing has ever
+ * defined it, so every modal simply appeared. Defined here, and kept short —
+ * brief §35 asks for minimal animation, not none.
+ *
+ * Anyone who has asked their system for less motion gets none of it. */
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-slide-up { animation: slide-up 160ms ease-out; }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-slide-up { animation: none; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 @media print {
   @page { margin: 0; }
   html, body { height: auto !important; overflow: visible !important; }
