@@ -2,10 +2,11 @@
 // services/search/globalSearch.test.js; this covers what reaches the screen.
 //
 // useEffect does not run under SSR, so the field's autofocus is not exercised here.
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { AppContext } from '../../context/AppContext';
 import { GlobalSearchModal } from './GlobalSearchModal';
+import { publishOnline, publishCollectionMeta, __resetSyncStatus } from '../../lib/syncStatus';
 
 const CUSTOMERS = [{ id: 1, name: 'Al Shaheer Cattle', phone: '0300-1234567', city: 'Karachi' }];
 const INVOICES = [
@@ -56,5 +57,31 @@ describe('GlobalSearchModal', () => {
 
   it('renders for a business with nothing in it', () => {
     expect(() => render({ customers: [], invoices: [], products: [], companies: [] })).not.toThrow();
+  });
+});
+
+// "Nothing matches" read as "this customer does not exist" — or worse, "owes nothing" — is
+// the wrong conclusion to invite from a device that has only part of the data.
+describe('GlobalSearchModal — offline', () => {
+  beforeEach(() => __resetSyncStatus());
+
+  // Said before the search rather than only after one fails: the notice and the empty-state
+  // wording read the same `offline` flag, and SSR cannot type into the box to reach the
+  // second one.
+  it('warns up front that it is searching only what this device holds', () => {
+    publishOnline(false);
+    expect(render()).toContain('Anything added elsewhere since your last connection is not here');
+  });
+
+  it('does the same on a dead-but-present connection, not just a clean disconnect', () => {
+    publishCollectionMeta('invoices', { fromCache: true, pending: 0 });
+    expect(render()).toContain('Searching data saved on this device');
+  });
+
+  it('says none of that when the connection is fine', () => {
+    publishCollectionMeta('invoices', { fromCache: false, pending: 0 });
+    const html = render();
+    expect(html).not.toContain('Not available offline');
+    expect(html).not.toContain('saved on this device');
   });
 });

@@ -137,7 +137,23 @@ step 7 exists.
 
 ---
 
-## Commit set B — making it comfortable (steps 3, 5)
+## Commit set B — making it comfortable (steps 3, 5) — ✅ DONE 2026-09-04
+
+B1, B2 and B3 landed. B4 landed early, with the hang fix, because the bug report that
+prompted it was "no status, no toast".
+
+Three things worth carrying forward:
+
+- **`includeMetadataChanges` would have caused a re-render storm** if added naively. Fifty
+  acknowledgements after a long outage, each recomputing every analytics `useMemo` over
+  every invoice, on a phone. Returning early when `snapshot.docChanges()` is empty avoids it
+  — that call excludes metadata-only changes by default, which is exactly the distinction
+  needed.
+- **A store read by `useSyncExternalStore` must return the identical object when nothing
+  changed**, or React re-renders forever. There is a test for it.
+- **Firebase requests are deliberately exempt from B2's timeout.** Cutting off a Firestore
+  long-poll at three seconds would break the realtime listeners; the SDK knows far better
+  than the worker when to give up.
 
 ### B1. A sync status pill
 

@@ -13,6 +13,7 @@ import { AppContext } from '../../context/AppContext';
 import { ModalWrapper } from '../ui/ModalWrapper';
 import { globalSearch, printDocTypeFor } from '../../services/search/globalSearch';
 import { formatDateDisp } from '../../helpers';
+import { useSyncStatus } from '../../hooks/useSyncStatus';
 
 const KIND_ICON = {
   customer: Users, invoice: ReceiptText, payment: Wallet, product: Package, company: Building2,
@@ -34,6 +35,11 @@ const {
 } = useContext(AppContext);
 
 const [query, setQuery] = useState('');
+// "Nothing matches" and "nothing matches in what this device has saved" are different
+// answers, and a person reading the first as the second concludes a customer does not
+// exist — or worse, that they owe nothing.
+const { state: syncState } = useSyncStatus();
+const offline = syncState === 'offline' || syncState === 'stale';
 const inputRef = useRef(null);
 useEffect(() => { inputRef.current?.focus(); }, []);
 
@@ -81,6 +87,14 @@ return (
     />
   </div>
 
+  {/* Said before the search rather than only after one fails. Someone searching offline
+      should know the set is partial while they are still typing. */}
+  {offline && (
+    <p className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+      Searching data saved on this device. Anything added elsewhere since your last connection is not here.
+    </p>
+  )}
+
   {query.trim().length < 2 && (
     <div className="bg-white border border-slate-200 rounded-2xl p-6 text-center">
       <p className="text-sm font-bold text-slate-500">Type at least two characters.</p>
@@ -92,8 +106,16 @@ return (
   )}
 
   {query.trim().length >= 2 && results.groups.length === 0 && (
-    <div className="bg-white border border-slate-200 rounded-2xl p-6 text-center">
-      <p className="text-sm font-bold text-slate-500">Nothing matches “{query.trim()}”.</p>
+    <div className={`rounded-2xl p-6 text-center border ${offline ? 'bg-amber-50 border-amber-200' : 'bg-white border-slate-200'}`}>
+      <p className={`text-sm font-bold ${offline ? 'text-amber-800' : 'text-slate-500'}`}>
+        {offline ? 'Not available offline' : `Nothing matches “${query.trim()}”.`}
+      </p>
+      {offline && (
+        <p className="text-[11px] text-amber-700 mt-2 leading-relaxed">
+          Nothing saved on this device matches “{query.trim()}”. That is not the same as it not
+          existing — connect to the internet to search everything.
+        </p>
+      )}
     </div>
   )}
 
