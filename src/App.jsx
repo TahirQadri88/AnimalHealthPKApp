@@ -740,7 +740,27 @@ return (
 );
 }
 
+// Signing out offline locks you out of your own data.
+//
+// signOut clears the local session. Signing back in needs getDoc(loginIndex) AND
+// signInWithEmailAndPassword, both of which need the network — Firebase Auth verifies a
+// password on its own server and cannot do it offline under any configuration. So during an
+// outage this one button turns a fully working app, with every customer and invoice cached
+// on the device, into a login screen that cannot be got past.
+//
+// Guarded in the function rather than on the buttons: there are two of them, the sidebar
+// and the mobile header, and a third would miss this.
+//
+// navigator.onLine is only trustworthy in one direction, and it is the right one here:
+// false means definitely offline, true can still mean a dead connection. So this warns
+// whenever it is certain, and stays quiet otherwise. When B1 lands, widen the condition to
+// include "the last snapshot came from cache", which catches the dead-but-present case
+// navigator.onLine cannot see.
 const logout = async () => {
+  if (!navigator.onLine && !await showConfirm(
+    'You are offline.\n\nSigning out now means you will NOT be able to sign back in until '
+    + 'the internet returns — your password is checked on Firebase\'s server, not on this '
+    + 'device.\n\nYour work is saved and will sync by itself. Sign out anyway?')) return;
   try { await signOut(auth); } catch (e) { console.error('Sign-out failed:', e); }
   setCurrentUser(null);
 };
