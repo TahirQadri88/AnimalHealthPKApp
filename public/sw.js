@@ -1,6 +1,6 @@
 // Bump this on any change to caching behaviour — the activate handler deletes every cache
 // whose name does not match, so bumping is what actually evicts stale content.
-const CACHE_NAME = 'animalhealth-v7';
+const CACHE_NAME = 'animalhealth-v8';
 const STATIC_ASSETS = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', event => {
@@ -28,13 +28,36 @@ const cachePut = (request, response) => {
   return response;
 };
 
+// Network-first, but not network-forever.
+//
+// A clean disconnect fails fast and falls back to cache immediately. A connection that is
+// present but dead — the usual failure here, not airplane mode — does not fail at all: the
+// fetch sits there until the browser's own timeout, and the app hangs on a blank screen with
+// every asset it needs already in the cache beside it.
+//
+// So each network-first fetch races a timer. Three seconds is well past a normal response on
+// a bad connection and well short of the browser's patience.
+const NETWORK_TIMEOUT_MS = 3000;
+
+const timeout = (ms) => new Promise((_, reject) =>
+  setTimeout(() => reject(new Error('network timeout')), ms));
+
+const networkFirst = (request, fallback) =>
+  Promise.race([
+    fetch(request).then(response => cachePut(request, response)),
+    timeout(NETWORK_TIMEOUT_MS),
+  ]).catch(() => fallback());
+
 self.addEventListener('fetch', event => {
   // Only handle GET requests
   if (event.request.method !== 'GET') return;
 
   const url = event.request.url;
 
-  // Network-first for Firebase (always fresh data)
+  // Firebase has its own offline handling and its own retry policy — the SDK knows far more
+  // about when to give up on a Firestore request than this worker does. Left alone
+  // deliberately, and NOT given the timeout below: cutting off a long-poll at three seconds
+  // would break the realtime listeners.
   if (url.includes('firestore') || url.includes('firebase')) {
     event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
     return;
@@ -48,21 +71,14 @@ self.addEventListener('fetch', event => {
   // been fixed and deployed kept reappearing on refresh for exactly this reason: the fix
   // was live, but the cached HTML still pointed at the broken file.
   if (event.request.mode === 'navigate' || event.request.destination === 'document') {
-    event.respondWith(
-      fetch(event.request)
-        .then(response => cachePut(event.request, response))
-        .catch(() => caches.match(event.request).then(hit => hit || caches.match('./index.html')))
-    );
+    event.respondWith(networkFirst(event.request,
+      () => caches.match(event.request).then(hit => hit || caches.match('./index.html'))));
     return;
   }
 
   // Network-first for JS/CSS assets so new deploys always load fresh
   if (url.includes('/assets/')) {
-    event.respondWith(
-      fetch(event.request)
-        .then(response => cachePut(event.request, response))
-        .catch(() => caches.match(event.request))
-    );
+    event.respondWith(networkFirst(event.request, () => caches.match(event.request)));
     return;
   }
 
