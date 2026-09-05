@@ -9,12 +9,18 @@ describe('signInErrorMessage', () => {
     expect(signInErrorMessage('auth/network-request-failed')).not.toContain('Invalid');
   });
 
-  it('says where the data went, because it has not gone anywhere', () => {
-    expect(OFFLINE_MESSAGE).toContain('saved data is still here');
+  it('says nothing is lost, without implying the data is lying around unprotected', () => {
+    expect(OFFLINE_MESSAGE).toContain('Nothing you did has been lost');
+    // The earlier wording invited exactly that reading, and someone asked.
+    expect(OFFLINE_MESSAGE).not.toContain('still saved here');
+  });
+
+  it('says no password is kept on the device, which is the actual security fact', () => {
+    expect(OFFLINE_MESSAGE).toContain('none is kept here');
   });
 
   it('says what to do about it', () => {
-    expect(OFFLINE_MESSAGE).toContain('connect to the internet');
+    expect(OFFLINE_MESSAGE).toContain('reconnect and sign in');
   });
 
   // Whatever code Firebase produced on the way, the browser knowing it is offline is the

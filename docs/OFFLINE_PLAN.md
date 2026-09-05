@@ -227,3 +227,59 @@ Stated so nothing here over-promises:
 misbehaves offline plus the risk of an evicted cache.** They are the recommended first
 commit set. Steps 3–5 make it comfortable. Step 4 is the one the brief's warning is really
 about, and it should not be skipped if two devices ever bill at the same time.
+
+---
+
+## What is stored on the device, and whether that is a risk
+
+Asked directly on 2026-09-04, after the offline login notice said "everything you had is
+still saved here" and that was read — reasonably — as "your data is lying around". The
+wording is fixed; the underlying question deserves a written answer.
+
+### What is actually there
+
+Written by this app:
+
+| | Contents |
+|---|---|
+| `localStorage` `app_currentUser` | id, name, role, permissions, authUid. **No password.** |
+| `localStorage` `docBlock:*` | reserved document-number ranges |
+
+Written by the Firebase SDK:
+
+| | Contents |
+|---|---|
+| IndexedDB — Firestore cache | the business data: customers, invoices, payments, products |
+| IndexedDB — Auth | the session's refresh and ID tokens |
+
+**No password is stored on the device in any form.** The security cutover removed passwords
+from Firestore in August, and Firebase Auth never hands one to the browser. That is exactly
+why signing in cannot work offline.
+
+### The threat model, honestly
+
+- **Remote attacker.** Cannot reach any of it. IndexedDB is sandboxed to the browser and
+  locked to one origin; there is no port, no server and no network path to it.
+- **Someone holding the unlocked device.** Can read all of it — but they did not need the
+  cache to do that. They could tap the app icon, because the session is persisted. **The
+  cache adds no exposure that being signed in does not already give.** The security boundary
+  is the device lock, not the cache.
+- **Stolen locked device.** Covered by the platform's disk encryption.
+- **Malicious browser extension on a laptop.** Can read same-origin storage. Real, entirely
+  pre-existing, and unrelated to offline work.
+
+The most sensitive item is the **Auth refresh token**, not the business data, and keeping it
+is inherent to staying signed in — a deliberate choice recorded in `src/firebase.js`:
+demanding a password on every refresh is how you end up with weak passwords.
+
+### The one thing genuinely worth deciding
+
+**Signing out clears the Auth session but not the Firestore cache.** On a personal device
+that is correct and is what makes offline work. On a shared or borrowed device, someone who
+knows their way around a browser could read the cached data afterwards even though they
+cannot sign in.
+
+A "Sign out and clear this device" option would close that, using `terminate(db)` followed by
+`clearIndexedDbPersistence(db)`. It is **not** the right default: it wipes the offline cache,
+so the next sign-in re-reads all fifteen collections and there is no offline capability until
+it refills. Offer it beside the normal sign-out; do not replace it.

@@ -790,7 +790,8 @@ return (
     <p className="text-[11px] font-bold text-amber-800">No connection to the server</p>
     <p className="text-[11px] text-amber-700 mt-1 leading-relaxed">
       Signing in needs the internet — your password is checked on Firebase&apos;s server, not on
-      this device. Everything you had is still saved here and will be waiting.
+      this device, so no password is ever kept here. Nothing you did has been lost: it is
+      saved and will sync as soon as you reconnect.
     </p>
   </div>
 )}

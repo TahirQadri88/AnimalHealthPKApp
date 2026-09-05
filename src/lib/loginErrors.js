@@ -31,9 +31,15 @@ export const WRONG_CREDENTIAL_CODES = [
 
 export const isNetworkError = (code) => NETWORK_CODES.includes(String(code || ''));
 
+// Wording matters here. An earlier draft said "everything you had is still saved here",
+// which was meant as "nothing is lost" and was read as "your data is lying around on this
+// device" — a fair question to ask, and the wrong impression to leave. It says what is
+// true and reassuring without implying an exposure: no password is kept on the device at
+// all, which is exactly why this cannot be checked offline.
 export const OFFLINE_MESSAGE =
   'No connection — cannot sign in. Your password is checked on Firebase\'s server, not on '
-  + 'this device. Your saved data is still here; connect to the internet and sign in again.';
+  + 'this device, so none is kept here. Nothing you did has been lost; reconnect and sign in '
+  + 'to carry on.';
 
 /**
  * @param {string} code    the Firebase error code
