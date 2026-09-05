@@ -1,4 +1,5 @@
 import { db, doc, runTransaction } from '../firebase';
+import { withTimeout } from './withTimeout';
 
 // Kept apart from getNextSeqNum deliberately. That one is pure and is unit-tested; this one
 // imports ../firebase, which initialises Auth on import and throws without credentials.
@@ -16,26 +17,48 @@ import { db, doc, runTransaction } from '../firebase';
 // is a floor on every subsequent claim, so if anything was ever numbered while the counter
 // was unavailable, the counter catches up instead of reissuing numbers already in use.
 //
-// Returns null if the transaction cannot run — most likely the counters rule has not been
-// published yet — and the caller falls back to the old behaviour. Degraded, not broken.
+// Returns null if the transaction cannot run, and the caller falls back to the old
+// behaviour. Degraded, not broken.
+//
+// That sentence used to be false in the one case that matters most. A transaction ALWAYS
+// reads from the server — it deliberately bypasses the local cache, which is what makes it
+// atomic — so offline it does not reject, it WAITS. `await claimDocNumber(...)` therefore
+// hung, and because saveInvoice claims the number before it writes anything, an invoice
+// created during an internet failure produced no record, no toast and no error at all.
+// Reported 2026-09-04.
+//
+// Two guards now:
+//   • When the browser is certain it is offline, do not start a transaction at all.
+//   • Otherwise cap the wait, because navigator.onLine says true on a dead connection.
+export const CLAIM_TIMEOUT_MS = 5000;
+
+const FALLBACK_WARNING =
+  'falling back to client-side numbering, which can duplicate a number if two devices bill '
+  + 'at the same time. Reserved number blocks remove that risk — see docs/OFFLINE_EXECUTION.md C1.';
+
 export const claimDocNumber = async (prefix, fallbackStart) => {
-  try {
-    return await runTransaction(db, async (tx) => {
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    console.warn(`[numbering] offline, so no counter transaction was attempted for ${prefix} — ${FALLBACK_WARNING}`);
+    return null;
+  }
+  return withTimeout(
+    runTransaction(db, async (tx) => {
       const ref = doc(db, 'counters', prefix);
       const snap = await tx.get(ref);
       const stored = snap.exists() ? Number(snap.data().next) || 0 : 0;
       const next = Math.max(stored, fallbackStart);
       tx.set(ref, { prefix, next: next + 1, updatedAt: new Date().toISOString() }, { merge: true });
       return next;
-    });
-  } catch (err) {
-    console.warn(
-      `[numbering] counter transaction failed for ${prefix} — falling back to client-side ` +
-      `numbering, which can duplicate numbers if two people bill at once. ` +
-      `Publish the counters rule from firestore.rules.`,
-      err?.code || err
-    );
-    return null;
-  }
+    }),
+    CLAIM_TIMEOUT_MS,
+    null,
+    (err) => console.warn(
+      err === null
+        ? `[numbering] the counter for ${prefix} did not answer within ${CLAIM_TIMEOUT_MS}ms — ${FALLBACK_WARNING}`
+        : `[numbering] counter transaction failed for ${prefix} — ${FALLBACK_WARNING} `
+          + 'If this persists while online, publish the counters rule from firestore.rules.',
+      err?.code || err || '',
+    ),
+  );
 };
 

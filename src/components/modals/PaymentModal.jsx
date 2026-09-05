@@ -8,6 +8,7 @@ import { ModalWrapper } from '../ui/ModalWrapper';
 import SearchableSelect from '../SearchableSelect';
 import { getLocalDateStr } from '../../helpers';
 import { getNextSeqNum } from '../../lib/docNumbers';
+import { QUEUED } from '../../lib/pendingWrite';
 
 export const PaymentModal = () => {
 const { selectedCustomerForPayment, customers, payments, getCustomerBalance, saveToFirebase, showToast, setShowPaymentModal, editingPayment, setEditingPayment, logSave, paymentsRaw, claimDocNumber } = useContext(AppContext);
@@ -24,15 +25,20 @@ const save = async () => {
 if(!form.customerId || !form.amount) return showToast("Customer and Amount are required", "error");
 if (isEdit) {
   const updated = { ...editingPayment, customerId: Number(form.customerId), amount: Number(form.amount), discount, date: form.date, note: form.note };
-  await saveToFirebase('payments', updated.id, updated);
+  const written = await saveToFirebase('payments', updated.id, updated);
   await logSave('payments', editingPayment, updated, updated.id);
-  showToast("Payment Receipt Updated!");
+  showToast(written === QUEUED
+    ? 'Receipt updated on this device — it will sync when you are back online'
+    : 'Payment Receipt Updated!');
 } else {
   const recNum = (await claimDocNumber('REC', getNextSeqNum(paymentsRaw, 'REC'))) ?? getNextSeqNum(paymentsRaw, 'REC');
   const newPayment = { id: `REC-${String(recNum).padStart(4, '0')}`, customerId: Number(form.customerId), amount: Number(form.amount), discount, date: form.date, note: form.note };
-  await saveToFirebase('payments', newPayment.id, newPayment);
+  const written = await saveToFirebase('payments', newPayment.id, newPayment);
   await logSave('payments', null, newPayment, newPayment.id);
-  showToast("Payment Received & Ledger Updated!");
+  // The ledger updates either way — it is computed in the browser from the local cache.
+  showToast(written === QUEUED
+    ? `${newPayment.id} saved on this device — it will sync when you are back online`
+    : 'Payment Received & Ledger Updated!');
 }
 handleClose();
 };

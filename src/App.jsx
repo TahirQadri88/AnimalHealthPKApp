@@ -546,13 +546,16 @@ const fetchAuditLog = async () => {
   }
 };
 
+// The second hang on the save path, and the reason fixing claimDocNumber alone would not
+// have been enough: saveInvoice awaits logSave before it shows its toast, and a bare
+// `await setDoc` never settles offline. A failed audit write is deliberately swallowed — a
+// payment that saved without logging is bad, a payment refused because the log was
+// unreachable is worse — and an unanswered one must be treated the same way.
 const writeAudit = async (entry) => {
-  try {
-    const id = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-    await setDoc(doc(db, 'auditLogs', id), { id, ...entry });
-  } catch (e) {
-    console.error('Audit write failed:', e);
-  }
+  const id = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const ack = setDoc(doc(db, 'auditLogs', id), { id, ...entry })
+    .catch(e => { console.error('Audit write failed:', e); throw e; });
+  return settleWrite(ack, { onLateFailure: (e) => console.error('Audit write rejected after queueing:', e) });
 };
 
 const logAction = (action, collectionName, record, extra = {}) => writeAudit(auditEntry({

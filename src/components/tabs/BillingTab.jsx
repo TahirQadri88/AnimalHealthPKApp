@@ -8,6 +8,7 @@ import { AppContext } from '../../context/AppContext';
 import { VEHICLES, getLocalDateStr, formatDateDisp, checkDateFilter } from '../../helpers';
 import { makeArrowNav } from '../../lib/a11y';
 import { getNextSeqNum } from '../../lib/docNumbers';
+import { QUEUED } from '../../lib/pendingWrite';
 import { isTransportMethod, isKnownVehicleType, usesCarrierPerson } from '../../lib/transport';
 import { invoiceTotal } from '../../services/accounting/invoiceTotals';
 
@@ -88,12 +89,16 @@ if (!finalInvoice.id) {
   finalInvoice.id = `${prefix}-${String(nextNum).padStart(4, '0')}`;
   if (!finalInvoice.date) finalInvoice.date = getLocalDateStr();
 }
-await saveToFirebase('invoices', finalInvoice.id, finalInvoice);
+const written = await saveToFirebase('invoices', finalInvoice.id, finalInvoice);
 // `currentInvoice.id` is only set when editing, which is also what decides the toast below.
 await logSave('invoices', currentInvoice.id ? invoices.find(o => o.id === finalInvoice.id) : null, finalInvoice, finalInvoice.id);
 const statusLabels = { Estimate: 'Estimate', Booked: 'Draft Order', Billed: 'Invoice' };
 const label = statusLabels[status] || status;
-showToast(currentInvoice.id ? `${label} Updated` : `${label} Saved`);
+// "Saved" and "saved on this device" are different facts, and on a document that will be
+// handed to a customer the difference is worth a sentence.
+showToast(written === QUEUED
+  ? `${label} ${finalInvoice.id} saved on this device — it will sync when you are back online`
+  : (currentInvoice.id ? `${label} Updated` : `${label} Saved`));
 setBillingView('list');
 };
 const inputClass = "w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-sm text-slate-800 placeholder-slate-400";
