@@ -18,10 +18,21 @@ Ground rules, unchanged from the rest of this project:
 
 ---
 
-## Commit set A — the hour that matters (steps 1, 2, 6)
+## Commit set A — the hour that matters (steps 1, 2, 6) — ✅ DONE 2026-09-04
 
-These three remove both ways the app currently misbehaves offline, plus the risk of the
-cache being evicted. Do them first, in this order.
+Landed as three commits: `A1: a save that cannot reach the server no longer hangs`,
+`A2: do not let anyone sign out into a lockout`, `A3: ask the browser not to throw the
+offline cache away`. 710 tests (was 685), `lint:scope` 20 at every step.
+
+Two things worth carrying into B and C:
+
+- **`deleteFromFirebase` had the identical hang** and was fixed alongside `saveToFirebase`.
+  Both return the tri-state now, so anything reading their result must use `isAccepted`.
+- **A2's guard uses `navigator.onLine`, which is trustworthy in one direction only.** False
+  means definitely offline; true can still mean a dead connection. **B1 should widen that
+  condition** to include "the last snapshot came from cache", which catches the
+  dead-but-present case — the common failure here. There is a comment in `logout()` saying
+  so.
 
 ### A1. Saves must not hang — `settleWrite`
 
