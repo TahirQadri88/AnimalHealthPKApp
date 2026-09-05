@@ -1,6 +1,6 @@
 // Purity of the move: node tools/extraction-diff.mjs BillingTab src/components/tabs/BillingTab.jsx
 //
-// The screen that bills every invoice. Testable only once claimDocNumber came through the
+// The screen that bills every invoice. Testable only once document numbering came through the
 // context. The list view is what SSR paints; the form is behind billingView === 'form'.
 import { describe, it, expect } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -31,7 +31,7 @@ const render = (over = {}) => renderToStaticMarkup(
     activeTab: 'billing', setActiveTab: () => {}, adminView: 'analytics', setAdminView: () => {},
     getCompanyName: () => 'Selmore', getCustomerBalance: () => 0,
     getCustomerLedger: () => ({ rows: [] }), generateReceiptData: () => ({}),
-    checkDuplicate: () => false, claimDocNumber: async () => 8458,
+    checkDuplicate: () => false, nextDocNumber: async () => 8458,
     saveToFirebase: () => {}, deleteFromFirebase: () => {}, showToast: () => {},
     showConfirm: () => {}, showPrompt: () => {}, voidRecord: () => {}, logSave: () => {},
     logDelete: () => {}, setPrintConfig: () => {},

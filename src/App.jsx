@@ -10,7 +10,8 @@ import { APP_NAME, VEHICLES } from './helpers';
 import PrintView from './components/PrintView';
 import { buildCustomerLedger, allocateCredits, statusFromSettled } from './services/accounting/ledger';
 import { AppContext } from './context/AppContext';
-import { claimDocNumber } from './lib/claimDocNumber';
+import { nextDocNumber, ensureBlocks } from './lib/claimDocNumber';
+import { getNextSeqNum } from './lib/docNumbers';
 import { settleWrite, FAILED } from './lib/pendingWrite';
 import { makeArrowNav } from './lib/a11y';
 import { uploadToDrive } from './lib/driveBackup';
@@ -656,6 +657,29 @@ note: row.desc
 };
 };
 
+// Reserve document numbers ahead of an outage.
+//
+// A number is only guaranteed unique by the transaction that reserved it, and a transaction
+// cannot run offline. So the reserving happens now, while there is a connection: one
+// transaction per prefix advances the counter by ten and hands this device that range
+// exclusively, to be spent later with no network at all. Runs on sign-in and again whenever
+// the browser reports the connection back — the two moments when it is worth topping up.
+//
+// The client-side guess is passed as the floor, so a counter that has never seen these
+// records starts above them rather than reissuing numbers already on paper.
+useEffect(() => {
+  if (!authUid) return undefined;
+  const floors = () => ({
+    INV: getNextSeqNum(invoicesRaw, 'INV'), EST: getNextSeqNum(invoicesRaw, 'EST'),
+    ORD: getNextSeqNum(invoicesRaw, 'ORD'), CN: getNextSeqNum(invoicesRaw, 'CN'),
+    REC: getNextSeqNum(paymentsRaw, 'REC'),
+  });
+  const top = () => { ensureBlocks(floors()).catch(() => {}); };
+  top();
+  window.addEventListener('online', top);
+  return () => window.removeEventListener('online', top);
+}, [authUid, invoicesRaw, paymentsRaw]);
+
 // Global keyboard shortcuts — must be BEFORE any conditional return (Rules of Hooks)
 useEffect(() => {
   if (!currentUser) return;
@@ -774,7 +798,7 @@ isAdmin, hasPermission, currentUser, companies, products, customers, invoices, e
 cities, areas, customerTypes, vehicleTypes,
 getPaymentStatus,
 showToast, showConfirm, showPrompt, confirmDialog, setConfirmDialog, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData,
-voidRecord, restoreRecord, logSave, logDelete, fetchAuditLog, claimDocNumber, invoicesRaw, paymentsRaw, expensesRaw,
+voidRecord, restoreRecord, logSave, logDelete, fetchAuditLog, nextDocNumber, invoicesRaw, paymentsRaw, expensesRaw,
 billingView, setBillingView, currentInvoice, setCurrentInvoice,
 activeTab, setActiveTab, adminView, setAdminView, analyticsView, setAnalyticsView,
 editingProduct, setEditingProduct, showProductModal, setShowProductModal, productPreFill, setProductPreFill,

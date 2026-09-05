@@ -1,6 +1,6 @@
 import { useState, useContext } from 'react';
 import { AlertCircle } from 'lucide-react';
-// claimDocNumber arrives through context rather than being imported: ../../lib/claimDocNumber
+// nextDocNumber arrives through context rather than being imported: ../../lib/claimDocNumber
 // pulls in ../firebase, which initialises Auth on import and makes this component
 // impossible to load from a test.
 import { AppContext } from '../../context/AppContext';
@@ -11,7 +11,7 @@ import { getNextSeqNum } from '../../lib/docNumbers';
 import { QUEUED } from '../../lib/pendingWrite';
 
 export const PaymentModal = () => {
-const { selectedCustomerForPayment, customers, payments, getCustomerBalance, saveToFirebase, showToast, setShowPaymentModal, editingPayment, setEditingPayment, logSave, paymentsRaw, claimDocNumber } = useContext(AppContext);
+const { selectedCustomerForPayment, customers, payments, getCustomerBalance, saveToFirebase, showToast, setShowPaymentModal, editingPayment, setEditingPayment, logSave, paymentsRaw, nextDocNumber } = useContext(AppContext);
 const isEdit = !!editingPayment;
 const [form, setForm] = useState(
   isEdit
@@ -31,7 +31,8 @@ if (isEdit) {
     ? 'Receipt updated on this device — it will sync when you are back online'
     : 'Payment Receipt Updated!');
 } else {
-  const recNum = (await claimDocNumber('REC', getNextSeqNum(paymentsRaw, 'REC'))) ?? getNextSeqNum(paymentsRaw, 'REC');
+  const recNum = await nextDocNumber('REC', getNextSeqNum(paymentsRaw, 'REC'));
+  if (recNum === null) return showToast("No receipt numbers left offline. Reconnect once to reserve more.", "error");
   const newPayment = { id: `REC-${String(recNum).padStart(4, '0')}`, customerId: Number(form.customerId), amount: Number(form.amount), discount, date: form.date, note: form.note };
   const written = await saveToFirebase('payments', newPayment.id, newPayment);
   await logSave('payments', null, newPayment, newPayment.id);

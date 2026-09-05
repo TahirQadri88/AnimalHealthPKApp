@@ -1,4 +1,4 @@
-// Purity of the move: proved in the previous commit. Testable only once claimDocNumber
+// Purity of the move: proved in the previous commit. Testable only once document numbering
 // moved to the context.
 //
 // Money, and the awkward kind: a credit note gives money back. Its figures are covered by
@@ -26,7 +26,7 @@ const render = (over = {}) => renderToStaticMarkup(
     currentUser: { id: 1, name: 'Owais' }, products: PRODUCTS, customers: CUSTOMERS,
     invoices: INVOICES, invoicesRaw: INVOICES,
     editingCreditNote: { customerId: 1, id: '' },
-    getCompanyName: () => 'Selmore', claimDocNumber: async () => 9,
+    getCompanyName: () => 'Selmore', nextDocNumber: async () => 9,
     saveToFirebase: () => {}, showToast: () => {}, logSave: () => {},
     setShowCreditNoteModal: () => {}, setEditingCreditNote: () => {}, ...over,
   }}>

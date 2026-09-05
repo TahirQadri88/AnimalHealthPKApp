@@ -1,5 +1,5 @@
 // Purity of the move: proved in the previous commit. This file became possible only once
-// claimDocNumber moved to the context — importing it pulls in ../firebase, which
+// nextDocNumber comes through the context — importing it pulls in ../firebase, which
 // initialises Auth on import and stops the test file loading at all.
 //
 // Money: this is where a receipt is recorded against a customer.
@@ -16,7 +16,7 @@ const render = (over = {}) => renderToStaticMarkup(
   <AppContext.Provider value={{
     customers: CUSTOMERS, payments: [], paymentsRaw: [],
     selectedCustomerForPayment: 1, editingPayment: null,
-    getCustomerBalance: () => 105600, claimDocNumber: async () => 115,
+    getCustomerBalance: () => 105600, nextDocNumber: async () => 115,
     saveToFirebase: () => {}, showToast: () => {}, logSave: () => {},
     setShowPaymentModal: () => {}, setEditingPayment: () => {}, ...over,
   }}>

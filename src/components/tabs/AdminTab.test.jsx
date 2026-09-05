@@ -18,7 +18,7 @@ const ctx = (over = {}) => ({
   cities: [], areas: [], customerTypes: [], appSettings: { id: 'main' },
   getPaymentStatus: () => 'Pending', getCustomerBalance: () => 0, getCompanyName: () => '',
   getCustomerLedger: () => ({ rows: [] }), generateReceiptData: () => ({}),
-  checkDuplicate: () => false, claimDocNumber: async () => 1, fetchAuditLog: async () => [],
+  checkDuplicate: () => false, nextDocNumber: async () => 1, fetchAuditLog: async () => [],
   saveToFirebase: () => {}, deleteFromFirebase: () => {}, showToast: () => {},
   showConfirm: () => {}, showPrompt: () => {}, voidRecord: () => {}, restoreRecord: () => {},
   logSave: () => {}, logDelete: () => {}, setPrintConfig: () => {},

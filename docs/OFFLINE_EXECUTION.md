@@ -182,7 +182,26 @@ testing the old worker and concluding the change did nothing.
 
 ---
 
-## Commit set C — the conflict model (step 4)
+## Commit set C — the conflict model (step 4) — ✅ DONE 2026-09-04
+
+Two things this step got wrong on the way, both worth keeping:
+
+- **It should have been done first.** It was ranked "medium — insurance against duplicate
+  numbers" when it was in fact a hard blocker: a transaction cannot run offline, and
+  `saveInvoice` claims its number before it writes anything, so an invoice created during an
+  outage produced no record, no toast and no error. This file's own §C1 contained the
+  sentence "if a number requires the server, then billing requires the server" and the
+  ranking ignored it. Fixed separately as the hang fix, then properly here.
+- **Refilling by replacing the block would have left constant gaps.** Topping up at four
+  remaining discards those four, every few invoices — a sequence that skips numbers every
+  Tuesday, in a business where they are read aloud. `mergeBlocks` joins a new range onto the
+  old one when they touch, which is the normal case, so an online business sees no gap at
+  all. Only a device that was beaten to the counter loses anything, and then at most half a
+  block.
+
+`claimDocNumber` itself is gone — `nextDocNumber` replaced it everywhere and it was then read
+by nothing.
+
 
 ### C1. Reserved document-number blocks
 
