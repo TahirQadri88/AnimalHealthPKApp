@@ -23,6 +23,8 @@ import { ExpenseCategoryModal } from './components/modals/ExpenseCategoryModal';
 import { PaymentModal } from './components/modals/PaymentModal';
 import { CustomerModal } from './components/modals/CustomerModal';
 import { GlobalSearchModal } from './components/modals/GlobalSearchModal';
+import { SyncPill } from './components/ui/SyncPill';
+import { useSyncStatus } from './hooks/useSyncStatus';
 import { RidersModal } from './components/modals/RidersModal';
 import { UserModal } from './components/modals/UserModal';
 import { ProductModal } from './components/modals/ProductModal';
@@ -63,6 +65,9 @@ const [activeTab, setActiveTab] = useState('dashboard');
 // One search box over customers, invoices, receipts, products and brands. Alt+S, or the
 // magnifier in either header.
 const [showSearchModal, setShowSearchModal] = useState(false);
+// Whether anything on screen has reached the server. Also what the logout guard reads —
+// see below.
+const sync = useSyncStatus();
 const [adminView, setAdminView] = useState('analytics');
 const [analyticsView, setAnalyticsView] = useState('Overview');
 const [toast, setToast] = useState(null);
@@ -778,14 +783,13 @@ return (
 // Guarded in the function rather than on the buttons: there are two of them, the sidebar
 // and the mobile header, and a third would miss this.
 //
-// navigator.onLine is only trustworthy in one direction, and it is the right one here:
-// false means definitely offline, true can still mean a dead connection. So this warns
-// whenever it is certain, and stays quiet otherwise. When B1 lands, widen the condition to
-// include "the last snapshot came from cache", which catches the dead-but-present case
-// navigator.onLine cannot see.
+// The condition reads the sync state, not just navigator.onLine. onLine is trustworthy in
+// one direction only — false means definitely offline, true can still mean a signal that is
+// up and carrying nothing — and 'stale' is exactly that case: Firestore serving cache while
+// the browser insists all is well. Signing out then is just as much of a lockout.
 const logout = async () => {
-  if (!navigator.onLine && !await showConfirm(
-    'You are offline.\n\nSigning out now means you will NOT be able to sign back in until '
+  if ((sync.state === 'offline' || sync.state === 'stale') && !await showConfirm(
+    'There is no connection to the server.\n\nSigning out now means you will NOT be able to sign back in until '
     + 'the internet returns — your password is checked on Firebase\'s server, not on this '
     + 'device.\n\nYour work is saved and will sync by itself. Sign out anyway?')) return;
   try { await signOut(auth); } catch (e) { console.error('Sign-out failed:', e); }
@@ -862,6 +866,7 @@ return (
         <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1.5 flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>{currentUser?.name}</p>
       </div>
       <div className="flex items-center gap-2">
+        <SyncPill />
         <button onClick={() => setShowSearchModal(true)} aria-label="Search everything" title="Search everything" className="p-2 bg-slate-100 rounded-lg text-slate-600 hover:bg-slate-200"><Search size={16}/></button>
         <button onClick={logout} className="text-[10px] font-bold uppercase tracking-widest text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg hover:bg-slate-200">Log Out</button>
       </div>
@@ -888,6 +893,7 @@ return (
         {activeTab === 'customers' && (
           <button onClick={() => { setSelectedCustomerForPayment(null); setShowPaymentModal(true); }} className="flex items-center gap-1.5 bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-emerald-600 transition-colors shadow-sm"><Wallet size={16}/> Receive Payment</button>
         )}
+        <SyncPill />
         <span className="text-[10px] text-slate-400 font-medium">Esc = back/close</span>
       </div>
     </header>
