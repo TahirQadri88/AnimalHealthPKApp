@@ -11,6 +11,7 @@ import PrintView from './components/PrintView';
 import { buildCustomerLedger, allocateCredits, statusFromSettled } from './services/accounting/ledger';
 import { AppContext } from './context/AppContext';
 import { claimDocNumber } from './lib/claimDocNumber';
+import { settleWrite, FAILED } from './lib/pendingWrite';
 import { makeArrowNav } from './lib/a11y';
 import { uploadToDrive } from './lib/driveBackup';
 import { LOG_PAGE } from './lib/constants';
@@ -415,33 +416,35 @@ const migrateUsersToAuth = async () => {
 // `merge` writes only the fields given, leaving the rest of the document alone. Default is
 // a full replace, which is what almost every caller wants — but see the auto-backup below
 // for the case where a replace silently undid somebody's edit.
-// Returns true if the server acknowledged the write, false if it did not.
+// Returns 'synced', 'queued' or 'failed' — see src/lib/pendingWrite.js.
 //
-// It used to return nothing, and callers had no way to tell a save from a failure. That is
-// fine for a form — the user sees the toast — but the restore loop counted its own
-// iterations and reported "412 records written" for a restore in which every write failed.
-// A safety net that reports success when the data did not land is worse than none.
+// Persistence is on, so a write applies to the local cache at once and is queued in
+// IndexedDB where it survives closing the browser; but setDoc's promise settles only when
+// the SERVER acknowledges, and offline it never settles. `await` on it therefore hung, and
+// every caller hung with it — the record safe on the device and the app saying it was
+// stuck. settleWrite stops waiting after a short timeout and calls that outcome QUEUED,
+// which is a success: Firestore will send it.
+//
+// This replaces the six-second "Still saving" toast, which fired while the caller was still
+// blocked and told the user to check a connection that had already done its job. The
+// standing signal for "not yet on the server" belongs in the sync indicator, not in a toast
+// per save.
 //
 // `silent` suppresses the toasts for a caller doing many writes at once, which would
-// otherwise stack one "Network Error" per record.
+// otherwise stack one error per record.
+//
+// Do NOT test the result for truthiness — all three outcomes are non-empty strings. Use
+// isAccepted from pendingWrite.
 const saveToFirebase = async (collectionName, id, dataObj, { merge = false, silent = false } = {}) => {
-try {
-  const ack = setDoc(doc(db, collectionName, String(id)), dataObj, { merge });
-  // Persistence is on, so the write applies locally at once but this promise only settles
-  // when the SERVER acknowledges. On a bad connection it can stay pending indefinitely,
-  // and the caller's success toast never runs — a save that appears to do nothing at all,
-  // with no error either. Saying so is better than silence.
-  let slow = false;
-  const warn = silent ? null : setTimeout(() => { slow = true; showToast('Still saving — check your connection', 'error'); }, 6000);
-  await ack;
-  if (warn) clearTimeout(warn);
-  if (slow) showToast('Saved.');
-  return true;
-} catch (e) {
-console.error("Firebase Write Error:", e);
-if (!silent) showToast("Network Error - Could not save", "error");
-return false;
-}
+  const ack = setDoc(doc(db, collectionName, String(id)), dataObj, { merge })
+    .catch(e => { console.error('Firebase Write Error:', e); throw e; });
+  const result = await settleWrite(ack, {
+    // A write the rules refuse is only refused once it reaches the server, which can be
+    // long after we reported it queued. Swallowing that is how data quietly goes missing.
+    onLateFailure: () => { if (!silent) showToast('A saved change was rejected by the server', 'error'); },
+  });
+  if (result === FAILED && !silent) showToast('Network Error - Could not save', 'error');
+  return result;
 };
 
 const vehicleTypesSeeded = React.useRef(false);
@@ -512,13 +515,17 @@ React.useEffect(() => {
   }
 }, [isAdmin, appSettings?.id, appSettings?.backupFreq, appSettings?.githubFreq, appSettings?.lastBackupAt, appSettings?.driveFreq, appSettings?.driveScriptUrl, appSettings?.lastDriveBackupAt]);
 
+// Same three outcomes, and the same reason: deleteDoc's promise also waits for the server,
+// so this hung offline exactly as saveToFirebase did. The deletion applies to the local
+// cache at once, so the record disappears from every screen immediately either way.
 const deleteFromFirebase = async (collectionName, id) => {
-try {
-await deleteDoc(doc(db, collectionName, String(id)));
-} catch (e) {
-console.error("Firebase Delete Error:", e);
-showToast("Network Error - Could not delete", "error");
-}
+  const ack = deleteDoc(doc(db, collectionName, String(id)))
+    .catch(e => { console.error('Firebase Delete Error:', e); throw e; });
+  const result = await settleWrite(ack, {
+    onLateFailure: () => showToast('A deletion was rejected by the server', 'error'),
+  });
+  if (result === FAILED) showToast('Network Error - Could not delete', 'error');
+  return result;
 };
 
 // ── Audit log ──────────────────────────────────────────────────────────────

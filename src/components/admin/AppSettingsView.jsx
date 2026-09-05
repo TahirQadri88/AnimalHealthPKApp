@@ -4,6 +4,7 @@ import { AppContext } from '../../context/AppContext';
 import { shareOrDownload } from '../../helpers';
 import { uploadToDrive, getDriveScript } from '../../lib/driveBackup';
 import { inspectBackupText, planWrites, backupAgeDays } from '../../services/backup/restore';
+import { SYNCED, QUEUED, isAccepted } from '../../lib/pendingWrite';
 import { FixInvoiceUnitsButton } from './FixInvoiceUnitsButton';
 
 export const AppSettingsView = () => {
@@ -112,23 +113,32 @@ const runRestore = async () => {
     `Write ${writes.length} records over your live data? Records created since this backup will NOT be removed.`)) return;
 
   setRestoring(true);
-  let written = 0;
+  // saveToFirebase returns 'synced' | 'queued' | 'failed'. All three are non-empty strings,
+  // so `if (result)` would count a failure as a success — which is the bug this whole
+  // screen was rewritten to remove. Count the three apart, and report them apart: a restore
+  // run offline is legitimate and finishes entirely in the 'queued' column.
+  let synced = 0;
+  let queued = 0;
   const failed = [];
   for (let i = 0; i < writes.length; i++) {
     const w = writes[i];
-    const ok = await saveToFirebase(w.collection, w.id, w.data, { silent: true });
-    if (ok) written += 1; else failed.push(`${w.collection}/${w.id}`);
+    const result = await saveToFirebase(w.collection, w.id, w.data, { silent: true });
+    if (result === SYNCED) synced += 1;
+    else if (result === QUEUED) queued += 1;
+    if (!isAccepted(result)) failed.push(`${w.collection}/${w.id}`);
     if (i % 25 === 0 || i === writes.length - 1) setRestoreProgress({ done: i + 1, total: writes.length });
   }
   setRestoring(false);
   setPending(null);
   setRestoreProgress(null);
 
-  if (failed.length === 0) {
-    showToast(`Restored ${written} records. Please refresh.`, 'success');
+  if (failed.length > 0) {
+    console.error('[restore] writes the server rejected:', failed);
+    showToast(`${synced + queued} of ${writes.length} restored — ${failed.length} failed. See the console.`, 'error');
+  } else if (queued > 0) {
+    showToast(`Restored ${synced + queued} records — ${queued} still to reach the server. Stay connected until they do.`, 'success');
   } else {
-    console.error('[restore] writes the server did not acknowledge:', failed);
-    showToast(`${written} of ${writes.length} restored — ${failed.length} failed. See the console.`, 'error');
+    showToast(`Restored ${synced} records. Please refresh.`, 'success');
   }
 };
 const inputCls = "w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100";
