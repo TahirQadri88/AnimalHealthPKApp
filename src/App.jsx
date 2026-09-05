@@ -13,6 +13,7 @@ import { AppContext } from './context/AppContext';
 import { nextDocNumber, ensureBlocks } from './lib/claimDocNumber';
 import { getNextSeqNum } from './lib/docNumbers';
 import { settleWrite, FAILED } from './lib/pendingWrite';
+import { signInErrorMessage, OFFLINE_MESSAGE } from './lib/loginErrors';
 import { makeArrowNav } from './lib/a11y';
 import { uploadToDrive } from './lib/driveBackup';
 import { LOG_PAGE } from './lib/constants';
@@ -85,8 +86,20 @@ useEffect(() => onAuthStateChanged(auth, (fbUser) => setAuthUid(fbUser ? fbUser.
 // migration, or expired. Once the rules are closed every read it makes would be denied, so
 // clear it and show the login screen rather than a broken app. Declared here, after
 // authUid: as a dependency it is read during render, so it must already exist.
+//
+// But NOT while offline. Signing in needs the network, so dropping someone to the login
+// screen during an outage is the same lockout as pressing Log Out — arriving without anyone
+// pressing anything. Firebase Auth restores its session from IndexedDB without a network
+// and should not report null here, but "should not" is not a guarantee worth betting a
+// day's billing on. A genuinely revoked session is cleared the moment the connection
+// returns, and offline it can do nothing anyway: the rules are enforced on the server.
 useEffect(() => {
-  if (authUid === null) setCurrentUser(prev => (prev && prev.authUid ? null : prev));
+  if (authUid !== null) return;
+  if (navigator.onLine === false) {
+    console.warn('[auth] no Firebase session while offline — keeping the local session rather than locking the user out');
+    return;
+  }
+  setCurrentUser(prev => (prev && prev.authUid ? null : prev));
 }, [authUid]);
 
 const appUsers = useLiveCollection('app_users', authUid);
@@ -186,6 +199,10 @@ const bootstrapFirstAdmin = async () => {
 // app_users to find their credentials, which cannot work once the rules are closed —
 // a signed-out visitor may read nothing. So: resolve the username to a login address
 // through the public loginIndex, sign in, and only then read anything.
+// Signing in needs the network in two places — the index lookup and the password check —
+// and Firebase Auth cannot verify a password offline under any configuration. Saying so
+// before trying beats a round trip that ends in a misleading error.
+if (navigator.onLine === false) return showToast(OFFLINE_MESSAGE, 'error');
 const slug = loginSlug(loginForm.name);
 let email = null;
 try {
@@ -225,10 +242,11 @@ try {
       console.error('Bootstrap failed:', bootErr.code || bootErr);
     }
   }
+  // Everything that was not rate-limiting used to be reported as "Invalid Credentials",
+  // so an outage told a person with a perfectly good password that it was wrong — which
+  // invites them to doubt it, retry, and ask for a reset, none of which helps.
   console.error('Sign-in failed:', err.code);
-  showToast(err.code === 'auth/too-many-requests'
-    ? "Too many attempts — wait a minute and try again"
-    : "Invalid Credentials", "error");
+  showToast(signInErrorMessage(err.code, { online: navigator.onLine !== false }), 'error');
 }
 };
 
@@ -764,7 +782,21 @@ return (
 <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1">Password</label>
 <input type="password" className="w-full bg-slate-50 border border-slate-200 p-4 rounded-2xl font-semibold mt-1.5 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-800" value={loginForm.password} onChange={e => setLoginForm({...loginForm, password: e.target.value})} />
 </div>
-<button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 rounded-2xl text-lg shadow-lg shadow-indigo-600/20 mt-8 active:scale-[0.98] transition-all">Access System</button>
+{/* Said before the attempt, not after it fails. Signing in is the one thing this app
+    genuinely cannot do without a connection, and the login screen is the only place a
+    person meets that limit. */}
+{sync.state !== 'live' && sync.state !== 'syncing' && (
+  <div className="mt-6 bg-amber-50 border border-amber-200 rounded-2xl p-3">
+    <p className="text-[11px] font-bold text-amber-800">No connection to the server</p>
+    <p className="text-[11px] text-amber-700 mt-1 leading-relaxed">
+      Signing in needs the internet — your password is checked on Firebase&apos;s server, not on
+      this device. Everything you had is still saved here and will be waiting.
+    </p>
+  </div>
+)}
+<button type="submit" disabled={sync.state === 'offline'} className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 disabled:shadow-none text-white font-bold py-4 rounded-2xl text-lg shadow-lg shadow-indigo-600/20 mt-8 active:scale-[0.98] transition-all">
+  {sync.state === 'offline' ? 'Waiting for a connection…' : 'Access System'}
+</button>
 </form>
 </div>
 {toastEl}
