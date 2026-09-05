@@ -2,6 +2,15 @@ import React from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App'
+import { requestPersistentStorage } from './lib/offlineStorage'
+
+// Everything this app can do offline rests on the Firestore cache in IndexedDB, and by
+// default a browser may evict that under storage pressure — which on a phone is normal.
+// Ask for the durable bucket instead. It is a request, not a guarantee, and it is
+// fire-and-forget: it must never delay or break start-up, which is why it cannot throw.
+requestPersistentStorage().then(granted => {
+  if (granted === false) console.warn('[offline] the browser refused persistent storage — the offline cache may be evicted');
+})
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
