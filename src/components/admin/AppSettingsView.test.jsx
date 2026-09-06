@@ -88,3 +88,38 @@ describe('AppSettingsView — restore', () => {
     expect(render()).not.toMatch(/undefined|NaN/);
   });
 });
+
+// Everything the offline work built is invisible until it fails. In particular, the browser
+// can REFUSE to keep the cache, and nobody would notice until a day's data had gone.
+describe('AppSettingsView — ready for offline', () => {
+  it('offers the readiness panel', () => {
+    const html = render();
+    expect(html).toContain('Ready for Offline');
+    expect(html).toContain('If the internet fails right now');
+  });
+
+  it('lists what would and would not work', () => {
+    const html = render();
+    expect(html).toContain('App saved on this device');
+    expect(html).toContain('Business data on this device');
+    expect(html).toContain('Storage kept when space runs low');
+    expect(html).toContain('Document numbers reserved');
+    expect(html).toContain('Changes waiting to sync');
+  });
+
+  // The two limits people meet at the worst moment.
+  it('says signing in and user changes always need the internet', () => {
+    const html = render();
+    expect(html).toContain('Signing in always needs the internet');
+    expect(html).toContain('do not sign out if you expect to work offline');
+  });
+
+  // No data, no reserved numbers, no service worker: the honest verdict, not a green tick.
+  it('does not claim to be ready when nothing has been cached', () => {
+    expect(render()).toContain('Not ready to work offline');
+  });
+
+  it('leaks no undefined into the markup', () => {
+    expect(render()).not.toMatch(/undefined|NaN/);
+  });
+});

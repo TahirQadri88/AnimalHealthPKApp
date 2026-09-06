@@ -4,7 +4,8 @@ import { AppContext } from '../../context/AppContext';
 import { ScrollableTabBar } from '../ui/ScrollableTabBar';
 import SearchableSelect from '../SearchableSelect';
 import { buildCustomerCard, balanceReminderText, waNumber } from '../../services/customers/customerCard';
-import { APP_NAME, VEHICLES, formatDateDisp } from '../../helpers';
+import { customerAging } from '../../services/analytics/receivables';
+import { APP_NAME, VEHICLES, formatDateDisp, getLocalDateStr } from '../../helpers';
 
 export const CustomersTab = () => {
 const { isAdmin, hasPermission, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, cities, areas, customerTypes, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig, showConfirm, showPrompt, voidRecord, logSave } = useContext(AppContext);
@@ -15,6 +16,7 @@ const [filterType, setFilterType] = useState('');
 const [filterBalance, setFilterBalance] = useState('All');
 const [showIncompleteOnly, setShowIncompleteOnly] = useState(false);
 const incompleteIds = useMemo(() => new Set(customers.filter(c => !c.city || !c.area || !c.customerType).map(c => c.id)), [customers]);
+const today = getLocalDateStr();
 const activeFilters = filterCity || filterArea || filterType || filterBalance !== 'All' || showIncompleteOnly;
 const clearFilters = () => { setFilterCity(''); setFilterArea(''); setFilterType(''); setFilterBalance('All'); setShowIncompleteOnly(false); };
 return (
@@ -58,6 +60,8 @@ const bal = getCustomerBalance(c.id);
 // Last invoice, last payment and last activity — brief §14. The card had the name and the
 // balance, and everything else meant opening the ledger to find out.
 const card = buildCustomerCard(c.id, { invoices, payments });
+// Only worth computing for someone who actually owes something.
+const aging = bal > 0 ? customerAging(c.id, { customers, invoices, payments, asOf: today }) : null;
 const wa = waNumber(c.phone);
 return (
 <div key={c.id} className="bg-white p-4 rounded-2xl border border-slate-200 flex justify-between items-start shadow-sm hover:border-indigo-200 transition-colors">
@@ -88,6 +92,13 @@ Bal: Rs. {bal.toLocaleString('en-US')} {bal > 0 ? '(Dr)' : bal < 0 ? '(Cr)' : ''
         </p>
       )}
       {!card.lastPayment && <p className="text-[10px] font-bold text-amber-600">Never paid</p>}
+      {/* How old the money is, not how long since they bought — the two are different, and
+          the aging report already settles each debt oldest-first to work it out. */}
+      {bal > 0 && aging && aging.oldestAgeDays > 30 && (
+        <p className={`text-[10px] font-bold ${aging.oldestAgeDays > 90 ? 'text-rose-600' : 'text-amber-600'}`}>
+          Oldest debt {aging.oldestAgeDays} days
+        </p>
+      )}
       {card.daysSinceActivity !== null && card.daysSinceActivity > 30 && (
         <p className="text-[10px] font-bold text-amber-600">Quiet for {card.daysSinceActivity} days</p>
       )}

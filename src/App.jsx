@@ -707,6 +707,8 @@ useEffect(() => {
 useEffect(() => {
   if (!currentUser) return;
   const handler = (e) => {
+    // Ctrl+K / Cmd+K is what people try first; Alt+S matches the app's own Alt+B / Alt+C.
+    if ((e.ctrlKey || e.metaKey) && e.key === 'k') { e.preventDefault(); setShowSearchModal(true); return; }
     if (e.altKey) {
       if (e.key === 's') { e.preventDefault(); setShowSearchModal(true); return; }
       const map = { d: 'dashboard', i: 'products', b: 'billing', c: 'customers', a: 'admin' };
@@ -885,7 +887,7 @@ return (
       })}
     </nav>
     <div className="px-3 py-3 border-t border-slate-100">
-      <div className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mb-2 px-1">Shortcuts: Alt+S=Search, Alt+B=Billing, Alt+C=Clients</div>
+      <div className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mb-2 px-1">Shortcuts: Ctrl+K=Search, Alt+B=Billing, Alt+C=Clients</div>
       <button onClick={logout} className="w-full text-xs font-bold uppercase tracking-widest text-slate-500 bg-slate-100 px-3 py-2 rounded-lg hover:bg-slate-200 transition-colors">Log Out</button>
     </div>
   </aside>
@@ -916,7 +918,7 @@ return (
         >
           <Search size={14} className="shrink-0"/>
           <span className="text-xs font-semibold truncate">Customer, invoice no., product…</span>
-          <kbd className="ml-auto text-[9px] bg-white border border-slate-200 px-1.5 py-0.5 rounded font-mono shrink-0">Alt+S</kbd>
+          <kbd className="ml-auto text-[9px] bg-white border border-slate-200 px-1.5 py-0.5 rounded font-mono shrink-0">Ctrl+K</kbd>
         </button>
       </div>
       <div className="flex items-center gap-3">

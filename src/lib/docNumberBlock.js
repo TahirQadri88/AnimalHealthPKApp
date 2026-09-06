@@ -23,6 +23,12 @@
 // in claimDocNumber.js beside the one it replaces.
 
 export const BLOCK_SIZE = 10;
+
+// Every document type that draws a number. Lives here rather than beside the transaction
+// that fills a block, because anything importing src/firebase.js cannot be loaded by a test
+// — and a screen that only wants to ask "how many invoice numbers are left" should not drag
+// Auth initialisation in behind it. That mistake has now been made six times in this repo.
+export const PREFIXES = ['INV', 'EST', 'ORD', 'REC', 'CN'];
 const KEY = (prefix) => `docBlock:${prefix}`;
 
 const store = (storage) => {

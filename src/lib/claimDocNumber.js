@@ -1,7 +1,7 @@
 import { db, doc, runTransaction } from '../firebase';
 import { withTimeout } from './withTimeout';
 import {
-  BLOCK_SIZE, blockFrom, readBlock, writeBlock, takeFromBlock, needsRefill, mergeBlocks,
+  BLOCK_SIZE, PREFIXES, blockFrom, readBlock, writeBlock, takeFromBlock, needsRefill, mergeBlocks,
 } from './docNumberBlock';
 
 // Kept apart from getNextSeqNum deliberately. That one is pure and is unit-tested; this one
@@ -115,8 +115,6 @@ export const nextDocNumber = async (prefix, clientGuess = 1) => {
 };
 
 /** Reserve for every document type, so an outage that starts now is survivable. */
-export const PREFIXES = ['INV', 'EST', 'ORD', 'REC', 'CN'];
-
 export const ensureBlocks = async (floors = {}) => {
   if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
   for (const prefix of PREFIXES) {

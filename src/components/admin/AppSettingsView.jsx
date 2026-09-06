@@ -6,6 +6,7 @@ import { uploadToDrive, getDriveScript } from '../../lib/driveBackup';
 import { inspectBackupText, planWrites, backupAgeDays } from '../../services/backup/restore';
 import { SYNCED, QUEUED, isAccepted } from '../../lib/pendingWrite';
 import { FixInvoiceUnitsButton } from './FixInvoiceUnitsButton';
+import { OfflineReadinessPanel } from './OfflineReadinessPanel';
 
 export const AppSettingsView = () => {
 const { appSettings, saveToFirebase, showToast, showConfirm, appUsers, companies, products, customers, invoices, expenses, expenseCategories, payments, cities, areas, customerTypes, vehicleTypes, riders, transportCompanies } = useContext(AppContext);
@@ -285,6 +286,8 @@ return (
     </div>
   </div>
   <FixInvoiceUnitsButton />
+
+  <OfflineReadinessPanel />
 
   {/* ── Firebase Auto-Backup ── */}
   <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
