@@ -123,3 +123,21 @@ describe('AppSettingsView — ready for offline', () => {
     expect(render()).not.toMatch(/undefined|NaN/);
   });
 });
+
+// Reported from a real device: the panel said the browser had refused persistent storage
+// and that "installing usually earns this" — with no way to act on it. Advice is not a fix.
+describe('AppSettingsView — fixing the storage refusal', () => {
+  it('offers a route to installing when storage was refused', () => {
+    // SSR cannot reach navigator.storage, so persistentStorage resolves null and the
+    // how-to-fix block is withheld. What must always hold is that the panel never claims
+    // the storage question was settled when it was not.
+    const html = render();
+    expect(html).toContain('Storage kept when space runs low');
+    expect(html).not.toContain('Granted.');
+  });
+
+  it('does not offer an install button the platform cannot honour', () => {
+    // No beforeinstallprompt has been captured under SSR, so no button.
+    expect(render()).not.toContain('Install app');
+  });
+});

@@ -6,7 +6,7 @@
 //
 // The judgement is services/offline/readiness.js; this gathers the facts and shows them.
 import { useState, useEffect, useContext } from 'react';
-import { ShieldCheck, AlertTriangle, XCircle, RefreshCw, WifiOff } from 'lucide-react';
+import { ShieldCheck, AlertTriangle, XCircle, RefreshCw, WifiOff, Download } from 'lucide-react';
 import { AppContext } from '../../context/AppContext';
 import { assessReadiness } from '../../services/offline/readiness';
 import { isStoragePersisted, storageEstimate, requestPersistentStorage } from '../../lib/offlineStorage';
@@ -14,6 +14,9 @@ import { isStoragePersisted, storageEstimate, requestPersistentStorage } from '.
 // initialises Auth on import and takes every test that touches this screen down with it.
 import { readBlock, PREFIXES } from '../../lib/docNumberBlock';
 import { useSyncStatus } from '../../hooks/useSyncStatus';
+import {
+  subscribeInstallPrompt, hasInstallPrompt, promptInstall, isStandalone, isIOS, installAdvice,
+} from '../../lib/installPrompt';
 
 const ICON = {
   ready:       { Icon: ShieldCheck,   cls: 'text-emerald-600', box: 'bg-emerald-50 border-emerald-200' },
@@ -26,6 +29,12 @@ const { invoices, customers, products, payments, expenses, companies } = useCont
 const sync = useSyncStatus();
 const [env, setEnv] = useState({ serviceWorker: null, persistentStorage: null, estimate: null });
 const [asking, setAsking] = useState(false);
+// The offer arrives on its own schedule, so re-render when it does.
+const [canPrompt, setCanPrompt] = useState(false);
+useEffect(() => {
+  setCanPrompt(hasInstallPrompt());
+  return subscribeInstallPrompt(() => setCanPrompt(hasInstallPrompt()));
+}, []);
 
 const gather = async () => {
   // getRegistration rather than `controller`, which is null on the very first load after an
@@ -58,6 +67,16 @@ const result = assessReadiness({
   lastSyncedAt: sync.lastSyncedAt,
 });
 const { Icon, cls, box } = ICON[result.level];
+
+const advice = installAdvice({ standalone: isStandalone(), canPrompt, ios: isIOS() });
+
+const install = async () => {
+  const outcome = await promptInstall();
+  // Installing is what earns the storage grant, so ask for it again straight away rather
+  // than making them press two buttons.
+  if (outcome === 'accepted') { await requestPersistentStorage(); }
+  await gather();
+};
 
 const ask = async () => {
   setAsking(true);
@@ -96,6 +115,21 @@ return (
       </li>
     ))}
   </ul>
+
+  {/* The refusal is the one finding here a person can actually act on, and telling them to
+      "install the app" without a way to do it is advice, not a fix. Chrome grants persistent
+      storage to an installed app and refuses it to a tab. */}
+  {env.persistentStorage === false && advice.mode !== 'installed' && (
+    <div className="mt-3 bg-amber-50 border border-amber-200 rounded-xl p-3">
+      <p className="text-[11px] font-bold text-amber-800 mb-1">How to fix the warning above</p>
+      <p className="text-[11px] text-amber-700 leading-relaxed">{advice.text}</p>
+      {advice.mode === 'prompt' && (
+        <button onClick={install} className="mt-2 flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold bg-indigo-600 text-white hover:bg-indigo-700">
+          <Download size={13}/> Install app
+        </button>
+      )}
+    </div>
+  )}
 
   <div className="flex flex-wrap gap-2 mt-3">
     <button onClick={gather} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold bg-white border border-slate-200 text-slate-700 hover:bg-slate-50">

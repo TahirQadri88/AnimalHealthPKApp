@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App'
 import { requestPersistentStorage } from './lib/offlineStorage'
+import { captureInstallPrompt } from './lib/installPrompt'
 
 // Everything this app can do offline rests on the Firestore cache in IndexedDB, and by
 // default a browser may evict that under storage pressure — which on a phone is normal.
@@ -11,6 +12,11 @@ import { requestPersistentStorage } from './lib/offlineStorage'
 requestPersistentStorage().then(granted => {
   if (granted === false) console.warn('[offline] the browser refused persistent storage — the offline cache may be evicted');
 })
+
+// beforeinstallprompt fires once, early, and often before any screen is mounted. Capture it
+// here or the offer is gone — and an installed app is how the browser is persuaded to keep
+// the offline cache it refuses to keep for an ordinary tab.
+captureInstallPrompt()
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
