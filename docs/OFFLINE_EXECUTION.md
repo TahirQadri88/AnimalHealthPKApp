@@ -259,7 +259,15 @@ guessing; a block survives a reload (`localStorage` round-trip).
 
 ---
 
-## Commit set D — knowing where you stand (step 7)
+## Commit set D — knowing where you stand (step 7) — ✅ DONE 2026-09-04
+
+Landed with E1 and E2. **Every step in this file is now done.**
+
+The firebase-import wall caught this one too, for the sixth time in the repo: the panel
+imported `PREFIXES` from `lib/claimDocNumber.js`, which imports `../firebase`, and took both
+`AppSettingsView` and `AdminTab`'s tests down with `auth/invalid-api-key`. A list of strings
+is not a Firestore operation — it lives in the pure module now. **Check this before importing
+anything into a component.**
 
 ### D1. "Ready for offline" panel in Settings
 
@@ -402,3 +410,33 @@ information about one. A1 and A2 stay first.
 | E2 | Ctrl+K alias for search | Trivial | Free |
 
 **Start with A1 → A2 → A3.** They are independent of each other and of everything after them.
+
+---
+
+## Done — 2026-09-04
+
+Every step above shipped, plus three things this file did not predict.
+
+| | |
+|---|---|
+| Tests | 685 → **893** |
+| `lint:scope` | 20 at every step |
+
+**The ranking was wrong, and a bug proved it.** C1 was ranked "medium — insurance against
+duplicate numbers" and was in fact a hard blocker: an invoice created offline produced no
+record, no toast and no error, because `claimDocNumber` awaited a transaction that offline
+never answers. This file contained the sentence *"if a number requires the server, then
+billing requires the server"* and the ranking ignored it. **When a plan contains a sentence
+like that, it is the ranking that is wrong, not the sentence.**
+
+**Two more hangs than expected.** `deleteFromFirebase` had A1's defect identically, and
+`writeAudit` sat further down the same save path — so fixing `claimDocNumber` alone would
+have moved the hang rather than removed it. `src/lib/writePaths.test.js` now reads every
+source file and fails if any of them awaits `setDoc`, `deleteDoc` or `runTransaction`
+directly, because a hang is the absence of an event and nothing else could catch it.
+
+**The login screen lied.** Reported after signing out during an outage: the catch mapped
+everything that was not rate-limiting to "Invalid Credentials", so a network failure told
+someone their password was wrong. Fixed with `lib/loginErrors.js`, a pre-check that does not
+attempt a sign-in it knows cannot work, and — the same lockout arriving without anyone
+pressing anything — a hold on clearing the local session while offline.
