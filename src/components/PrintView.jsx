@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { FileDown, Printer, Share2, X, MessageCircle, Image } from 'lucide-react';
 import { formatDateDisp, getLocalDateStr, APP_NAME } from '../helpers';
+import { splitDispatchLine } from '../lib/packaging';
 import { YELLOW, isBlockBackground } from './printTheme';
 
 // Format: 'thermal' | 'a5' | 'a4'
@@ -87,17 +88,15 @@ const findProduct = (item) => {
   return p;
 };
 const getDispatchParts = (item) => {
-  if (!item) return { qty: 0, uib: 1, boxes: 0, loose: 0 };
-  let uib = item.unitsInBox;
-  if (!uib) {
-    const prod = findProduct(item);
-    uib = prod ? prod.unitsInBox : 1;
-  }
-  uib = Number(uib) || 1;
-  const qty = Number(item.quantity) || 0;
-  const boxes = uib > 1 ? Math.floor(qty / uib) : 0;
-  const loose  = uib > 1 ? qty % uib : qty;
-  return { qty, uib, boxes, loose };
+  if (!item) return { qty: 0, uib: 1, boxes: 0, loose: 0, bags: 0 };
+  // One lookup for both fields. The unit decides whether this is a bag — see lib/packaging.
+  const prod = (!item.unitsInBox || !item.unit) ? findProduct(item) : null;
+  return splitDispatchLine({
+    quantity: item.quantity,
+    unitsInBox: item.unitsInBox || prod?.unitsInBox,
+    unit: item.unit || prod?.unit,
+    name: item.name,
+  });
 };
 
 const safeStr = (s) => String(s ?? '').replace(/[^a-zA-Z0-9_\-]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
@@ -1496,6 +1495,9 @@ return (
           {docType === 'dispatch' && safeItems.length > 0 && (() => {
             const totalUnits = safeItems.reduce((s, i) => s + (Number(i.quantity) || 0), 0);
             const totalPacks = safeItems.reduce((s, i) => s + getDispatchParts(i).boxes, 0);
+            // A sealed bag is one whole thing somebody carries, not broken stock, so it is
+            // counted on its own rather than swept in with the loose vials.
+            const totalBags = safeItems.reduce((s, i) => s + getDispatchParts(i).bags, 0);
             // Every unit is either in a pack or it is loose. The old `uib > 1 ? loose : 0`
             // dropped every line that has no box size, so a 25kg bag, a drum or anything
             // else sold as a single thing appeared in "units total" and in neither column —
@@ -1511,14 +1513,21 @@ return (
                     Total SKUs: <strong style={{ color: '#1e293b' }}>{safeItems.length}</strong>
                   </td>
                   <td colSpan={1} style={{ padding: sz('6px','8px','9px'), textAlign: 'left', fontWeight: 800, color: '#1e293b' }}>
-                    <div style={{ fontSize: sz('8.5px','9.5px','10.5px'), fontWeight: 800, color: '#1e293b', marginBottom: totalPacks > 0 ? '3px' : 0 }}>
+                    <div style={{ fontSize: sz('8.5px','9.5px','10.5px'), fontWeight: 800, color: '#1e293b', marginBottom: (totalPacks > 0 || totalBags > 0) ? '3px' : 0 }}>
                       {totalUnits} units total
                     </div>
-                    {totalPacks > 0 && (
+                    {(totalPacks > 0 || totalBags > 0) && (
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px' }}>
-                        <span style={{ background: '#e0f2fe', color: '#0369a1', borderRadius: '3px', padding: '1px 4px', fontWeight: 700, fontSize: sz('7px','7.5px','8px') }}>
-                          {totalPacks} {totalPacks === 1 ? 'Pack' : 'Packs'}
-                        </span>
+                        {totalPacks > 0 && (
+                          <span style={{ background: '#e0f2fe', color: '#0369a1', borderRadius: '3px', padding: '1px 4px', fontWeight: 700, fontSize: sz('7px','7.5px','8px') }}>
+                            {totalPacks} {totalPacks === 1 ? 'Pack' : 'Packs'}
+                          </span>
+                        )}
+                        {totalBags > 0 && (
+                          <span style={{ background: '#dcfce7', color: '#166534', borderRadius: '3px', padding: '1px 4px', fontWeight: 700, fontSize: sz('7px','7.5px','8px') }}>
+                            {totalBags} {totalBags === 1 ? 'Bag' : 'Bags'}
+                          </span>
+                        )}
                         {totalLoose > 0 && (
                           <span style={{ background: '#fef3c7', color: '#92400e', borderRadius: '3px', padding: '1px 4px', fontWeight: 700, fontSize: sz('7px','7.5px','8px') }}>
                             {totalLoose} Loose
