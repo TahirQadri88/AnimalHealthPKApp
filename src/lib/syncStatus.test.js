@@ -108,11 +108,31 @@ describe('the store', () => {
   // useSyncExternalStore compares by reference, so an unchanged status must return the very
   // same object or React re-renders forever.
   it('returns the identical object when nothing changed', () => {
+    // The clock is pinned deliberately. lastSyncedAt is part of the snapshot and moves
+    // whenever a collection reaches the server, so without this the test passed or failed
+    // on whether three calls happened to land in the same millisecond — which is exactly
+    // what it did on a faster machine. The identity being tested is real; the flakiness
+    // was the clock.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-09-14T10:00:00Z'));
+    try {
+      publishCollectionMeta('invoices', { fromCache: false, pending: 0 });
+      const first = getSyncSnapshot();
+      publishCollectionMeta('invoices', { fromCache: false, pending: 0 });
+      publishCollectionMeta('payments', { fromCache: false, pending: 0 });
+      expect(getSyncSnapshot()).toBe(first);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  // And the other half of the same contract: when it HAS changed, a new object comes back.
+  it('returns a new object when the picture really did change', () => {
     publishCollectionMeta('invoices', { fromCache: false, pending: 0 });
     const first = getSyncSnapshot();
-    publishCollectionMeta('invoices', { fromCache: false, pending: 0 });
-    publishCollectionMeta('payments', { fromCache: false, pending: 0 });
-    expect(getSyncSnapshot()).toBe(first);
+    publishCollectionMeta('invoices', { fromCache: false, pending: 2 });
+    expect(getSyncSnapshot()).not.toBe(first);
+    expect(getSyncSnapshot().pending).toBe(2);
   });
 
   it('does not tell subscribers about a repeat of the same news', () => {

@@ -1496,7 +1496,14 @@ return (
           {docType === 'dispatch' && safeItems.length > 0 && (() => {
             const totalUnits = safeItems.reduce((s, i) => s + (Number(i.quantity) || 0), 0);
             const totalPacks = safeItems.reduce((s, i) => s + getDispatchParts(i).boxes, 0);
-            const totalLoose = safeItems.reduce((s, i) => { const { loose, uib } = getDispatchParts(i); return s + (uib > 1 ? loose : 0); }, 0);
+            // Every unit is either in a pack or it is loose. The old `uib > 1 ? loose : 0`
+            // dropped every line that has no box size, so a 25kg bag, a drum or anything
+            // else sold as a single thing appeared in "units total" and in neither column —
+            // a note reading "80 units · 3 Packs · 35 Loose" where 3 packs of twelve is 36,
+            // leaving nine units the person loading the vehicle could not account for.
+            // getDispatchParts already returns loose = qty for an unboxed line; the guard
+            // was throwing that away.
+            const totalLoose = safeItems.reduce((s, i) => s + getDispatchParts(i).loose, 0);
             return (
               <tfoot>
                 <tr style={{ borderTop: '2px solid #1e293b' }}>
