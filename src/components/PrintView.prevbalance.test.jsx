@@ -89,3 +89,57 @@ describe('a genuine prior balance still prints', () => {
     expect(after(html, 'Net Balance')).toBe('58,250');
   });
 });
+
+// ── Counter sales open on Bill Only ─────────────────────────────────────────
+//
+// Reported 2026-09-18: a cash sale printed "Previous Balance Rs. 93,210" and a Net Balance
+// carrying it forward. A walk-in account is shared, so that balance belongs to no one
+// customer in particular, and the bill is settled on the spot anyway. It should open on
+// Bill Only. The toggle still decides; this is only where it starts.
+const CASH = { id: 99, name: 'Cash Sale (Walk in Customer)', openingBalance: 93210 };
+const CASH_INV = {
+  id: 'INV-8562', date: '2026-09-17', customerId: 99, customerName: CASH.name,
+  status: 'Billed', vehicle: 'Rider', deliveryBilled: 500, total: 33000, receivedAmount: 33000,
+  items: [{ productId: 3, name: 'IVOMEC 500 ML', quantity: 1, price: 32500 }],
+};
+const cashWorld = { customers: [CASH], invoices: [CASH_INV], payments: [] };
+
+const renderFor = (customer, invoice, world, format = 'a4') => renderToStaticMarkup(
+  <PrintView
+    printConfig={{ docType: 'invoice', format, data: invoice }}
+    setPrintConfig={() => {}} products={[]} customers={[customer]}
+    getCustomerLedger={(id) => buildCustomerLedger(id, world)}
+    getCustomerBalance={() => 0}
+    showToast={() => {}} appSettings={{}}
+  />
+);
+
+describe('a cash sale prints the bill, not the ledger', () => {
+  ['a4', 'a5', 'thermal'].forEach(format => {
+    it(`withholds the previous balance on ${format}`, () => {
+      const html = renderFor(CASH, CASH_INV, cashWorld, format);
+      expect(html).not.toContain('Previous Balance');
+      expect(html).not.toContain('93,210');
+    });
+  });
+
+  it('still prints what the bill itself came to', () => {
+    const html = renderFor(CASH, CASH_INV, cashWorld);
+    expect(html).toContain('33,000');
+    expect(after(html, 'Net Balance')).toBe('0');
+  });
+
+  // The toggle shows the mode it is IN, not the one it would switch to, so a counter sale
+  // reads "Bill Only" — visible proof of the default, and one tap from the ledger.
+  it('shows the toggle sitting on Bill Only', () => {
+    const html = renderFor(CASH, CASH_INV, cashWorld);
+    expect(html).toContain('Bill Only');
+    expect(html).toContain('Toggle previous balance visibility on invoice');
+  });
+
+  // The change must not reach a named customer, who is exactly who the ledger is for.
+  it('leaves a named customer on the full ledger', () => {
+    const html = render(INV_8476);
+    expect(html).toContain('Previous Balance');
+  });
+});

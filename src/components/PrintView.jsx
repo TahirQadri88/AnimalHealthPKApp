@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { FileDown, Printer, Share2, X, MessageCircle, Image } from 'lucide-react';
 import { formatDateDisp, getLocalDateStr, APP_NAME } from '../helpers';
 import { splitDispatchLine } from '../lib/packaging';
+import { isCashSale } from '../lib/cashCustomer';
 import { YELLOW, isBlockBackground } from './printTheme';
 
 // Format: 'thermal' | 'a5' | 'a4'
@@ -45,7 +46,12 @@ const isAging = docType === 'report' && data?.view === 'Aging';
 const aging = isAging ? (data.aging || {}) : null;
 const agingBuckets = (aging && aging.buckets) || [];
 const printRef = useRef(null);
-const [showPrevBal, setShowPrevBal] = useState(true);
+// A counter sale is settled on the spot and handed over, so it opens on Bill Only: a
+// running ledger on a walk-in account shows a balance that belongs to no one customer in
+// particular. Everything else opens on the full ledger, as before. The toggle still
+// decides — this is only where it starts, and it is re-evaluated per document because
+// PrintView unmounts between them.
+const [showPrevBal, setShowPrevBal] = useState(() => !isCashSale(printConfig?.data, customers));
 // Keyboard: Escape closes the print view
 useEffect(() => {
   const onKey = (e) => { if (e.key === 'Escape') setPrintConfig(null); };

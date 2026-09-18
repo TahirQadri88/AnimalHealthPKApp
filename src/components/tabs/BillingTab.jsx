@@ -7,7 +7,7 @@ import { Plus, Search, X, Edit, Trash2, Save, Users, Package, Truck, MapPin, Cal
 import { AppContext } from '../../context/AppContext';
 import { VEHICLES, getLocalDateStr, formatDateDisp, checkDateFilter } from '../../helpers';
 import { makeArrowNav } from '../../lib/a11y';
-import { getNextSeqNum } from '../../lib/docNumbers';
+import { getNextSeqNum, prefixForStatus, needsRenumber } from '../../lib/docNumbers';
 import { QUEUED } from '../../lib/pendingWrite';
 import { isTransportMethod, isKnownVehicleType, usesCarrierPerson } from '../../lib/transport';
 import { invoiceTotal } from '../../services/accounting/invoiceTotals';
@@ -82,25 +82,40 @@ const finalInvoice = { ...currentInvoice,
   driverPhone:      dropPerson  ? '' : (currentInvoice.driverPhone || ''),
   riderId:          dropPerson  ? '' : (currentInvoice.riderId || ''),
   items: enrichedItems, total: grandTotal, status: status, salespersonId: currentUser.id, salespersonName: currentUser.name, customerDetails: activeCustomer ? { contactPerson: activeCustomer.contactPerson || '', phone: activeCustomer.phone || '', address1: activeCustomer.address1 || activeCustomer.address || '', map1: activeCustomer.map1 || '', address2: activeCustomer.address2 || '', map2: activeCustomer.map2 || '' } : {} };
-if (!finalInvoice.id) {
-  const prefix = status === 'Estimate' ? 'EST' : status === 'Booked' ? 'ORD' : 'INV';
+// A document that changes series needs a number from the series it is moving INTO.
+// This used to claim a number only for a brand-new document, so converting EST-0037 to an
+// invoice kept the estimate's number and printed the word INVOICE above it. The
+// Issue-as-Invoice button on the list always renumbered; the form did not.
+const prefix = prefixForStatus(status);
+const converting = needsRenumber(finalInvoice.id, status);
+const previousId = converting ? finalInvoice.id : null;
+if (!finalInvoice.id || converting) {
   const clientGuess = getNextSeqNum(invoicesRaw, prefix);
   // Null means offline with no reserved numbers left. Refusing is the point: a guessed
   // number can duplicate one another device is using, and both get printed.
   const nextNum = await nextDocNumber(prefix, clientGuess);
   if (nextNum === null) return showToast("No document numbers left offline. Reconnect once to reserve more.", "error");
   finalInvoice.id = `${prefix}-${String(nextNum).padStart(4, '0')}`;
+  // The date is left exactly as the form has it. Conversion must not silently re-date a
+  // document whose date the user can see and edit.
   if (!finalInvoice.date) finalInvoice.date = getLocalDateStr();
 }
 const written = await saveToFirebase('invoices', finalInvoice.id, finalInvoice);
-// `currentInvoice.id` is only set when editing, which is also what decides the toast below.
-await logSave('invoices', currentInvoice.id ? invoices.find(o => o.id === finalInvoice.id) : null, finalInvoice, finalInvoice.id);
+// A conversion is a CREATE under the new number, not an edit of it — `invoices.find` would
+// look for an id that has never existed and log an update against `undefined`.
+await logSave('invoices', (!converting && currentInvoice.id) ? invoices.find(o => o.id === finalInvoice.id) : null, finalInvoice, finalInvoice.id);
+if (previousId) {
+  // The old document is consumed by the conversion, exactly as the list button does it.
+  await deleteFromFirebase('invoices', previousId);
+  await logDelete('invoices', invoices.find(o => o.id === previousId) || { id: previousId }, `Converted to ${finalInvoice.id}`, previousId);
+}
 const statusLabels = { Estimate: 'Estimate', Booked: 'Draft Order', Billed: 'Invoice' };
 const label = statusLabels[status] || status;
 // "Saved" and "saved on this device" are different facts, and on a document that will be
 // handed to a customer the difference is worth a sentence.
 showToast(written === QUEUED
   ? `${label} ${finalInvoice.id} saved on this device — it will sync when you are back online`
+  : previousId ? `${previousId} converted to ${label} ${finalInvoice.id}`
   : (currentInvoice.id ? `${label} Updated` : `${label} Saved`));
 setBillingView('list');
 };

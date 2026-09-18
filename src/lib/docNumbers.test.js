@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getNextSeqNum } from './docNumbers';
+import { getNextSeqNum, needsRenumber, seriesOf, prefixForStatus } from './docNumbers';
 
 // claimDocNumber is not covered here: it is a Firestore transaction, and the behaviour that
 // matters about it — that the counter only ever moves upward — is enforced by the rule in
@@ -44,5 +44,57 @@ describe('getNextSeqNum', () => {
     expect(getNextSeqNum(all, 'INV')).toBe(10);
     const withoutTheVoidedOne = all.filter(o => o.id !== 'INV-0009');
     expect(getNextSeqNum(withoutTheVoidedOne, 'INV')).toBe(9);   // INV-0009 issued twice
+  });
+});
+
+// ── Changing series ─────────────────────────────────────────────────────────
+//
+// Reported 2026-09-18: an estimate converted to an invoice printed the word INVOICE over
+// "REF # EST-0037". saveInvoice claimed a number only for a brand-new document, so
+// converting changed the status and kept the number.
+describe('needsRenumber', () => {
+  it('renumbers an estimate that becomes an invoice — the reported case', () => {
+    expect(needsRenumber('EST-0037', 'Billed')).toBe(true);
+  });
+
+  it('renumbers between every pair of series', () => {
+    expect(needsRenumber('EST-0037', 'Booked')).toBe(true);
+    expect(needsRenumber('ORD-0004', 'Billed')).toBe(true);
+    expect(needsRenumber('INV-8561', 'Estimate')).toBe(true);
+  });
+
+  it('leaves a document alone when it is saved back into its own series', () => {
+    expect(needsRenumber('EST-0037', 'Estimate')).toBe(false);
+    expect(needsRenumber('INV-8561', 'Billed')).toBe(false);
+    expect(needsRenumber('ORD-0004', 'Booked')).toBe(false);
+  });
+
+  // Legacy ids predate the prefixes and are printed on paper somewhere. Renumbering one
+  // would be inventing a change nobody asked for.
+  it('never renumbers an id whose series it does not recognise', () => {
+    ['1693847263000', 'A-123', 'INV8561', '', null, undefined].forEach(id => {
+      expect(needsRenumber(id, 'Billed')).toBe(false);
+      expect(needsRenumber(id, 'Estimate')).toBe(false);
+    });
+  });
+
+  it('treats an unknown status as the invoice series, which is what it saves as', () => {
+    expect(prefixForStatus('Something Else')).toBe('INV');
+    expect(needsRenumber('EST-0037', 'Something Else')).toBe(true);
+    expect(needsRenumber('INV-8561', 'Something Else')).toBe(false);
+  });
+});
+
+describe('seriesOf', () => {
+  it('names the series an id belongs to', () => {
+    expect(seriesOf('EST-0037')).toBe('EST');
+    expect(seriesOf('ORD-0004')).toBe('ORD');
+    expect(seriesOf('INV-8561')).toBe('INV');
+  });
+
+  it('is null for anything it does not recognise', () => {
+    expect(seriesOf('CN-0009')).toBeNull();   // credit notes are not part of this flow
+    expect(seriesOf('1693847263000')).toBeNull();
+    expect(seriesOf(undefined)).toBeNull();
   });
 });
