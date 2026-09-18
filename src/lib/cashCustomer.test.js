@@ -55,3 +55,39 @@ describe('isCashSale', () => {
     expect(isCashSale({ customerId: 1 })).toBe(false);
   });
 });
+
+// ── The checkbox ────────────────────────────────────────────────────────────
+//
+// Added 2026-09-18. The name stays as the fallback, so nothing that already worked stops
+// working — but an explicit answer is an answer, in both directions.
+describe('isCashCustomer — the explicit flag', () => {
+  it('marks an ordinary-sounding account as a counter account when ticked', () => {
+    expect(isCashCustomer({ name: 'Front Desk', isCashCustomer: true })).toBe(true);
+  });
+
+  // The direction that is easy to get wrong: a real customer whose name reads like one.
+  it('un-marks a named customer whose name happens to read like a cash account', () => {
+    expect(isCashCustomer({ name: 'Walk In Traders', isCashCustomer: false })).toBe(false);
+  });
+
+  it('falls back to the name when the question has never been asked', () => {
+    expect(isCashCustomer({ name: 'Cash Sale (Walk in Customer)' })).toBe(true);
+    expect(isCashCustomer({ name: 'Al Shaheer Cattle' })).toBe(false);
+  });
+
+  // `false` and absent are different: absent means nobody has been asked yet.
+  it('tells an explicit no apart from an unanswered question', () => {
+    expect(isCashCustomer({ name: 'Cash Sale', isCashCustomer: false })).toBe(false);
+    expect(isCashCustomer({ name: 'Cash Sale', isCashCustomer: undefined })).toBe(true);
+  });
+
+  it('ignores a flag that is not a boolean, rather than guessing at it', () => {
+    expect(isCashCustomer({ name: 'Cash Sale', isCashCustomer: 'yes' })).toBe(true);
+    expect(isCashCustomer({ name: 'Al Shaheer', isCashCustomer: 1 })).toBe(false);
+  });
+
+  it('reaches the printed document through the record, flag and all', () => {
+    const customers = [{ id: 5, name: 'Front Desk', isCashCustomer: true }];
+    expect(isCashSale({ customerId: 5 }, customers)).toBe(true);
+  });
+});

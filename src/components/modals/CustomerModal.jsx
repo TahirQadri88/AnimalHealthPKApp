@@ -4,24 +4,31 @@ import { AppContext } from '../../context/AppContext';
 import { ModalWrapper } from '../ui/ModalWrapper';
 import SearchableSelect from '../SearchableSelect';
 import { getLocalDateStr } from '../../helpers';
+import { isCashCustomer } from '../../lib/cashCustomer';
 
 export const CustomerModal = () => {
 const { editingCustomer, customers, invoices, billingView, currentInvoice, isAdmin, checkDuplicate, saveToFirebase, showToast, setShowCustomerModal, setCurrentInvoice, cities, areas, customerTypes, setShowSegmentsModal } = useContext(AppContext);
 const isEdit = !!editingCustomer;
-const [form, setForm] = useState(isEdit ? editingCustomer : { name: '', contactPerson: '', phone: '', address1: '', map1: '', address2: '', map2: '', openingBalance: 0, city: '', area: '', customerType: '', registrationDate: getLocalDateStr() });
+// isCashCustomer is seeded from the EFFECTIVE answer, not the raw field. Before this
+// checkbox existed the walk-in account was recognised by its name alone; opening it here
+// and saving would otherwise write `false` over that and quietly demote the one record the
+// whole feature was built for.
+const [form, setForm] = useState(isEdit
+  ? { ...editingCustomer, isCashCustomer: isCashCustomer(editingCustomer) }
+  : { name: '', contactPerson: '', phone: '', address1: '', map1: '', address2: '', map2: '', openingBalance: 0, city: '', area: '', customerType: '', registrationDate: getLocalDateStr(), isCashCustomer: false });
 useEffect(() => { if (isEdit && editingCustomer.address && !editingCustomer.address1) { setForm(prev => ({...prev, address1: editingCustomer.address})); } }, [isEdit, editingCustomer]);
 const save = async () => {
 if(!form.name) return showToast("Customer Name required", "error");
 if(checkDuplicate(customers, form.name, form.id)) return showToast("Customer Name must be unique", "error");
 if(isEdit) {
-const updatedCustomer = {...form, openingBalance: Number(form.openingBalance)};
+const updatedCustomer = {...form, openingBalance: Number(form.openingBalance), isCashCustomer: !!form.isCashCustomer};
 if(updatedCustomer.address) delete updatedCustomer.address;
 await saveToFirebase('customers', form.id, updatedCustomer);
 if(form.name !== editingCustomer.name) { for (const o of invoices) { if (o.customerId === form.id) await saveToFirebase('invoices', o.id, {...o, customerName: form.name}); } }
 showToast("Customer Updated");
 } else {
 const newId = Date.now();
-const newCust = { ...form, openingBalance: Number(form.openingBalance), id: newId };
+const newCust = { ...form, openingBalance: Number(form.openingBalance), isCashCustomer: !!form.isCashCustomer, id: newId };
 await saveToFirebase('customers', newId, newCust);
 if (billingView === 'form' && currentInvoice) { setCurrentInvoice({...currentInvoice, customerId: newCust.id, customerName: newCust.name}); }
 showToast("Customer Added");
@@ -44,6 +51,22 @@ return (
 <div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Alt. Phone (Optional)</label><input placeholder="03XXXXXXXXX" className={inputClass} value={form.altPhone || ''} onChange={e => setForm({...form, altPhone: e.target.value})} /></div>
 </div>
 <div><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1 block">Email (Optional)</label><input type="email" placeholder="clinic@example.com" className={inputClass} value={form.email || ''} onChange={e => setForm({...form, email: e.target.value})} /></div>
+<label className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${form.isCashCustomer ? 'bg-amber-50 border-amber-300' : 'bg-white border-slate-200 hover:bg-slate-50'}`}>
+  <input
+    type="checkbox"
+    className="mt-0.5 w-4 h-4 accent-amber-500 shrink-0"
+    checked={!!form.isCashCustomer}
+    onChange={e => setForm({...form, isCashCustomer: e.target.checked})}
+  />
+  <span className="min-w-0">
+    <span className="block text-xs font-bold text-slate-800">Cash Sale (Walk in Customer)</span>
+    <span className="block text-[11px] text-slate-500 leading-relaxed mt-0.5">
+      A counter account settled on the spot. Its bills open on <strong>Bill Only</strong> — no
+      previous balance and no running ledger, because a shared walk-in account&apos;s balance
+      belongs to no one customer in particular. The toggle on the document still overrides it.
+    </span>
+  </span>
+</label>
 </div>
 <div className="space-y-3 bg-slate-100 p-3 rounded-xl border border-slate-200">
 <h3 className="text-xs font-bold text-slate-800 uppercase tracking-widest flex items-center gap-1"><MapPin size={14}/> Primary Location</h3>
