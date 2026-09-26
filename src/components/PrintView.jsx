@@ -72,7 +72,7 @@ const _prodByWord = (() => {
   return m;
 })();
 
-const findProduct = (item) => {
+const findProductUncached = (item) => {
   if (!item) return null;
   const idStr   = String(item.productId || '');
   const uidStr  = String(item.uniqueId  || '');
@@ -93,14 +93,48 @@ const findProduct = (item) => {
   if (!p && nameLower) console.warn('[PrintView] No product match:', item.name, '| id:', item.productId, '| pool:', products.length);
   return p;
 };
+
+// Memoised for the life of one render, keyed by the item object itself.
+//
+// getDispatchParts asks for the product on every call now, and the footer alone calls it
+// three times per line. For a line that matches, that is three map lookups and harmless.
+// For a line whose product has been deleted it is two full scans of the catalogue AND a
+// console warning — five times per row, on every render, for as long as the note is open.
+// The cache is rebuilt each render, so a product edited in another tab still lands.
+const _prodCache = new Map();
+const findProduct = (item) => {
+  if (!item) return null;
+  if (_prodCache.has(item)) return _prodCache.get(item);
+  const p = findProductUncached(item);
+  _prodCache.set(item, p);
+  return p;
+};
+// The PRODUCT decides how it is packed, not the invoice.
+//
+// saveInvoice snapshots unit and unitsInBox onto every line, and this used to prefer that
+// snapshot — so a line billed at ten per carton stayed at ten however the product was
+// corrected afterwards, and there was no route for the correction to reach it. Neither the
+// render-time enrichment below nor the Fix Invoice Units button helped: both only fill in a
+// MISSING unit, never a stale one.
+//
+// Inverted, because these two fields are display-only. They decide the Packs / Bags / Loose
+// split and the label beside a quantity, and touch no money at all — not price, not total,
+// not the ledger, not the P&L. And a dispatch note is a picking document: it tells whoever
+// is loading the vehicle what to put on it NOW, so the carton size the product has now is
+// the right answer every time. A stale one misdirects the person doing the work.
+//
+// Price and costPrice stay snapshotted on the line, as they must — those are the terms of
+// the sale and may never move.
+//
+// The snapshot remains the fallback, for a product that has been deleted or renamed beyond
+// matching.
 const getDispatchParts = (item) => {
   if (!item) return { qty: 0, uib: 1, boxes: 0, loose: 0, bags: 0 };
-  // One lookup for both fields. The unit decides whether this is a bag — see lib/packaging.
-  const prod = (!item.unitsInBox || !item.unit) ? findProduct(item) : null;
+  const prod = findProduct(item);
   return splitDispatchLine({
     quantity: item.quantity,
-    unitsInBox: item.unitsInBox || prod?.unitsInBox,
-    unit: item.unit || prod?.unit,
+    unitsInBox: prod?.unitsInBox || item.unitsInBox,
+    unit: prod?.unit || item.unit,
     name: item.name,
   });
 };
@@ -1436,7 +1470,9 @@ return (
                 <td style={{ padding: sz('6px 2px','8px 4px','9px 6px'), textAlign: docType === 'dispatch' ? 'left' : 'center', fontWeight: 600, lineHeight: sz('1.5','1.55','1.6'), color: '#334155', whiteSpace: docType === 'dispatch' ? 'normal' : 'nowrap' }}>
                   {docType === 'dispatch' ? (() => {
                     const { qty, uib, boxes, loose } = getDispatchParts(item);
-                    const rawUnit = item?.unit || findProduct(item)?.unit || '';
+                    // Product first, for the same reason getDispatchParts reads it first:
+                    // correcting a product must reach the notes already raised.
+                    const rawUnit = findProduct(item)?.unit || item?.unit || '';
                     const unitLabel = rawUnit && isNaN(rawUnit) && String(rawUnit).trim().length > 1 ? rawUnit : '';
                     if (uib <= 1) return <span style={{ fontWeight: 800, color: '#1e293b' }}>{qty}{unitLabel && <span style={{ fontWeight: 500, color: '#334155', fontSize: sz('7.5px','8px','8.5px'), marginLeft: '3px' }}>{unitLabel}</span>}</span>;
                     return (
