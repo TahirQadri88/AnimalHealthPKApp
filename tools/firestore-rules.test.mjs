@@ -139,7 +139,8 @@ describe('granular permissions', () => {
   });
 
   it('addEditProducts gates writing a product', async () => {
-    await assertSucceeds(setDoc(doc(as(STAFF), 'products', '6'), { id: 6, name: 'New Item' }));
+    // What ProductModal sends for staff: no cost, marked for an admin to price.
+    await assertSucceeds(setDoc(doc(as(STAFF), 'products', '6'), { id: 6, name: 'New Item', costPrice: 0, costPending: true }));
     await assertFails(setDoc(doc(as(BARE), 'products', '7'), { id: 7, name: 'New Item' }));
   });
 
@@ -227,6 +228,47 @@ describe('a new invoice is signed with its author', () => {
   });
   it('issueInvoices may issue a colleague’s estimate under their name', async () => {
     await assertSucceeds(setDoc(doc(as(STAFF), 'invoices', 'INV-32'), { id: 'INV-32', status: 'Billed', total: 100, salespersonId: ADMIN.appUserId }));
+  });
+});
+
+// Every staff-facing button checked against what the rules let it write (2026-10-28).
+describe('staff screens and the rules agree', () => {
+  it('staff cannot set or change a product’s cost, but can correct the rest', async () => {
+    await assertFails(setDoc(doc(as(STAFF), 'products', '20'), { id: 20, name: 'Priced', costPrice: 80, costPending: true }));
+    await assertFails(setDoc(doc(as(STAFF), 'products', '21'), { id: 21, name: 'Unflagged', costPrice: 0 }));
+    await assertFails(updateDoc(doc(as(STAFF), 'products', '5'), { costPrice: 1 }));
+    await assertSucceeds(updateDoc(doc(as(STAFF), 'products', '5'), { sellingPrice: 150 }));
+    await assertSucceeds(updateDoc(doc(as(ADMIN), 'products', '5'), { costPrice: 90, costPending: false }));
+  });
+
+  it('a new company may be added along with a new product, but not renamed or removed', async () => {
+    await assertSucceeds(setDoc(doc(as(STAFF), 'companies', 'c1'), { id: 'c1', name: 'Hilton Pharma' }));
+    await assertFails(setDoc(doc(as(BARE), 'companies', 'c2'), { id: 'c2', name: 'X' }));
+    await assertFails(updateDoc(doc(as(STAFF), 'companies', 'c1'), { name: 'Renamed' }));
+    await assertFails(deleteDoc(doc(as(STAFF), 'companies', 'c1')));
+  });
+
+  it('receiving a payment is staff work; changing one already recorded is an admin’s', async () => {
+    await assertFails(updateDoc(doc(as(STAFF), 'payments', 'REC-1'), { amount: 1 }));
+    await assertFails(updateDoc(doc(as(STAFF), 'payments', 'REC-1'), { voided: true }));
+    await assertSucceeds(updateDoc(doc(as(ADMIN), 'payments', 'REC-1'), { amount: 400 }));
+  });
+
+  it('expenses are entered from the Admin tab only', async () => {
+    await assertFails(setDoc(doc(as(STAFF), 'expenses', '2'), { id: 2, amount: 50 }));
+    await assertFails(updateDoc(doc(as(STAFF), 'expenses', '1'), { amount: 1 }));
+    await assertSucceeds(setDoc(doc(as(ADMIN), 'expenses', '3'), { id: 3, amount: 50 }));
+  });
+
+  it('"Convert to Draft Order" works on a colleague’s estimate, and goes no further', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'invoices', 'EST-2'), { id: 'EST-2', status: 'Estimate', total: 700, salespersonId: ADMIN.appUserId });
+    });
+    await assertSucceeds(updateDoc(doc(as(STAFF), 'invoices', 'EST-2'), { status: 'Booked' }));
+    await assertFails(updateDoc(doc(as(STAFF), 'invoices', 'EST-2'), { status: 'Billed' }));
+    await assertFails(updateDoc(doc(as(STAFF), 'invoices', 'EST-2'), { salespersonId: STAFF.appUserId }));
+    await assertFails(updateDoc(doc(as(BARE), 'invoices', 'EST-2'), { status: 'Booked' }));
+    await assertFails(updateDoc(doc(as(STAFF), 'invoices', 'INV-2'), { status: 'Booked' }));
   });
 });
 

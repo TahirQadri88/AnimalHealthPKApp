@@ -448,7 +448,8 @@ const vehicleTypesSeeded = React.useRef(false);
 React.useEffect(() => {
   // Seed default vehicle types — only when Firestore has responded (appSettings loaded)
   // and the collection is genuinely empty. Predictable string IDs prevent duplicates.
-  if (!appSettings?.id || vehicleTypes.length > 0 || vehicleTypesSeeded.current) return;
+  // Admins only: the rules refuse anyone else, so on a staff login this could only fail.
+  if (!isAdmin || !appSettings?.id || vehicleTypes.length > 0 || vehicleTypesSeeded.current) return;
   vehicleTypesSeeded.current = true;
   const defaults = [
     { name: 'Rider',               requiresRider: true  },
@@ -461,13 +462,13 @@ React.useEffect(() => {
     const id = 'vt_' + d.name.replace(/\s+/g, '_');
     saveToFirebase('vehicleTypes', id, { id, name: d.name, requiresRider: d.requiresRider });
   });
-}, [appSettings?.id, vehicleTypes.length]);
+}, [isAdmin, appSettings?.id, vehicleTypes.length]);
 
 React.useEffect(() => {
-  if (appSettings?.id === 'main' && appSettings.showBusinessNameOnDocs === undefined) {
+  if (isAdmin && appSettings?.id === 'main' && appSettings.showBusinessNameOnDocs === undefined) {
     saveToFirebase('appSettings', 'main', { showBusinessNameOnDocs: true, showBusinessNameOnReports: true }, { merge: true });
   }
-}, [appSettings?.id, appSettings?.showBusinessNameOnDocs]);
+}, [isAdmin, appSettings?.id, appSettings?.showBusinessNameOnDocs]);
 
 // Auto-backup (Firebase + Google Drive) — runs once per session when settings load
 const autoBackupRan = React.useRef(false);
@@ -898,7 +899,7 @@ return (
         {activeTab === 'billing' && billingView === 'list' && (
           <button onClick={() => { setCurrentInvoice({ id: null, customerId: '', customerName: '', customerDetails: {}, items: [], deliveryBilled: 0, transportExpense: 0, discount: 0, vehicle: VEHICLES[0], paymentStatus: 'Pending', receivedAmount: 0, transportCompany: '', biltyNumber: '', driverName: '', driverPhone: '', riderId: '', deliveryAddressKey: 'address1', notes: '' }); setBillingView('form'); }} className="flex items-center gap-1.5 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700 transition-colors shadow-sm"><Plus size={16}/> New Invoice <kbd className="ml-1 text-[9px] bg-indigo-500 px-1.5 py-0.5 rounded font-mono">Alt+B</kbd></button>
         )}
-        {activeTab === 'customers' && (
+        {activeTab === 'customers' && hasPermission('receivePayments') && (
           <button onClick={() => { setSelectedCustomerForPayment(null); setShowPaymentModal(true); }} className="flex items-center gap-1.5 bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-emerald-600 transition-colors shadow-sm"><Wallet size={16}/> Receive Payment</button>
         )}
         <SyncPill />

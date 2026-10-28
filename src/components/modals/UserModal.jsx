@@ -31,7 +31,7 @@ const PERMS = [
   { key: 'viewCustomers',    label: 'Customer List',         desc: 'Browse all customers & outstanding balances' },
   { key: 'receivePayments',  label: 'Receive Payments',      desc: 'Record new customer payments in Receipts tab' },
   { key: 'collectOnBill',    label: 'Collect on Invoice',    desc: 'Record payment received while creating an invoice' },
-  { key: 'editOwnInvoices',  label: 'Edit Own Invoices',     desc: 'Edit or delete invoices they personally created' },
+  { key: 'editOwnInvoices',  label: 'Edit Own Invoices',     desc: 'Edit invoices they personally created' },
   { key: 'issueInvoices',    label: 'Issue / Convert Docs',  desc: 'Convert estimates to orders or finalize as invoices' },
   { key: 'salesReturns',     label: 'Sales Returns',         desc: 'Issue credit notes and process product returns' },
   { key: 'viewLedger',       label: 'Customer Ledger',       desc: 'View full account statement for any customer' },

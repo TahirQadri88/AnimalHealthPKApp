@@ -127,22 +127,33 @@ service cloud.firestore {
                     || (can('editOwnInvoices') && ownsRecord()
                         && request.resource.data.get('salespersonId', '__no_author__') == resource.data.get('salespersonId', '__no_author__')
                         && ((!statusIs('CreditNote') && request.resource.data.get('status', '') != 'CreditNote') || can('salesReturns'))
-                        && (request.resource.data.get('receivedAmount', 0) == resource.data.get('receivedAmount', 0) || can('collectOnBill')));
+                        && (request.resource.data.get('receivedAmount', 0) == resource.data.get('receivedAmount', 0) || can('collectOnBill')))
+                    // "Convert to Draft Order" on the list moves anyone's estimate along in place.
+                    // Issue / Convert Docs can already re-create a colleague's draft and delete the
+                    // original, so moving it between the two draft states grants nothing new.
+                    || (can('issueInvoices')
+                        && (statusIs('Estimate') || statusIs('Booked'))
+                        && request.resource.data.get('status', '') in ['Estimate', 'Booked']
+                        && request.resource.data.get('salespersonId', '__no_author__') == resource.data.get('salespersonId', '__no_author__')
+                        && request.resource.data.get('receivedAmount', 0) == resource.data.get('receivedAmount', 0));
       // Issuing an estimate writes a new invoice and removes the draft, so that one
       // delete has to be available to whoever may issue. A Billed invoice or a credit
       // note is never deleted by anyone below admin — it is voided.
       allow delete: if isAdmin()
                     || (can('issueInvoices') && (statusIs('Estimate') || statusIs('Booked')));
     }
+    // Receiving a payment is staff work; changing or voiding one already recorded is not —
+    // the edit and void buttons are admin-only on every screen.
     match /payments/{id} {
       allow read: if active();
-      allow create, update: if can('receivePayments');
+      allow create: if can('receivePayments');
+      allow update: if isAdmin();
       allow delete: if isAdmin();
     }
-    // No permission governs expenses in the UI, so none is invented here.
+    // Expenses are entered from the Admin tab only, so only an admin writes them.
     match /expenses/{id} {
       allow read: if active();
-      allow create, update: if active();
+      allow create, update: if isAdmin();
       allow delete: if isAdmin();
     }
 
@@ -167,14 +178,28 @@ service cloud.firestore {
     // member holding addEditProducts, and the rule refused them — the UI showed a button
     // that could only ever produce a permission error. The permission now governs it, as
     // it was always meant to. Deleting a product is still admin-only.
+    //
+    // Cost Price is admin-only on screen: it is the margin. A staff member registers a product
+    // with no cost and `costPending: true`, which puts "Cost needed" in front of an admin, and
+    // corrects one without touching either field.
+    function keepsProductCost() {
+      return request.resource.data.get('costPrice', 0) == resource.data.get('costPrice', 0)
+          && request.resource.data.get('costPending', false) == resource.data.get('costPending', false);
+    }
     match /products/{id} {
       allow read: if active();
-      allow create, update: if can('addEditProducts');
+      allow create: if can('addEditProducts')
+                    && (isAdmin() || (request.resource.data.get('costPrice', 0) == 0
+                                      && request.resource.data.get('costPending', false) == true));
+      allow update: if can('addEditProducts') && (isAdmin() || keepsProductCost());
       allow delete: if isAdmin();
     }
+    // The product form offers "new company" to anyone registering a product; without this a
+    // staff member's new product pointed at a company that was never written.
     match /companies/{id} {
       allow read: if active();
-      allow write: if isAdmin();
+      allow create: if can('addEditProducts');
+      allow update, delete: if isAdmin();
     }
 
     // ── Operational registries ───────────────────────────────────────────────

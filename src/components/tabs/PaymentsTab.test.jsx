@@ -3,7 +3,7 @@
 // Money: the receipts register. It shows two kinds of credit — a standalone REC- payment,
 // and cash taken at billing time, which is a field on the invoice rather than a record of
 // its own. Both appear here, and telling them apart is what the void path depends on.
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { AppContext } from '../../context/AppContext';
 import { PaymentsTab } from './PaymentsTab';
@@ -25,6 +25,13 @@ const render = (over = {}) => renderToStaticMarkup(
     <PaymentsTab />
   </AppContext.Provider>
 );
+
+
+// The screen opens on "This Month" and these records are dated September 2026, so the
+// tests read the calendar. They passed in September and failed from 1 October. Pin the
+// clock inside the records' month so they test the screen, not today's date.
+beforeAll(() => { vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date('2026-09-15T12:00:00')); });
+afterAll(() => { vi.useRealTimers(); });
 
 describe('PaymentsTab', () => {
   it('lists a standalone receipt', () => {

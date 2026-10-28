@@ -105,3 +105,34 @@ describe('BillingTab — form', () => {
     expect(form()).not.toMatch(/undefined|NaN/);
   });
 });
+
+// Converting a saved document (estimate → order → invoice) deletes the original, and the rules
+// give that delete to Issue / Convert Docs alone. Offered without it, the new document saved
+// and the old one stayed: an estimate and its invoice, both on the books.
+describe('BillingTab — converting needs Issue / Convert Docs', () => {
+  const estimate = { ...INVOICES[1], items: [], vehicle: 'Self-Pickup' };
+  const staff = (perms) => ({
+    isAdmin: false, hasPermission: (k) => !!perms[k],
+    currentUser: { id: 1, name: 'Ghousia', role: 'staff', permissions: perms },
+    billingView: 'form', currentInvoice: estimate,
+  });
+
+  it('a staff member who may only edit sees no way to convert their estimate', () => {
+    const html = render(staff({ editOwnInvoices: true }));
+    expect(html).toContain('Save as Estimate');
+    expect(html).not.toContain('Draft Order');
+    expect(html).not.toContain('Issue Invoice');
+  });
+
+  it('with the permission, both conversions are offered', () => {
+    const html = render(staff({ editOwnInvoices: true, issueInvoices: true }));
+    expect(html).toContain('Draft Order');
+    expect(html).toContain('Issue Invoice');
+  });
+
+  it('a new document offers every status to anyone', () => {
+    const html = render({ ...staff({}), currentInvoice: { ...estimate, id: null, status: undefined } });
+    expect(html).toContain('Draft Order');
+    expect(html).toContain('Issue Invoice');
+  });
+});

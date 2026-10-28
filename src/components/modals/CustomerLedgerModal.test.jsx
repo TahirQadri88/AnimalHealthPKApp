@@ -3,7 +3,7 @@
 // The statement a customer is shown when they query their balance. The arithmetic is
 // buildCustomerLedger's and is covered by ledger.test.js; these check the figures reach
 // the screen and that the running balance is the one the customer will be quoted.
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { AppContext } from '../../context/AppContext';
 import { CustomerLedgerModal } from './CustomerLedgerModal';
@@ -30,6 +30,13 @@ const render = (over = {}) => renderToStaticMarkup(
     <CustomerLedgerModal />
   </AppContext.Provider>
 );
+
+
+// The screen opens on "This Month" and these records are dated September 2026, so the
+// tests read the calendar. They passed in September and failed from 1 October. Pin the
+// clock inside the records' month so they test the screen, not today's date.
+beforeAll(() => { vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date('2026-09-15T12:00:00')); });
+afterAll(() => { vi.useRealTimers(); });
 
 describe('CustomerLedgerModal', () => {
   it('names the account holder', () => {

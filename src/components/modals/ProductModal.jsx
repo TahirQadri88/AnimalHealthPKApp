@@ -4,6 +4,7 @@ import { AppContext } from '../../context/AppContext';
 import { ModalWrapper } from '../ui/ModalWrapper';
 import SearchableSelect from '../SearchableSelect';
 import { getLocalDateStr, formatDateDisp } from '../../helpers';
+import { FAILED } from '../../lib/pendingWrite';
 import { profitImpactOfCostChange, defaultEffectiveDate, firstSaleDate } from '../../services/accounting/costPriceChange';
 
 export const ProductModal = () => {
@@ -15,27 +16,41 @@ const costChanged = isEdit && Number(form.costPrice) !== Number(originalCost);
 // Defaults to today. It used to default to the product's FIRST EVER SALE, so saving a new
 // cost quietly rewrote every invoice ever raised for it and moved the profit reported for
 // months that were already closed. Reaching into history is now something you choose.
-const [effectiveDate, setEffectiveDate] = useState(() => defaultEffectiveDate(getLocalDateStr()));
 const earliestSale = isEdit ? firstSaleDate(form.id, invoices, getLocalDateStr()) : getLocalDateStr();
+// A product a staff member registered has been sold at no cost until now, so its FIRST cost
+// is a correction of every one of those bills, not a price change from today.
+const [effectiveDate, setEffectiveDate] = useState(() => (isEdit && editingProduct.costPending) ? earliestSale : defaultEffectiveDate(getLocalDateStr()));
 const costImpact = costChanged
   ? profitImpactOfCostChange({ productId: form.id, newCost: Number(form.costPrice || 0), effectiveDate, invoices })
   : { invoiceCount: 0, profitDelta: 0 };
 const [newCompany, setNewCompany] = useState('');
 const [isAddingCompany, setIsAddingCompany] = useState(false);
 const save = async () => {
-if(!form.name || !form.sellingPrice || !form.costPrice || !form.unit || !form.unitsInBox || (!form.companyId && !newCompany)) {
-return showToast("All fields (Name, Company, Unit, Qty, Cost, Selling) are compulsory.", "error");
+// Cost is admin-only: staff never see the field, and firestore.rules refuses a staff save
+// that sets or changes it. Demanding it from them meant no staff member could ever register
+// a product, so for staff it is left for an admin, and the product is marked to say so.
+if(!form.name || !form.sellingPrice || (isAdmin && !form.costPrice) || !form.unit || !form.unitsInBox || (!form.companyId && !newCompany)) {
+return showToast(isAdmin ? "All fields (Name, Company, Unit, Qty, Cost, Selling) are compulsory." : "All fields (Name, Company, Unit, Qty, Selling) are compulsory.", "error");
 }
 if(checkDuplicate(products, form.name, form.id)) return showToast("Product Name must be unique", "error");
 let finalCompanyId = form.companyId;
 if (isAddingCompany) {
 if(checkDuplicate(companies, newCompany)) return showToast("Company Name already exists", "error");
 const newComp = { id: Date.now(), name: newCompany };
-await saveToFirebase('companies', newComp.id, newComp);
+// A product pointing at a company that was never written shows as "Unknown" everywhere.
+if ((await saveToFirebase('companies', newComp.id, newComp)) === FAILED) return;
 finalCompanyId = newComp.id;
 }
 const newCost = Number(form.costPrice||0);
-const formatted = { ...form, companyId: Number(finalCompanyId), costPrice: newCost, sellingPrice: Number(form.sellingPrice), unitsInBox: Number(form.unitsInBox) };
+const formatted = { ...form, companyId: Number(finalCompanyId), sellingPrice: Number(form.sellingPrice), unitsInBox: Number(form.unitsInBox) };
+if (isAdmin) {
+  formatted.costPrice = newCost;
+  if (newCost > 0) formatted.costPending = false;
+} else if (!isEdit) {
+  // An edit sends the stored cost back exactly as stored; a conversion would count as a change.
+  formatted.costPrice = 0;
+  formatted.costPending = true;
+}
 if (isEdit) {
 await saveToFirebase('products', form.id, formatted);
 if (costChanged) {
@@ -54,7 +69,7 @@ showToast(`Product Updated. Cost applied to ${costUpdCount} invoice${costUpdCoun
 const newId = Date.now();
 await saveToFirebase('products', newId, { ...formatted, id: newId });
 setProductPreFill('');
-showToast("Product Registered");
+showToast(isAdmin ? "Product Registered" : "Product Registered — an admin will add its cost price");
 }
 setShowProductModal(false);
 };

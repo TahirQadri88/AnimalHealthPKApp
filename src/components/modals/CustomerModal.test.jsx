@@ -86,3 +86,14 @@ describe('CustomerModal — the cash customer checkbox', () => {
       .not.toContain('checked=""');
   });
 });
+
+// "+ Manage" writes cities, areas and customer types, which only an admin may change. On a staff
+// screen it could only end in "A saved change was rejected by the server".
+describe('CustomerModal — segment management is an admin tool', () => {
+  it('is offered to an admin', () => {
+    expect(render()).toContain('+ Manage');
+  });
+  it('is not offered to staff', () => {
+    expect(render({ isAdmin: false })).not.toContain('+ Manage');
+  });
+});

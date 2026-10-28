@@ -81,13 +81,17 @@ const finalInvoice = { ...currentInvoice,
   driverName:       dropPerson  ? '' : (currentInvoice.driverName || ''),
   driverPhone:      dropPerson  ? '' : (currentInvoice.driverPhone || ''),
   riderId:          dropPerson  ? '' : (currentInvoice.riderId || ''),
-  items: enrichedItems, total: grandTotal, status: status, salespersonId: currentUser.id, salespersonName: currentUser.name, customerDetails: activeCustomer ? { contactPerson: activeCustomer.contactPerson || '', phone: activeCustomer.phone || '', address1: activeCustomer.address1 || activeCustomer.address || '', map1: activeCustomer.map1 || '', address2: activeCustomer.address2 || '', map2: activeCustomer.map2 || '' } : {} };
+  items: enrichedItems, total: grandTotal, status: status,
+  // The author stays the author. Stamping whoever pressed Save handed a staff member's invoice to
+  // the admin who corrected it: it left their sales figures and they could no longer edit it.
+  salespersonId: currentInvoice.salespersonId ?? currentUser.id, salespersonName: currentInvoice.salespersonName ?? currentUser.name, customerDetails: activeCustomer ? { contactPerson: activeCustomer.contactPerson || '', phone: activeCustomer.phone || '', address1: activeCustomer.address1 || activeCustomer.address || '', map1: activeCustomer.map1 || '', address2: activeCustomer.address2 || '', map2: activeCustomer.map2 || '' } : {} };
 // A document that changes series needs a number from the series it is moving INTO.
 // This used to claim a number only for a brand-new document, so converting EST-0037 to an
 // invoice kept the estimate's number and printed the word INVOICE above it. The
 // Issue-as-Invoice button on the list always renumbered; the form did not.
 const prefix = prefixForStatus(status);
 const converting = needsRenumber(finalInvoice.id, status);
+if (converting && !hasPermission('issueInvoices')) return showToast("Converting a saved document needs the Issue / Convert Docs permission", "error");
 const previousId = converting ? finalInvoice.id : null;
 if (!finalInvoice.id || converting) {
   const clientGuess = getNextSeqNum(invoicesRaw, prefix);
@@ -143,8 +147,13 @@ const formTypeLabel = isEdit
   ? (editingStatus === 'Estimate' ? 'Edit Estimate' : editingStatus === 'Booked' ? 'Edit Draft Order' : editingStatus === 'CreditNote' ? 'Credit Note' : `Edit Invoice`)
   : (statusFilter === 'Estimate' ? 'New Estimate / Quotation' : statusFilter === 'Booked' ? 'New Draft Order' : 'New Invoice');
 const canSaveAsEstimate = !isEdit || editingStatus === 'Estimate' || editingStatus === 'Booked';
+// Moving a saved document into another series is a conversion: a new number, and the old
+// document deleted. The rules give that delete to Issue / Convert Docs alone, so without it the
+// new document saved and the old one stayed — an estimate and its invoice, both on the books.
+const canConvert = hasPermission('issueInvoices');
+const offerStatus = (target) => !isEdit || editingStatus === target || canConvert;
 return (
-<div className="h-full flex flex-col bg-slate-50 absolute inset-0 z-20 animate-slide-up" onKeyDown={e => { if (e.ctrlKey && e.key === 'Enter') { e.preventDefault(); saveInvoice('Billed'); } }}>
+<div className="h-full flex flex-col bg-slate-50 absolute inset-0 z-20 animate-slide-up" onKeyDown={e => { if (e.ctrlKey && e.key === 'Enter' && offerStatus('Billed')) { e.preventDefault(); saveInvoice('Billed'); } }}>
 <div className="bg-white/80 backdrop-blur-md p-4 border-b border-slate-200 flex justify-between items-center sticky top-0 z-30 shadow-sm">
 <div><h2 className="text-lg font-extrabold text-slate-800 tracking-tight">{isEdit ? `${formTypeLabel} — ${currentInvoice.id}` : formTypeLabel}</h2><input type="date" value={currentInvoice.date || getLocalDateStr()} onChange={e => setCurrentInvoice({...currentInvoice, date: e.target.value})} className="text-[11px] font-bold text-slate-500 bg-transparent border-0 outline-none cursor-pointer hover:text-indigo-600 transition-colors mt-0.5 p-0" /></div>
 <button onClick={() => setBillingView('list')} className="p-2 bg-slate-100 rounded-full text-slate-600 hover:bg-slate-200 transition-colors"><X size={20}/></button>
@@ -428,10 +437,10 @@ return (
 {isEdit && isAdmin && (<button onClick={async () => { const reason = await showPrompt(`Void ${currentInvoice.id}?\n\nIt stays on file and drops out of every balance and report.`, { placeholder: 'e.g. duplicate entry' }); if (reason === null) return; /* void what is stored, not the half-edited form state */ const stored = invoices.find(o => o.id === currentInvoice.id) || currentInvoice; await voidRecord('invoices', stored, { label: stored.id, reason }); showToast(`${currentInvoice.id} voided`); setBillingView('list'); }} className="w-full bg-white text-rose-600 font-bold p-4 rounded-xl flex justify-center items-center gap-2 border border-rose-200 hover:bg-rose-50 shadow-sm mt-4"><Trash2 size={18}/> Void {editingStatus === 'Estimate' ? 'Estimate' : editingStatus === 'Booked' ? 'Draft Order' : 'Invoice'}</button>)}
 </div>
 <div className="p-4 bg-white/80 backdrop-blur-md border-t border-slate-200 shrink-0 space-y-2">
-{canSaveAsEstimate && <button onClick={() => saveInvoice('Estimate')} className="w-full bg-violet-600 hover:bg-violet-700 text-white py-2.5 rounded-xl font-bold shadow-sm flex justify-center items-center gap-2 active:scale-95 transition-all text-sm"><FileText size={16}/> Save as Estimate / Quotation</button>}
+{canSaveAsEstimate && offerStatus('Estimate') && <button onClick={() => saveInvoice('Estimate')} className="w-full bg-violet-600 hover:bg-violet-700 text-white py-2.5 rounded-xl font-bold shadow-sm flex justify-center items-center gap-2 active:scale-95 transition-all text-sm"><FileText size={16}/> Save as Estimate / Quotation</button>}
 <div className="flex gap-3">
-{canSaveAsEstimate && <button onClick={() => saveInvoice('Booked')} className="flex-1 bg-white text-slate-700 border border-slate-300 py-3.5 rounded-xl font-bold shadow-sm flex justify-center items-center gap-2 active:scale-95 transition-all hover:bg-slate-50"><Save size={18}/> Draft Order</button>}
-<button onClick={() => saveInvoice('Billed')} className={`${canSaveAsEstimate ? 'flex-[2]' : 'flex-1'} bg-indigo-600 hover:bg-indigo-700 text-white py-3.5 rounded-xl font-bold shadow-md flex justify-center items-center gap-2 active:scale-95 transition-all`}><ReceiptText size={18}/> {isEdit && editingStatus === 'Billed' ? 'Update Invoice' : 'Issue Invoice'}</button>
+{canSaveAsEstimate && offerStatus('Booked') && <button onClick={() => saveInvoice('Booked')} className="flex-1 bg-white text-slate-700 border border-slate-300 py-3.5 rounded-xl font-bold shadow-sm flex justify-center items-center gap-2 active:scale-95 transition-all hover:bg-slate-50"><Save size={18}/> Draft Order</button>}
+{offerStatus('Billed') && <button onClick={() => saveInvoice('Billed')} className={`${canSaveAsEstimate ? 'flex-[2]' : 'flex-1'} bg-indigo-600 hover:bg-indigo-700 text-white py-3.5 rounded-xl font-bold shadow-md flex justify-center items-center gap-2 active:scale-95 transition-all`}><ReceiptText size={18}/> {isEdit && editingStatus === 'Billed' ? 'Update Invoice' : 'Issue Invoice'}</button>}
 </div>
 </div>
 </div>

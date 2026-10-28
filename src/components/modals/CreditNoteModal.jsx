@@ -101,8 +101,9 @@ const save = async () => {
     total: grandTotal,
     reason: form.reason || '',
     status: 'CreditNote',
-    salespersonId: currentUser.id,
-    salespersonName: currentUser.name,
+    // Editing a credit note must not move it to whoever corrected it.
+    salespersonId: existingCN?.salespersonId ?? currentUser.id,
+    salespersonName: existingCN?.salespersonName ?? currentUser.name,
     customerDetails: cust ? { contactPerson: cust.contactPerson || '', phone: cust.phone || '', address1: cust.address1 || cust.address || '' } : {},
   };
   await saveToFirebase('invoices', cn.id, cn);
