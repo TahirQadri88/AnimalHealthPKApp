@@ -90,10 +90,12 @@ All shipped. For reference, what had to change and why:
 - **Firestore listeners re-subscribe when the session changes.** A listener refused
   permission is terminated and never retried, so every collection would have died on the
   login screen and stayed dead — a logged-in user would have seen an empty app.
-- **First-run bootstrap no longer gates on `appUsers` being empty.** That list is
-  unreadable from the login screen under the new rules, so the check would have been true
-  for everyone and diverted every sign-in into bootstrap. It now runs only when Firebase
-  confirms no such account exists and the setup secret matches.
+- **First-run bootstrap has been removed (2026-10-28).** It ran when Firebase reported no
+  such account and the password matched `VITE_SETUP_SECRET`. That secret was compiled into
+  the public JavaScript bundle, so anyone could read it. The bootstrap could not do harm,
+  because the closed rules refuse a stranger's write to `userRoles`, but it was dead code
+  guarded by a public secret. The business already has admins. If none can sign in, follow
+  `docs/ADMIN_RECOVERY.md`.
 - **Creating, editing and deleting users maintains all three records** — profile, role
   mirror, login index. Deleting only the profile would leave the Auth account working with
   its rights intact, since a browser cannot delete an Auth user.

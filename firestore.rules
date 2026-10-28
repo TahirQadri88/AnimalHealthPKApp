@@ -107,13 +107,24 @@ service cloud.firestore {
       allow read: if active();
       // A credit note gives money back, so it is not the same act as billing.
       // Cash taken at the counter is `collectOnBill`, likewise separate.
+      // A new document is signed with its author's own id. The exception is issueInvoices:
+      // "Issue as Invoice" re-creates a colleague's estimate under a new number and keeps
+      // the colleague as its salesperson, which is the whole point of the button.
       allow create: if active()
+                    && (request.resource.data.get('salespersonId', '__no_author__') == roleDoc().get('appUserId', '__no_id__')
+                        || can('issueInvoices'))
                     && (request.resource.data.get('status', '') != 'CreditNote' || can('salesReturns'))
                     && (request.resource.data.get('receivedAmount', 0) == 0 || can('collectOnBill'));
       // "Edit Own Invoices" means own. A colleague's invoice is an admin matter.
+      //
+      // The checks look at the document AFTER the edit as well as before it. Checking only
+      // the stored copy let an edit hand the invoice to someone else, turn it into a credit
+      // note, or record cash on it — each of which needs a permission of its own at create.
       allow update: if isAdmin()
                     || (can('editOwnInvoices') && ownsRecord()
-                        && (!statusIs('CreditNote') || can('salesReturns')));
+                        && request.resource.data.get('salespersonId', '__no_author__') == resource.data.get('salespersonId', '__no_author__')
+                        && ((!statusIs('CreditNote') && request.resource.data.get('status', '') != 'CreditNote') || can('salesReturns'))
+                        && (request.resource.data.get('receivedAmount', 0) == resource.data.get('receivedAmount', 0) || can('collectOnBill')));
       // Issuing an estimate writes a new invoice and removes the draft, so that one
       // delete has to be available to whoever may issue. A Billed invoice or a credit
       // note is never deleted by anyone below admin — it is voided.

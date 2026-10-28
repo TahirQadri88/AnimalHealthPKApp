@@ -172,29 +172,6 @@ return list.some(item => item.name.toLowerCase() === name.toLowerCase() && item.
 
 const handleLogin = async (e) => {
 e.preventDefault();
-// First-run bootstrap deliberately does NOT gate on appUsers being empty any more.
-// That list is unreadable from the login screen once the rules are closed, so the old
-// check would have been true for everyone and every sign-in would have been diverted
-// into bootstrap and rejected. The setup secret is the gate; it is attempted only after
-// Firebase confirms there is no such account.
-const bootstrapFirstAdmin = async () => {
-  const setupSecret = import.meta.env.VITE_SETUP_SECRET;
-  if (!setupSecret || loginForm.password !== setupSecret) return false;
-  const email = authEmailFor(loginForm.name);
-  const cred = await createUserWithEmailAndPassword(auth, email, loginForm.password);
-  const id = Date.now().toString();
-  const profile = { id, name: loginForm.name, role: 'admin', permissions: {},
-                    authUid: cred.user.uid, authEmail: email, loginName: loginForm.name };
-  await saveToFirebase('app_users', id, profile);
-  await saveToFirebase('userRoles', cred.user.uid, {
-    uid: cred.user.uid, appUserId: id, name: loginForm.name, role: 'admin', permissions: {}, active: true });
-  await writeLoginIndex(profile, email);
-  const defaultCats = ['Transport', 'Utility Bill', 'Staff Food/Tea', 'Maintenance', 'Other'];
-  defaultCats.forEach((cat, i) => saveToFirebase('expenseCategories', Date.now()+i, { id: Date.now()+i, name: cat }));
-  setCurrentUser({ id, name: loginForm.name, role: 'admin', permissions: {}, authUid: cred.user.uid });
-  showToast("Welcome! Admin account created.");
-  return true;
-};
 // Authenticate BEFORE touching the database. The old flow looked the user up in
 // app_users to find their credentials, which cannot work once the rules are closed —
 // a signed-out visitor may read nothing. So: resolve the username to a login address
@@ -234,14 +211,6 @@ try {
   setCurrentUser({ id: r.appUserId, name: r.name, role: r.role || 'staff', permissions: r.permissions || {}, authUid: cred.user.uid });
   showToast(`Welcome ${r.name}`);
 } catch (err) {
-  const noSuchAccount = ['auth/user-not-found', 'auth/invalid-credential', 'auth/invalid-login-credentials'].includes(err.code);
-  if (noSuchAccount) {
-    try {
-      if (await bootstrapFirstAdmin()) return;
-    } catch (bootErr) {
-      console.error('Bootstrap failed:', bootErr.code || bootErr);
-    }
-  }
   // Everything that was not rate-limiting used to be reported as "Invalid Credentials",
   // so an outage told a person with a perfectly good password that it was wrong — which
   // invites them to doubt it, retry, and ask for a reset, none of which helps.
