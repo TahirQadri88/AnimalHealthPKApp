@@ -102,7 +102,11 @@ useEffect(() => {
   setCurrentUser(prev => (prev && prev.authUid ? null : prev));
 }, [authUid]);
 
-const appUsers = useLiveCollection('app_users', authUid);
+// Admins only. The rules let staff read nothing here but their own profile, so a staff
+// listener on the whole collection is refused — and a refused listener that had first served
+// the device's cache left the sync pill stuck on "No connection". Staff never read this list.
+// (currentUser, not isAdmin: isAdmin is declared further down, and this runs at render.)
+const appUsers = useLiveCollection('app_users', currentUser?.role === 'admin' ? authUid : null);
 const companies = useLiveCollection('companies', authUid);
 const products = useLiveCollection('products', authUid);
 const customers = useLiveCollection('customers', authUid);

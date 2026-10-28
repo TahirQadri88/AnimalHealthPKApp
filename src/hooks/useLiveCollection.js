@@ -2,7 +2,7 @@
 // is left byte-identical rather than tidied, so the extraction stays a pure move.
 import React, { useEffect } from 'react';
 import { db, collection, onSnapshot } from '../firebase';
-import { publishCollectionMeta, countPending } from '../lib/syncStatus';
+import { publishCollectionMeta, countPending, forgetCollection } from '../lib/syncStatus';
 
 /**
  * Subscribe to a whole collection.
@@ -41,8 +41,12 @@ if (snapshot.docChanges().length === 0) return;
 const items = [];
 snapshot.forEach((d) => items.push(d.data()));
 setData(items.sort((a, b) => (a.id > b.id ? 1 : -1)));
-}, (error) => { console.error('Error fetching ' + collectionName + ':', error); });
-return () => unsubscribe();
+}, (error) => {
+  console.error('Error fetching ' + collectionName + ':', error);
+  // Firestore does not retry a failed listener, so it will never report again.
+  forgetCollection(collectionName);
+});
+return () => { unsubscribe(); forgetCollection(collectionName); };
 }, [collectionName, authKey]);
 return data;
 }

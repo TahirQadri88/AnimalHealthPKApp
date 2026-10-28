@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   deriveStatus, countPending, publishCollectionMeta, publishOnline,
-  getSyncSnapshot, subscribeSyncStatus, __resetSyncStatus,
+  getSyncSnapshot, subscribeSyncStatus, __resetSyncStatus, forgetCollection,
 } from './syncStatus';
 
 beforeEach(() => __resetSyncStatus());
@@ -169,5 +169,30 @@ describe('the store', () => {
     subscribeSyncStatus(good);
     expect(() => publishCollectionMeta('invoices', { fromCache: true, pending: 0 })).not.toThrow();
     expect(good).toHaveBeenCalled();
+  });
+});
+
+// A listener the server refuses delivers the device's cache first, then dies. Its last word
+// was "from cache", and it used to hold the pill at "No connection" on a working line.
+describe('forgetCollection', () => {
+  it('a refused listener stops holding the indicator at stale', () => {
+    publishCollectionMeta('invoices', { fromCache: false, pending: 0 });
+    publishCollectionMeta('app_users', { fromCache: true, pending: 0 });
+    expect(getSyncSnapshot().state).toBe('stale');
+    forgetCollection('app_users');
+    expect(getSyncSnapshot().state).toBe('live');
+  });
+
+  it('still reports stale when a live listener is genuinely out of touch', () => {
+    publishCollectionMeta('invoices', { fromCache: true, pending: 0 });
+    publishCollectionMeta('app_users', { fromCache: true, pending: 0 });
+    forgetCollection('app_users');
+    expect(getSyncSnapshot().state).toBe('stale');
+  });
+
+  it('forgetting something never published is a no-op', () => {
+    const before = getSyncSnapshot();
+    forgetCollection('nothing');
+    expect(getSyncSnapshot()).toBe(before);
   });
 });

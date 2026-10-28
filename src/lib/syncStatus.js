@@ -71,6 +71,22 @@ export const publishCollectionMeta = (name, { fromCache, pending }) => {
   recompute();
 };
 
+/**
+ * Called when a listener stops: closed on sign-out, or refused by the server.
+ *
+ * A refused listener is the dangerous one. With the persistent cache it first delivers
+ * whatever this device has stored (fromCache: true), then the server says no and Firestore
+ * terminates it for good. Its last word stays "from cache" forever, and one such entry is
+ * enough to hold the whole indicator at "No connection" on a perfectly good line. A listener
+ * that has stopped says nothing about the connection, so it is dropped.
+ */
+export const forgetCollection = (name) => {
+  if (!(name in collections)) return;
+  const { [name]: _gone, ...rest } = collections;
+  collections = rest;
+  recompute();
+};
+
 export const publishOnline = (isOnline) => {
   if (online === isOnline) return;
   online = isOnline;
