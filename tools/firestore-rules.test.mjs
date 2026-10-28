@@ -51,7 +51,7 @@ beforeEach(async () => {
     await setDoc(doc(db, 'invoices', 'INV-3'), { id: 'INV-3', status: 'Billed', customerId: 9, total: 800, receivedAmount: 0, salespersonId: EDIT.appUserId });
     await setDoc(doc(db, 'payments', 'REC-1'), { id: 'REC-1', customerId: 9, amount: 500 });
     await setDoc(doc(db, 'expenses', '1'), { id: 1, amount: 100, category: 'Transport' });
-    await setDoc(doc(db, 'customers', '9'), { id: 9, name: 'Abdul Qadir' });
+    await setDoc(doc(db, 'customers', '9'), { id: 9, name: 'Abdul Qadir', openingBalance: 136000, creditLimit: '50000' });
     await setDoc(doc(db, 'products', '5'), { id: 5, name: 'Antox 9', costPrice: 100 });
     await setDoc(doc(db, 'counters', 'INV'), { prefix: 'INV', next: 10 });
     await setDoc(doc(db, 'appSettings', 'main'), { id: 'main', businessName: 'Khyber Traders' });
@@ -65,6 +65,8 @@ const anon = () => env.unauthenticatedContext().firestore();
 describe('signed out', () => {
   it('can resolve a username at the login screen, and nothing else', async () => {
     await assertSucceeds(getDoc(doc(anon(), 'loginIndex', 'ghousia')));
+    // One name at a time. Listing would hand a visitor every username and login address.
+    await assertFails(getDocs(collection(anon(), 'loginIndex')));
     await assertFails(getDocs(collection(anon(), 'invoices')));
     await assertFails(getDoc(doc(anon(), 'customers', '9')));
     await assertFails(setDoc(doc(anon(), 'invoices', 'INV-9'), { total: 1 }));
@@ -247,6 +249,26 @@ describe('master data', () => {
   it('addCustomers covers correcting a client as well as adding one', async () => {
     await assertSucceeds(updateDoc(doc(as(STAFF), 'customers', '9'), { phone: '0300-1111111' }));
     await assertFails(updateDoc(doc(as(BARE), 'customers', '9'), { phone: '0300-2222222' }));
+  });
+
+  // Admin-only on screen, and now in the database. Opening Balance is debt from before the
+  // system: zeroing it erases what a customer owes.
+  it('staff cannot change a client’s opening balance or credit limit', async () => {
+    await assertFails(updateDoc(doc(as(STAFF), 'customers', '9'), { openingBalance: 0 }));
+    await assertFails(updateDoc(doc(as(STAFF), 'customers', '9'), { creditLimit: '0' }));
+    await assertSucceeds(updateDoc(doc(as(ADMIN), 'customers', '9'), { openingBalance: 0, creditLimit: 0 }));
+  });
+
+  it('staff saving the whole form unchanged still goes through', async () => {
+    // What CustomerModal sends: every stored field back, as stored.
+    await assertSucceeds(setDoc(doc(as(STAFF), 'customers', '9'), { id: 9, name: 'Abdul Qadir', phone: '0300', openingBalance: 136000, creditLimit: '50000' }));
+  });
+
+  it('staff may register a client, but not with a balance already on it', async () => {
+    await assertSucceeds(setDoc(doc(as(STAFF), 'customers', '10'), { id: 10, name: 'New Shop', openingBalance: 0 }));
+    await assertFails(setDoc(doc(as(STAFF), 'customers', '11'), { id: 11, name: 'Shop', openingBalance: 5000 }));
+    await assertFails(setDoc(doc(as(STAFF), 'customers', '12'), { id: 12, name: 'Shop', creditLimit: 900000 }));
+    await assertSucceeds(setDoc(doc(as(ADMIN), 'customers', '13'), { id: 13, name: 'Shop', openingBalance: 5000 }));
   });
 
   it('deleting a client or a product stays with admins', async () => {

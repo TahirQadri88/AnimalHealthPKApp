@@ -21,7 +21,11 @@ const save = async () => {
 if(!form.name) return showToast("Customer Name required", "error");
 if(checkDuplicate(customers, form.name, form.id)) return showToast("Customer Name must be unique", "error");
 if(isEdit) {
-const updatedCustomer = {...form, openingBalance: Number(form.openingBalance), isCashCustomer: !!form.isCashCustomer};
+// Opening Balance is admin-only, on screen and in firestore.rules, which refuses a staff
+// save that changes it. Converting it to a number counts as a change on a record that
+// stored it as text, so only an admin's save converts it; anyone else sends it back as is.
+const updatedCustomer = {...form, isCashCustomer: !!form.isCashCustomer};
+if (isAdmin) updatedCustomer.openingBalance = Number(form.openingBalance);
 if(updatedCustomer.address) delete updatedCustomer.address;
 await saveToFirebase('customers', form.id, updatedCustomer);
 if(form.name !== editingCustomer.name) { for (const o of invoices) { if (o.customerId === form.id) await saveToFirebase('invoices', o.id, {...o, customerName: form.name}); } }

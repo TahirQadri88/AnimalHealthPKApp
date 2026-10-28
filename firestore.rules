@@ -74,8 +74,11 @@ service cloud.firestore {
     // its login address BEFORE anyone is signed in. It holds no secret — only the synthetic
     // address a username maps to. Writable by admins alone; anyone able to repoint an entry
     // could redirect a colleague's login to an account they control.
+    //
+    // `get`, not `read`: sign-in looks up one name at a time. `read` also allowed `list`,
+    // which handed any visitor every username and login address in one query.
     match /loginIndex/{slug} {
-      allow read: if true;
+      allow get: if true;
       allow write: if isAdmin();
     }
 
@@ -144,11 +147,20 @@ service cloud.firestore {
     }
 
     // ── Master data ──────────────────────────────────────────────────────────
+    // Opening Balance and Credit Limit are admin-only on screen. Opening Balance is money
+    // owed from before the system: a staff member able to zero it could erase a debt.
+    // Staff may register a client with neither set, and correct one without touching them.
+    function keepsCustomerMoney() {
+      return request.resource.data.get('openingBalance', 0) == resource.data.get('openingBalance', 0)
+          && request.resource.data.get('creditLimit', 0) == resource.data.get('creditLimit', 0);
+    }
     match /customers/{id} {
       allow read: if active();
-      allow create: if can('addCustomers');
+      allow create: if can('addCustomers')
+                    && (isAdmin() || (request.resource.data.get('openingBalance', 0) == 0
+                                      && request.resource.data.get('creditLimit', 0) == 0));
       // Whoever may register a client may correct one; removing a client is admin work.
-      allow update: if can('addCustomers');
+      allow update: if can('addCustomers') && (isAdmin() || keepsCustomerMoney());
       allow delete: if isAdmin();
     }
     // This one LOOSENS. The billing screen offers "Add / Edit Products" to any staff
