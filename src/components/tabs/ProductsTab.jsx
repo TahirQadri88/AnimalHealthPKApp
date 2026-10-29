@@ -1,4 +1,5 @@
 import { useState, useContext } from 'react';
+import { needsCost } from '../../lib/costPending';
 import { Plus, Search, Edit, Trash2, RotateCcw } from 'lucide-react';
 import { AppContext } from '../../context/AppContext';
 
@@ -12,10 +13,11 @@ return (
 <button onClick={() => { setEditingProduct(null); setShowProductModal(true); }} className="bg-indigo-600 text-white p-3 rounded-xl shadow-md"><Plus size={20}/></button>
 </div>
 <div className="flex-1 overflow-y-auto space-y-3 pb-24 pr-1">
-{products.filter(p => p.name.toLowerCase().includes(search.toLowerCase())).map(p => (
+{/* Products waiting for a cost come first: the Home notice and the tab badge send you here for them. */}
+{products.filter(p => p.name.toLowerCase().includes(search.toLowerCase())).sort((a, b) => needsCost(b) - needsCost(a)).map(p => (
 <div key={p.id} className={`p-4 rounded-2xl border shadow-sm ${p.archived ? 'bg-amber-50/40 border-amber-200 opacity-75' : 'bg-white border-slate-200'}`}>
 <div className="flex justify-between items-start mb-3">
-<div><h4 className="font-bold text-slate-800 text-base leading-tight">{p.name}{p.archived && <span className="ml-2 px-1.5 py-0.5 text-[9px] font-bold bg-amber-100 text-amber-700 rounded-full uppercase align-middle">Archived</span>}{isAdmin && p.costPending && <span className="ml-2 px-1.5 py-0.5 text-[9px] font-bold bg-rose-100 text-rose-700 rounded-full uppercase align-middle" title="Registered by staff. Until a cost is set, its sales count as pure profit.">Cost needed</span>}</h4><p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mt-1">{getCompanyName(p.companyId)} • {p.unit} ({p.unitsInBox})</p></div>
+<div><h4 className="font-bold text-slate-800 text-base leading-tight">{p.name}{p.archived && <span className="ml-2 px-1.5 py-0.5 text-[9px] font-bold bg-amber-100 text-amber-700 rounded-full uppercase align-middle">Archived</span>}{isAdmin && needsCost(p) && <span className="ml-2 px-1.5 py-0.5 text-[9px] font-bold bg-rose-100 text-rose-700 rounded-full uppercase align-middle" title="Registered by staff. Until a cost is set, its sales count as pure profit.">Cost needed</span>}</h4><p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mt-1">{getCompanyName(p.companyId)} • {p.unit} ({p.unitsInBox})</p></div>
 {isAdmin && (<div className="flex gap-1.5"><button onClick={() => { setEditingProduct(p); setShowProductModal(true); }} className="p-2 bg-slate-50 text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"><Edit size={16}/></button>
 {p.archived
   ? <button onClick={async () => { await saveToFirebase('products', p.id, { ...p, archived: false }); }} className="p-2 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition-colors" title="Unarchive"><RotateCcw size={16}/></button>

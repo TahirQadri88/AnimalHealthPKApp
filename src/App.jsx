@@ -17,6 +17,7 @@ import { signInErrorMessage, OFFLINE_MESSAGE } from './lib/loginErrors';
 import { makeArrowNav } from './lib/a11y';
 import { uploadToDrive } from './lib/driveBackup';
 import { LOG_PAGE } from './lib/constants';
+import { productsNeedingCost } from './lib/costPending';
 import { useLiveCollection } from './hooks/useLiveCollection';
 import { ConfirmDialog } from './components/ui/ConfirmDialog';
 import { CustomersTab } from './components/tabs/CustomersTab';
@@ -845,6 +846,8 @@ return (
         if (!canSeeTab(tab)) return null;
         const active = activeTab === tab.id;
         const draftCount = tab.id === 'billing' ? invoices.filter(o => o.status === 'Booked' || o.status === 'Estimate').length : 0;
+        // Items is admin-only, so this is only ever seen by someone who can set the cost.
+        const costCount = tab.id === 'products' ? productsNeedingCost(products).length : 0;
         return (
           <button key={tab.id} data-sidenav={tab.id} tabIndex={active ? 0 : -1} onClick={() => setActiveTab(tab.id)} title={`Alt+${tab.label[0].toLowerCase()}`}
             aria-current={active ? 'page' : undefined}
@@ -852,7 +855,7 @@ return (
             className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-semibold text-sm transition-all ${active ? 'bg-indigo-50 text-indigo-700 shadow-sm' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'}`}>
             <div className="relative shrink-0">
               <tab.icon size={18} strokeWidth={active ? 2.5 : 2} />
-              {draftCount > 0 && <span className="absolute -top-1.5 -right-1.5 bg-amber-500 text-white text-[7px] font-black w-3.5 h-3.5 rounded-full flex items-center justify-center leading-none">{draftCount > 9 ? '9+' : draftCount}</span>}
+              {draftCount > 0 && <span className="absolute -top-1.5 -right-1.5 bg-amber-500 text-white text-[7px] font-black w-3.5 h-3.5 rounded-full flex items-center justify-center leading-none">{draftCount > 9 ? '9+' : draftCount}</span>}{costCount > 0 && <span title="Products waiting for a cost price" className="absolute -top-1.5 -right-1.5 bg-rose-500 text-white text-[7px] font-black w-3.5 h-3.5 rounded-full flex items-center justify-center leading-none">{costCount > 9 ? '9+' : costCount}</span>}
             </div>
             <span>{tab.label}</span>
             {active && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-indigo-500"></span>}
@@ -924,6 +927,8 @@ return (
         if (!canSeeTab(tab)) return null;
         const active = activeTab === tab.id;
         const draftCount = tab.id === 'billing' ? invoices.filter(o => o.status === 'Booked' || o.status === 'Estimate').length : 0;
+        // Items is admin-only, so this is only ever seen by someone who can set the cost.
+        const costCount = tab.id === 'products' ? productsNeedingCost(products).length : 0;
         return (
           <button key={tab.id} data-sidenav={tab.id} tabIndex={active ? 0 : -1} onClick={() => setActiveTab(tab.id)}
             aria-current={active ? 'page' : undefined}
@@ -931,7 +936,7 @@ return (
             className={`flex flex-col items-center justify-center w-full min-h-[48px] transition-all ${active ? 'text-indigo-600' : 'text-slate-400'}`}>
             <div className={`relative p-1.5 rounded-xl transition-all ${active ? 'bg-indigo-50 shadow-sm' : ''}`}>
               <tab.icon size={22} strokeWidth={active ? 2.5 : 2} />
-              {draftCount > 0 && <span className="absolute -top-1 -right-1 bg-amber-500 text-white text-[8px] font-black w-4 h-4 rounded-full flex items-center justify-center leading-none">{draftCount > 9 ? '9+' : draftCount}</span>}
+              {draftCount > 0 && <span className="absolute -top-1 -right-1 bg-amber-500 text-white text-[8px] font-black w-4 h-4 rounded-full flex items-center justify-center leading-none">{draftCount > 9 ? '9+' : draftCount}</span>}{costCount > 0 && <span title="Products waiting for a cost price" className="absolute -top-1 -right-1 bg-rose-500 text-white text-[8px] font-black w-4 h-4 rounded-full flex items-center justify-center leading-none">{costCount > 9 ? '9+' : costCount}</span>}
             </div>
             <span className={`text-[9px] font-bold uppercase tracking-widest ${active ? 'text-indigo-700 mt-1' : 'mt-0.5'}`}>{tab.label}</span>
           </button>

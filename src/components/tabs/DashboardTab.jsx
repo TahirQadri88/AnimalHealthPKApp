@@ -3,6 +3,7 @@ import { Search, Calendar, Wallet, TrendingUp, TrendingDown, DollarSign, Chevron
 import { AppContext } from '../../context/AppContext';
 import { getLocalDateStr, formatDateDisp, checkDateFilter } from '../../helpers';
 import { netBilled, topProducts, momChangePct } from '../../services/analytics/dashboard';
+import { productsNeedingCost, billsAffected } from '../../lib/costPending';
 
 export const DashboardTab = () => {
 const { getPaymentStatus, isAdmin, hasPermission, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, analyticsView, setAnalyticsView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, productPreFill, setProductPreFill, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig, showConfirm } = useContext(AppContext);
@@ -69,9 +70,28 @@ const recentActivity = useMemo(() => {
     .slice(0, 8);
 }, [visibleInvoices, payments, customers, dateFilter, ownOnly]);
 
+// Products staff registered without a cost. Until an admin prices them, every sale of one
+// counts as pure profit, so the admin is told here rather than left to find it on Items.
+const costPending = isAdmin ? productsNeedingCost(products) : [];
+const costPendingBills = billsAffected(costPending, invoices);
 return (
 <div className="h-full overflow-y-auto">
 <div className="p-5 space-y-6 pb-24">
+{costPending.length > 0 && (
+<button onClick={() => setActiveTab('products')} className="w-full text-left bg-rose-50 border border-rose-200 rounded-2xl p-4 flex items-start gap-3 hover:bg-rose-100 transition-colors">
+  <Bell size={18} className="text-rose-600 shrink-0 mt-0.5" />
+  <span className="flex-1 min-w-0">
+    <span className="block text-sm font-bold text-rose-800">
+      {costPending.length} product{costPending.length !== 1 ? 's' : ''} need{costPending.length === 1 ? 's' : ''} a cost price
+    </span>
+    <span className="block text-[11px] text-rose-700 mt-0.5 leading-relaxed">
+      Added by staff: {costPending.slice(0, 3).map(p => p.name).join(', ')}{costPending.length > 3 ? ` and ${costPending.length - 3} more` : ''}.
+      {costPendingBills > 0 ? ` Sold on ${costPendingBills} bill${costPendingBills !== 1 ? 's' : ''} so far, counted as pure profit until you set the cost.` : ' Set the cost before it is sold, or its sales count as pure profit.'}
+    </span>
+  </span>
+  <ChevronRight size={16} className="text-rose-400 shrink-0 mt-0.5" />
+</button>
+)}
 <div className="flex justify-between items-center">
 <h2 className="text-2xl font-extrabold text-slate-800 tracking-tight">Overview</h2>
 <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-full border border-slate-200 shadow-sm">

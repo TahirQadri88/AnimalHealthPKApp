@@ -76,3 +76,27 @@ describe('DashboardTab', () => {
     expect(render()).not.toMatch(/undefined|NaN/);
   });
 });
+
+// A product staff registered has no cost until an admin sets one, and its sales count as pure
+// profit meanwhile. The admin is told on Home, not left to find it on the Items tab.
+describe('DashboardTab — products waiting for a cost', () => {
+  const pending = [{ id: 77, name: 'Tylosin 20%', costPrice: 0, costPending: true, sellingPrice: 900 }];
+  const sold = [{ id: 'INV-9001', date: '2026-10-28', status: 'Billed', customerId: 1, total: 900, items: [{ productId: 77, quantity: 1, price: 900 }] }];
+
+  it('tells an admin, naming the product and the bills it is on', () => {
+    const html = render({ products: pending, invoices: sold });
+    expect(html).toContain('1 product needs a cost price');
+    expect(html).toContain('Tylosin 20%');
+    expect(html).toContain('Sold on 1 bill');
+  });
+
+  it('says nothing to staff, who cannot set a cost', () => {
+    const html = render({ isAdmin: false, hasPermission: () => true, products: pending, invoices: sold });
+    expect(html).not.toContain('need a cost price');
+    expect(html).not.toContain('needs a cost price');
+  });
+
+  it('says nothing once every product is priced', () => {
+    expect(render({ products: [{ ...pending[0], costPrice: 600, costPending: false }] })).not.toContain('cost price');
+  });
+});
