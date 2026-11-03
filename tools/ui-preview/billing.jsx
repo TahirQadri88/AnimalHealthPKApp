@@ -3,6 +3,21 @@
 import { createRoot } from 'react-dom/client';
 import { useState } from 'react';
 import '../../src/index.css';
+import '@fontsource/poppins/400.css'; import '@fontsource/poppins/500.css'; import '@fontsource/poppins/600.css';
+import '@fontsource/dm-sans/400.css'; import '@fontsource/dm-sans/500.css'; import '@fontsource/dm-sans/600.css';
+import '@fontsource/eb-garamond/400.css'; import '@fontsource/eb-garamond/500.css';
+import '@fontsource/gentium-book-plus/400.css'; import '@fontsource/gentium-book-plus/700.css';
+
+// ?font= picks a pairing, so the options can be compared on the real screen.
+const FONTS = {
+  brand:    ['"Poppins"', '"Poppins"'],
+  website:  ['"DM Sans"', '"Gentium Book Plus"'],
+  garamond: ['"DM Sans"', '"EB Garamond"'],
+  mixed:    ['"Poppins"', '"EB Garamond"'],
+};
+const [ui, display] = FONTS[new URLSearchParams(location.search).get('font')] || FONTS.garamond;
+document.documentElement.style.setProperty('--font-ui', `${ui}, system-ui, sans-serif`);
+document.documentElement.style.setProperty('--font-display', `${display}, Georgia, serif`);
 import { AppContext } from '../../src/context/AppContext';
 import { BillingTab } from '../../src/components/tabs/BillingTab';
 

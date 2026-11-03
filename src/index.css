@@ -2,6 +2,16 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Fonts for the Khyber Traders look. Two roles; see tailwind.config.js. Trial: only the
+ * Billing screen uses them so far, and the font files are imported by whichever option is
+ * chosen. Display serifs default to old-style figures, which do not line up in a money
+ * column, so `.font-display` asks for lining, tabular figures. */
+:root {
+  --font-ui: "DM Sans", system-ui, sans-serif;
+  --font-display: "EB Garamond", Georgia, serif;
+}
+.font-display { font-variant-numeric: lining-nums tabular-nums; }
+
 /* ── Keyboard focus ──────────────────────────────────────────────────────────
  *
  * 46 controls in this app carry Tailwind's `outline-none` with nothing put back,

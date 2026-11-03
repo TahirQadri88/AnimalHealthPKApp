@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useContext } from 'react';
-import { Plus, Search, X, Edit, Trash2, Save, Users, Package, Truck, MapPin, Calendar,
-         AlertCircle, AlignLeft, BookOpen, FileText, ReceiptText, RotateCcw, Gift } from 'lucide-react';
+import { Plus, Search, X, Edit, Trash2, Save, Truck, MapPin, Calendar,
+         AlertCircle, BookOpen, FileText, ReceiptText, RotateCcw, Gift } from 'lucide-react';
 // nextDocNumber comes through context, not by import: ../../lib/claimDocNumber pulls in
 // ../firebase, which initialises Auth on import and would make this — the screen that
 // bills every invoice — impossible to load from a test.
@@ -10,7 +10,7 @@ import { makeArrowNav } from '../../lib/a11y';
 import { getNextSeqNum, prefixForStatus, needsRenumber } from '../../lib/docNumbers';
 import { QUEUED } from '../../lib/pendingWrite';
 import { isTransportMethod, isKnownVehicleType, usesCarrierPerson } from '../../lib/transport';
-import { invoiceTotal } from '../../services/accounting/invoiceTotals';
+import { invoiceTotal, itemsSubtotal, bonusSavings } from '../../services/accounting/invoiceTotals';
 
 export const BillingTab = () => {
 const { getPaymentStatus, isAdmin, hasPermission, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, productPreFill, setProductPreFill, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig, setShowCreditNoteModal, setEditingCreditNote, showConfirm, riders, vehicleTypes, transportCompanies, showPrompt, voidRecord, logSave, invoicesRaw, logDelete, nextDocNumber } = useContext(AppContext);
@@ -126,8 +126,10 @@ setBillingView('list');
 // Khyber Traders look (unslop trial): bone neutrals, hairlines, one yellow block per screen.
 const inputClass = "w-full h-11 px-3 bg-white border border-kt-line rounded-lg text-sm text-kt-ink placeholder-kt-muted focus:outline-none focus:border-kt-ink transition-colors";
 const labelClass = "text-xs font-medium text-kt-sub mb-1.5 block";
-const sectionClass = "bg-white p-5 rounded-xl border border-kt-line";
-const sectionTitleClass = "text-sm font-medium text-kt-ink mb-4 flex items-center gap-2";
+const sectionClass = "bg-white p-5 sm:p-6 rounded-xl border border-kt-line shadow-[0_1px_2px_rgba(20,20,20,0.05)]";
+const sectionTitleClass = "font-display text-xl text-kt-ink mb-4 flex items-center gap-3";
+// The signature detail: sections numbered like the parts of a bill book, in the order a bill is written.
+const Step = ({ n }) => <span aria-hidden="true" className="font-ui w-6 h-6 shrink-0 rounded-full bg-kt-charcoal text-white text-xs font-medium flex items-center justify-center">{n}</span>;
 const iconBtn = "w-11 h-11 shrink-0 flex items-center justify-center rounded-lg border border-kt-line bg-white text-kt-sub hover:bg-kt-raised hover:text-kt-ink transition-colors";
 const handleAddItem = (p, isBonus) => {
 const uniqueId = isBonus ? `${p.id}_bonus` : p.id;
@@ -158,14 +160,14 @@ const canSaveAsEstimate = !isEdit || editingStatus === 'Estimate' || editingStat
 const canConvert = hasPermission('issueInvoices');
 const offerStatus = (target) => !isEdit || editingStatus === target || canConvert;
 return (
-<div className="h-full flex flex-col bg-kt-page absolute inset-0 z-20 animate-slide-up" onKeyDown={e => { if (e.ctrlKey && e.key === 'Enter' && offerStatus('Billed')) { e.preventDefault(); saveInvoice('Billed'); } }}>
-<div className="bg-white px-5 py-4 border-b border-kt-line flex justify-between items-center sticky top-0 z-30">
-<div><h2 className="text-lg font-semibold text-kt-ink">{isEdit ? `${formTypeLabel} — ${currentInvoice.id}` : formTypeLabel}</h2><input type="date" value={currentInvoice.date || getLocalDateStr()} onChange={e => setCurrentInvoice({...currentInvoice, date: e.target.value})} className="text-sm text-kt-sub bg-transparent border-0 outline-none cursor-pointer hover:text-kt-ink transition-colors mt-1 p-0 tabular-nums" /></div>
-<button onClick={() => setBillingView('list')} title="Close" aria-label="Close" className="w-9 h-9 flex items-center justify-center rounded-lg text-kt-sub hover:bg-kt-raised hover:text-kt-ink transition-colors"><X size={18} strokeWidth={1.5}/></button>
+<div className="font-ui h-full flex flex-col bg-kt-page absolute inset-0 z-20 animate-slide-up" onKeyDown={e => { if (e.ctrlKey && e.key === 'Enter' && offerStatus('Billed')) { e.preventDefault(); saveInvoice('Billed'); } }}>
+<div className="bg-kt-charcoal text-white px-5 sm:px-6 py-4 flex justify-between items-center sticky top-0 z-30">
+<div><h2 className="font-display text-2xl leading-tight">{isEdit ? `${formTypeLabel} — ${currentInvoice.id}` : formTypeLabel}</h2><input type="date" value={currentInvoice.date || getLocalDateStr()} onChange={e => setCurrentInvoice({...currentInvoice, date: e.target.value})} className="text-sm text-white/70 bg-transparent border-0 outline-none cursor-pointer hover:text-white transition-colors mt-1 p-0 tabular-nums [color-scheme:dark]" /></div>
+<button onClick={() => setBillingView('list')} title="Close" aria-label="Close" className="w-9 h-9 flex items-center justify-center rounded-lg text-white/70 hover:bg-white/10 hover:text-white transition-colors"><X size={18} strokeWidth={1.5}/></button>
 </div>
 <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 pb-6">
 <div className={sectionClass}>
-<h3 className={sectionTitleClass}><Users size={16} strokeWidth={1.5} className="text-kt-muted"/> Customer</h3>
+<h3 className={sectionTitleClass}><Step n={1}/> Customer</h3>
 <div className="flex gap-2 items-center">
 <div className="relative flex-1">
   <Search size={16} strokeWidth={1.5} className="absolute left-3 top-3.5 text-kt-muted pointer-events-none z-10"/>
@@ -229,7 +231,7 @@ return (
   if (!cust?.address2) return null;
   return (
     <div className={sectionClass}>
-      <h3 className={sectionTitleClass}><MapPin size={16} strokeWidth={1.5} className="text-kt-muted"/> Delivery Address</h3>
+      <h3 className={sectionTitleClass}><MapPin size={18} strokeWidth={1.5} className="text-kt-muted"/> Delivery address</h3>
       <div className="space-y-2">
         {[{key:'address1',label:'Primary',address:cust.address1},{key:'address2',label:'Secondary',address:cust.address2}].map(opt=>(
           <label key={opt.key} className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${currentInvoice.deliveryAddressKey===opt.key?'bg-kt-raised border-kt-ink':'bg-white border-kt-line hover:bg-kt-raised'}`}>
@@ -242,7 +244,7 @@ return (
   );
 })()}
 <div className={sectionClass}>
-<h3 className={sectionTitleClass}><Package size={16} strokeWidth={1.5} className="text-kt-muted"/> Products{currentInvoice.items.length > 0 && <span className="ml-1 text-kt-muted font-normal tabular-nums">{currentInvoice.items.length} SKU{currentInvoice.items.length !== 1 ? 's' : ''} · {currentInvoice.items.reduce((s,i)=>s+(i.quantity||0),0)} units</span>}</h3>
+<h3 className={sectionTitleClass}><Step n={2}/> Products{currentInvoice.items.length > 0 && <span className="font-ui ml-auto text-sm text-kt-muted font-normal tabular-nums">{currentInvoice.items.length} SKU{currentInvoice.items.length !== 1 ? 's' : ''} · {currentInvoice.items.reduce((s,i)=>s+(i.quantity||0),0)} units</span>}</h3>
 <div className="flex gap-2 items-center mb-4">
   <div className="relative flex-1"><Search size={16} strokeWidth={1.5} className="absolute left-3 top-3.5 text-kt-muted"/><input ref={prodSearchRef} placeholder="Search products" className={`pl-10 ${inputClass}`} value={prodSearch} onChange={e=>{ setProdSearch(e.target.value); setHiProduct(-1); }} onKeyDown={e => { const filtP = products.filter(p => p.available && !p.archived && p.name.toLowerCase().includes(prodSearch.toLowerCase())); if (e.key === 'ArrowDown') { e.preventDefault(); setHiProduct(h => Math.min(h + 1, filtP.length - 1)); } else if (e.key === 'ArrowUp') { e.preventDefault(); setHiProduct(h => Math.max(h - 1, 0)); } else if (e.key === 'Enter') { e.preventDefault(); const p = hiProduct >= 0 ? filtP[hiProduct] : filtP.length === 1 ? filtP[0] : null; if (p) { justAddedRef.current = true; handleAddItem(p, false); setProdSearch(''); setHiProduct(-1); } } else if (e.key === 'Escape') { setProdSearch(''); setHiProduct(-1); } }} /></div>
   {hasPermission('addEditProducts') && <button type="button" onClick={() => { setProductPreFill(prodSearch.trim()); setEditingProduct(null); setShowProductModal(true); }} className="shrink-0 h-11 flex items-center gap-1.5 px-4 bg-white text-kt-ink border border-kt-line rounded-lg text-sm font-medium hover:bg-kt-raised transition-colors" title="Register a new product"><Plus size={16} strokeWidth={1.5}/> New</button>}
@@ -261,9 +263,10 @@ return (
 {currentInvoice.items.map((item, idx) => {
 const itemKey = item.uniqueId || item.productId;
 return (
-<div key={itemKey} data-item-row="1" className="bg-kt-page/60 p-3 rounded-lg border border-kt-line">
-<div className="flex justify-between items-start mb-2">
-<p className="font-medium text-sm text-kt-ink leading-tight">{item.name}{item.isBonus && <span className="ml-2 text-xs text-kt-green">Bonus</span>}</p>
+<div key={itemKey} data-item-row="1" className="bg-kt-page/50 p-4 rounded-lg border border-kt-line">
+<div className="flex justify-between items-start gap-3 mb-3">
+<p className="font-medium text-[15px] text-kt-ink leading-tight">{item.name}{item.isBonus && <span className="ml-2 text-xs font-medium text-kt-green bg-kt-green/10 px-1.5 py-0.5 rounded">Bonus</span>}</p>
+<span className="ml-auto font-display text-lg text-kt-ink leading-none whitespace-nowrap">{item.isBonus ? 'Free' : `Rs. ${((Number(item.price) || 0) * (Number(item.quantity) || 0)).toLocaleString('en-US')}`}</span>
 <button tabIndex={-1} onClick={() => setCurrentInvoice({...currentInvoice, items: currentInvoice.items.filter(i => (i.uniqueId || i.productId) !== itemKey)})} title="Remove" aria-label="Remove" className="text-kt-muted hover:text-kt-red transition-colors"><X size={16} strokeWidth={1.5}/></button>
 </div>
 <div className="flex items-center justify-between">
@@ -286,7 +289,7 @@ return (
 </div>
 </div>
 <div className={sectionClass}>
-<h3 className={sectionTitleClass}><Truck size={16} strokeWidth={1.5} className="text-kt-muted"/> Logistics</h3>
+<h3 className={sectionTitleClass}><Step n={3}/> Delivery and payment</h3>
 <div className="mb-4"><label className={labelClass}>Vehicle / transport method</label><select className={inputClass} value={currentInvoice.vehicle} onChange={e => { const v = e.target.value; setCurrentInvoice({...currentInvoice, vehicle: v, ...(isTransportMethod(vehicleTypes, v) ? {} : { transportCompany: '', biltyNumber: '' }), ...(usesCarrierPerson(v) ? {} : { driverName: '', driverPhone: '', riderId: '' })}); }}>{(vehicleTypes.length ? vehicleTypes : [{name:'Rider'},{name:'Rickshaw'},{name:'Suzuki'},{name:'Intercity Transport'},{name:'Self-Pickup'}]).map(v => <option key={v.name} value={v.name}>{v.name}</option>)}</select></div>
 {(isTransportMethod(vehicleTypes, currentInvoice.vehicle) || (!isKnownVehicleType(vehicleTypes, currentInvoice.vehicle) && (currentInvoice.transportCompany || currentInvoice.biltyNumber))) && (
 <div className="grid grid-cols-2 gap-3 mb-4 bg-kt-page/60 p-4 rounded-lg border border-kt-line">
@@ -432,14 +435,31 @@ return (
 )}
 </div>
 <div className={sectionClass}>
-<h3 className={sectionTitleClass}><AlignLeft size={16} strokeWidth={1.5} className="text-kt-muted"/> Notes</h3>
+<h3 className={sectionTitleClass}><Step n={4}/> Notes</h3>
 <textarea rows={3} placeholder="Delivery instructions, payment terms" className={`${inputClass} h-auto py-2.5 resize-none`} value={currentInvoice.notes || ''} onChange={e => setCurrentInvoice({...currentInvoice, notes: e.target.value})} />
 </div>
-{/* The one bright element: the same yellow block, black lettering, that the printed invoice carries. */}
-<div className="bg-kt-yellow text-black px-5 py-4 rounded-xl flex items-baseline justify-between gap-4">
-<p className="text-sm font-medium">Grand total</p>
-<p className="text-3xl font-semibold tabular-nums">Rs. {grandTotal.toLocaleString('en-US')}</p>
-</div>
+{/* The one bright element: the bill's arithmetic, ending on the total in Khyber Yellow. */}
+{(() => {
+  const sub = itemsSubtotal(currentInvoice.items);
+  const delivery = Number(currentInvoice.deliveryBilled) || 0;
+  const disc = Number(currentInvoice.discount) || 0;
+  const saved = bonusSavings(currentInvoice.items);
+  const row = (label, value) => <div className="flex justify-between text-sm text-white/70"><span>{label}</span><span className="tabular-nums">{value}</span></div>;
+  return (
+    <div className="bg-kt-charcoal text-white rounded-xl p-5 sm:p-6">
+      <div className="space-y-1.5">
+        {row('Items', `Rs. ${sub.toLocaleString('en-US')}`)}
+        {delivery > 0 && row('Delivery', `+ Rs. ${delivery.toLocaleString('en-US')}`)}
+        {disc > 0 && row('Discount', `− Rs. ${disc.toLocaleString('en-US')}`)}
+        {saved > 0 && row('Bonus given', `Rs. ${saved.toLocaleString('en-US')}`)}
+      </div>
+      <div className="mt-4 pt-4 border-t border-white/15 flex items-baseline justify-between gap-4">
+        <p className="text-sm font-medium">Grand total</p>
+        <p className="font-display text-4xl text-kt-yellow leading-none">Rs. {grandTotal.toLocaleString('en-US')}</p>
+      </div>
+    </div>
+  );
+})()}
 {isEdit && isAdmin && (<button onClick={async () => { const reason = await showPrompt(`Void ${currentInvoice.id}?\n\nIt stays on file and drops out of every balance and report.`, { placeholder: 'e.g. duplicate entry' }); if (reason === null) return; /* void what is stored, not the half-edited form state */ const stored = invoices.find(o => o.id === currentInvoice.id) || currentInvoice; await voidRecord('invoices', stored, { label: stored.id, reason }); showToast(`${currentInvoice.id} voided`); setBillingView('list'); }} className="w-full h-11 bg-white text-kt-red font-medium rounded-lg flex justify-center items-center gap-2 border border-kt-line hover:bg-kt-raised transition-colors"><Trash2 size={16} strokeWidth={1.5}/> Void {editingStatus === 'Estimate' ? 'Estimate' : editingStatus === 'Booked' ? 'Draft Order' : 'Invoice'}</button>)}
 </div>
 <div className="px-4 sm:px-6 py-4 bg-white border-t border-kt-line shrink-0 space-y-2">
@@ -459,8 +479,25 @@ const filtered = invoices.filter(o =>
   checkDateFilter(o.date, dateFilter) &&
   (statusFilter === 'All' || o.status === statusFilter)
 );
+// The period at a glance, from the same documents the list shows (search and type filter aside).
+const inPeriod = invoices.filter(o => (!ownOnly || String(o.salespersonId) === String(currentUser?.id)) && checkDateFilter(o.date, dateFilter));
+const billedDocs = inPeriod.filter(o => o.status === 'Billed');
+const billedSum = billedDocs.reduce((t, o) => t + (Number(o.total) || 0), 0);
+const returnsSum = inPeriod.filter(o => o.status === 'CreditNote').reduce((t, o) => t + (Number(o.total) || 0), 0);
+const unpaidCount = billedDocs.filter(o => getPaymentStatus(o) !== 'Paid').length;
+const openDrafts = inPeriod.filter(o => o.status === 'Estimate' || o.status === 'Booked').length;
 return (
-<div className="p-4 flex flex-col h-full">
+<div className="font-ui p-4 sm:p-6 flex flex-col h-full bg-kt-page">
+<div className="bg-kt-charcoal text-white rounded-xl px-5 py-4 mb-4 flex flex-wrap items-end gap-x-8 gap-y-3">
+  <div className="mr-auto">
+    <p className="text-sm text-white/60">Billed · {dateFilter}</p>
+    <p className="font-display text-4xl text-kt-yellow leading-tight">Rs. {billedSum.toLocaleString('en-US')}</p>
+  </div>
+  <div><p className="text-sm text-white/60">Bills</p><p className="font-display text-2xl leading-tight">{billedDocs.length}</p></div>
+  <div><p className="text-sm text-white/60">Not fully paid</p><p className="font-display text-2xl leading-tight">{unpaidCount}</p></div>
+  <div><p className="text-sm text-white/60">Quotes and orders</p><p className="font-display text-2xl leading-tight">{openDrafts}</p></div>
+  {returnsSum > 0 && <div><p className="text-sm text-white/60">Returns</p><p className="font-display text-2xl leading-tight">Rs. {returnsSum.toLocaleString('en-US')}</p></div>}
+</div>
 <div className="flex gap-2 mb-3">
 <div className="relative flex-1"><Search className="absolute left-3 top-3.5 text-kt-muted" size={16} strokeWidth={1.5} /><input placeholder="Search invoices" className="w-full h-11 pl-9 pr-3 bg-white border border-kt-line rounded-lg text-sm text-kt-ink placeholder-kt-muted outline-none focus:border-kt-ink transition-colors" value={search} onChange={e => setSearch(e.target.value)} onKeyDown={e => { if (e.key === 'Escape' && search) { e.stopPropagation(); setSearch(''); } }} /></div>
 {statusFilter === 'CreditNote'
@@ -485,16 +522,17 @@ return (
   if (d !== 0) return d;
   return (parseInt((b.id||'').replace(/\D/g,''))||0) - (parseInt((a.id||'').replace(/\D/g,''))||0);
 }).map(o => (
-<div key={o.id} className="bg-white px-4 py-3 rounded-xl border border-kt-line hover:border-kt-muted/40 transition-colors">
+<div key={o.id} className="bg-white px-5 py-4 rounded-xl border border-kt-line shadow-[0_1px_2px_rgba(20,20,20,0.05)] hover:shadow-[0_6px_20px_rgba(20,20,20,0.07)] transition-shadow">
 <div className="flex justify-between gap-4">
-<div className="min-w-0"><h4 className="font-medium text-kt-ink text-[15px] truncate">{o.customerName}</h4><p className="text-sm text-kt-sub mt-0.5 flex items-center gap-x-3 gap-y-0.5 flex-wrap"><span className="font-mono text-[13px] text-kt-ink">{o.id}</span><span className="tabular-nums">{formatDateDisp(o.date)}</span><span className="inline-flex items-center gap-1.5"><span aria-hidden="true" className={`w-1.5 h-1.5 rounded-full ${o.status==='CreditNote'?'bg-kt-red':o.status==='Estimate'?'bg-kt-blue':o.status==='Booked'?'bg-kt-amber':'bg-kt-ink'}`}></span>{o.status==='CreditNote'?'Credit Note':o.status==='Booked'?'Draft Order':o.status}</span></p></div>
-<div className="text-right shrink-0"><p className={`font-semibold text-base tabular-nums ${o.status==='CreditNote'?'text-kt-red':'text-kt-ink'}`}>{o.status==='CreditNote'?'− ':''}Rs. {o.total.toLocaleString('en-US')}</p>
-{/* The derived status, the same one the edge used to be coloured from. The label used to read
+<div className="min-w-0"><h4 className="font-medium text-kt-ink text-base truncate">{o.customerName}</h4></div>
+<div className="text-right shrink-0"><p className={`font-display text-2xl leading-tight ${o.status==='CreditNote'?'text-kt-red':'text-kt-ink'}`}>{o.status==='CreditNote'?'− ':''}Rs. {o.total.toLocaleString('en-US')}</p>
+
+</div>
+</div>
+<div className="flex flex-wrap justify-between items-center gap-x-4 gap-y-2 mt-2">
+<div className="text-sm text-kt-sub flex items-center gap-x-3 gap-y-0.5 flex-wrap"><span className="font-mono text-[13px] text-kt-ink">{o.id}</span><span className="tabular-nums">{formatDateDisp(o.date)}</span><span className={`inline-flex items-center h-6 px-2 rounded-md text-xs font-medium ${o.status==='CreditNote'?'bg-kt-red/10 text-kt-red':o.status==='Estimate'?'bg-kt-blue/10 text-kt-blue':o.status==='Booked'?'bg-kt-amber/10 text-kt-amber':'bg-kt-raised text-kt-ink'}`}>{o.status==='CreditNote'?'Credit Note':o.status==='Booked'?'Draft Order':o.status}</span>{/* The derived status, the same one the edge used to be coloured from. The label used to read
     the stored field, so a bill settled by a later receipt could say Pending in green. */}
-{o.status==='Billed' && (() => { const ps = getPaymentStatus(o); return <p className={`text-sm mt-0.5 ${ps==='Paid'?'text-kt-green':ps==='Partial'?'text-kt-amber':'text-kt-red'}`}>{ps==='Pending'?'Unpaid':ps}</p>; })()}
-</div>
-</div>
-<div className="flex justify-end items-center mt-2">
+{o.status==='Billed' && (() => { const ps = getPaymentStatus(o); return <span className={`inline-flex items-center h-6 px-2 rounded-md text-xs font-medium ${ps==='Paid'?'bg-kt-green/10 text-kt-green':ps==='Partial'?'bg-kt-amber/10 text-kt-amber':'bg-kt-red/10 text-kt-red'}`}>{ps==='Pending'?'Unpaid':ps}</span>; })()}</div>
 <div className="flex gap-1 -mr-1.5">
 {o.status === 'Estimate' && hasPermission('issueInvoices') && <button onClick={async () => { await saveToFirebase('invoices', o.id, {...o, status: 'Booked'}); showToast('Converted to Draft Order'); }} title="Convert to Draft Order" className="w-9 h-9 flex items-center justify-center rounded-md text-kt-sub hover:bg-kt-raised hover:text-kt-ink transition-colors"><Save size={16} strokeWidth={1.5}/></button>}
 {(o.status === 'Estimate' || o.status === 'Booked') && hasPermission('issueInvoices') && <button onClick={async () => { const invGuess = getNextSeqNum(invoicesRaw, 'INV'); const invNum = await nextDocNumber('INV', invGuess); if (invNum === null) return showToast("No invoice numbers left offline. Reconnect once to reserve more.", "error"); const newId = `INV-${String(invNum).padStart(4, '0')}`; const issued = {...o, id: newId, status: 'Billed', date: getLocalDateStr()}; await saveToFirebase('invoices', newId, issued); await logSave('invoices', null, issued, newId); await deleteFromFirebase('invoices', o.id); await logDelete('invoices', o, `Issued as ${newId}`, o.id); showToast(`Converted to Invoice: ${newId}`); }} title="Issue as Invoice" className="w-9 h-9 flex items-center justify-center rounded-md text-kt-sub hover:bg-kt-raised hover:text-kt-ink transition-colors"><ReceiptText size={16} strokeWidth={1.5}/></button>}

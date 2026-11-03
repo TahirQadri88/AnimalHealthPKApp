@@ -2,6 +2,12 @@ export default {
   content: ['./index.html', './src/**/*.{js,jsx}'],
   theme: {
     extend: {
+      // Two roles, set by CSS variables so a font choice is one line in index.css:
+      // `ui` for everything you read and type, `display` for headings and money.
+      fontFamily: {
+        ui: ['var(--font-ui)', 'system-ui', 'sans-serif'],
+        display: ['var(--font-display)', 'Georgia', 'serif'],
+      },
       // Khyber Traders, from the brand skill: Khyber Yellow and black, bone and the stone
       // greys for neutrals, signal red for cautions only. `kt-` so they cannot collide with
       // Tailwind's own `stone`. Used by the Billing screen first (the unslop trial).
@@ -11,7 +17,7 @@ export default {
           ink: '#1F1B16',      // primary text
           sub: '#5E554A',      // secondary text, labels
           muted: '#6B675C',    // meta and icons (stone)
-          page: '#F6F3EA',     // bone
+          page: '#EEEAE0',     // bone, one step deeper so white cards stand off it
           raised: '#F1EDE3',   // inputs at rest, hover, inner panels
           line: '#E7E3D8',     // hairlines (stone)
           charcoal: '#141414', // primary buttons
