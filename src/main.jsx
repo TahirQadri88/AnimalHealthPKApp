@@ -1,6 +1,13 @@
 import React from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
+// The Khyber Traders type: DM Sans for reading and typing, EB Garamond for headings and money.
+// Self-hosted and Latin only, so they are cached with the app and work offline.
+import '@fontsource/dm-sans/latin-400.css'
+import '@fontsource/dm-sans/latin-500.css'
+import '@fontsource/dm-sans/latin-600.css'
+import '@fontsource/eb-garamond/latin-400.css'
+import '@fontsource/eb-garamond/latin-500.css'
 import App from './App'
 import { requestPersistentStorage } from './lib/offlineStorage'
 import { captureInstallPrompt } from './lib/installPrompt'

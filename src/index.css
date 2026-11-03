@@ -2,10 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Fonts for the Khyber Traders look. Two roles; see tailwind.config.js. Trial: only the
- * Billing screen uses them so far, and the font files are imported by whichever option is
- * chosen. Display serifs default to old-style figures, which do not line up in a money
- * column, so `.font-display` asks for lining, tabular figures. */
+/* Fonts for the Khyber Traders look: two roles, see tailwind.config.js. Only the Billing
+ * screen uses them so far; the files are imported in main.jsx. EB Garamond defaults to
+ * old-style figures, which do not line up in a money column, so `.font-display` asks for
+ * lining, tabular figures. */
 :root {
   --font-ui: "DM Sans", system-ui, sans-serif;
   --font-display: "EB Garamond", Georgia, serif;
