@@ -8,7 +8,10 @@ import '@fontsource/eb-garamond/latin-400.css'; import '@fontsource/eb-garamond/
 import { AppContext } from '../../src/context/AppContext';
 import { BillingTab } from '../../src/components/tabs/BillingTab';
 
-const view = new URLSearchParams(location.search).get('view') || 'list';
+const params = new URLSearchParams(location.search);
+const view = params.get('view') || 'list';
+// ?palette= tries a candidate palette from index.css on the real screen.
+if (params.get('palette')) document.documentElement.dataset.palette = params.get('palette');
 const CUSTOMERS = [
   { id: 1, name: 'Abdul Qadir Shan Cattle', phone: '0300-1234567', city: 'Karachi' },
   { id: 2, name: 'Cash Sale (Walk in Customer)', isCashCustomer: true },

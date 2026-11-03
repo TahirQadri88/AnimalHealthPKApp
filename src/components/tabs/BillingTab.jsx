@@ -129,7 +129,7 @@ const labelClass = "text-xs font-medium text-kt-sub mb-1.5 block";
 const sectionClass = "bg-white p-5 sm:p-6 rounded-xl border border-kt-line shadow-[0_1px_2px_rgba(20,20,20,0.05)]";
 const sectionTitleClass = "font-display text-xl text-kt-ink mb-4 flex items-center gap-3";
 // The signature detail: sections numbered like the parts of a bill book, in the order a bill is written.
-const Step = ({ n }) => <span aria-hidden="true" className="font-ui w-6 h-6 shrink-0 rounded-full bg-kt-charcoal text-white text-xs font-medium flex items-center justify-center">{n}</span>;
+const Step = ({ n }) => <span aria-hidden="true" className="font-ui w-6 h-6 shrink-0 rounded-full bg-kt-primary text-white text-xs font-medium flex items-center justify-center">{n}</span>;
 const iconBtn = "w-11 h-11 shrink-0 flex items-center justify-center rounded-lg border border-kt-line bg-white text-kt-sub hover:bg-kt-raised hover:text-kt-ink transition-colors";
 const handleAddItem = (p, isBonus) => {
 const uniqueId = isBonus ? `${p.id}_bonus` : p.id;
@@ -161,7 +161,7 @@ const canConvert = hasPermission('issueInvoices');
 const offerStatus = (target) => !isEdit || editingStatus === target || canConvert;
 return (
 <div className="font-ui h-full flex flex-col bg-kt-page absolute inset-0 z-20 animate-slide-up" onKeyDown={e => { if (e.ctrlKey && e.key === 'Enter' && offerStatus('Billed')) { e.preventDefault(); saveInvoice('Billed'); } }}>
-<div className="bg-kt-charcoal text-white px-5 sm:px-6 py-4 flex justify-between items-center sticky top-0 z-30">
+<div className="bg-kt-band text-white px-5 sm:px-6 py-4 flex justify-between items-center sticky top-0 z-30">
 <div><h2 className="font-display text-2xl leading-tight">{isEdit ? `${formTypeLabel} — ${currentInvoice.id}` : formTypeLabel}</h2><input type="date" value={currentInvoice.date || getLocalDateStr()} onChange={e => setCurrentInvoice({...currentInvoice, date: e.target.value})} className="text-sm text-white/70 bg-transparent border-0 outline-none cursor-pointer hover:text-white transition-colors mt-1 p-0 tabular-nums [color-scheme:dark]" /></div>
 <button onClick={() => setBillingView('list')} title="Close" aria-label="Close" className="w-9 h-9 flex items-center justify-center rounded-lg text-white/70 hover:bg-white/10 hover:text-white transition-colors"><X size={18} strokeWidth={1.5}/></button>
 </div>
@@ -235,7 +235,7 @@ return (
       <div className="space-y-2">
         {[{key:'address1',label:'Primary',address:cust.address1},{key:'address2',label:'Secondary',address:cust.address2}].map(opt=>(
           <label key={opt.key} className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${currentInvoice.deliveryAddressKey===opt.key?'bg-kt-raised border-kt-ink':'bg-white border-kt-line hover:bg-kt-raised'}`}>
-            <input type="radio" name="deliveryAddress" className="mt-0.5 accent-kt-charcoal" checked={currentInvoice.deliveryAddressKey===opt.key} onChange={()=>setCurrentInvoice({...currentInvoice,deliveryAddressKey:opt.key})} />
+            <input type="radio" name="deliveryAddress" className="mt-0.5 accent-kt-primary" checked={currentInvoice.deliveryAddressKey===opt.key} onChange={()=>setCurrentInvoice({...currentInvoice,deliveryAddressKey:opt.key})} />
             <div><span className="text-xs font-medium text-kt-sub">{opt.label}</span><p className="text-sm text-kt-ink mt-0.5 leading-snug">{opt.address}</p></div>
           </label>
         ))}
@@ -446,7 +446,7 @@ return (
   const saved = bonusSavings(currentInvoice.items);
   const row = (label, value) => <div className="flex justify-between text-sm text-white/70"><span>{label}</span><span className="tabular-nums">{value}</span></div>;
   return (
-    <div className="bg-kt-charcoal text-white rounded-xl p-5 sm:p-6">
+    <div className="bg-kt-band text-white rounded-xl p-5 sm:p-6">
       <div className="space-y-1.5">
         {row('Items', `Rs. ${sub.toLocaleString('en-US')}`)}
         {delivery > 0 && row('Delivery', `+ Rs. ${delivery.toLocaleString('en-US')}`)}
@@ -466,7 +466,7 @@ return (
 {canSaveAsEstimate && offerStatus('Estimate') && <button onClick={() => saveInvoice('Estimate')} className="w-full h-10 bg-white text-kt-ink border border-kt-line hover:bg-kt-raised rounded-lg font-medium flex justify-center items-center gap-2 active:scale-[0.98] transition-[background-color,transform] text-sm"><FileText size={16} strokeWidth={1.5}/> Save as Estimate / Quotation</button>}
 <div className="flex gap-2">
 {canSaveAsEstimate && offerStatus('Booked') && <button onClick={() => saveInvoice('Booked')} className="flex-1 h-12 bg-white text-kt-ink border border-kt-line rounded-lg font-medium flex justify-center items-center gap-2 active:scale-[0.98] transition-[background-color,transform] hover:bg-kt-raised"><Save size={18} strokeWidth={1.5}/> Draft Order</button>}
-{offerStatus('Billed') && <button onClick={() => saveInvoice('Billed')} className={`${canSaveAsEstimate ? 'flex-[2]' : 'flex-1'} h-12 bg-kt-charcoal hover:bg-black text-white rounded-lg font-medium flex justify-center items-center gap-2 active:scale-[0.98] transition-[background-color,transform]`}><ReceiptText size={18} strokeWidth={1.5}/> {isEdit && editingStatus === 'Billed' ? 'Update Invoice' : 'Issue Invoice'}</button>}
+{offerStatus('Billed') && <button onClick={() => saveInvoice('Billed')} className={`${canSaveAsEstimate ? 'flex-[2]' : 'flex-1'} h-12 bg-kt-primary hover:bg-kt-primary/90 text-white rounded-lg font-medium flex justify-center items-center gap-2 active:scale-[0.98] transition-[background-color,transform]`}><ReceiptText size={18} strokeWidth={1.5}/> {isEdit && editingStatus === 'Billed' ? 'Update Invoice' : 'Issue Invoice'}</button>}
 </div>
 </div>
 </div>
@@ -488,7 +488,7 @@ const unpaidCount = billedDocs.filter(o => getPaymentStatus(o) !== 'Paid').lengt
 const openDrafts = inPeriod.filter(o => o.status === 'Estimate' || o.status === 'Booked').length;
 return (
 <div className="font-ui p-4 sm:p-6 flex flex-col h-full bg-kt-page">
-<div className="bg-kt-charcoal text-white rounded-xl px-5 py-4 mb-4 flex flex-wrap items-end gap-x-8 gap-y-3">
+<div className="bg-kt-band text-white rounded-xl px-5 py-4 mb-4 flex flex-wrap items-end gap-x-8 gap-y-3">
   <div className="mr-auto">
     <p className="text-sm text-white/60">Billed · {dateFilter}</p>
     <p className="font-display text-4xl text-kt-yellow leading-tight">Rs. {billedSum.toLocaleString('en-US')}</p>
@@ -501,8 +501,8 @@ return (
 <div className="flex gap-2 mb-3">
 <div className="relative flex-1"><Search className="absolute left-3 top-3.5 text-kt-muted" size={16} strokeWidth={1.5} /><input placeholder="Search invoices" className="w-full h-11 pl-9 pr-3 bg-white border border-kt-line rounded-lg text-sm text-kt-ink placeholder-kt-muted outline-none focus:border-kt-ink transition-colors" value={search} onChange={e => setSearch(e.target.value)} onKeyDown={e => { if (e.key === 'Escape' && search) { e.stopPropagation(); setSearch(''); } }} /></div>
 {statusFilter === 'CreditNote'
-  ? hasPermission('salesReturns') && <button onClick={() => { setEditingCreditNote({ customerId: '', id: '' }); setShowCreditNoteModal(true); }} className="h-11 bg-kt-charcoal hover:bg-black text-white px-4 rounded-lg font-medium text-sm flex items-center gap-2 active:scale-[0.98] transition-[background-color,transform] whitespace-nowrap"><RotateCcw size={16} strokeWidth={1.5}/> New return</button>
-  : <button onClick={startNewInvoice} className="h-11 bg-kt-charcoal hover:bg-black text-white px-4 rounded-lg font-medium text-sm flex items-center gap-2 active:scale-[0.98] transition-[background-color,transform]"><Plus size={16} strokeWidth={1.5}/> New</button>
+  ? hasPermission('salesReturns') && <button onClick={() => { setEditingCreditNote({ customerId: '', id: '' }); setShowCreditNoteModal(true); }} className="h-11 bg-kt-primary hover:bg-kt-primary/90 text-white px-4 rounded-lg font-medium text-sm flex items-center gap-2 active:scale-[0.98] transition-[background-color,transform] whitespace-nowrap"><RotateCcw size={16} strokeWidth={1.5}/> New return</button>
+  : <button onClick={startNewInvoice} className="h-11 bg-kt-primary hover:bg-kt-primary/90 text-white px-4 rounded-lg font-medium text-sm flex items-center gap-2 active:scale-[0.98] transition-[background-color,transform]"><Plus size={16} strokeWidth={1.5}/> New</button>
 }
 </div>
 <div className="flex flex-col sm:flex-row gap-2 mb-4">
