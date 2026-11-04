@@ -127,7 +127,7 @@ return (
       {momChange !== null && <p className="text-xs sm:text-sm text-white/80">{Number(momChange) >= 0 ? '▲' : '▼'} {Math.abs(momChange)}% vs last month</p>}
     </div>
     {isAdmin && (
-    <button onClick={() => { setSelectedLedgerId(null); setShowLedgerModal(false); setActiveTab('customers'); }} className="w-full sm:w-auto flex sm:block items-baseline justify-between gap-3 text-left sm:text-right rounded-lg -mx-2 px-2 py-1 sm:-m-2 sm:p-2 hover:bg-white/10 transition-colors">
+    <button onClick={() => { setSelectedLedgerId(null); setShowLedgerModal(false); setActiveTab('customers'); }} className="w-full sm:w-auto flex sm:block items-baseline justify-between gap-3 text-left sm:text-right rounded-lg hover:bg-white/10 transition-colors">
       <p className="text-sm text-white/70 flex items-center sm:justify-end gap-1.5"><DollarSign size={16} strokeWidth={1.5}/> Receivables{topReceivables.length > 0 && <span className="text-white/70"> · {topReceivables.length} high</span>}</p>
       <p className="font-display text-2xl sm:text-3xl leading-tight whitespace-nowrap">{money(totalReceivables)}</p>
     </button>
@@ -169,7 +169,7 @@ return (
 )}
 
 {isAdmin && (
-<div className="grid sm:grid-cols-2 gap-4">
+<div className="grid sm:grid-cols-2 gap-4 items-start">
 <button type="button" className={`${card} p-4 sm:p-5 flex justify-between items-center hover:border-kt-muted/40 transition-colors text-left`} onClick={() => {setActiveTab('admin'); setAdminView('expenses');}}>
 <div><p className="text-sm text-kt-sub flex items-center gap-1.5"><TrendingDown size={16} strokeWidth={1.5}/> Operational expenses · {dateFilter}</p><p className="font-display text-2xl sm:text-3xl text-kt-ink mt-0.5 sm:mt-1">{money(totalExpenses)}</p></div>
 <ChevronRight size={20} strokeWidth={1.5} className="text-kt-muted"/>

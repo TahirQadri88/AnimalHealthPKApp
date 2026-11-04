@@ -134,12 +134,12 @@ return (
 <div className="bg-white p-4 rounded-xl border border-kt-line mb-4">
 <h3 className="text-xs font-medium text-kt-ink mb-3 flex items-center gap-1.5"><Download size={14} className="text-kt-blue"/> Export Master Data</h3>
 <div className="flex flex-wrap gap-2 mb-2">
-<button onClick={() => setActiveExportTab('items')} className={`flex-1 py-2 rounded-lg text-xs font-medium transition-colors ${activeExportTab==='items'?'bg-kt-primary text-white':'bg-kt-raised text-kt-sub'}`}>Items</button>
-<button onClick={() => setActiveExportTab('clients')} className={`flex-1 py-2 rounded-lg text-xs font-medium transition-colors ${activeExportTab==='clients'?'bg-kt-primary text-white':'bg-kt-raised text-kt-sub'}`}>Clients</button>
-<button onClick={() => setActiveExportTab('invoices')} className={`flex-1 py-2 rounded-lg text-xs font-medium transition-colors ${activeExportTab==='invoices'?'bg-kt-primary text-white':'bg-kt-raised text-kt-sub'}`}>Invoices</button>
-<button onClick={() => setActiveExportTab('payments')} className={`flex-1 py-2 rounded-lg text-xs font-medium transition-colors ${activeExportTab==='payments'?'bg-kt-primary text-white':'bg-kt-raised text-kt-sub'}`}>Payments</button>
-<button onClick={() => setActiveExportTab('riders')} className={`flex-1 py-2 rounded-lg text-xs font-medium transition-colors ${activeExportTab==='riders'?'bg-kt-amber text-white':'bg-kt-raised text-kt-sub'}`}>Riders</button>
-<button onClick={() => setActiveExportTab('all')} className={`flex-1 py-2 rounded-lg text-xs font-medium transition-colors ${activeExportTab==='all'?'bg-kt-primary text-white':'bg-kt-raised text-kt-sub'}`}>All</button>
+<button onClick={() => setActiveExportTab('items')} className={`flex-1 basis-[30%] sm:basis-0 px-2 py-2 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${activeExportTab==='items'?'bg-kt-primary text-white':'bg-kt-raised text-kt-sub'}`}>Items</button>
+<button onClick={() => setActiveExportTab('clients')} className={`flex-1 basis-[30%] sm:basis-0 px-2 py-2 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${activeExportTab==='clients'?'bg-kt-primary text-white':'bg-kt-raised text-kt-sub'}`}>Clients</button>
+<button onClick={() => setActiveExportTab('invoices')} className={`flex-1 basis-[30%] sm:basis-0 px-2 py-2 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${activeExportTab==='invoices'?'bg-kt-primary text-white':'bg-kt-raised text-kt-sub'}`}>Invoices</button>
+<button onClick={() => setActiveExportTab('payments')} className={`flex-1 basis-[30%] sm:basis-0 px-2 py-2 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${activeExportTab==='payments'?'bg-kt-primary text-white':'bg-kt-raised text-kt-sub'}`}>Payments</button>
+<button onClick={() => setActiveExportTab('riders')} className={`flex-1 basis-[30%] sm:basis-0 px-2 py-2 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${activeExportTab==='riders'?'bg-kt-amber text-white':'bg-kt-raised text-kt-sub'}`}>Riders</button>
+<button onClick={() => setActiveExportTab('all')} className={`flex-1 basis-[30%] sm:basis-0 px-2 py-2 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${activeExportTab==='all'?'bg-kt-primary text-white':'bg-kt-raised text-kt-sub'}`}>All</button>
 </div>
 {activeExportTab === 'items' && <button onClick={() => { const data = products.map(p => ({ ID: p.id, Name: p.name, Company: getCompanyName(p.companyId), Unit: p.unit, BoxQty: p.unitsInBox, Cost: p.costPrice, Selling: p.sellingPrice, Status: p.available ? 'Active' : 'Inactive' })); exportToCSV(data, 'Items_Master.csv'); }} className="w-full bg-kt-blue/10 border border-kt-blue/30 text-kt-blue py-2.5 rounded-xl font-medium text-xs">Export {products.length} Items as CSV</button>}
 {activeExportTab === 'clients' && <button onClick={() => { const data = customers.map(c => ({ ID: c.id, Name: c.name, Contact: c.contactPerson||'', Phone: c.phone||'', Email: c.email||'', AltPhone: c.altPhone||'', City: c.city||'', Area: c.area||'', Type: c.customerType||'', Address1: c.address1||'', Map1: c.map1||'', Address2: c.address2||'', Map2: c.map2||'', OpeningBalance: c.openingBalance||0, CreditLimit: c.creditLimit||0 })); exportToCSV(data, 'Customers_Master.csv'); }} className="w-full bg-kt-blue/10 border border-kt-blue/30 text-kt-blue py-2.5 rounded-xl font-medium text-xs">Export {customers.length} Clients as CSV</button>}
@@ -209,9 +209,9 @@ return (
      <div className="flex-none bg-white rounded-xl border border-kt-line flex flex-col overflow-hidden" style={{minHeight: '300px'}}>
         <div className="p-3 border-b border-kt-line flex flex-col gap-2 bg-kt-raised">
           <div className="flex justify-between items-center gap-2">
-            <div className="flex items-center gap-2 flex-1">
+            <div className="flex items-center gap-2 flex-1 min-w-0">
               <h3 className="font-medium text-kt-ink text-sm flex items-center gap-1.5 shrink-0"><ArrowUpDown size={15}/> Quick Edit</h3>
-              <input value={bulkSearch} onChange={e=>setBulkSearch(e.target.value)} placeholder="Search..." className="flex-1 p-1.5 text-xs border border-kt-line rounded-lg outline-none focus:border-kt-ink font-semibold bg-white"/>
+              <input value={bulkSearch} onChange={e=>setBulkSearch(e.target.value)} placeholder="Search" className="flex-1 min-w-0 p-1.5 text-xs border border-kt-line rounded-lg outline-none focus:border-kt-ink font-semibold bg-white"/>
             </div>
             <button onClick={handleBulkSave} className="bg-kt-primary text-white px-3 py-1.5 rounded-lg font-medium text-xs shrink-0">Save All</button>
           </div>
