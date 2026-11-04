@@ -142,14 +142,14 @@ const runRestore = async () => {
     showToast(`Restored ${synced} records. Please refresh.`, 'success');
   }
 };
-const inputCls = "w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100";
-const labelCls = "block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5";
+const inputCls = "w-full p-3 bg-white border border-kt-line rounded-xl text-sm font-medium outline-none focus:border-kt-ink";
+const labelCls = "block text-xs font-medium text-kt-sub   mb-1.5";
 const totalRecords = invoices.length + customers.length + products.length + payments.length + expenses.length;
 return (
 <div className="flex-1 overflow-y-auto p-4 pb-28 space-y-5">
-  <form onSubmit={e => { e.preventDefault(); saveSettings(); }} className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
-    <h3 className="font-black text-slate-800 text-base mb-1">Business Profile</h3>
-    <p className="text-xs text-slate-400 mb-5">Used on invoices, receipts, and all generated documents.</p>
+  <form onSubmit={e => { e.preventDefault(); saveSettings(); }} className="bg-white rounded-xl p-5 border border-kt-line">
+    <h3 className="font-semibold text-kt-ink text-base mb-1">Business Profile</h3>
+    <p className="text-xs text-kt-muted mb-5">Used on invoices, receipts, and all generated documents.</p>
     <div className="space-y-4">
       <div><label className={labelCls}>Business / Company Name</label><input className={inputCls} value={form.businessName} onChange={e=>setForm(p=>({...p,businessName:e.target.value}))} placeholder="e.g. Khyber Traders" /></div>
       <div><label className={labelCls}>App Name (shown on documents)</label><input className={inputCls} value={form.appName} onChange={e=>setForm(p=>({...p,appName:e.target.value}))} placeholder="e.g. AnimalHealth.PK" /></div>
@@ -160,45 +160,45 @@ return (
       </div>
       <div><label className={labelCls}>Address</label><input className={inputCls} value={form.address} onChange={e=>setForm(p=>({...p,address:e.target.value}))} placeholder="City, Country" /></div>
     </div>
-    <div className="mt-5 bg-slate-50 rounded-xl px-4 py-1 border border-slate-100">
-      <div className="flex items-start justify-between gap-4 py-3 border-b border-slate-100">
-        <div><div className="text-sm font-bold text-slate-700">Show on Invoices &amp; Documents</div><div className="text-[11px] text-slate-400 mt-0.5">Display business name in document headers and footers</div></div>
-        <button type="button" onClick={()=>setForm(p=>({...p,showBusinessNameOnDocs:!p.showBusinessNameOnDocs}))} className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${form.showBusinessNameOnDocs?'bg-indigo-600':'bg-slate-300'}`}><span className={`inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${form.showBusinessNameOnDocs?'translate-x-6':'translate-x-1'}`}/></button>
+    <div className="mt-5 bg-kt-raised rounded-xl px-4 py-1 border border-kt-line">
+      <div className="flex items-start justify-between gap-4 py-3 border-b border-kt-line">
+        <div><div className="text-sm font-medium text-kt-ink">Show on Invoices &amp; Documents</div><div className="text-xs text-kt-muted mt-0.5">Display business name in document headers and footers</div></div>
+        <button type="button" onClick={()=>setForm(p=>({...p,showBusinessNameOnDocs:!p.showBusinessNameOnDocs}))} className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${form.showBusinessNameOnDocs?'bg-kt-primary':'bg-kt-line'}`}><span className={`inline-block h-4 w-4 rounded-full bg-white  transition-transform ${form.showBusinessNameOnDocs?'translate-x-6':'translate-x-1'}`}/></button>
       </div>
       <div className="flex items-start justify-between gap-4 py-3">
-        <div><div className="text-sm font-bold text-slate-700">Show on Reports</div><div className="text-[11px] text-slate-400 mt-0.5">Display business name on printed analytics reports</div></div>
-        <button type="button" onClick={()=>setForm(p=>({...p,showBusinessNameOnReports:!p.showBusinessNameOnReports}))} className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${form.showBusinessNameOnReports?'bg-indigo-600':'bg-slate-300'}`}><span className={`inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${form.showBusinessNameOnReports?'translate-x-6':'translate-x-1'}`}/></button>
+        <div><div className="text-sm font-medium text-kt-ink">Show on Reports</div><div className="text-xs text-kt-muted mt-0.5">Display business name on printed analytics reports</div></div>
+        <button type="button" onClick={()=>setForm(p=>({...p,showBusinessNameOnReports:!p.showBusinessNameOnReports}))} className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${form.showBusinessNameOnReports?'bg-kt-primary':'bg-kt-line'}`}><span className={`inline-block h-4 w-4 rounded-full bg-white  transition-transform ${form.showBusinessNameOnReports?'translate-x-6':'translate-x-1'}`}/></button>
       </div>
     </div>
-    <button type="submit" className="mt-5 w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-3 rounded-xl text-sm flex items-center justify-center gap-2">
+    <button type="submit" className="mt-5 w-full bg-kt-primary hover:bg-kt-primary/90 text-white font-semibold py-3 rounded-xl text-sm flex items-center justify-center gap-2">
       <Save size={15}/> Save Settings
     </button>
   </form>
-  <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
-    <h3 className="font-black text-slate-800 text-base mb-1">Backup & Data Safety</h3>
-    <p className="text-xs text-slate-400 mb-4">Download a full JSON backup of all your data. Store in Google Drive or another safe location. Recommended: weekly.</p>
-    <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4">
+  <div className="bg-white rounded-xl p-5 border border-kt-line">
+    <h3 className="font-semibold text-kt-ink text-base mb-1">Backup & Data Safety</h3>
+    <p className="text-xs text-kt-muted mb-4">Download a full JSON backup of all your data. Store in Google Drive or another safe location. Recommended: weekly.</p>
+    <div className="bg-kt-amber/10 border border-kt-amber/30 rounded-xl p-4 mb-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="font-black text-amber-900 text-sm">Full Backup (JSON)</div>
-          <div className="text-[11px] text-amber-700 mt-1">{invoices.length} invoices · {customers.length} customers · {products.length} products · {payments.length} payments · {expenses.length} expenses <span className="font-bold">({totalRecords} total records)</span></div>
+          <div className="font-semibold text-kt-amber text-sm">Full Backup (JSON)</div>
+          <div className="text-xs text-kt-amber mt-1">{invoices.length} invoices · {customers.length} customers · {products.length} products · {payments.length} payments · {expenses.length} expenses <span className="font-medium">({totalRecords} total records)</span></div>
         </div>
-        <button onClick={downloadBackup} className="bg-amber-500 hover:bg-amber-600 text-white font-bold px-4 py-2 rounded-lg text-xs flex items-center gap-1.5 shrink-0">
+        <button onClick={downloadBackup} className="bg-kt-amber hover:bg-kt-amber text-white font-medium px-4 py-2 rounded-lg text-xs flex items-center gap-1.5 shrink-0">
           <Download size={13}/> Download
         </button>
       </div>
     </div>
-    <div className="bg-rose-50 border border-rose-200 rounded-xl p-4">
-      <div className="font-black text-rose-900 text-sm mb-1">Restore from Backup ⚠</div>
+    <div className="bg-kt-red/10 border border-kt-red/30 rounded-xl p-4">
+      <div className="font-semibold text-kt-red text-sm mb-1">Restore from Backup ⚠</div>
       {/* "Overwrites all existing data" was not true and is not what a person should be
           told before a restore. It writes the backup's records over the live ones; a
           record created since the backup is left exactly where it is. */}
-      <p className="text-[11px] text-rose-700 mb-3">
+      <p className="text-xs text-kt-red mb-3">
         Writes the records in the file over your live data. Anything created <em>since</em> the
         backup is left alone — this is not a wipe-and-replace. You will see what is in the file
         before anything is written.
       </p>
-      <label className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold cursor-pointer ${restoring?'bg-slate-200 text-slate-400':'bg-rose-600 hover:bg-rose-700 text-white'}`}>
+      <label className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium cursor-pointer ${restoring?'bg-kt-line text-kt-muted':'bg-kt-red hover:bg-kt-red/90 text-white'}`}>
         <Upload size={13}/> {restoring?'Restoring…':'Choose Backup .json File'}
         <input type="file" accept=".json" onChange={handleRestoreFile} disabled={restoring} className="hidden" />
       </label>
@@ -207,82 +207,82 @@ return (
         const { inspection, fileName } = pending;
         const age = backupAgeDays(inspection.exportedAt);
         return (
-          <div className="mt-3 bg-white border border-rose-200 rounded-xl overflow-hidden">
-            <div className="flex justify-between items-center gap-2 p-3 border-b border-rose-100 bg-rose-100/50">
+          <div className="mt-3 bg-white border border-kt-red/30 rounded-xl overflow-hidden">
+            <div className="flex justify-between items-center gap-2 p-3 border-b border-kt-red/30 bg-kt-red/10">
               <div className="min-w-0">
-                <p className="text-xs font-black text-rose-900 truncate">{fileName}</p>
-                <p className="text-[10px] text-rose-700">
+                <p className="text-xs font-semibold text-kt-red truncate">{fileName}</p>
+                <p className="text-xs text-kt-red">
                   {inspection.exportedAt
                     ? `Exported ${new Date(inspection.exportedAt).toLocaleString()}${age !== null ? ` · ${age} day${age === 1 ? '' : 's'} old` : ''}`
                     : 'No export date in the file'}
                 </p>
               </div>
-              <button onClick={() => { setPending(null); setSafetyTaken(false); }} title="Cancel" className="p-1.5 bg-white rounded-lg text-slate-400 hover:text-slate-700 border border-slate-200 shrink-0"><X size={14}/></button>
+              <button onClick={() => { setPending(null); setSafetyTaken(false); }} title="Cancel" className="p-1.5 bg-white rounded-lg text-kt-muted hover:text-kt-ink border border-kt-line shrink-0"><X size={14}/></button>
             </div>
 
             <div className="p-3 space-y-2">
-              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+              <p className="text-xs font-medium text-kt-sub">
                 {inspection.totalRecords.toLocaleString('en-US')} records will be written
               </p>
               <div className="grid grid-cols-2 gap-x-3 gap-y-1">
                 {inspection.collections.map(c => (
-                  <div key={c.name} className="flex justify-between text-[11px]">
-                    <span className="font-semibold text-slate-600 truncate">{c.name}</span>
-                    <span className="font-black text-slate-800 ml-2 shrink-0">{c.count.toLocaleString('en-US')}</span>
+                  <div key={c.name} className="flex justify-between text-xs">
+                    <span className="font-semibold text-kt-sub truncate">{c.name}</span>
+                    <span className="font-semibold text-kt-ink ml-2 shrink-0">{c.count.toLocaleString('en-US')}</span>
                   </div>
                 ))}
               </div>
 
               {inspection.refused.length > 0 && (
-                <div className="pt-2 border-t border-slate-100">
-                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 flex items-center gap-1"><ShieldCheck size={11}/> Not restored</p>
+                <div className="pt-2 border-t border-kt-line">
+                  <p className="text-xs font-medium text-kt-sub mb-1 flex items-center gap-1"><ShieldCheck size={11}/> Not restored</p>
                   {inspection.refused.map(r => (
-                    <p key={r.name} className="text-[10px] text-slate-500"><span className="font-bold text-slate-700">{r.name}</span> — {r.reason}</p>
+                    <p key={r.name} className="text-xs text-kt-sub"><span className="font-medium text-kt-ink">{r.name}</span> — {r.reason}</p>
                   ))}
                 </div>
               )}
 
               {inspection.warnings.length > 0 && (
-                <div className="pt-2 border-t border-slate-100 space-y-1">
+                <div className="pt-2 border-t border-kt-line space-y-1">
                   {inspection.warnings.map((w, i) => (
-                    <p key={i} className="text-[10px] text-amber-700 flex items-start gap-1"><AlertTriangle size={11} className="shrink-0 mt-0.5"/><span>{w}</span></p>
+                    <p key={i} className="text-xs text-kt-amber flex items-start gap-1"><AlertTriangle size={11} className="shrink-0 mt-0.5"/><span>{w}</span></p>
                   ))}
                 </div>
               )}
             </div>
 
             {restoreProgress ? (
-              <div className="p-3 border-t border-rose-100">
-                <p className="text-[11px] font-bold text-slate-600 mb-1">Writing {restoreProgress.done.toLocaleString('en-US')} of {restoreProgress.total.toLocaleString('en-US')}…</p>
-                <div className="w-full bg-slate-100 rounded-full h-1.5"><div className="bg-rose-500 h-1.5 rounded-full" style={{ width: `${(restoreProgress.done / restoreProgress.total) * 100}%` }}></div></div>
+              <div className="p-3 border-t border-kt-red/30">
+                <p className="text-xs font-medium text-kt-sub mb-1">Writing {restoreProgress.done.toLocaleString('en-US')} of {restoreProgress.total.toLocaleString('en-US')}…</p>
+                <div className="w-full bg-kt-raised rounded-full h-1.5"><div className="bg-kt-red h-1.5 rounded-full" style={{ width: `${(restoreProgress.done / restoreProgress.total) * 100}%` }}></div></div>
               </div>
             ) : (
-              <div className="p-3 border-t border-rose-100 space-y-2">
+              <div className="p-3 border-t border-kt-red/30 space-y-2">
                 {/* The brief asks for this and it was never there: a restore is itself a
                     destructive write, and the state before it should be recoverable. */}
                 <button
                   onClick={async () => { await downloadBackup(); setSafetyTaken(true); }}
                   disabled={restoring}
-                  className={`w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-xs font-bold border ${safetyTaken ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'}`}
+                  className={`w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-xs font-medium border ${safetyTaken ? 'bg-kt-green/10 border-kt-green/30 text-kt-green' : 'bg-white border-kt-line text-kt-ink hover:bg-kt-raised'}`}
                 >
                   {safetyTaken ? <><ShieldCheck size={13}/> Current data downloaded</> : <><Download size={13}/> 1. Download current data first</>}
                 </button>
                 <button
                   onClick={runRestore}
                   disabled={restoring}
-                  className="w-full px-4 py-2 rounded-lg text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white disabled:bg-slate-200 disabled:text-slate-400"
+                  className="w-full px-4 py-2 rounded-lg text-xs font-medium bg-kt-red hover:bg-kt-red/90 text-white disabled:bg-kt-line disabled:text-kt-muted"
                 >
                   2. Restore {inspection.totalRecords.toLocaleString('en-US')} records
                 </button>
-                {!safetyTaken && <p className="text-[10px] text-slate-400 text-center">Downloading first is not required, but it is the only way back.</p>}
+                {!safetyTaken && <p className="text-xs text-kt-muted text-center">Downloading first is not required, but it is the only way back.</p>}
               </div>
             )}
           </div>
         );
       })()}
     </div>
-    <div className="mt-4 p-3 bg-slate-50 rounded-xl border border-slate-100 text-[11px] text-slate-500">
-      <strong className="text-slate-600">Also:</strong> Firebase Console → Firestore → Automated Backups for server-side backups (requires Blaze plan).
+    <div className="mt-4 p-3 bg-kt-raised rounded-xl border border-kt-line text-xs text-kt-sub">
+      <strong className="text-kt-sub">Also:</strong> Firebase Console → Firestore → Automated Backups for server-side backups (requires Blaze plan).
     </div>
   </div>
   <FixInvoiceUnitsButton />
@@ -290,9 +290,9 @@ return (
   <OfflineReadinessPanel />
 
   {/* ── Firebase Auto-Backup ── */}
-  <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
-    <h3 className="font-black text-slate-800 text-base mb-1 flex items-center gap-2"><Database size={16}/> Firebase Auto-Backup</h3>
-    <p className="text-xs text-slate-400 mb-4">Saves a full backup to your Firebase database automatically. No token needed — uses your existing login.</p>
+  <div className="bg-white rounded-xl p-5 border border-kt-line">
+    <h3 className="font-semibold text-kt-ink text-base mb-1 flex items-center gap-2"><Database size={16}/> Firebase Auto-Backup</h3>
+    <p className="text-xs text-kt-muted mb-4">Saves a full backup to your Firebase database automatically. No token needed — uses your existing login.</p>
     <div className="space-y-3">
       <div>
         <label className={labelCls}>Auto-Backup Frequency</label>
@@ -304,30 +304,30 @@ return (
         </select>
       </div>
       {appSettings?.lastBackupAt && (
-        <div className="text-[11px]">
-          <span className="text-emerald-600 font-bold">Last backup: {appSettings.lastBackupAt.slice(0,10)}</span>
+        <div className="text-xs">
+          <span className="text-kt-green font-medium">Last backup: {appSettings.lastBackupAt.slice(0,10)}</span>
         </div>
       )}
     </div>
     <div className="flex gap-2 mt-4">
-      <button type="button" onClick={saveSettings} className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5"><Save size={13}/> Save Settings</button>
-      <button type="button" onClick={manualFirebaseBackup} disabled={firebaseBacking} className="flex-1 bg-slate-800 hover:bg-slate-700 text-white font-bold py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 disabled:opacity-40"><Upload size={13}/> {firebaseBacking ? 'Saving…' : 'Backup Now'}</button>
+      <button type="button" onClick={saveSettings} className="flex-1 bg-kt-primary hover:bg-kt-primary/90 text-white font-medium py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5"><Save size={13}/> Save Settings</button>
+      <button type="button" onClick={manualFirebaseBackup} disabled={firebaseBacking} className="flex-1 bg-kt-band hover:bg-kt-line text-white font-medium py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 disabled:opacity-40"><Upload size={13}/> {firebaseBacking ? 'Saving…' : 'Backup Now'}</button>
     </div>
   </div>
 
   {/* ── Google Drive Backup ── */}
-  <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
-    <h3 className="font-black text-slate-800 text-base mb-1 flex items-center gap-2">
+  <div className="bg-white rounded-xl p-5 border border-kt-line">
+    <h3 className="font-semibold text-kt-ink text-base mb-1 flex items-center gap-2">
       <svg viewBox="0 0 24 24" width="16" height="16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7.71 3.5L1.15 15l3.43 5.5h12.84L22 15 15.29 3.5H7.71z" fill="#34A853" opacity=".6"/><path d="M1.15 15l3.43 5.5H10.5L7.07 15H1.15z" fill="#0F9D58"/><path d="M22 15l-3.43 5.5H10.5l3.43-5.5H22z" fill="#4285F4"/><path d="M15.29 3.5H7.71L10.5 8.5h3l2.79-5z" fill="#FBBC05"/><path d="M7.71 3.5L1.15 15h6.07L13.5 8.5l-2.79-5H7.71z" fill="#34A853"/><path d="M15.29 3.5L22 15h-6.07L10.5 8.5l2.79-5h2z" fill="#4285F4"/></svg>
       Google Drive Backup
     </h3>
-    <p className="text-xs text-slate-400 mb-4">Saves a single JSON file to your Google Drive folder. No size limit. Requires a one-time Apps Script setup.</p>
+    <p className="text-xs text-kt-muted mb-4">Saves a single JSON file to your Google Drive folder. No size limit. Requires a one-time Apps Script setup.</p>
     <div className="space-y-3">
       <div>
         <label className={labelCls}>Drive Folder ID</label>
         <input className={inputCls} placeholder="e.g. 1vIGbDIEcbVw8Ocz3Dve63mDyCB4rFSJN"
           value={form.driveFolderId} onChange={e => setForm(p=>({...p, driveFolderId: e.target.value.trim()}))}/>
-        <p className="text-[10px] text-slate-400 mt-1">Copy the long ID from your Drive folder's URL. The generated script below will use it automatically.</p>
+        <p className="text-xs text-kt-muted mt-1">Copy the long ID from your Drive folder's URL. The generated script below will use it automatically.</p>
       </div>
       <div>
         <label className={labelCls}>Apps Script URL</label>
@@ -344,18 +344,18 @@ return (
         </select>
       </div>
       {appSettings?.lastDriveBackupAt && (
-        <div className="text-[11px]">
-          <span className="text-emerald-600 font-bold">Last backup: {appSettings.lastDriveBackupAt.slice(0,10)}</span>
+        <div className="text-xs">
+          <span className="text-kt-green font-medium">Last backup: {appSettings.lastDriveBackupAt.slice(0,10)}</span>
         </div>
       )}
-      <div className="border border-slate-200 rounded-xl overflow-hidden">
+      <div className="border border-kt-line rounded-xl overflow-hidden">
         <button type="button" onClick={() => setShowDriveSetup(p => !p)}
-          className="w-full flex items-center justify-between px-4 py-2.5 text-[11px] font-bold text-slate-600 hover:bg-slate-50">
+          className="w-full flex items-center justify-between px-4 py-2.5 text-xs font-medium text-kt-sub hover:bg-kt-raised">
           <span>How to set up (one time, 2 minutes)</span>
           <ChevronDown size={13} className={`transition-transform ${showDriveSetup ? 'rotate-180' : ''}`}/>
         </button>
         {showDriveSetup && (
-          <div className="px-4 pb-4 space-y-2 text-[11px] text-slate-600 border-t border-slate-100">
+          <div className="px-4 pb-4 space-y-2 text-xs text-kt-sub border-t border-kt-line">
             <ol className="list-decimal list-inside space-y-1 mt-3">
               <li>Open <strong>script.google.com</strong> → New project</li>
               <li>Delete the default code and paste the script below</li>
@@ -364,9 +364,9 @@ return (
               <li>Click Deploy → copy the deployment URL → paste it in the field above</li>
             </ol>
             <div className="relative mt-3">
-              <pre className="bg-slate-900 text-emerald-300 text-[10px] rounded-lg p-3 overflow-x-auto whitespace-pre-wrap break-all">{getDriveScript(form.driveFolderId)}</pre>
+              <pre className="bg-kt-band text-kt-green text-xs rounded-lg p-3 overflow-x-auto whitespace-pre-wrap break-all">{getDriveScript(form.driveFolderId)}</pre>
               <button type="button" onClick={() => { navigator.clipboard?.writeText(getDriveScript(form.driveFolderId)); showToast('Script copied!'); }}
-                className="absolute top-2 right-2 bg-slate-700 hover:bg-slate-600 text-white text-[10px] font-bold px-2 py-1 rounded">
+                className="absolute top-2 right-2 bg-kt-line hover:bg-kt-line text-white text-xs font-medium px-2 py-1 rounded">
                 Copy
               </button>
             </div>
@@ -375,8 +375,8 @@ return (
       </div>
     </div>
     <div className="flex gap-2 mt-4">
-      <button type="button" onClick={saveSettings} className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5"><Save size={13}/> Save Settings</button>
-      <button type="button" onClick={manualDriveBackup} disabled={!form.driveScriptUrl || driveBacking} className="flex-1 bg-green-700 hover:bg-green-800 text-white font-bold py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 disabled:opacity-40"><Upload size={13}/> {driveBacking ? 'Sending…' : 'Backup Now'}</button>
+      <button type="button" onClick={saveSettings} className="flex-1 bg-kt-primary hover:bg-kt-primary/90 text-white font-medium py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5"><Save size={13}/> Save Settings</button>
+      <button type="button" onClick={manualDriveBackup} disabled={!form.driveScriptUrl || driveBacking} className="flex-1 bg-kt-green/90 hover:bg-kt-green/90 text-white font-medium py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 disabled:opacity-40"><Upload size={13}/> {driveBacking ? 'Sending…' : 'Backup Now'}</button>
     </div>
   </div>
 </div>

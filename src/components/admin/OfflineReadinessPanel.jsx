@@ -19,9 +19,9 @@ import {
 } from '../../lib/installPrompt';
 
 const ICON = {
-  ready:       { Icon: ShieldCheck,   cls: 'text-emerald-600', box: 'bg-emerald-50 border-emerald-200' },
-  partial:     { Icon: AlertTriangle, cls: 'text-amber-600',   box: 'bg-amber-50 border-amber-200' },
-  'not-ready': { Icon: XCircle,       cls: 'text-rose-600',    box: 'bg-rose-50 border-rose-200' },
+  ready:       { Icon: ShieldCheck,   cls: 'text-kt-green', box: 'bg-kt-green/10 border-kt-green/30' },
+  partial:     { Icon: AlertTriangle, cls: 'text-kt-amber',   box: 'bg-kt-amber/10 border-kt-amber/30' },
+  'not-ready': { Icon: XCircle,       cls: 'text-kt-red',    box: 'bg-kt-red/10 border-kt-red/30' },
 };
 
 export const OfflineReadinessPanel = () => {
@@ -86,31 +86,31 @@ const ask = async () => {
 };
 
 return (
-<div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
-  <h3 className="font-black text-slate-800 text-base mb-1 flex items-center gap-2"><WifiOff size={16}/> Ready for Offline</h3>
-  <p className="text-xs text-slate-400 mb-4">If the internet fails right now, this is what would and would not work.</p>
+<div className="bg-white rounded-xl p-5 border border-kt-line">
+  <h3 className="font-semibold text-kt-ink text-base mb-1 flex items-center gap-2"><WifiOff size={16}/> Ready for Offline</h3>
+  <p className="text-xs text-kt-muted mb-4">If the internet fails right now, this is what would and would not work.</p>
 
   <div className={`flex items-center gap-3 p-3 rounded-xl border mb-3 ${box}`}>
     <Icon size={22} className={`${cls} shrink-0`}/>
     <div className="min-w-0">
-      <p className={`font-black text-sm ${cls}`}>{result.summary}</p>
+      <p className={`font-semibold text-sm ${cls}`}>{result.summary}</p>
       {result.lastSyncedAt && (
-        <p className="text-[10px] text-slate-500 mt-0.5">
+        <p className="text-xs text-kt-sub mt-0.5">
           Last in touch with the server at {new Date(result.lastSyncedAt).toLocaleTimeString()}
         </p>
       )}
     </div>
   </div>
 
-  <ul className="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden">
+  <ul className="divide-y divide-kt-line border border-kt-line rounded-xl overflow-hidden">
     {result.checks.map(c => (
       <li key={c.key} className="p-3 flex items-start gap-2.5">
-        <span className={`mt-0.5 shrink-0 text-xs font-black ${c.ok ? 'text-emerald-600' : c.severity === 'critical' ? 'text-rose-600' : 'text-amber-600'}`}>
+        <span className={`mt-0.5 shrink-0 text-xs font-semibold ${c.ok ? 'text-kt-green' : c.severity === 'critical' ? 'text-kt-red' : 'text-kt-amber'}`}>
           {c.ok ? '✓' : c.severity === 'critical' ? '✗' : '!'}
         </span>
         <span className="min-w-0">
-          <span className="block text-xs font-bold text-slate-700">{c.label}</span>
-          <span className="block text-[11px] text-slate-500 leading-relaxed">{c.detail}</span>
+          <span className="block text-xs font-medium text-kt-ink">{c.label}</span>
+          <span className="block text-xs text-kt-sub leading-relaxed">{c.detail}</span>
         </span>
       </li>
     ))}
@@ -120,11 +120,11 @@ return (
       "install the app" without a way to do it is advice, not a fix. Chrome grants persistent
       storage to an installed app and refuses it to a tab. */}
   {env.persistentStorage === false && advice.mode !== 'installed' && (
-    <div className="mt-3 bg-amber-50 border border-amber-200 rounded-xl p-3">
-      <p className="text-[11px] font-bold text-amber-800 mb-1">How to fix the warning above</p>
-      <p className="text-[11px] text-amber-700 leading-relaxed">{advice.text}</p>
+    <div className="mt-3 bg-kt-amber/10 border border-kt-amber/30 rounded-xl p-3">
+      <p className="text-xs font-medium text-kt-amber mb-1">How to fix the warning above</p>
+      <p className="text-xs text-kt-amber leading-relaxed">{advice.text}</p>
       {advice.mode === 'prompt' && (
-        <button onClick={install} className="mt-2 flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold bg-indigo-600 text-white hover:bg-indigo-700">
+        <button onClick={install} className="mt-2 flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium bg-kt-primary text-white hover:bg-kt-primary/90">
           <Download size={13}/> Install app
         </button>
       )}
@@ -132,17 +132,17 @@ return (
   )}
 
   <div className="flex flex-wrap gap-2 mt-3">
-    <button onClick={gather} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold bg-white border border-slate-200 text-slate-700 hover:bg-slate-50">
+    <button onClick={gather} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium bg-white border border-kt-line text-kt-ink hover:bg-kt-raised">
       <RefreshCw size={13}/> Check again
     </button>
     {env.persistentStorage === false && (
-      <button onClick={ask} disabled={asking} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold bg-amber-500 text-white hover:bg-amber-600 disabled:bg-slate-300">
+      <button onClick={ask} disabled={asking} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium bg-kt-amber text-white hover:bg-kt-amber disabled:bg-kt-line">
         {asking ? 'Asking…' : 'Ask again to keep storage'}
       </button>
     )}
   </div>
 
-  <p className="text-[10px] text-slate-400 mt-3 leading-relaxed">
+  <p className="text-xs text-kt-muted mt-3 leading-relaxed">
     Signing in always needs the internet — your password is checked on Firebase&apos;s server, so
     do not sign out if you expect to work offline. Adding or editing users needs it too.
   </p>

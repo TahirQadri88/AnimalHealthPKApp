@@ -48,16 +48,16 @@ const run = async () => {
   showToast(total>0 ? `Updated ${invoicesFixed} invoice${invoicesFixed>1?'s':''}: ${namesFixed} name${namesFixed!==1?'s':''} + ${unitsFixed} unit${unitsFixed!==1?'s':''} fixed!` : 'All items already up to date — nothing to fix.', total>0?'success':'info');
 };
 return (
-<div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
-  <h3 className="font-black text-slate-800 text-base mb-1">Fix Invoice Item Units</h3>
-  <p className="text-xs text-slate-400 mb-4">Re-enriches all saved invoice items that are missing unit labels (e.g. Vial, Bottle) from the current product master. Run this once to fix old invoices.</p>
-  <div className="bg-teal-50 border border-teal-200 rounded-xl p-4">
+<div className="bg-white rounded-xl p-5 border border-kt-line">
+  <h3 className="font-semibold text-kt-ink text-base mb-1">Fix Invoice Item Units</h3>
+  <p className="text-xs text-kt-muted mb-4">Re-enriches all saved invoice items that are missing unit labels (e.g. Vial, Bottle) from the current product master. Run this once to fix old invoices.</p>
+  <div className="bg-kt-green/10 border border-kt-green/30 rounded-xl p-4">
     <div className="flex items-center justify-between gap-3">
       <div>
-        <div className="font-black text-teal-900 text-sm">Scan & Fix All Invoices</div>
-        <div className="text-[11px] text-teal-700 mt-1">{invoices.length} invoices · {products.length} products in master</div>
+        <div className="font-semibold text-kt-green text-sm">Scan & Fix All Invoices</div>
+        <div className="text-xs text-kt-green mt-1">{invoices.length} invoices · {products.length} products in master</div>
       </div>
-      <button onClick={run} disabled={running} className={`font-bold px-4 py-2 rounded-lg text-xs flex items-center gap-1.5 shrink-0 ${running?'bg-slate-200 text-slate-400':'bg-teal-600 hover:bg-teal-700 text-white'}`}>
+      <button onClick={run} disabled={running} className={`font-medium px-4 py-2 rounded-lg text-xs flex items-center gap-1.5 shrink-0 ${running?'bg-kt-line text-kt-muted':'bg-kt-primary hover:bg-kt-primary/90 text-white'}`}>
         {running?'Running…':'Run Fix'}
       </button>
     </div>

@@ -8,7 +8,7 @@ const { riders, vehicleTypes, saveToFirebase, deleteFromFirebase, showToast, set
 const riderVehicleTypes = vehicleTypes.filter(vt => vt.requiresRider).map(vt => vt.name);
 const fallbackRiderTypes = ['Rider', 'Rickshaw', 'Suzuki'];
 const riderTypeList = riderVehicleTypes.length ? riderVehicleTypes : fallbackRiderTypes;
-const inputCls = "w-full p-3 bg-white border border-kt-line rounded-xl text-sm font-semibold focus:outline-none focus:border-kt-blue/30 ";
+const inputCls = "w-full p-3 bg-white border border-kt-line rounded-xl text-sm font-semibold focus:outline-none focus:border-kt-ink ";
 const [form, setForm] = useState({ name: '', phone: '', vehicleType: '', vehicleNumber: '' });
 const [editingId, setEditingId] = useState(null);
 const [editForm, setEditForm] = useState({});

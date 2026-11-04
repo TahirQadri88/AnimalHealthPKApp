@@ -131,22 +131,22 @@ const visibleProducts = bulkProducts.filter(p => !bulkSearch || p.name.toLowerCa
 return (
 <div className="flex-1 overflow-y-auto p-4 pb-24">
 {/* Export Section */}
-<div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm mb-4">
-<h3 className="text-xs font-bold text-slate-800 uppercase tracking-widest mb-3 flex items-center gap-1.5"><Download size={14} className="text-indigo-600"/> Export Master Data</h3>
+<div className="bg-white p-4 rounded-xl border border-kt-line mb-4">
+<h3 className="text-xs font-medium text-kt-ink mb-3 flex items-center gap-1.5"><Download size={14} className="text-kt-blue"/> Export Master Data</h3>
 <div className="flex flex-wrap gap-2 mb-2">
-<button onClick={() => setActiveExportTab('items')} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-colors ${activeExportTab==='items'?'bg-indigo-600 text-white':'bg-slate-100 text-slate-600'}`}>Items</button>
-<button onClick={() => setActiveExportTab('clients')} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-colors ${activeExportTab==='clients'?'bg-indigo-600 text-white':'bg-slate-100 text-slate-600'}`}>Clients</button>
-<button onClick={() => setActiveExportTab('invoices')} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-colors ${activeExportTab==='invoices'?'bg-indigo-600 text-white':'bg-slate-100 text-slate-600'}`}>Invoices</button>
-<button onClick={() => setActiveExportTab('payments')} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-colors ${activeExportTab==='payments'?'bg-emerald-600 text-white':'bg-slate-100 text-slate-600'}`}>Payments</button>
-<button onClick={() => setActiveExportTab('riders')} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-colors ${activeExportTab==='riders'?'bg-amber-500 text-white':'bg-slate-100 text-slate-600'}`}>Riders</button>
-<button onClick={() => setActiveExportTab('all')} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-colors ${activeExportTab==='all'?'bg-indigo-600 text-white':'bg-slate-100 text-slate-600'}`}>All</button>
+<button onClick={() => setActiveExportTab('items')} className={`flex-1 py-2 rounded-lg text-xs font-medium transition-colors ${activeExportTab==='items'?'bg-kt-primary text-white':'bg-kt-raised text-kt-sub'}`}>Items</button>
+<button onClick={() => setActiveExportTab('clients')} className={`flex-1 py-2 rounded-lg text-xs font-medium transition-colors ${activeExportTab==='clients'?'bg-kt-primary text-white':'bg-kt-raised text-kt-sub'}`}>Clients</button>
+<button onClick={() => setActiveExportTab('invoices')} className={`flex-1 py-2 rounded-lg text-xs font-medium transition-colors ${activeExportTab==='invoices'?'bg-kt-primary text-white':'bg-kt-raised text-kt-sub'}`}>Invoices</button>
+<button onClick={() => setActiveExportTab('payments')} className={`flex-1 py-2 rounded-lg text-xs font-medium transition-colors ${activeExportTab==='payments'?'bg-kt-primary text-white':'bg-kt-raised text-kt-sub'}`}>Payments</button>
+<button onClick={() => setActiveExportTab('riders')} className={`flex-1 py-2 rounded-lg text-xs font-medium transition-colors ${activeExportTab==='riders'?'bg-kt-amber text-white':'bg-kt-raised text-kt-sub'}`}>Riders</button>
+<button onClick={() => setActiveExportTab('all')} className={`flex-1 py-2 rounded-lg text-xs font-medium transition-colors ${activeExportTab==='all'?'bg-kt-primary text-white':'bg-kt-raised text-kt-sub'}`}>All</button>
 </div>
-{activeExportTab === 'items' && <button onClick={() => { const data = products.map(p => ({ ID: p.id, Name: p.name, Company: getCompanyName(p.companyId), Unit: p.unit, BoxQty: p.unitsInBox, Cost: p.costPrice, Selling: p.sellingPrice, Status: p.available ? 'Active' : 'Inactive' })); exportToCSV(data, 'Items_Master.csv'); }} className="w-full bg-indigo-50 border border-indigo-100 text-indigo-700 py-2.5 rounded-xl font-bold text-xs">Export {products.length} Items as CSV</button>}
-{activeExportTab === 'clients' && <button onClick={() => { const data = customers.map(c => ({ ID: c.id, Name: c.name, Contact: c.contactPerson||'', Phone: c.phone||'', Email: c.email||'', AltPhone: c.altPhone||'', City: c.city||'', Area: c.area||'', Type: c.customerType||'', Address1: c.address1||'', Map1: c.map1||'', Address2: c.address2||'', Map2: c.map2||'', OpeningBalance: c.openingBalance||0, CreditLimit: c.creditLimit||0 })); exportToCSV(data, 'Customers_Master.csv'); }} className="w-full bg-indigo-50 border border-indigo-100 text-indigo-700 py-2.5 rounded-xl font-bold text-xs">Export {customers.length} Clients as CSV</button>}
-{activeExportTab === 'invoices' && <button onClick={() => { const data = invoices.map(o => ({ ID: o.id, Date: o.date, Customer: o.customerName, Status: o.status, IsCreditNote: o.isCreditNote?'Yes':'', Total: o.total, Delivery: o.deliveryBilled||0, Transport: o.transportExpense||0, Vehicle: o.vehicle||'', TransportCo: o.transportCompany||'', BiltyNo: o.biltyNumber||'', DriverName: o.driverName||'', DriverPhone: o.driverPhone||'', RiderID: o.riderId||'', DeliveryAddrKey: o.deliveryAddressKey||'', ReceivedAmt: o.receivedAmount||0, Salesperson: o.salespersonName||'', PaymentStatus: o.paymentStatus||'', Notes: o.notes||'' })); exportToCSV(data, 'Invoices_Export.csv'); }} className="w-full bg-indigo-50 border border-indigo-100 text-indigo-700 py-2.5 rounded-xl font-bold text-xs">Export {invoices.length} Invoices as CSV</button>}
-{activeExportTab === 'payments' && <button onClick={() => { const cMap = Object.fromEntries(customers.map(c=>[c.id, c.name])); const data = payments.map(p => ({ ID: p.id, Date: p.date, CustomerID: p.customerId, Customer: cMap[p.customerId]||'', Amount: p.amount, Note: p.note||'' })); exportToCSV(data, 'Payments_Export.csv'); }} className="w-full bg-emerald-50 border border-emerald-100 text-emerald-700 py-2.5 rounded-xl font-bold text-xs">Export {payments.length} Payments as CSV</button>}
-{activeExportTab === 'riders' && <button onClick={() => { const data = riders.map(r => ({ ID: r.id, Name: r.name, Phone: r.phone||'', VehicleType: r.vehicleType||'', VehicleNumber: r.vehicleNumber||'' })); exportToCSV(data, 'Riders_Master.csv'); }} className="w-full bg-amber-50 border border-amber-100 text-amber-700 py-2.5 rounded-xl font-bold text-xs">Export {riders.length} Riders as CSV</button>}
-{activeExportTab === 'all' && <button onClick={exportAll} className="w-full bg-indigo-600 text-white py-2.5 rounded-xl font-bold text-xs shadow-sm">Export Full Master Data (CSV)</button>}
+{activeExportTab === 'items' && <button onClick={() => { const data = products.map(p => ({ ID: p.id, Name: p.name, Company: getCompanyName(p.companyId), Unit: p.unit, BoxQty: p.unitsInBox, Cost: p.costPrice, Selling: p.sellingPrice, Status: p.available ? 'Active' : 'Inactive' })); exportToCSV(data, 'Items_Master.csv'); }} className="w-full bg-kt-blue/10 border border-kt-blue/30 text-kt-blue py-2.5 rounded-xl font-medium text-xs">Export {products.length} Items as CSV</button>}
+{activeExportTab === 'clients' && <button onClick={() => { const data = customers.map(c => ({ ID: c.id, Name: c.name, Contact: c.contactPerson||'', Phone: c.phone||'', Email: c.email||'', AltPhone: c.altPhone||'', City: c.city||'', Area: c.area||'', Type: c.customerType||'', Address1: c.address1||'', Map1: c.map1||'', Address2: c.address2||'', Map2: c.map2||'', OpeningBalance: c.openingBalance||0, CreditLimit: c.creditLimit||0 })); exportToCSV(data, 'Customers_Master.csv'); }} className="w-full bg-kt-blue/10 border border-kt-blue/30 text-kt-blue py-2.5 rounded-xl font-medium text-xs">Export {customers.length} Clients as CSV</button>}
+{activeExportTab === 'invoices' && <button onClick={() => { const data = invoices.map(o => ({ ID: o.id, Date: o.date, Customer: o.customerName, Status: o.status, IsCreditNote: o.isCreditNote?'Yes':'', Total: o.total, Delivery: o.deliveryBilled||0, Transport: o.transportExpense||0, Vehicle: o.vehicle||'', TransportCo: o.transportCompany||'', BiltyNo: o.biltyNumber||'', DriverName: o.driverName||'', DriverPhone: o.driverPhone||'', RiderID: o.riderId||'', DeliveryAddrKey: o.deliveryAddressKey||'', ReceivedAmt: o.receivedAmount||0, Salesperson: o.salespersonName||'', PaymentStatus: o.paymentStatus||'', Notes: o.notes||'' })); exportToCSV(data, 'Invoices_Export.csv'); }} className="w-full bg-kt-blue/10 border border-kt-blue/30 text-kt-blue py-2.5 rounded-xl font-medium text-xs">Export {invoices.length} Invoices as CSV</button>}
+{activeExportTab === 'payments' && <button onClick={() => { const cMap = Object.fromEntries(customers.map(c=>[c.id, c.name])); const data = payments.map(p => ({ ID: p.id, Date: p.date, CustomerID: p.customerId, Customer: cMap[p.customerId]||'', Amount: p.amount, Note: p.note||'' })); exportToCSV(data, 'Payments_Export.csv'); }} className="w-full bg-kt-green/10 border border-kt-green/30 text-kt-green py-2.5 rounded-xl font-medium text-xs">Export {payments.length} Payments as CSV</button>}
+{activeExportTab === 'riders' && <button onClick={() => { const data = riders.map(r => ({ ID: r.id, Name: r.name, Phone: r.phone||'', VehicleType: r.vehicleType||'', VehicleNumber: r.vehicleNumber||'' })); exportToCSV(data, 'Riders_Master.csv'); }} className="w-full bg-kt-amber/10 border border-kt-amber/30 text-kt-amber py-2.5 rounded-xl font-medium text-xs">Export {riders.length} Riders as CSV</button>}
+{activeExportTab === 'all' && <button onClick={exportAll} className="w-full bg-kt-primary text-white py-2.5 rounded-xl font-medium text-xs">Export Full Master Data (CSV)</button>}
 </div>
 
      {/* Fix Duplicate Companies */}
@@ -158,9 +158,9 @@ return (
        });
        if (dupes.length === 0) return null;
        return (
-         <div className="bg-rose-50 border border-rose-200 p-4 rounded-2xl mb-4">
-           <p className="text-xs font-bold text-rose-700 mb-2 flex items-center gap-1.5"><AlertCircle size={14}/> {dupes.length} Duplicate {dupes.length === 1 ? 'Company' : 'Companies'} Found</p>
-           <p className="text-[10px] text-rose-600 mb-3">These were created by previous imports. Click to merge them and fix all product references.</p>
+         <div className="bg-kt-red/10 border border-kt-red/30 p-4 rounded-xl mb-4">
+           <p className="text-xs font-medium text-kt-red mb-2 flex items-center gap-1.5"><AlertCircle size={14}/> {dupes.length} Duplicate {dupes.length === 1 ? 'Company' : 'Companies'} Found</p>
+           <p className="text-xs text-kt-red mb-3">These were created by previous imports. Click to merge them and fix all product references.</p>
            <button onClick={async () => {
              if(!await showConfirm(`Merge ${dupes.length} duplicate compan${dupes.length > 1 ? 'ies' : 'y'}? This will re-assign all linked products and cannot be undone.`)) return;
              const canonical = {};
@@ -175,7 +175,7 @@ return (
                fixed++;
              }
              showToast(`Merged ${fixed} duplicate companies`);
-           }} className="w-full bg-rose-600 text-white py-2 rounded-xl font-bold text-xs hover:bg-rose-700 transition-colors">
+           }} className="w-full bg-kt-red text-white py-2 rounded-xl font-medium text-xs hover:bg-kt-red/90 transition-colors">
              Fix {dupes.length} Duplicate{dupes.length > 1 ? 's' : ''} Now
            </button>
          </div>
@@ -183,58 +183,58 @@ return (
      })()}
 
      {/* Import Section */}
-     <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm mb-4">
-        <h3 className="text-xs font-bold text-slate-800 uppercase tracking-widest mb-2 flex items-center gap-1.5"><Upload size={14} className="text-emerald-600"/> Import Data</h3>
+     <div className="bg-white p-4 rounded-xl border border-kt-line mb-4">
+        <h3 className="text-xs font-medium text-kt-ink mb-2 flex items-center gap-1.5"><Upload size={14} className="text-kt-green"/> Import Data</h3>
         <div className="grid grid-cols-2 gap-3">
-           <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
-             <p className="text-[10px] font-bold text-slate-700 uppercase tracking-wider mb-1">Items</p>
-             <p className="text-[9px] text-slate-400 mb-2 leading-tight">Columns: Name, Company, Unit, BoxQty, Cost, Selling</p>
+           <div className="bg-kt-raised p-3 rounded-xl border border-kt-line">
+             <p className="text-xs font-medium text-kt-ink mb-1">Items</p>
+             <p className="text-xs text-kt-muted mb-2 leading-tight">Columns: Name, Company, Unit, BoxQty, Cost, Selling</p>
              <div className="flex gap-1.5">
-               <button onClick={downloadImportTemplate} className="flex-1 bg-white border border-slate-200 text-slate-600 py-1.5 rounded-lg font-bold text-[10px]">Template</button>
-               <label className="flex-1 bg-emerald-500 text-white py-1.5 rounded-lg font-bold text-[10px] cursor-pointer text-center"><input type="file" accept=".csv" className="hidden" onChange={handleImportCSV}/>Import</label>
+               <button onClick={downloadImportTemplate} className="flex-1 bg-white border border-kt-line text-kt-sub py-1.5 rounded-lg font-medium text-xs">Template</button>
+               <label className="flex-1 bg-kt-primary text-white py-1.5 rounded-lg font-medium text-xs cursor-pointer text-center"><input type="file" accept=".csv" className="hidden" onChange={handleImportCSV}/>Import</label>
              </div>
            </div>
-           <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
-             <p className="text-[10px] font-bold text-slate-700 uppercase tracking-wider mb-1">Clients</p>
-             <p className="text-[9px] text-slate-400 mb-2 leading-tight">Columns: Name, Contact, Phone, Address1, Map1, OpeningBalance</p>
+           <div className="bg-kt-raised p-3 rounded-xl border border-kt-line">
+             <p className="text-xs font-medium text-kt-ink mb-1">Clients</p>
+             <p className="text-xs text-kt-muted mb-2 leading-tight">Columns: Name, Contact, Phone, Address1, Map1, OpeningBalance</p>
              <div className="flex gap-1.5">
-               <button onClick={() => exportToCSV([{Name:'Sample Clinic',Contact:'Dr Ali',Phone:'0300-0000000',Address1:'DHA Karachi',Map1:'https://maps.app.goo.gl/...',OpeningBalance:0}], 'Customer_Import_Template.csv')} className="flex-1 bg-white border border-slate-200 text-slate-600 py-1.5 rounded-lg font-bold text-[10px]">Template</button>
-               <label className="flex-1 bg-emerald-500 text-white py-1.5 rounded-lg font-bold text-[10px] cursor-pointer text-center"><input type="file" accept=".csv" className="hidden" onChange={handleImportCustomers}/>Import</label>
+               <button onClick={() => exportToCSV([{Name:'Sample Clinic',Contact:'Dr Ali',Phone:'0300-0000000',Address1:'DHA Karachi',Map1:'https://maps.app.goo.gl/...',OpeningBalance:0}], 'Customer_Import_Template.csv')} className="flex-1 bg-white border border-kt-line text-kt-sub py-1.5 rounded-lg font-medium text-xs">Template</button>
+               <label className="flex-1 bg-kt-primary text-white py-1.5 rounded-lg font-medium text-xs cursor-pointer text-center"><input type="file" accept=".csv" className="hidden" onChange={handleImportCustomers}/>Import</label>
              </div>
            </div>
         </div>
      </div>
 
      {/* Bulk Price Edit */}
-     <div className="flex-none bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col overflow-hidden" style={{minHeight: '300px'}}>
-        <div className="p-3 border-b border-slate-200 flex flex-col gap-2 bg-slate-50">
+     <div className="flex-none bg-white rounded-xl border border-kt-line flex flex-col overflow-hidden" style={{minHeight: '300px'}}>
+        <div className="p-3 border-b border-kt-line flex flex-col gap-2 bg-kt-raised">
           <div className="flex justify-between items-center gap-2">
             <div className="flex items-center gap-2 flex-1">
-              <h3 className="font-bold text-slate-800 text-sm flex items-center gap-1.5 shrink-0"><ArrowUpDown size={15}/> Quick Edit</h3>
-              <input value={bulkSearch} onChange={e=>setBulkSearch(e.target.value)} placeholder="Search..." className="flex-1 p-1.5 text-xs border border-slate-200 rounded-lg outline-none focus:border-indigo-400 font-semibold bg-white"/>
+              <h3 className="font-medium text-kt-ink text-sm flex items-center gap-1.5 shrink-0"><ArrowUpDown size={15}/> Quick Edit</h3>
+              <input value={bulkSearch} onChange={e=>setBulkSearch(e.target.value)} placeholder="Search..." className="flex-1 p-1.5 text-xs border border-kt-line rounded-lg outline-none focus:border-kt-ink font-semibold bg-white"/>
             </div>
-            <button onClick={handleBulkSave} className="bg-emerald-500 text-white px-3 py-1.5 rounded-lg font-bold text-xs shadow-sm shrink-0">Save All</button>
+            <button onClick={handleBulkSave} className="bg-kt-primary text-white px-3 py-1.5 rounded-lg font-medium text-xs shrink-0">Save All</button>
           </div>
-          <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5">
-            <AlertCircle size={12} className="text-amber-600 shrink-0"/>
-            <span className="text-[10px] font-bold text-amber-700 shrink-0">Cost Effective From:</span>
+          <div className="flex items-center gap-2 bg-kt-amber/10 border border-kt-amber/30 rounded-lg px-2.5 py-1.5">
+            <AlertCircle size={12} className="text-kt-amber shrink-0"/>
+            <span className="text-xs font-medium text-kt-amber shrink-0">Cost Effective From:</span>
             <input type="date" value={bulkEffectiveDate} onChange={e=>setBulkEffectiveDate(e.target.value)}
-              className="text-[10px] font-bold text-amber-900 bg-transparent outline-none border-0 cursor-pointer"/>
-            <span className="text-[9px] text-amber-600 hidden sm:block">— Cost price changes will update invoices from this date</span>
+              className="text-xs font-medium text-kt-amber bg-transparent outline-none border-0 cursor-pointer"/>
+            <span className="text-xs text-kt-amber hidden sm:block">— Cost price changes will update invoices from this date</span>
           </div>
         </div>
         <div className="overflow-auto" style={{maxHeight: '400px'}}>
            <table className="w-full text-left text-xs whitespace-nowrap min-w-[760px]">
-              <thead className="text-slate-500 uppercase font-bold tracking-wider bg-slate-50 sticky top-0"><tr><th className="p-2 pb-3">Product</th><th className="p-2 pb-3 w-16">Unit</th><th className="p-2 pb-3 w-16">Box</th><th className="p-2 pb-3 w-24">Cost</th><th className="p-2 pb-3 w-24">Selling</th><th className="p-2 pb-3 w-16 text-center">Active</th></tr></thead>
-              <tbody className="divide-y divide-slate-100">
+              <thead className="text-kt-sub font-medium bg-kt-raised sticky top-0"><tr><th className="p-2 pb-3">Product</th><th className="p-2 pb-3 w-16">Unit</th><th className="p-2 pb-3 w-16">Box</th><th className="p-2 pb-3 w-24">Cost</th><th className="p-2 pb-3 w-24">Selling</th><th className="p-2 pb-3 w-16 text-center">Active</th></tr></thead>
+              <tbody className="divide-y divide-kt-line">
                  {visibleProducts.map(p => (
-                    <tr key={p.id} className="hover:bg-slate-50">
-                       <td className="p-2"><input type="text" className="w-full p-1.5 bg-slate-50 border border-slate-200 rounded font-semibold text-slate-800 outline-none focus:border-indigo-400 min-w-[140px]" value={p.name} onChange={e => setBulkProducts(bulkProducts.map(bp=>bp.id===p.id?{...bp, name: e.target.value}:bp))} /></td>
-                       <td className="p-2"><input type="text" className="w-full p-1.5 bg-slate-50 border border-slate-200 rounded font-semibold text-slate-800 outline-none focus:border-indigo-400" value={p.unit} onChange={e => setBulkProducts(bulkProducts.map(bp=>bp.id===p.id?{...bp, unit: e.target.value}:bp))} /></td>
-                       <td className="p-2"><input type="number" className="w-full p-1.5 bg-slate-50 border border-slate-200 rounded font-semibold text-slate-800 outline-none focus:border-indigo-400" value={p.unitsInBox} onChange={e => setBulkProducts(bulkProducts.map(bp=>bp.id===p.id?{...bp, unitsInBox: Number(e.target.value)}:bp))} /></td>
-                       <td className="p-2"><input type="number" className="w-full p-1.5 bg-slate-50 border border-slate-200 rounded font-bold text-slate-800 outline-none focus:border-indigo-400" value={p.costPrice} onChange={e => setBulkProducts(bulkProducts.map(bp=>bp.id===p.id?{...bp, costPrice: Number(e.target.value)}:bp))} /></td>
-                       <td className="p-2"><input type="number" className="w-full p-1.5 bg-slate-50 border border-slate-200 rounded font-bold text-emerald-700 outline-none focus:border-indigo-400" value={p.sellingPrice} onChange={e => setBulkProducts(bulkProducts.map(bp=>bp.id===p.id?{...bp, sellingPrice: Number(e.target.value)}:bp))} /></td>
-                       <td className="p-2 text-center"><input type="checkbox" checked={p.available} onChange={e => setBulkProducts(bulkProducts.map(bp=>bp.id===p.id?{...bp, available: e.target.checked}:bp))} className="w-4 h-4 accent-indigo-600" /></td>
+                    <tr key={p.id} className="hover:bg-kt-raised">
+                       <td className="p-2"><input type="text" className="w-full p-1.5 bg-kt-raised border border-kt-line rounded font-semibold text-kt-ink outline-none focus:border-kt-ink min-w-[140px]" value={p.name} onChange={e => setBulkProducts(bulkProducts.map(bp=>bp.id===p.id?{...bp, name: e.target.value}:bp))} /></td>
+                       <td className="p-2"><input type="text" className="w-full p-1.5 bg-kt-raised border border-kt-line rounded font-semibold text-kt-ink outline-none focus:border-kt-ink" value={p.unit} onChange={e => setBulkProducts(bulkProducts.map(bp=>bp.id===p.id?{...bp, unit: e.target.value}:bp))} /></td>
+                       <td className="p-2"><input type="number" className="w-full p-1.5 bg-kt-raised border border-kt-line rounded font-semibold text-kt-ink outline-none focus:border-kt-ink" value={p.unitsInBox} onChange={e => setBulkProducts(bulkProducts.map(bp=>bp.id===p.id?{...bp, unitsInBox: Number(e.target.value)}:bp))} /></td>
+                       <td className="p-2"><input type="number" className="w-full p-1.5 bg-kt-raised border border-kt-line rounded font-medium text-kt-ink outline-none focus:border-kt-ink" value={p.costPrice} onChange={e => setBulkProducts(bulkProducts.map(bp=>bp.id===p.id?{...bp, costPrice: Number(e.target.value)}:bp))} /></td>
+                       <td className="p-2"><input type="number" className="w-full p-1.5 bg-kt-raised border border-kt-line rounded font-medium text-kt-green outline-none focus:border-kt-ink" value={p.sellingPrice} onChange={e => setBulkProducts(bulkProducts.map(bp=>bp.id===p.id?{...bp, sellingPrice: Number(e.target.value)}:bp))} /></td>
+                       <td className="p-2 text-center"><input type="checkbox" checked={p.available} onChange={e => setBulkProducts(bulkProducts.map(bp=>bp.id===p.id?{...bp, available: e.target.checked}:bp))} className="w-4 h-4 accent-kt-primary" /></td>
                     </tr>
                  ))}
               </tbody>

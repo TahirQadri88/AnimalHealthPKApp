@@ -174,7 +174,7 @@ const SearchableSelect = ({
                 onChange={e => { setSearch(e.target.value); setHi(0); }}
                 onKeyDown={handleKeyDown}
                 placeholder="Search…"
-                className="w-full px-2.5 py-1.5 text-sm bg-kt-raised border border-kt-line rounded-lg outline-none focus:border-kt-blue/30 focus:ring-2 focus:ring-kt-blue/30 font-medium placeholder-kt-muted"
+                className="w-full px-2.5 py-1.5 text-sm bg-kt-raised border border-kt-line rounded-lg outline-none focus:border-kt-ink font-medium placeholder-kt-muted"
               />
             </div>
 

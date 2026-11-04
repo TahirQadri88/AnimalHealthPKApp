@@ -2,7 +2,8 @@
 // belongs to one of these groups, and the colour is how the group reads at a glance in the
 // expenses list. Adding a group means adding a colour, which is why they sit together.
 export const EXPENSE_GROUPS = ['Transportation', 'Salary', 'Utilities', 'Office', 'Other'];
-export const EXPENSE_GROUP_COLORS = { Transportation: 'bg-indigo-50 text-indigo-600 border-indigo-100', Salary: 'bg-amber-50 text-amber-600 border-amber-100', Utilities: 'bg-teal-50 text-teal-600 border-teal-100', Office: 'bg-purple-50 text-purple-600 border-purple-100', Other: 'bg-slate-100 text-slate-500 border-slate-200' };
+// Khyber Traders tokens; each pair measured at WCAG AA in the expense list.
+export const EXPENSE_GROUP_COLORS = { Transportation: 'bg-kt-blue/10 text-kt-blue border-kt-blue/30', Salary: 'bg-kt-amber/10 text-kt-amber border-kt-amber/30', Utilities: 'bg-kt-green/10 text-kt-green border-kt-green/30', Office: 'bg-kt-red/10 text-kt-red border-kt-red/30', Other: 'bg-white text-kt-sub border-kt-line' };
 
 // The vehicle types that carry one of our own riders, used as the fallback before the
 // vehicleTypes registry has loaded. The registry is the source of truth once it exists.

@@ -5,6 +5,17 @@ import { Search, Calendar, Download, Printer, Share2, Users, Package, Zap, Phone
 import { AppContext } from '../../context/AppContext';
 import { ScrollableTabBar } from '../ui/ScrollableTabBar';
 import { MultiPicker } from '../ui/MultiPicker';
+
+// Meaning colours as whole class strings, so Tailwind can find them. Analytics used to build
+// names like `bg-${color}-50` at run time, which only rendered when the same class happened to
+// be used somewhere else in the app.
+const KT_TONE = {
+  emerald: { border: 'border-kt-green/30', head: 'bg-kt-green/10 border-kt-green/30 text-kt-green' },
+  amber:   { border: 'border-kt-amber/30', head: 'bg-kt-amber/10 border-kt-amber/30 text-kt-amber' },
+  orange:  { border: 'border-kt-amber/30', head: 'bg-kt-amber/10 border-kt-amber/30 text-kt-amber' },
+  rose:    { border: 'border-kt-red/30',   head: 'bg-kt-red/10 border-kt-red/30 text-kt-red' },
+  indigo:  { border: 'border-kt-blue/30',  head: 'bg-kt-blue/10 border-kt-blue/30 text-kt-blue' },
+};
 import { APP_NAME, getPKTDate, getLocalDateStr, formatDateDisp, checkDateFilter, exportToCSV } from '../../helpers';
 import { makeArrowNav } from '../../lib/a11y';
 import { buildReport } from '../../services/analytics/reportEngine';
@@ -334,15 +345,15 @@ const renderTable = (dataObj, type, dimension) => {
   const totalRev = arrWithABC.reduce((s, r) => s + (r.revenue || r.productRevenue || 0), 0);
   const totalGP = arrWithABC.reduce((s, r) => s + (r.profit || 0), 0);
   const totalQtyOrOrders = arrWithABC.reduce((s, r) => s + (r.qty || r.orders || 0), 0);
-  const tierColors = { A: 'bg-emerald-100 text-emerald-700 border-emerald-200', B: 'bg-amber-100 text-amber-700 border-amber-200', C: 'bg-slate-100 text-slate-500 border-slate-200' };
+  const tierColors = { A: 'bg-kt-green/10 text-kt-green border-kt-green/30', B: 'bg-kt-amber/10 text-kt-amber border-kt-amber/30', C: 'bg-kt-raised text-kt-sub border-kt-line' };
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mt-3">
-       <div className="bg-slate-50 border-b border-slate-200 p-2 flex justify-between items-center">
+    <div className="bg-white rounded-xl border border-kt-line overflow-hidden mt-3">
+       <div className="bg-kt-raised border-b border-kt-line p-2 flex justify-between items-center">
          <div className="flex items-center gap-2 ml-1">
-           <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{arrWithABC.length} {type}s</span>
-           <span className="text-[9px] text-slate-400 font-medium">| ABC = revenue tier</span>
+           <span className="text-xs font-medium text-kt-sub">{arrWithABC.length} {type}s</span>
+           <span className="text-xs text-kt-muted font-medium">| ABC = revenue tier</span>
          </div>
-         <select value={sortBy} onChange={e=>setSortBy(e.target.value)} className="bg-white border border-slate-200 rounded px-2 py-1 text-xs font-bold text-slate-600 outline-none">
+         <select value={sortBy} onChange={e=>setSortBy(e.target.value)} className="bg-white border border-kt-line rounded px-2 py-1 text-xs font-medium text-kt-sub outline-none">
            <option value="profit">Sort: Highest GP</option>
            <option value="revenue">Sort: Highest Revenue</option>
            <option value="margin">Sort: Best Margin</option>
@@ -352,18 +363,18 @@ const renderTable = (dataObj, type, dimension) => {
        </div>
        <div className="overflow-x-auto">
          <table className="w-full text-left text-xs whitespace-nowrap">
-            <thead className="bg-slate-50 text-slate-500 uppercase font-bold tracking-wider border-b border-slate-200">
+            <thead className="bg-kt-raised text-kt-sub font-medium border-b border-kt-line">
               <tr>
                 <th className="p-3">{type}</th>
                 {type !== 'Customer' && <th className="p-3 text-center">Qty</th>}
                 {type === 'Customer' && <th className="p-3 text-center">Orders</th>}
                 <th className="p-3 text-right">Revenue</th>
                 <th className="p-3 text-right">Rev%</th>
-                <th className="p-3 text-right text-emerald-600">GP</th>
-                <th className="p-3 text-right text-indigo-500">Margin%</th>
+                <th className="p-3 text-right text-kt-green">GP</th>
+                <th className="p-3 text-right text-kt-blue">Margin%</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
+            <tbody className="divide-y divide-kt-line font-semibold text-kt-ink">
               {arrWithABC.map((row, i) => {
                 const rev = row.revenue || row.productRevenue || 0;
                 const gp = row.profit || 0;
@@ -371,37 +382,37 @@ const renderTable = (dataObj, type, dimension) => {
                 const revShare = totalRev > 0 ? ((rev / totalRev) * 100).toFixed(1) : 0;
                 const barW = maxProfit > 0 ? Math.max((gp / maxProfit) * 100, 0) : 0;
                 return (
-                  <tr key={i} className="hover:bg-slate-50">
+                  <tr key={i} className="hover:bg-kt-raised">
                     <td className="p-3">
                       <div className="flex items-center gap-1.5">
-                        <span className={`text-[9px] font-black px-1 py-0.5 rounded border ${tierColors[row.abcTier]}`}>{row.abcTier}</span>
+                        <span className={`text-xs font-semibold px-1 py-0.5 rounded border ${tierColors[row.abcTier]}`}>{row.abcTier}</span>
                         <button
-                          className="font-bold text-slate-800 hover:text-indigo-600 text-left transition-colors underline decoration-dotted decoration-slate-300 underline-offset-2"
+                          className="font-medium text-kt-ink hover:text-kt-blue text-left transition-colors underline decoration-dotted decoration-slate-300 underline-offset-2"
                           title={`Show the transactions behind ${row.label || row.key}`}
                           onClick={() => openDrill(dimension, row.key, row.label || row.key)}
                         >{row.label || row.key}</button>
                       </div>
-                      {row.company && <div className="text-[9px] text-slate-400 uppercase tracking-widest mt-0.5">{row.company}</div>}
-                      <div className="w-full bg-slate-100 rounded-full h-1 mt-1.5 max-w-[100px]"><div className="bg-emerald-400 h-1 rounded-full" style={{width:`${barW}%`}}></div></div>
+                      {row.company && <div className="text-xs text-kt-muted mt-0.5">{row.company}</div>}
+                      <div className="w-full bg-kt-raised rounded-full h-1 mt-1.5 max-w-[100px]"><div className="bg-kt-primary h-1 rounded-full" style={{width:`${barW}%`}}></div></div>
                     </td>
-                    {type !== 'Customer' && <td className="p-3 text-center bg-slate-50/50 font-bold">{(row.qty||0).toLocaleString('en-US')}</td>}
-                    {type === 'Customer' && <td className="p-3 text-center bg-slate-50/50 font-bold">{row.orders||0}</td>}
-                    <td className="p-3 text-right text-slate-800 font-bold">Rs.{rev.toLocaleString('en-US')}</td>
-                    <td className="p-3 text-right text-slate-500">{revShare}%</td>
-                    <td className="p-3 text-right font-bold" style={{color: gp >= 0 ? '#059669' : '#e11d48'}}>Rs.{gp.toLocaleString('en-US')}</td>
-                    <td className="p-3 text-right text-indigo-600 font-bold">{margin}%</td>
+                    {type !== 'Customer' && <td className="p-3 text-center bg-kt-raised/50 font-medium">{(row.qty||0).toLocaleString('en-US')}</td>}
+                    {type === 'Customer' && <td className="p-3 text-center bg-kt-raised/50 font-medium">{row.orders||0}</td>}
+                    <td className="p-3 text-right text-kt-ink font-medium">Rs.{rev.toLocaleString('en-US')}</td>
+                    <td className="p-3 text-right text-kt-sub">{revShare}%</td>
+                    <td className="p-3 text-right font-medium" style={{color: gp >= 0 ? 'rgb(var(--kt-green))' : 'rgb(var(--kt-red))'}}>Rs.{gp.toLocaleString('en-US')}</td>
+                    <td className="p-3 text-right text-kt-blue font-medium">{margin}%</td>
                   </tr>
                 );
               })}
             </tbody>
-            <tfoot className="bg-slate-50 border-t-2 border-slate-300 font-black text-slate-800 text-xs">
+            <tfoot className="bg-kt-raised border-t-2 border-kt-line font-semibold text-kt-ink text-xs">
               <tr>
-                <td className="p-3 uppercase tracking-wider text-slate-600">Totals</td>
+                <td className="p-3 text-kt-sub">Totals</td>
                 <td className="p-3 text-center">{totalQtyOrOrders.toLocaleString('en-US')}</td>
                 <td className="p-3 text-right">Rs.{totalRev.toLocaleString('en-US')}</td>
-                <td className="p-3 text-right text-slate-500">100%</td>
-                <td className="p-3 text-right text-emerald-700">Rs.{totalGP.toLocaleString('en-US')}</td>
-                <td className="p-3 text-right text-indigo-700">{totalRev > 0 ? ((totalGP/totalRev)*100).toFixed(1) : 0}%</td>
+                <td className="p-3 text-right text-kt-sub">100%</td>
+                <td className="p-3 text-right text-kt-green">Rs.{totalGP.toLocaleString('en-US')}</td>
+                <td className="p-3 text-right text-kt-blue">{totalRev > 0 ? ((totalGP/totalRev)*100).toFixed(1) : 0}%</td>
               </tr>
             </tfoot>
          </table>
@@ -420,10 +431,10 @@ const renderSegmentTable = (dataObj, label, dimension) => {
   });
   const maxRev = arr[0]?.revenue || 1;
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mt-3">
-      <div className="bg-slate-50 border-b border-slate-200 p-2 flex justify-between items-center">
-        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-2">{arr.length} {label}s</span>
-        <select value={sortBy} onChange={e=>setSortBy(e.target.value)} className="bg-white border border-slate-200 rounded px-2 py-1 text-xs font-bold text-slate-600 outline-none">
+    <div className="bg-white rounded-xl border border-kt-line overflow-hidden mt-3">
+      <div className="bg-kt-raised border-b border-kt-line p-2 flex justify-between items-center">
+        <span className="text-xs font-medium text-kt-sub ml-2">{arr.length} {label}s</span>
+        <select value={sortBy} onChange={e=>setSortBy(e.target.value)} className="bg-white border border-kt-line rounded px-2 py-1 text-xs font-medium text-kt-sub outline-none">
           <option value="revenue">Sort: Highest Revenue</option>
           <option value="profit">Sort: Highest GP</option>
           <option value="margin">Sort: Best Margin</option>
@@ -432,33 +443,33 @@ const renderSegmentTable = (dataObj, label, dimension) => {
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-left text-xs whitespace-nowrap">
-          <thead className="bg-slate-50 text-slate-500 uppercase font-bold tracking-wider border-b border-slate-200">
-            <tr><th className="p-3">{label}</th><th className="p-3 text-center">Orders</th><th className="p-3 text-right">Revenue</th><th className="p-3 text-right text-emerald-600">GP</th><th className="p-3 text-right text-indigo-500">Margin%</th></tr>
+          <thead className="bg-kt-raised text-kt-sub font-medium border-b border-kt-line">
+            <tr><th className="p-3">{label}</th><th className="p-3 text-center">Orders</th><th className="p-3 text-right">Revenue</th><th className="p-3 text-right text-kt-green">GP</th><th className="p-3 text-right text-kt-blue">Margin%</th></tr>
           </thead>
-          <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
+          <tbody className="divide-y divide-kt-line font-semibold text-kt-ink">
             {arr.map((row, i) => {
               const rev = row.revenue || 0;
               const gp = row.profit || 0;
               const margin = rev > 0 ? ((gp / rev) * 100).toFixed(1) : 0;
               const barW = maxRev > 0 ? Math.max((rev / maxRev) * 100, 0) : 0;
               return (
-                <tr key={i} className="hover:bg-slate-50">
+                <tr key={i} className="hover:bg-kt-raised">
                   <td className="p-3">
                     <button
-                      className="font-bold text-slate-800 hover:text-indigo-600 text-left transition-colors underline decoration-dotted decoration-slate-300 underline-offset-2"
+                      className="font-medium text-kt-ink hover:text-kt-blue text-left transition-colors underline decoration-dotted decoration-slate-300 underline-offset-2"
                       title={`Show the transactions behind ${row.key}`}
                       onClick={() => openDrill(dimension, row.key)}
                     >{row.key || '—'}</button>
-                    <div className="w-full bg-slate-100 rounded-full h-1 mt-1.5 max-w-[100px]"><div className="bg-indigo-400 h-1 rounded-full" style={{width:`${barW}%`}}></div></div>
+                    <div className="w-full bg-kt-raised rounded-full h-1 mt-1.5 max-w-[100px]"><div className="bg-kt-primary h-1 rounded-full" style={{width:`${barW}%`}}></div></div>
                   </td>
-                  <td className="p-3 text-center bg-slate-50/50 font-bold">{row.orders||0}</td>
-                  <td className="p-3 text-right font-bold text-slate-800">Rs.{rev.toLocaleString('en-US')}</td>
-                  <td className="p-3 text-right font-bold" style={{color: gp >= 0 ? '#059669' : '#e11d48'}}>Rs.{gp.toLocaleString('en-US')}</td>
-                  <td className="p-3 text-right text-indigo-600 font-bold">{margin}%</td>
+                  <td className="p-3 text-center bg-kt-raised/50 font-medium">{row.orders||0}</td>
+                  <td className="p-3 text-right font-medium text-kt-ink">Rs.{rev.toLocaleString('en-US')}</td>
+                  <td className="p-3 text-right font-medium" style={{color: gp >= 0 ? 'rgb(var(--kt-green))' : 'rgb(var(--kt-red))'}}>Rs.{gp.toLocaleString('en-US')}</td>
+                  <td className="p-3 text-right text-kt-blue font-medium">{margin}%</td>
                 </tr>
               );
             })}
-            {arr.length === 0 && <tr><td colSpan={5} className="p-6 text-center text-slate-400">No data. Add city/area/type to customers first.</td></tr>}
+            {arr.length === 0 && <tr><td colSpan={5} className="p-6 text-center text-kt-muted">No data. Add city/area/type to customers first.</td></tr>}
           </tbody>
         </table>
       </div>
@@ -494,9 +505,9 @@ return (
   <div className="h-full flex flex-col p-4">
     {/* Filter Bar */}
     <div className="flex flex-wrap gap-2 mb-3 shrink-0 pb-1">
-       <div className="flex items-center gap-1.5 bg-white px-2.5 py-1.5 rounded-lg border border-slate-200 shadow-sm shrink-0">
-         <Calendar size={13} className="text-indigo-500"/>
-         <select value={dateFilter} onChange={e => setDateFilter(e.target.value)} className="bg-transparent font-bold text-[11px] text-slate-700 outline-none cursor-pointer">
+       <div className="flex items-center gap-1.5 bg-white px-2.5 py-1.5 rounded-lg border border-kt-line shrink-0">
+         <Calendar size={13} className="text-kt-blue"/>
+         <select value={dateFilter} onChange={e => setDateFilter(e.target.value)} className="bg-transparent font-medium text-xs text-kt-ink outline-none cursor-pointer">
            <option>Today</option><option>This Week</option><option>This Month</option><option>This Year</option><option>All Time</option><option>Custom</option>
          </select>
        </div>
@@ -511,8 +522,8 @@ return (
     {/* Custom date inputs */}
     {dateFilter === 'Custom' && (
       <div className="flex gap-2 mb-3 shrink-0">
-        <div className="flex-1"><label className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-1">From</label><input type="date" value={customStart} onChange={e=>setCustomStart(e.target.value)} className="w-full p-2 bg-white border border-slate-200 rounded-lg text-xs font-semibold outline-none focus:border-indigo-500"/></div>
-        <div className="flex-1"><label className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-1">To</label><input type="date" value={customEnd} onChange={e=>setCustomEnd(e.target.value)} className="w-full p-2 bg-white border border-slate-200 rounded-lg text-xs font-semibold outline-none focus:border-indigo-500"/></div>
+        <div className="flex-1"><label className="text-xs font-medium text-kt-sub block mb-1">From</label><input type="date" value={customStart} onChange={e=>setCustomStart(e.target.value)} className="w-full p-2 bg-white border border-kt-line rounded-lg text-xs font-semibold outline-none focus:border-kt-ink"/></div>
+        <div className="flex-1"><label className="text-xs font-medium text-kt-sub block mb-1">To</label><input type="date" value={customEnd} onChange={e=>setCustomEnd(e.target.value)} className="w-full p-2 bg-white border border-kt-line rounded-lg text-xs font-semibold outline-none focus:border-kt-ink"/></div>
       </div>
     )}
 
@@ -522,35 +533,35 @@ return (
          <button key={v} data-analytictab={v} tabIndex={view===v?0:-1}
            onClick={() => setView(v)}
            onKeyDown={makeArrowNav(['Overview','Insights','Monthly Trend','By Product','By Company','By Customer','By City','By Area','By Type','By Salesperson','Receivables','Collections','Returns','Expenses','Item Sales'],view,setView,'data-analytictab')}
-           className={`px-3 py-1.5 rounded-xl font-bold text-[11px] whitespace-nowrap shadow-sm transition-colors ${view === v ? 'bg-slate-800 text-white' : 'bg-white text-slate-600 border border-slate-200'}`}>{v}</button>
+           className={`px-3 py-1.5 rounded-xl font-medium text-xs whitespace-nowrap  transition-colors ${view === v ? 'bg-kt-band text-white' : 'bg-white text-kt-sub border border-kt-line'}`}>{v}</button>
        ))}
     </ScrollableTabBar>
 
     {/* Active filter chips */}
     {(filterCompanies.size > 0 || filterCustomers.size > 0 || filterSalespersons.size > 0) && (
       <div className="flex flex-wrap gap-1.5 mb-2 px-0.5 shrink-0">
-        {filterCompanies.size > 0 && <span className="bg-indigo-100 text-indigo-700 text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1">
+        {filterCompanies.size > 0 && <span className="bg-kt-blue/10 text-kt-blue text-xs font-medium px-2 py-1 rounded-full flex items-center gap-1">
           Brand: {[...filterCompanies].slice(0,2).map(id=>companies.find(c=>String(c.id)===id)?.name).filter(Boolean).join(', ')}{filterCompanies.size > 2 && ` +${filterCompanies.size-2}`}
-          <button onClick={()=>clearFilter(setFilterCompanies)} className="ml-1 text-indigo-400 hover:text-indigo-700"><X size={10}/></button>
+          <button onClick={()=>clearFilter(setFilterCompanies)} className="ml-1 text-kt-blue hover:text-kt-blue"><X size={10}/></button>
         </span>}
-        {filterCustomers.size > 0 && <span className="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1">
+        {filterCustomers.size > 0 && <span className="bg-kt-green/10 text-kt-green text-xs font-medium px-2 py-1 rounded-full flex items-center gap-1">
           Client: {[...filterCustomers].slice(0,2).map(id=>customers.find(c=>String(c.id)===id)?.name).filter(Boolean).join(', ')}{filterCustomers.size > 2 && ` +${filterCustomers.size-2}`}
-          <button onClick={()=>clearFilter(setFilterCustomers)} className="ml-1 text-emerald-400 hover:text-emerald-700"><X size={10}/></button>
+          <button onClick={()=>clearFilter(setFilterCustomers)} className="ml-1 text-kt-green hover:text-kt-green"><X size={10}/></button>
         </span>}
-        {filterSalespersons.size > 0 && <span className="bg-amber-100 text-amber-700 text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1">
+        {filterSalespersons.size > 0 && <span className="bg-kt-amber/10 text-kt-amber text-xs font-medium px-2 py-1 rounded-full flex items-center gap-1">
           Staff: {[...filterSalespersons].slice(0,2).map(id=>appUsers.find(u=>String(u.id)===id)?.name).filter(Boolean).join(', ')}{filterSalespersons.size > 2 && ` +${filterSalespersons.size-2}`}
-          <button onClick={()=>clearFilter(setFilterSalespersons)} className="ml-1 text-amber-400 hover:text-amber-700"><X size={10}/></button>
+          <button onClick={()=>clearFilter(setFilterSalespersons)} className="ml-1 text-kt-amber hover:text-kt-amber"><X size={10}/></button>
         </span>}
       </div>
     )}
 
     {/* Export bar */}
-    <div className="flex justify-between items-center bg-indigo-50/50 border border-indigo-100 p-2 rounded-xl my-2 shrink-0">
-        <span className="text-[10px] font-bold text-indigo-700 ml-1 uppercase tracking-widest truncate">{filterLabel}</span>
+    <div className="flex justify-between items-center bg-kt-blue/10 border border-kt-blue/30 p-2 rounded-xl my-2 shrink-0">
+        <span className="text-xs font-medium text-kt-blue ml-1 truncate">{filterLabel}</span>
         <div className="flex gap-1.5">
-           <button onClick={()=>handleExport('text')} title="WhatsApp" className="p-2 bg-green-500 text-white rounded-lg shadow-sm"><Share2 size={15}/></button>
-           <button onClick={()=>handleExport('csv')} title="CSV" className="p-2 bg-white text-slate-600 rounded-lg shadow-sm border border-slate-200"><Download size={15}/></button>
-           <button onClick={()=>handleExport('pdf')} title="PDF, Image or Save — opens the document" className="p-2 bg-indigo-600 text-white rounded-lg shadow-sm"><Printer size={15}/></button>
+           <button onClick={()=>handleExport('text')} title="WhatsApp" className="p-2 bg-kt-green text-white rounded-lg"><Share2 size={15}/></button>
+           <button onClick={()=>handleExport('csv')} title="CSV" className="p-2 bg-white text-kt-sub rounded-lg border border-kt-line"><Download size={15}/></button>
+           <button onClick={()=>handleExport('pdf')} title="PDF, Image or Save — opens the document" className="p-2 bg-kt-primary text-white rounded-lg"><Printer size={15}/></button>
         </div>
     </div>
 
@@ -564,40 +575,40 @@ return (
                { label: 'Revenue Trend', val: reportEngine.trends.revenue, icon: TrendingUp },
                { label: 'Profit Trend', val: reportEngine.trends.profit, icon: TrendingUp }
              ].map(({label, val, icon: Icon}) => (
-               <div key={label} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-                 <p className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">{label}</p>
+               <div key={label} className="bg-white p-4 rounded-xl border border-kt-line">
+                 <p className="text-xs font-medium text-kt-muted">{label}</p>
                  {val !== null ? (
                    <div className="flex items-center gap-1 mt-1">
-                     <span className={`text-lg font-black ${Number(val) >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{Number(val) >= 0 ? '+' : ''}{val}%</span>
-                     <span className="text-[10px] text-slate-400">vs prev</span>
+                     <span className={`text-lg font-semibold ${Number(val) >= 0 ? 'text-kt-green' : 'text-kt-red'}`}>{Number(val) >= 0 ? '+' : ''}{val}%</span>
+                     <span className="text-xs text-kt-muted">vs prev</span>
                    </div>
-                 ) : <p className="text-xs text-slate-400 mt-1">No prior data</p>}
+                 ) : <p className="text-xs text-kt-muted mt-1">No prior data</p>}
                </div>
              ))}
            </div>
 
            {/* New vs Repeat + Collection Rate quick stats */}
            <div className="grid grid-cols-3 gap-2">
-             <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm text-center">
-               <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">New Clients</p>
-               <p className="text-xl font-black text-indigo-600 mt-0.5">{reportEngine.newCustCount}</p>
+             <div className="bg-white p-3 rounded-xl border border-kt-line text-center">
+               <p className="text-xs font-medium text-kt-muted">New Clients</p>
+               <p className="text-xl font-semibold text-kt-blue mt-0.5">{reportEngine.newCustCount}</p>
              </div>
-             <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm text-center">
-               <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Repeat</p>
-               <p className="text-xl font-black text-emerald-600 mt-0.5">{reportEngine.repeatCustCount}</p>
+             <div className="bg-white p-3 rounded-xl border border-kt-line text-center">
+               <p className="text-xs font-medium text-kt-muted">Repeat</p>
+               <p className="text-xl font-semibold text-kt-green mt-0.5">{reportEngine.repeatCustCount}</p>
              </div>
-             <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm text-center">
-               <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Collected</p>
-               <p className={`text-xl font-black mt-0.5 ${Number(reportEngine.collectionRate) >= 80 ? 'text-emerald-600' : Number(reportEngine.collectionRate) >= 50 ? 'text-amber-600' : 'text-rose-600'}`}>{reportEngine.collectionRate}%</p>
+             <div className="bg-white p-3 rounded-xl border border-kt-line text-center">
+               <p className="text-xs font-medium text-kt-muted">Collected</p>
+               <p className={`text-xl font-semibold mt-0.5 ${Number(reportEngine.collectionRate) >= 80 ? 'text-kt-green' : Number(reportEngine.collectionRate) >= 50 ? 'text-kt-amber' : 'text-kt-red'}`}>{reportEngine.collectionRate}%</p>
              </div>
            </div>
 
            {/* Daily chart - revenue + profit bars */}
            {Object.keys(reportEngine.dailyBreakdown).length > 0 && (
-             <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+             <div className="bg-white p-4 rounded-xl border border-kt-line">
                <div className="flex justify-between items-center mb-3">
-                 <p className="text-[10px] font-bold uppercase text-slate-500 tracking-wider">Daily Sales</p>
-                 <div className="flex gap-2 text-[9px] font-bold"><span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-indigo-400 inline-block"></span>Revenue</span><span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-emerald-400 inline-block"></span>Profit</span></div>
+                 <p className="text-xs font-medium text-kt-sub">Daily Sales</p>
+                 <div className="flex gap-2 text-xs font-medium"><span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-kt-muted/40 inline-block"></span>Revenue</span><span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-kt-primary inline-block"></span>Profit</span></div>
                </div>
                <div className="flex items-end gap-1 h-28 overflow-x-auto">
                  {Object.entries(reportEngine.dailyBreakdown).sort((a,b) => a[0].localeCompare(b[0])).slice(-21).map(([date, data]) => {
@@ -606,14 +617,14 @@ return (
                    const pH = Math.max((Math.max(data.profit,0) / maxRevenue) * 100, 0);
                    return (
                      <div key={date} className="flex flex-col items-center min-w-[22px] group relative">
-                       <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[9px] font-bold px-1.5 py-1 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-none">
+                       <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-kt-band text-white text-xs font-medium px-1.5 py-1 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-none">
                          {date.slice(5)}<br/>Rev: {data.revenue.toLocaleString('en-US')}<br/>GP: {data.profit.toLocaleString('en-US')}
                        </div>
                        <div className="flex gap-0.5 items-end" style={{height:'96px'}}>
-                         <div className="w-2 bg-indigo-400 rounded-t" style={{height:`${rH}%`}}></div>
-                         <div className="w-2 bg-emerald-400 rounded-t" style={{height:`${pH}%`}}></div>
+                         <div className="w-2 bg-kt-muted/40 rounded-t" style={{height:`${rH}%`}}></div>
+                         <div className="w-2 bg-kt-primary rounded-t" style={{height:`${pH}%`}}></div>
                        </div>
-                       <span className="text-[8px] text-slate-400 mt-1">{date.slice(-2)}</span>
+                       <span className="text-[8px] text-kt-muted mt-1">{date.slice(-2)}</span>
                      </div>
                    );
                  })}
@@ -622,17 +633,17 @@ return (
            )}
 
            {/* Top 5 products */}
-           <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-             <p className="text-[10px] font-bold uppercase text-slate-500 tracking-wider mb-3">Top 5 Products by GP</p>
+           <div className="bg-white p-4 rounded-xl border border-kt-line">
+             <p className="text-xs font-medium text-kt-sub mb-3">Top 5 Products by GP</p>
              <div className="space-y-2">
                {Object.entries(reportEngine.byProduct).sort((a,b) => b[1].profit - a[1].profit).slice(0, 5).map(([name, data], i) => {
                  const maxP = Object.entries(reportEngine.byProduct).sort((a,b) => b[1].profit - a[1].profit)[0]?.[1].profit || 1;
                  return (
                    <div key={name} className="flex items-center gap-3">
-                     <span className="w-5 h-5 bg-slate-100 rounded-full flex items-center justify-center text-[10px] font-bold text-slate-500 shrink-0">{i+1}</span>
+                     <span className="w-5 h-5 bg-kt-raised rounded-full flex items-center justify-center text-xs font-medium text-kt-sub shrink-0">{i+1}</span>
                      <div className="flex-1 min-w-0">
-                       <div className="flex justify-between text-xs"><span className="font-semibold text-slate-700 truncate">{name}</span><span className="font-bold text-emerald-600 ml-2 shrink-0">Rs.{data.profit.toLocaleString('en-US')}</span></div>
-                       <div className="w-full bg-slate-100 rounded-full h-1.5 mt-1"><div className="bg-emerald-500 h-1.5 rounded-full" style={{width:`${Math.min((data.profit/maxP)*100,100)}%`}}></div></div>
+                       <div className="flex justify-between text-xs"><span className="font-semibold text-kt-ink truncate">{name}</span><span className="font-medium text-kt-green ml-2 shrink-0">Rs.{data.profit.toLocaleString('en-US')}</span></div>
+                       <div className="w-full bg-kt-raised rounded-full h-1.5 mt-1"><div className="bg-kt-primary h-1.5 rounded-full" style={{width:`${Math.min((data.profit/maxP)*100,100)}%`}}></div></div>
                      </div>
                    </div>
                  );
@@ -642,16 +653,16 @@ return (
 
            {/* Expense breakdown by category */}
            {Object.keys(reportEngine.byExpenseCategory).length > 0 && (
-             <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-               <p className="text-[10px] font-bold uppercase text-slate-500 tracking-wider mb-3">Expenses by Category</p>
+             <div className="bg-white p-4 rounded-xl border border-kt-line">
+               <p className="text-xs font-medium text-kt-sub mb-3">Expenses by Category</p>
                <div className="space-y-2">
                  {Object.entries(reportEngine.byExpenseCategory).sort((a,b)=>b[1]-a[1]).map(([cat, amt]) => {
                    const maxAmt = Math.max(...Object.values(reportEngine.byExpenseCategory), 1);
                    return (
                      <div key={cat} className="flex items-center gap-3">
                        <div className="flex-1 min-w-0">
-                         <div className="flex justify-between text-xs"><span className="font-semibold text-slate-600 truncate">{cat}</span><span className="font-bold text-rose-500 ml-2 shrink-0">Rs.{amt.toLocaleString('en-US')}</span></div>
-                         <div className="w-full bg-slate-100 rounded-full h-1.5 mt-1"><div className="bg-rose-400 h-1.5 rounded-full" style={{width:`${Math.min((amt/maxAmt)*100,100)}%`}}></div></div>
+                         <div className="flex justify-between text-xs"><span className="font-semibold text-kt-sub truncate">{cat}</span><span className="font-medium text-kt-red ml-2 shrink-0">Rs.{amt.toLocaleString('en-US')}</span></div>
+                         <div className="w-full bg-kt-raised rounded-full h-1.5 mt-1"><div className="bg-kt-red h-1.5 rounded-full" style={{width:`${Math.min((amt/maxAmt)*100,100)}%`}}></div></div>
                        </div>
                      </div>
                    );
@@ -666,22 +677,22 @@ return (
              const gpPct = k.productRevenue > 0 ? ((k.grossMargin / k.productRevenue) * 100).toFixed(1) : '0.0';
              const netPct = k.productRevenue > 0 ? ((k.netProfit / k.productRevenue) * 100).toFixed(1) : '0.0';
              return (
-               <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white p-6 rounded-3xl shadow-xl border border-slate-800">
-                 <p className="text-[10px] uppercase font-bold text-slate-400 mb-5 tracking-widest flex justify-between"><span>P&L Dashboard</span><span className="text-indigo-300">{filterLabel}</span></p>
+               <div className="bg-kt-band text-white p-6 rounded-2xl shadow-[0_8px_24px_rgba(0,0,0,0.08)] border border-white/15">
+                 <p className="text-xs font-medium text-white/70 mb-5 flex justify-between"><span>P&L Dashboard</span><span className="text-white">{filterLabel}</span></p>
                  <div className="space-y-3">
-                   <div className="flex justify-between items-center text-sm font-medium"><span className="text-slate-300">Gross Product Sales</span><span className="font-bold text-white">Rs.{(k.productRevenue + k.creditNotesTotal).toLocaleString('en-US')}</span></div>
-                   {k.creditNotesTotal > 0 && <div className="flex justify-between items-center text-xs"><span className="text-rose-300">Sales Returns ({k.creditNotesCount})</span><span className="font-bold text-rose-300">− Rs.{k.creditNotesTotal.toLocaleString('en-US')}</span></div>}
-                   <div className="flex justify-between items-center text-sm font-medium"><span className="text-rose-300">Total COGS</span><span className="font-bold text-rose-300">- Rs.{k.totalCOGS.toLocaleString('en-US')}</span></div>
-                   <div className="flex justify-between items-baseline"><span className="text-indigo-300 text-sm font-semibold">Gross Profit</span><div className="text-right"><span className="font-bold text-indigo-300">Rs.{k.grossMargin.toLocaleString('en-US')}</span><span className="text-[10px] text-indigo-400 ml-2">{gpPct}%</span></div></div>
-                   <div className="h-px bg-slate-700 my-1"></div>
-                   <div className="flex justify-between items-center text-xs"><span className="text-slate-400">Delivery Billed</span><span className="font-bold text-slate-300">+ Rs.{k.deliveryBilled.toLocaleString('en-US')}</span></div>
-                   <div className="flex justify-between items-center text-xs"><span className="text-rose-400">Transport Expenses</span><span className="font-bold text-rose-400">- Rs.{k.transportExpense.toLocaleString('en-US')}</span></div>
-                   <div className="flex justify-between items-center text-xs"><span className="text-rose-400">Operational Expenses</span><span className="font-bold text-rose-400">- Rs.{k.totalExpenses.toLocaleString('en-US')}</span></div>
-                   <div className="h-px bg-slate-700 my-1"></div>
-                   <div className="flex justify-between items-baseline"><span className="font-bold uppercase tracking-widest text-emerald-400 text-xs">Net Profit</span><div className="text-right"><span className={`font-black text-2xl tracking-tight ${k.netProfit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>Rs.{k.netProfit.toLocaleString('en-US')}</span><span className={`text-[10px] ml-2 ${k.netProfit >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>{netPct}%</span></div></div>
-                   <div className="h-px bg-slate-700 my-1"></div>
-                   <div className="flex justify-between items-center text-xs"><span className="text-amber-400 font-semibold">Outstanding Receivables</span><span className="font-bold text-amber-300">Rs.{k.totalReceivables.toLocaleString('en-US')}</span></div>
-                   <div className="flex justify-between items-center text-xs"><span className="text-slate-500">Collection Rate (all-time)</span><span className={`font-bold ${Number(reportEngine.collectionRate) >= 80 ? 'text-emerald-400' : Number(reportEngine.collectionRate) >= 50 ? 'text-amber-400' : 'text-rose-400'}`}>{reportEngine.collectionRate}%</span></div>
+                   <div className="flex justify-between items-center text-sm font-medium"><span className="text-white/70">Gross Product Sales</span><span className="font-medium text-white">Rs.{(k.productRevenue + k.creditNotesTotal).toLocaleString('en-US')}</span></div>
+                   {k.creditNotesTotal > 0 && <div className="flex justify-between items-center text-xs"><span className="text-white/80">Sales Returns ({k.creditNotesCount})</span><span className="font-medium text-white/80">− Rs.{k.creditNotesTotal.toLocaleString('en-US')}</span></div>}
+                   <div className="flex justify-between items-center text-sm font-medium"><span className="text-white/80">Total COGS</span><span className="font-medium text-white/80">- Rs.{k.totalCOGS.toLocaleString('en-US')}</span></div>
+                   <div className="flex justify-between items-baseline"><span className="text-white text-sm font-semibold">Gross Profit</span><div className="text-right"><span className="font-medium text-white">Rs.{k.grossMargin.toLocaleString('en-US')}</span><span className="text-xs text-white ml-2">{gpPct}%</span></div></div>
+                   <div className="h-px bg-white/10 my-1"></div>
+                   <div className="flex justify-between items-center text-xs"><span className="text-white/70">Delivery Billed</span><span className="font-medium text-white/70">+ Rs.{k.deliveryBilled.toLocaleString('en-US')}</span></div>
+                   <div className="flex justify-between items-center text-xs"><span className="text-white/80">Transport Expenses</span><span className="font-medium text-white/80">- Rs.{k.transportExpense.toLocaleString('en-US')}</span></div>
+                   <div className="flex justify-between items-center text-xs"><span className="text-white/80">Operational Expenses</span><span className="font-medium text-white/80">- Rs.{k.totalExpenses.toLocaleString('en-US')}</span></div>
+                   <div className="h-px bg-white/10 my-1"></div>
+                   <div className="flex justify-between items-baseline"><span className="font-medium text-kt-yellow text-xs">Net Profit</span><div className="text-right"><span className={`font-display text-2xl  ${k.netProfit >= 0 ? 'text-kt-yellow' : 'text-white/80'}`}>Rs.{k.netProfit.toLocaleString('en-US')}</span><span className={`text-xs ml-2 ${k.netProfit >= 0 ? 'text-kt-yellow' : 'text-white/80'}`}>{netPct}%</span></div></div>
+                   <div className="h-px bg-white/10 my-1"></div>
+                   <div className="flex justify-between items-center text-xs"><span className="text-white/80 font-semibold">Outstanding Receivables</span><span className="font-medium text-white/80">Rs.{k.totalReceivables.toLocaleString('en-US')}</span></div>
+                   <div className="flex justify-between items-center text-xs"><span className="text-white/80">Collection Rate (all-time)</span><span className={`font-medium ${Number(reportEngine.collectionRate) >= 80 ? 'text-kt-yellow' : Number(reportEngine.collectionRate) >= 50 ? 'text-white/80' : 'text-white/80'}`}>{reportEngine.collectionRate}%</span></div>
                  </div>
                </div>
              );
@@ -703,67 +714,67 @@ return (
         const totalAmt = rows.reduce((s, r) => s + r.sub, 0);
         return (
           <div className="space-y-3 mt-3">
-            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
-              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5"><Search size={11}/> Filter</p>
+            <div className="bg-white p-4 rounded-xl border border-kt-line space-y-3">
+              <p className="text-xs font-medium text-kt-sub flex items-center gap-1.5"><Search size={11}/> Filter</p>
               <div className="grid grid-cols-2 gap-2">
                 <div className="relative">
-                  <Search size={13} className="absolute left-2.5 top-2.5 text-slate-400 pointer-events-none"/>
-                  <input className="w-full pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-300" placeholder="Product name…" value={itemProdFilter} onChange={e => setItemProdFilter(e.target.value)}/>
+                  <Search size={13} className="absolute left-2.5 top-2.5 text-kt-muted pointer-events-none"/>
+                  <input className="w-full pl-8 pr-3 py-2 bg-kt-raised border border-kt-line rounded-xl text-xs font-semibold outline-none focus:border-kt-ink focus:ring-1" placeholder="Product name…" value={itemProdFilter} onChange={e => setItemProdFilter(e.target.value)}/>
                 </div>
                 <div className="relative">
-                  <Users size={13} className="absolute left-2.5 top-2.5 text-slate-400 pointer-events-none"/>
-                  <input className="w-full pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-300" placeholder="Customer name…" value={itemCustFilter} onChange={e => setItemCustFilter(e.target.value)}/>
+                  <Users size={13} className="absolute left-2.5 top-2.5 text-kt-muted pointer-events-none"/>
+                  <input className="w-full pl-8 pr-3 py-2 bg-kt-raised border border-kt-line rounded-xl text-xs font-semibold outline-none focus:border-kt-ink focus:ring-1" placeholder="Customer name…" value={itemCustFilter} onChange={e => setItemCustFilter(e.target.value)}/>
                 </div>
               </div>
             </div>
             {!hasFilter && (
-              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-8 text-center">
-                <Package size={28} className="mx-auto text-slate-300 mb-2"/>
-                <p className="text-slate-500 font-semibold text-sm">Search a product or customer to see invoice-level sales</p>
+              <div className="bg-kt-raised border border-kt-line rounded-xl p-8 text-center">
+                <Package size={28} className="mx-auto text-kt-muted mb-2"/>
+                <p className="text-kt-sub font-semibold text-sm">Search a product or customer to see invoice-level sales</p>
               </div>
             )}
             {hasFilter && rows.length === 0 && (
-              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 text-center">
-                <p className="text-slate-400 font-semibold text-sm">No results found for the current filters</p>
+              <div className="bg-kt-raised border border-kt-line rounded-xl p-6 text-center">
+                <p className="text-kt-muted font-semibold text-sm">No results found for the current filters</p>
               </div>
             )}
             {hasFilter && rows.length > 0 && (
               <>
                 <div className="grid grid-cols-3 gap-2">
-                  <div className="bg-indigo-50 p-3 rounded-2xl border border-indigo-100 text-center">
-                    <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider">Invoices</p>
-                    <p className="text-xl font-black text-indigo-700">{new Set(rows.map(r=>r.invoiceId)).size}</p>
+                  <div className="bg-kt-blue/10 p-3 rounded-xl border border-kt-blue/30 text-center">
+                    <p className="text-xs font-medium text-kt-blue">Invoices</p>
+                    <p className="text-xl font-semibold text-kt-blue">{new Set(rows.map(r=>r.invoiceId)).size}</p>
                   </div>
-                  <div className="bg-teal-50 p-3 rounded-2xl border border-teal-100 text-center">
-                    <p className="text-[10px] font-bold text-teal-500 uppercase tracking-wider">Units</p>
-                    <p className="text-xl font-black text-teal-700">{totalUnits.toLocaleString('en-US')}</p>
+                  <div className="bg-kt-green/10 p-3 rounded-xl border border-kt-green/30 text-center">
+                    <p className="text-xs font-medium text-kt-green">Units</p>
+                    <p className="text-xl font-semibold text-kt-green">{totalUnits.toLocaleString('en-US')}</p>
                   </div>
-                  <div className="bg-emerald-50 p-3 rounded-2xl border border-emerald-100 text-center">
-                    <p className="text-[10px] font-bold text-emerald-500 uppercase tracking-wider">Revenue</p>
-                    <p className="text-lg font-black text-emerald-700">Rs.{totalAmt.toLocaleString('en-US')}</p>
+                  <div className="bg-kt-green/10 p-3 rounded-xl border border-kt-green/30 text-center">
+                    <p className="text-xs font-medium text-kt-green">Revenue</p>
+                    <p className="text-lg font-semibold text-kt-green">Rs.{totalAmt.toLocaleString('en-US')}</p>
                   </div>
                 </div>
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="bg-white rounded-xl border border-kt-line overflow-hidden">
                   <div className="overflow-x-auto">
                     <table className="w-full text-left text-xs whitespace-nowrap">
-                      <thead className="bg-slate-50 text-slate-500 uppercase font-bold tracking-wider border-b border-slate-200">
+                      <thead className="bg-kt-raised text-kt-sub font-medium border-b border-kt-line">
                         <tr><th className="p-3">Date</th><th className="p-3">Customer</th><th className="p-3">Invoice</th><th className="p-3">Product</th><th className="p-3 text-center">Qty</th><th className="p-3 text-right">Rate</th><th className="p-3 text-right">Amount</th></tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-100">
+                      <tbody className="divide-y divide-kt-line">
                         {rows.map((r, i) => (
-                          <tr key={i} className="hover:bg-slate-50">
-                            <td className="p-3 text-slate-500 font-medium">{formatDateDisp(r.date)}</td>
-                            <td className="p-3"><button className="font-semibold text-slate-800 hover:text-indigo-600 transition-colors text-left" onClick={() => { setSelectedLedgerId(r.customerId); setShowLedgerModal(true); }}>{r.customerName}</button></td>
-                            <td className="p-3"><button className="font-bold text-indigo-600 hover:text-indigo-800 hover:underline transition-colors" onClick={() => setPrintConfig({ docType: 'invoice', format: 'thermal', data: r.inv })}>{r.invoiceId}</button></td>
-                            <td className="p-3 font-semibold text-slate-800">{r.name}</td>
-                            <td className="p-3 text-center font-bold text-slate-700">{r.qty}</td>
-                            <td className="p-3 text-right text-slate-600">Rs.{r.rate.toLocaleString('en-US')}</td>
-                            <td className="p-3 text-right font-bold text-emerald-700">Rs.{r.sub.toLocaleString('en-US')}</td>
+                          <tr key={i} className="hover:bg-kt-raised">
+                            <td className="p-3 text-kt-sub font-medium">{formatDateDisp(r.date)}</td>
+                            <td className="p-3"><button className="font-semibold text-kt-ink hover:text-kt-blue transition-colors text-left" onClick={() => { setSelectedLedgerId(r.customerId); setShowLedgerModal(true); }}>{r.customerName}</button></td>
+                            <td className="p-3"><button className="font-medium text-kt-blue hover:text-kt-blue hover:underline transition-colors" onClick={() => setPrintConfig({ docType: 'invoice', format: 'thermal', data: r.inv })}>{r.invoiceId}</button></td>
+                            <td className="p-3 font-semibold text-kt-ink">{r.name}</td>
+                            <td className="p-3 text-center font-medium text-kt-ink">{r.qty}</td>
+                            <td className="p-3 text-right text-kt-sub">Rs.{r.rate.toLocaleString('en-US')}</td>
+                            <td className="p-3 text-right font-medium text-kt-green">Rs.{r.sub.toLocaleString('en-US')}</td>
                           </tr>
                         ))}
                       </tbody>
-                      <tfoot className="bg-slate-50 border-t-2 border-slate-300 font-black text-xs">
-                        <tr><td colSpan={4} className="p-3 text-slate-600 uppercase tracking-wider">Totals</td><td className="p-3 text-center">{totalUnits.toLocaleString('en-US')}</td><td></td><td className="p-3 text-right text-emerald-700">Rs.{totalAmt.toLocaleString('en-US')}</td></tr>
+                      <tfoot className="bg-kt-raised border-t-2 border-kt-line font-semibold text-xs">
+                        <tr><td colSpan={4} className="p-3 text-kt-sub">Totals</td><td className="p-3 text-center">{totalUnits.toLocaleString('en-US')}</td><td></td><td className="p-3 text-right text-kt-green">Rs.{totalAmt.toLocaleString('en-US')}</td></tr>
                       </tfoot>
                     </table>
                   </div>
@@ -775,31 +786,31 @@ return (
       })()}
 
       {view === 'By Salesperson' && (
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mt-3">
-          <div className="bg-slate-50 border-b border-slate-200 p-3">
-            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{Object.keys(reportEngine.bySalesperson).length} Staff Members</p>
+        <div className="bg-white rounded-xl border border-kt-line overflow-hidden mt-3">
+          <div className="bg-kt-raised border-b border-kt-line p-3">
+            <p className="text-xs font-medium text-kt-sub">{Object.keys(reportEngine.bySalesperson).length} Staff Members</p>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs whitespace-nowrap">
-              <thead className="bg-slate-50 text-slate-500 uppercase font-bold tracking-wider border-b border-slate-200">
-                <tr><th className="p-3">Staff</th><th className="p-3 text-center">Orders</th><th className="p-3 text-right">Revenue</th><th className="p-3 text-right text-emerald-600">GP</th><th className="p-3 text-right text-indigo-500">Margin%</th></tr>
+              <thead className="bg-kt-raised text-kt-sub font-medium border-b border-kt-line">
+                <tr><th className="p-3">Staff</th><th className="p-3 text-center">Orders</th><th className="p-3 text-right">Revenue</th><th className="p-3 text-right text-kt-green">GP</th><th className="p-3 text-right text-kt-blue">Margin%</th></tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-kt-line">
                 {Object.entries(reportEngine.bySalesperson).sort((a,b)=>b[1].revenue-a[1].revenue).map(([name, data], i) => {
                   const margin = data.revenue > 0 ? ((data.profit / data.revenue) * 100).toFixed(1) : 0;
                   return (
-                    <tr key={i} className="hover:bg-slate-50">
-                      <td className="p-3 font-bold text-slate-800">{name}</td>
-                      <td className="p-3 text-center font-bold">{data.orders}</td>
-                      <td className="p-3 text-right font-bold text-slate-800">Rs.{data.revenue.toLocaleString('en-US')}</td>
-                      <td className="p-3 text-right font-bold text-emerald-600">Rs.{data.profit.toLocaleString('en-US')}</td>
-                      <td className="p-3 text-right font-bold text-indigo-600">{margin}%</td>
+                    <tr key={i} className="hover:bg-kt-raised">
+                      <td className="p-3 font-medium text-kt-ink">{name}</td>
+                      <td className="p-3 text-center font-medium">{data.orders}</td>
+                      <td className="p-3 text-right font-medium text-kt-ink">Rs.{data.revenue.toLocaleString('en-US')}</td>
+                      <td className="p-3 text-right font-medium text-kt-green">Rs.{data.profit.toLocaleString('en-US')}</td>
+                      <td className="p-3 text-right font-medium text-kt-blue">{margin}%</td>
                     </tr>
                   );
                 })}
               </tbody>
-              <tfoot className="bg-slate-50 border-t-2 border-slate-300 font-black text-xs">
-                {(() => { const totalRev = Object.values(reportEngine.bySalesperson).reduce((s,d)=>s+d.revenue,0); const totalGP = Object.values(reportEngine.bySalesperson).reduce((s,d)=>s+d.profit,0); const totalOrders = Object.values(reportEngine.bySalesperson).reduce((s,d)=>s+d.orders,0); return (<tr><td className="p-3 text-slate-600 uppercase tracking-wider">Totals</td><td className="p-3 text-center">{totalOrders}</td><td className="p-3 text-right">Rs.{totalRev.toLocaleString('en-US')}</td><td className="p-3 text-right text-emerald-700">Rs.{totalGP.toLocaleString('en-US')}</td><td className="p-3 text-right text-indigo-700">{totalRev > 0 ? ((totalGP/totalRev)*100).toFixed(1) : 0}%</td></tr>); })()}
+              <tfoot className="bg-kt-raised border-t-2 border-kt-line font-semibold text-xs">
+                {(() => { const totalRev = Object.values(reportEngine.bySalesperson).reduce((s,d)=>s+d.revenue,0); const totalGP = Object.values(reportEngine.bySalesperson).reduce((s,d)=>s+d.profit,0); const totalOrders = Object.values(reportEngine.bySalesperson).reduce((s,d)=>s+d.orders,0); return (<tr><td className="p-3 text-kt-sub">Totals</td><td className="p-3 text-center">{totalOrders}</td><td className="p-3 text-right">Rs.{totalRev.toLocaleString('en-US')}</td><td className="p-3 text-right text-kt-green">Rs.{totalGP.toLocaleString('en-US')}</td><td className="p-3 text-right text-kt-blue">{totalRev > 0 ? ((totalGP/totalRev)*100).toFixed(1) : 0}%</td></tr>); })()}
               </tfoot>
             </table>
           </div>
@@ -810,15 +821,15 @@ return (
         <div className="space-y-3 mt-3">
           {/* Collection rate summary */}
           <div className="grid grid-cols-2 gap-3">
-            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Collection Rate <span className="text-slate-300">(All-time)</span></p>
-              <p className={`text-2xl font-black mt-1 ${Number(reportEngine.collectionRate) >= 80 ? 'text-emerald-600' : Number(reportEngine.collectionRate) >= 50 ? 'text-amber-600' : 'text-rose-600'}`}>{reportEngine.collectionRate}%</p>
-              <p className="text-[10px] text-slate-400 mt-1">of all-time billed amount recovered</p>
+            <div className="bg-white p-4 rounded-xl border border-kt-line">
+              <p className="text-xs font-medium text-kt-muted">Collection Rate <span className="text-kt-muted">(All-time)</span></p>
+              <p className={`font-display text-2xl mt-1 ${Number(reportEngine.collectionRate) >= 80 ? 'text-kt-green' : Number(reportEngine.collectionRate) >= 50 ? 'text-kt-amber' : 'text-kt-red'}`}>{reportEngine.collectionRate}%</p>
+              <p className="text-xs text-kt-muted mt-1">of all-time billed amount recovered</p>
             </div>
-            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Outstanding</p>
-              <p className="text-2xl font-black mt-1 text-rose-600">Rs.{reportEngine.kpis.totalReceivables.toLocaleString('en-US')}</p>
-              <p className="text-[10px] text-slate-400 mt-1">{reportEngine.receivablesList.length} customers with balance</p>
+            <div className="bg-white p-4 rounded-xl border border-kt-line">
+              <p className="text-xs font-medium text-kt-muted">Outstanding</p>
+              <p className="font-display text-2xl mt-1 text-kt-red">Rs.{reportEngine.kpis.totalReceivables.toLocaleString('en-US')}</p>
+              <p className="text-xs text-kt-muted mt-1">{reportEngine.receivablesList.length} customers with balance</p>
             </div>
           </div>
           {/* Top Overdue Balances */}
@@ -834,21 +845,21 @@ return (
             const overdue = [...byCust.values()].sort((a,b)=>b.amount-a.amount).slice(0,5);
             if (!overdue.length) return null;
             return (
-              <div className="bg-white rounded-2xl shadow-sm border border-rose-300 overflow-hidden">
-                <div className="bg-rose-600 p-3 flex justify-between items-center">
-                  <span className="text-xs font-bold text-white uppercase tracking-widest flex items-center gap-1.5"><AlertCircle size={13}/> Top Overdue Balances</span>
-                  <span className="text-[10px] font-black text-rose-200">{overdue.length} accounts · 31+ days</span>
+              <div className="bg-white rounded-xl border border-kt-red/30 overflow-hidden">
+                <div className="bg-kt-red p-3 flex justify-between items-center">
+                  <span className="text-xs font-medium text-white flex items-center gap-1.5"><AlertCircle size={13}/> Top Overdue Balances</span>
+                  <span className="text-xs font-semibold text-kt-red">{overdue.length} accounts · 31+ days</span>
                 </div>
-                <div className="divide-y divide-slate-100">
+                <div className="divide-y divide-kt-line">
                   {overdue.map((r,i) => (
                     <div key={i} className="flex justify-between items-center p-3">
                       <div className="flex-1 min-w-0">
-                        <button className="font-semibold text-sm text-slate-800 truncate hover:text-indigo-600 text-left w-full" onClick={()=>{setSelectedLedgerId(r.id);setShowLedgerModal(true);}}>{r.name}</button>
-                        <p className="text-[10px] text-rose-400 font-semibold">{r.ageDays} days overdue</p>
+                        <button className="font-semibold text-sm text-kt-ink truncate hover:text-kt-blue text-left w-full" onClick={()=>{setSelectedLedgerId(r.id);setShowLedgerModal(true);}}>{r.name}</button>
+                        <p className="text-xs text-kt-red font-semibold">{r.ageDays} days overdue</p>
                       </div>
                       <div className="flex items-center gap-2 ml-2 shrink-0">
-                        <span className="font-extrabold text-rose-600 text-sm">Rs.{r.amount.toLocaleString('en-US')}</span>
-                        {r.phone && <a href={`https://wa.me/92${r.phone.replace(/^0/,'').replace(/\D/g,'')}?text=${encodeURIComponent(`Assalam o Alaikum ${r.name},\n\nYour outstanding balance is *Rs. ${r.amount.toLocaleString('en-US')}*. Kindly process payment at earliest.\n\nJazakAllah Khair`)}`} target="_blank" rel="noopener noreferrer" className="p-1.5 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 border border-green-100"><PhoneCall size={13}/></a>}
+                        <span className="font-semibold text-kt-red text-sm">Rs.{r.amount.toLocaleString('en-US')}</span>
+                        {r.phone && <a href={`https://wa.me/92${r.phone.replace(/^0/,'').replace(/\D/g,'')}?text=${encodeURIComponent(`Assalam o Alaikum ${r.name},\n\nYour outstanding balance is *Rs. ${r.amount.toLocaleString('en-US')}*. Kindly process payment at earliest.\n\nJazakAllah Khair`)}`} target="_blank" rel="noopener noreferrer" className="p-1.5 bg-kt-green/10 text-kt-green rounded-lg hover:bg-kt-green/10 border border-kt-green/30"><PhoneCall size={13}/></a>}
                       </div>
                     </div>
                   ))}
@@ -865,25 +876,26 @@ return (
             const bucket = reportEngine.agingBuckets[key];
             if (!bucket.length) return null;
             const total = bucket.reduce((s,r)=>s+r.amount,0);
+            // Spelled out: Tailwind cannot see an assembled `bg-${color}-50`.
             return (
-              <div key={key} className={`bg-white rounded-2xl shadow-sm border border-${color}-100 overflow-hidden`}>
-                <div className={`bg-${color}-50 border-b border-${color}-100 p-3 flex justify-between items-center`}>
-                  <span className={`text-xs font-bold text-${color}-700 uppercase tracking-widest`}>{label} ({bucket.length} account{bucket.length === 1 ? '' : 's'})</span>
-                  <span className={`text-xs font-black text-${color}-700`}>Rs.{total.toLocaleString('en-US')}</span>
+              <div key={key} className={`bg-white rounded-xl border overflow-hidden ${KT_TONE[color].border}`}>
+                <div className={`border-b p-3 flex justify-between items-center ${KT_TONE[color].head}`}>
+                  <span className="text-xs font-medium">{label} ({bucket.length} account{bucket.length === 1 ? '' : 's'})</span>
+                  <span className="text-xs font-semibold tabular-nums">Rs.{total.toLocaleString('en-US')}</span>
                 </div>
-                <div className="divide-y divide-slate-100">
+                <div className="divide-y divide-kt-line">
                   {bucket.map((r,i) => {
                     const waMsg = `Assalam o Alaikum ${r.name},\n\nYour outstanding balance with ${APP_NAME} is *Rs. ${r.amount.toLocaleString('en-US')}*.\n\nKindly process the payment at your earliest convenience.\n\nJazakAllah Khair`;
                     return (
                       <div key={i} className="flex justify-between items-center p-3">
                         <div className="flex-1 min-w-0">
-                          <button className="font-semibold text-sm text-slate-800 truncate hover:text-indigo-600 transition-colors text-left w-full" onClick={() => { setSelectedLedgerId(r.id); setShowLedgerModal(true); }}>{r.name}</button>
-                          <p className="text-[10px] text-slate-400">{r.ageDays} days old{r.oldestAgeDays > r.ageDays ? ` · oldest debt ${r.oldestAgeDays}d` : ''}</p>
+                          <button className="font-semibold text-sm text-kt-ink truncate hover:text-kt-blue transition-colors text-left w-full" onClick={() => { setSelectedLedgerId(r.id); setShowLedgerModal(true); }}>{r.name}</button>
+                          <p className="text-xs text-kt-muted">{r.ageDays} days old{r.oldestAgeDays > r.ageDays ? ` · oldest debt ${r.oldestAgeDays}d` : ''}</p>
                         </div>
                         <div className="flex items-center gap-2 ml-2 shrink-0">
-                          <span className="font-extrabold text-rose-600 text-sm">Rs.{r.amount.toLocaleString('en-US')}</span>
+                          <span className="font-semibold text-kt-red text-sm">Rs.{r.amount.toLocaleString('en-US')}</span>
                           {r.phone && (
-                            <a href={`https://wa.me/92${r.phone.replace(/^0/,'').replace(/\D/g,'')}?text=${encodeURIComponent(waMsg)}`} target="_blank" rel="noopener noreferrer" className="p-1.5 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 transition-colors border border-green-100" title="Send WhatsApp reminder">
+                            <a href={`https://wa.me/92${r.phone.replace(/^0/,'').replace(/\D/g,'')}?text=${encodeURIComponent(waMsg)}`} target="_blank" rel="noopener noreferrer" className="p-1.5 bg-kt-green/10 text-kt-green rounded-lg hover:bg-kt-green/10 transition-colors border border-kt-green/30" title="Send WhatsApp reminder">
                               <PhoneCall size={13}/>
                             </a>
                           )}
@@ -896,9 +908,9 @@ return (
             );
           })}
           {reportEngine.receivablesList.length === 0 && (
-            <div className="bg-emerald-50 p-6 rounded-2xl text-center border border-emerald-100">
-              <CheckCircle2 className="mx-auto text-emerald-500 mb-2" size={32}/>
-              <p className="font-bold text-emerald-700">All accounts are clear!</p>
+            <div className="bg-kt-green/10 p-6 rounded-xl text-center border border-kt-green/30">
+              <CheckCircle2 className="mx-auto text-kt-green mb-2" size={32}/>
+              <p className="font-medium text-kt-green">All accounts are clear!</p>
             </div>
           )}
         </div>
@@ -909,50 +921,50 @@ return (
         const maxCat = expenseReport.byCategory.reduce((m, c) => Math.max(m, c.amount), 0) || 1;
         const maxMonth = expenseReport.byMonth.reduce((m, c) => Math.max(m, c.amount), 0) || 1;
         const move = (pct) => pct === null ? null : (
-          <span className={`text-[10px] font-black ${pct > 0 ? 'text-rose-600' : pct < 0 ? 'text-emerald-600' : 'text-slate-400'}`}>
+          <span className={`text-xs font-semibold ${pct > 0 ? 'text-kt-red' : pct < 0 ? 'text-kt-green' : 'text-kt-muted'}`}>
             {pct > 0 ? '↑' : pct < 0 ? '↓' : '='} {Math.abs(pct)}%
           </span>
         );
         return (
           <div className="space-y-3 mt-3">
             <div className="grid grid-cols-2 gap-3">
-              <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Spent · {filterLabel}</p>
-                <p className="text-2xl font-black mt-1 text-rose-600">Rs.{t.amount.toLocaleString('en-US')}</p>
-                <p className="text-[10px] text-slate-400 mt-1">{t.count} entr{t.count === 1 ? 'y' : 'ies'}</p>
+              <div className="bg-white p-4 rounded-xl border border-kt-line">
+                <p className="text-xs font-medium text-kt-muted">Spent · {filterLabel}</p>
+                <p className="font-display text-2xl mt-1 text-kt-red">Rs.{t.amount.toLocaleString('en-US')}</p>
+                <p className="text-xs text-kt-muted mt-1">{t.count} entr{t.count === 1 ? 'y' : 'ies'}</p>
               </div>
-              <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">vs Previous Period</p>
+              <div className="bg-white p-4 rounded-xl border border-kt-line">
+                <p className="text-xs font-medium text-kt-muted">vs Previous Period</p>
                 {t.changePct === null ? (
-                  <p className="text-sm font-bold text-slate-400 mt-2">Nothing spent in the period before this one</p>
+                  <p className="text-sm font-medium text-kt-muted mt-2">Nothing spent in the period before this one</p>
                 ) : (
                   <>
-                    <p className={`text-2xl font-black mt-1 ${t.changePct > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>{t.changePct >= 0 ? '+' : ''}{t.changePct}%</p>
-                    <p className="text-[10px] text-slate-400 mt-1">was Rs.{t.prevAmount.toLocaleString('en-US')}</p>
+                    <p className={`font-display text-2xl mt-1 ${t.changePct > 0 ? 'text-kt-red' : 'text-kt-green'}`}>{t.changePct >= 0 ? '+' : ''}{t.changePct}%</p>
+                    <p className="text-xs text-kt-muted mt-1">was Rs.{t.prevAmount.toLocaleString('en-US')}</p>
                   </>
                 )}
               </div>
             </div>
 
             {t.count === 0 && (
-              <div className="bg-white p-8 rounded-2xl text-center border border-slate-200">
-                <p className="font-bold text-slate-400">Nothing was spent in this period.</p>
+              <div className="bg-white p-8 rounded-xl text-center border border-kt-line">
+                <p className="font-medium text-kt-muted">Nothing was spent in this period.</p>
               </div>
             )}
 
             {expenseReport.byMonth.length > 1 && (
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                <div className="bg-slate-50 border-b border-slate-200 p-3">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Month by month <span className="text-slate-400 normal-case font-medium">· all time, not the selected period</span></span>
+              <div className="bg-white rounded-xl border border-kt-line overflow-hidden">
+                <div className="bg-kt-raised border-b border-kt-line p-3">
+                  <span className="text-xs font-medium text-kt-sub">Month by month <span className="text-kt-muted normal-case font-medium">· all time, not the selected period</span></span>
                 </div>
                 <div className="flex items-end gap-1 p-3 overflow-x-auto">
                   {expenseReport.byMonth.map(m => (
                     <div key={m.key} className="flex-1 min-w-[44px] text-center">
-                      <div className="text-[9px] font-black text-slate-600">{Math.round(m.amount / 1000)}k</div>
-                      <div className="bg-slate-100 rounded mt-1" style={{ height: 44 }}>
-                        <div className="bg-rose-400 rounded" style={{ height: `${Math.max((m.amount / maxMonth) * 44, 2)}px`, marginTop: `${44 - Math.max((m.amount / maxMonth) * 44, 2)}px` }}></div>
+                      <div className="text-xs font-semibold text-kt-sub">{Math.round(m.amount / 1000)}k</div>
+                      <div className="bg-kt-raised rounded mt-1" style={{ height: 44 }}>
+                        <div className="bg-kt-red rounded" style={{ height: `${Math.max((m.amount / maxMonth) * 44, 2)}px`, marginTop: `${44 - Math.max((m.amount / maxMonth) * 44, 2)}px` }}></div>
                       </div>
-                      <div className="text-[8px] text-slate-400 font-bold mt-1">{m.key.slice(2).replace('-', '/')}</div>
+                      <div className="text-[8px] text-kt-muted font-medium mt-1">{m.key.slice(2).replace('-', '/')}</div>
                     </div>
                   ))}
                 </div>
@@ -960,21 +972,21 @@ return (
             )}
 
             {expenseReport.byCategory.length > 0 && (
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                <div className="bg-slate-50 border-b border-slate-200 p-3">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">By category, and how it moved</span>
+              <div className="bg-white rounded-xl border border-kt-line overflow-hidden">
+                <div className="bg-kt-raised border-b border-kt-line p-3">
+                  <span className="text-xs font-medium text-kt-sub">By category, and how it moved</span>
                 </div>
-                <div className="divide-y divide-slate-100">
+                <div className="divide-y divide-kt-line">
                   {expenseReport.byCategory.map(c => (
                     <div key={c.key} className="p-3">
                       <div className="flex justify-between items-center gap-2">
-                        <span className="text-xs font-bold text-slate-700 truncate">{c.key} <span className="text-slate-400 font-medium">({c.count})</span></span>
+                        <span className="text-xs font-medium text-kt-ink truncate">{c.key} <span className="text-kt-muted font-medium">({c.count})</span></span>
                         <span className="flex items-center gap-2 shrink-0">
                           {move(c.changePct)}
-                          <span className="text-xs font-black text-slate-800">Rs.{c.amount.toLocaleString('en-US')}</span>
+                          <span className="text-xs font-semibold text-kt-ink">Rs.{c.amount.toLocaleString('en-US')}</span>
                         </span>
                       </div>
-                      <div className="w-full bg-slate-100 rounded-full h-1 mt-1"><div className="bg-rose-400 h-1 rounded-full" style={{ width: `${Math.max((c.amount / maxCat) * 100, 1)}%` }}></div></div>
+                      <div className="w-full bg-kt-raised rounded-full h-1 mt-1"><div className="bg-kt-red h-1 rounded-full" style={{ width: `${Math.max((c.amount / maxCat) * 100, 1)}%` }}></div></div>
                     </div>
                   ))}
                 </div>
@@ -982,15 +994,15 @@ return (
             )}
 
             {expenseReport.byGroup.length > 1 && (
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                <div className="bg-slate-50 border-b border-slate-200 p-3">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">By group</span>
+              <div className="bg-white rounded-xl border border-kt-line overflow-hidden">
+                <div className="bg-kt-raised border-b border-kt-line p-3">
+                  <span className="text-xs font-medium text-kt-sub">By group</span>
                 </div>
-                <div className="divide-y divide-slate-100">
+                <div className="divide-y divide-kt-line">
                   {expenseReport.byGroup.map(g => (
                     <div key={g.key} className="flex justify-between items-center p-3">
-                      <span className="text-xs font-bold text-slate-700">{g.key} <span className="text-slate-400 font-medium">({g.count})</span></span>
-                      <span className="text-xs font-black text-slate-800">Rs.{g.amount.toLocaleString('en-US')}</span>
+                      <span className="text-xs font-medium text-kt-ink">{g.key} <span className="text-kt-muted font-medium">({g.count})</span></span>
+                      <span className="text-xs font-semibold text-kt-ink">Rs.{g.amount.toLocaleString('en-US')}</span>
                     </div>
                   ))}
                 </div>
@@ -998,30 +1010,30 @@ return (
             )}
 
             {expenseReport.rows.length > 0 && (
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                <div className="bg-slate-50 border-b border-slate-200 p-3">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Every expense · newest first</span>
+              <div className="bg-white rounded-xl border border-kt-line overflow-hidden">
+                <div className="bg-kt-raised border-b border-kt-line p-3">
+                  <span className="text-xs font-medium text-kt-sub">Every expense · newest first</span>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs whitespace-nowrap">
-                    <thead className="bg-slate-50 text-slate-500 uppercase font-bold tracking-wider border-b border-slate-200">
+                    <thead className="bg-kt-raised text-kt-sub font-medium border-b border-kt-line">
                       <tr><th className="p-3">Date</th><th className="p-3">Category</th><th className="p-3">Group</th><th className="p-3">Note</th><th className="p-3 text-right">Amount</th></tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
+                    <tbody className="divide-y divide-kt-line font-semibold text-kt-ink">
                       {expenseReport.rows.map(r => (
-                        <tr key={r.id} className="hover:bg-slate-50">
-                          <td className="p-3 text-slate-500">{formatDateDisp(r.date)}</td>
-                          <td className="p-3 font-bold text-slate-800">{r.category}</td>
-                          <td className="p-3 text-slate-500">{r.group}</td>
-                          <td className="p-3 text-slate-400 max-w-[180px] truncate">{r.note}</td>
-                          <td className="p-3 text-right font-black text-rose-600">Rs.{r.amount.toLocaleString('en-US')}</td>
+                        <tr key={r.id} className="hover:bg-kt-raised">
+                          <td className="p-3 text-kt-sub">{formatDateDisp(r.date)}</td>
+                          <td className="p-3 font-medium text-kt-ink">{r.category}</td>
+                          <td className="p-3 text-kt-sub">{r.group}</td>
+                          <td className="p-3 text-kt-muted max-w-[180px] truncate">{r.note}</td>
+                          <td className="p-3 text-right font-semibold text-kt-red">Rs.{r.amount.toLocaleString('en-US')}</td>
                         </tr>
                       ))}
                     </tbody>
-                    <tfoot className="bg-slate-50 border-t-2 border-slate-300 font-black text-slate-800 text-xs">
+                    <tfoot className="bg-kt-raised border-t-2 border-kt-line font-semibold text-kt-ink text-xs">
                       <tr>
-                        <td className="p-3 uppercase tracking-wider text-slate-600" colSpan={4}>Total spent</td>
-                        <td className="p-3 text-right text-rose-700">Rs.{t.amount.toLocaleString('en-US')}</td>
+                        <td className="p-3 text-kt-sub" colSpan={4}>Total spent</td>
+                        <td className="p-3 text-right text-kt-red">Rs.{t.amount.toLocaleString('en-US')}</td>
                       </tr>
                     </tfoot>
                   </table>
@@ -1037,51 +1049,51 @@ return (
         const maxReason = returns.byReason.reduce((m, x) => Math.max(m, x.value), 0) || 1;
         const rateColor = t.ratePct >= 10 ? 'rose' : t.ratePct >= 5 ? 'amber' : 'emerald';
         const list = (title, note, items, unit) => (
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="bg-slate-50 border-b border-slate-200 p-3">
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{title}</span>
-              {note && <span className="block text-[9px] text-slate-400 font-medium mt-0.5">{note}</span>}
+          <div className="bg-white rounded-xl border border-kt-line overflow-hidden">
+            <div className="bg-kt-raised border-b border-kt-line p-3">
+              <span className="text-xs font-medium text-kt-sub">{title}</span>
+              {note && <span className="block text-xs text-kt-muted font-medium mt-0.5">{note}</span>}
             </div>
-            <div className="divide-y divide-slate-100 max-h-72 overflow-y-auto">
+            <div className="divide-y divide-kt-line max-h-72 overflow-y-auto">
               {items.map(x => (
                 <div key={x.key} className="p-3">
                   <div className="flex justify-between items-center gap-2">
-                    <span className="text-xs font-bold text-slate-700 truncate">{x.key} <span className="text-slate-400 font-medium">({x.count})</span></span>
-                    <span className="text-xs font-black text-rose-600 shrink-0">Rs.{x.value.toLocaleString('en-US')}</span>
+                    <span className="text-xs font-medium text-kt-ink truncate">{x.key} <span className="text-kt-muted font-medium">({x.count})</span></span>
+                    <span className="text-xs font-semibold text-kt-red shrink-0">Rs.{x.value.toLocaleString('en-US')}</span>
                   </div>
-                  {unit && <p className="text-[10px] text-slate-400 mt-0.5">{x.units.toLocaleString('en-US')} units</p>}
-                  <div className="w-full bg-slate-100 rounded-full h-1 mt-1"><div className="bg-rose-400 h-1 rounded-full" style={{ width: `${Math.max((x.value / maxReason) * 100, 1)}%` }}></div></div>
+                  {unit && <p className="text-xs text-kt-muted mt-0.5">{x.units.toLocaleString('en-US')} units</p>}
+                  <div className="w-full bg-kt-raised rounded-full h-1 mt-1"><div className="bg-kt-red h-1 rounded-full" style={{ width: `${Math.max((x.value / maxReason) * 100, 1)}%` }}></div></div>
                 </div>
               ))}
-              {items.length === 0 && <p className="p-4 text-center text-xs text-slate-400">—</p>}
+              {items.length === 0 && <p className="p-4 text-center text-xs text-kt-muted">—</p>}
             </div>
           </div>
         );
         return (
           <div className="space-y-3 mt-3">
             <div className="grid grid-cols-2 gap-3">
-              <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Returned · {filterLabel}</p>
-                <p className="text-2xl font-black mt-1 text-rose-600">Rs.{t.value.toLocaleString('en-US')}</p>
-                <p className="text-[10px] text-slate-400 mt-1">{t.count} credit note{t.count === 1 ? '' : 's'} · {t.units.toLocaleString('en-US')} units</p>
+              <div className="bg-white p-4 rounded-xl border border-kt-line">
+                <p className="text-xs font-medium text-kt-muted">Returned · {filterLabel}</p>
+                <p className="font-display text-2xl mt-1 text-kt-red">Rs.{t.value.toLocaleString('en-US')}</p>
+                <p className="text-xs text-kt-muted mt-1">{t.count} credit note{t.count === 1 ? '' : 's'} · {t.units.toLocaleString('en-US')} units</p>
               </div>
-              <div className={`bg-${rateColor}-50 p-4 rounded-2xl border border-${rateColor}-100 shadow-sm`}>
-                <p className={`text-[10px] font-bold text-${rateColor}-600 uppercase tracking-wider`}>Return Rate</p>
-                <p className={`text-2xl font-black mt-1 text-${rateColor}-700`}>{t.ratePct}%</p>
-                <p className={`text-[10px] text-${rateColor}-500 mt-1`}>of Rs.{t.grossSales.toLocaleString('en-US')} gross sales</p>
+              <div className={`p-4 rounded-xl border ${KT_TONE[rateColor]?.head || 'bg-white border-kt-line text-kt-sub'}`}>
+                <p className="text-xs font-medium">Return Rate</p>
+                <p className="font-display text-2xl mt-1 text-kt-ink">{t.ratePct}%</p>
+                <p className="text-xs text-kt-ink/80 mt-1">of Rs.{t.grossSales.toLocaleString('en-US')} gross sales</p>
               </div>
             </div>
 
             {t.withoutReason > 0 && (
-              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 flex justify-between items-center gap-2">
-                <span className="text-[11px] font-bold text-amber-700">{t.withoutReason} credit note{t.withoutReason === 1 ? '' : 's'} with no reason recorded — the field is on the form and was left blank</span>
+              <div className="bg-kt-amber/10 border border-kt-amber/30 rounded-xl p-3 flex justify-between items-center gap-2">
+                <span className="text-xs font-medium text-kt-amber">{t.withoutReason} credit note{t.withoutReason === 1 ? '' : 's'} with no reason recorded — the field is on the form and was left blank</span>
               </div>
             )}
 
             {t.count === 0 && (
-              <div className="bg-emerald-50 p-6 rounded-2xl text-center border border-emerald-100">
-                <CheckCircle2 className="mx-auto text-emerald-500 mb-2" size={32}/>
-                <p className="font-bold text-emerald-700">Nothing came back this period.</p>
+              <div className="bg-kt-green/10 p-6 rounded-xl text-center border border-kt-green/30">
+                <CheckCircle2 className="mx-auto text-kt-green mb-2" size={32}/>
+                <p className="font-medium text-kt-green">Nothing came back this period.</p>
               </div>
             )}
 
@@ -1093,36 +1105,36 @@ return (
                   {list('Who returns most', '', returns.byCustomer, false)}
                 </div>
 
-                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                  <div className="bg-slate-50 border-b border-slate-200 p-3">
-                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Every credit note · newest first</span>
+                <div className="bg-white rounded-xl border border-kt-line overflow-hidden">
+                  <div className="bg-kt-raised border-b border-kt-line p-3">
+                    <span className="text-xs font-medium text-kt-sub">Every credit note · newest first</span>
                   </div>
                   <div className="overflow-x-auto">
                     <table className="w-full text-left text-xs whitespace-nowrap">
-                      <thead className="bg-slate-50 text-slate-500 uppercase font-bold tracking-wider border-b border-slate-200">
+                      <thead className="bg-kt-raised text-kt-sub font-medium border-b border-kt-line">
                         <tr><th className="p-3">Date</th><th className="p-3">Credit Note</th><th className="p-3">Customer</th><th className="p-3">Reason</th><th className="p-3 text-center">Days Out</th><th className="p-3 text-right">Value</th></tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
+                      <tbody className="divide-y divide-kt-line font-semibold text-kt-ink">
                         {returns.rows.map(r => (
-                          <tr key={r.id} className="hover:bg-slate-50">
-                            <td className="p-3 text-slate-500">{formatDateDisp(r.date)}</td>
+                          <tr key={r.id} className="hover:bg-kt-raised">
+                            <td className="p-3 text-kt-sub">{formatDateDisp(r.date)}</td>
                             <td className="p-3">
-                              <span className="font-bold text-slate-800">{r.id}</span>
-                              {r.originalInvoiceId && <span className="block text-[10px] text-slate-400">ref {r.originalInvoiceId}</span>}
+                              <span className="font-medium text-kt-ink">{r.id}</span>
+                              {r.originalInvoiceId && <span className="block text-xs text-kt-muted">ref {r.originalInvoiceId}</span>}
                             </td>
                             <td className="p-3">
-                              <button className="hover:text-indigo-600 text-left" onClick={() => { if (r.customerId !== undefined) { setSelectedLedgerId(r.customerId); setShowLedgerModal(true); } }}>{r.customerName}</button>
+                              <button className="hover:text-kt-blue text-left" onClick={() => { if (r.customerId !== undefined) { setSelectedLedgerId(r.customerId); setShowLedgerModal(true); } }}>{r.customerName}</button>
                             </td>
-                            <td className={`p-3 ${r.hasReason ? 'text-slate-600' : 'text-amber-600 font-bold'}`}>{r.reason}</td>
-                            <td className="p-3 text-center text-slate-500">{r.daysSinceSale ?? '—'}</td>
-                            <td className="p-3 text-right font-black text-rose-600">Rs.{r.value.toLocaleString('en-US')}<span className="block text-[10px] font-bold text-slate-400">{r.units} units</span></td>
+                            <td className={`p-3 ${r.hasReason ? 'text-kt-sub' : 'text-kt-amber font-medium'}`}>{r.reason}</td>
+                            <td className="p-3 text-center text-kt-sub">{r.daysSinceSale ?? '—'}</td>
+                            <td className="p-3 text-right font-semibold text-kt-red">Rs.{r.value.toLocaleString('en-US')}<span className="block text-xs font-medium text-kt-muted">{r.units} units</span></td>
                           </tr>
                         ))}
                       </tbody>
-                      <tfoot className="bg-slate-50 border-t-2 border-slate-300 font-black text-slate-800 text-xs">
+                      <tfoot className="bg-kt-raised border-t-2 border-kt-line font-semibold text-kt-ink text-xs">
                         <tr>
-                          <td className="p-3 uppercase tracking-wider text-slate-600" colSpan={5}>Total returned</td>
-                          <td className="p-3 text-right text-rose-700">Rs.{t.value.toLocaleString('en-US')}</td>
+                          <td className="p-3 text-kt-sub" colSpan={5}>Total returned</td>
+                          <td className="p-3 text-right text-kt-red">Rs.{t.value.toLocaleString('en-US')}</td>
                         </tr>
                       </tfoot>
                     </table>
@@ -1138,53 +1150,53 @@ return (
         const t = collections.totals;
         const maxDay = collections.byDay.reduce((m, d) => Math.max(m, d.amount), 0) || 1;
         const bar = (val, max, cls) => (
-          <div className="w-full bg-slate-100 rounded-full h-1.5 mt-1">
+          <div className="w-full bg-kt-raised rounded-full h-1.5 mt-1">
             <div className={`${cls} h-1.5 rounded-full`} style={{ width: `${max > 0 ? Math.max((val / max) * 100, 1) : 0}%` }}></div>
           </div>
         );
         return (
           <div className="space-y-3 mt-3">
             <div className="grid grid-cols-2 gap-3">
-              <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Received · {filterLabel}</p>
-                <p className="text-2xl font-black mt-1 text-emerald-600">Rs.{t.received.toLocaleString('en-US')}</p>
-                <p className="text-[10px] text-slate-400 mt-1">{t.count} collection{t.count === 1 ? '' : 's'}</p>
+              <div className="bg-white p-4 rounded-xl border border-kt-line">
+                <p className="text-xs font-medium text-kt-muted">Received · {filterLabel}</p>
+                <p className="font-display text-2xl mt-1 text-kt-green">Rs.{t.received.toLocaleString('en-US')}</p>
+                <p className="text-xs text-kt-muted mt-1">{t.count} collection{t.count === 1 ? '' : 's'}</p>
               </div>
-              <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">At Counter vs Receipts</p>
-                <p className="text-base font-black mt-1 text-slate-800">Rs.{t.atBilling.toLocaleString('en-US')}</p>
-                <p className="text-[10px] text-slate-400">taken when the bill was raised</p>
-                <p className="text-base font-black mt-1 text-slate-800">Rs.{t.receipts.toLocaleString('en-US')}</p>
-                <p className="text-[10px] text-slate-400">collected later</p>
+              <div className="bg-white p-4 rounded-xl border border-kt-line">
+                <p className="text-xs font-medium text-kt-muted">At Counter vs Receipts</p>
+                <p className="text-base font-semibold mt-1 text-kt-ink">Rs.{t.atBilling.toLocaleString('en-US')}</p>
+                <p className="text-xs text-kt-muted">taken when the bill was raised</p>
+                <p className="text-base font-semibold mt-1 text-kt-ink">Rs.{t.receipts.toLocaleString('en-US')}</p>
+                <p className="text-xs text-kt-muted">collected later</p>
               </div>
             </div>
 
             {t.discount > 0 && (
-              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 flex justify-between items-center">
-                <span className="text-[11px] font-bold text-amber-700">Round-off discount given — reduces the balance but was never received</span>
-                <span className="text-sm font-black text-amber-700 shrink-0 ml-2">Rs.{t.discount.toLocaleString('en-US')}</span>
+              <div className="bg-kt-amber/10 border border-kt-amber/30 rounded-xl p-3 flex justify-between items-center">
+                <span className="text-xs font-medium text-kt-amber">Round-off discount given — reduces the balance but was never received</span>
+                <span className="text-sm font-semibold text-kt-amber shrink-0 ml-2">Rs.{t.discount.toLocaleString('en-US')}</span>
               </div>
             )}
 
             {t.count === 0 && (
-              <div className="bg-white p-8 rounded-2xl text-center border border-slate-200">
-                <p className="font-bold text-slate-400">Nothing came in during this period.</p>
+              <div className="bg-white p-8 rounded-xl text-center border border-kt-line">
+                <p className="font-medium text-kt-muted">Nothing came in during this period.</p>
               </div>
             )}
 
             {collections.byDay.length > 0 && (
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                <div className="bg-slate-50 border-b border-slate-200 p-3">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Day by day</span>
+              <div className="bg-white rounded-xl border border-kt-line overflow-hidden">
+                <div className="bg-kt-raised border-b border-kt-line p-3">
+                  <span className="text-xs font-medium text-kt-sub">Day by day</span>
                 </div>
-                <div className="divide-y divide-slate-100 max-h-72 overflow-y-auto">
+                <div className="divide-y divide-kt-line max-h-72 overflow-y-auto">
                   {[...collections.byDay].reverse().map(d => (
                     <div key={d.key} className="p-3">
                       <div className="flex justify-between items-center">
-                        <span className="text-xs font-bold text-slate-700">{formatDateDisp(d.key)}</span>
-                        <span className="text-xs font-black text-emerald-600">Rs.{d.amount.toLocaleString('en-US')}</span>
+                        <span className="text-xs font-medium text-kt-ink">{formatDateDisp(d.key)}</span>
+                        <span className="text-xs font-semibold text-kt-green">Rs.{d.amount.toLocaleString('en-US')}</span>
                       </div>
-                      {bar(d.amount, maxDay, 'bg-emerald-400')}
+                      {bar(d.amount, maxDay, 'bg-kt-primary')}
                     </div>
                   ))}
                 </div>
@@ -1192,52 +1204,52 @@ return (
             )}
 
             <div className="grid sm:grid-cols-2 gap-3">
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                <div className="bg-slate-50 border-b border-slate-200 p-3">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">By method</span>
-                  <span className="block text-[9px] text-slate-400 font-medium mt-0.5">Read from the payment note — there is no method field to record one</span>
+              <div className="bg-white rounded-xl border border-kt-line overflow-hidden">
+                <div className="bg-kt-raised border-b border-kt-line p-3">
+                  <span className="text-xs font-medium text-kt-sub">By method</span>
+                  <span className="block text-xs text-kt-muted font-medium mt-0.5">Read from the payment note — there is no method field to record one</span>
                 </div>
-                <div className="divide-y divide-slate-100">
+                <div className="divide-y divide-kt-line">
                   {collections.byMethod.map(m => (
                     <div key={m.key} className="flex justify-between items-center p-3">
-                      <span className="text-xs font-bold text-slate-700">{m.key} <span className="text-slate-400 font-medium">({m.count})</span></span>
-                      <span className="text-xs font-black text-slate-800">Rs.{m.amount.toLocaleString('en-US')}</span>
+                      <span className="text-xs font-medium text-kt-ink">{m.key} <span className="text-kt-muted font-medium">({m.count})</span></span>
+                      <span className="text-xs font-semibold text-kt-ink">Rs.{m.amount.toLocaleString('en-US')}</span>
                     </div>
                   ))}
-                  {collections.byMethod.length === 0 && <p className="p-4 text-center text-xs text-slate-400">—</p>}
+                  {collections.byMethod.length === 0 && <p className="p-4 text-center text-xs text-kt-muted">—</p>}
                 </div>
               </div>
 
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                <div className="bg-slate-50 border-b border-slate-200 p-3">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Who collected it</span>
-                  <span className="block text-[9px] text-slate-400 font-medium mt-0.5">Counter cash goes to the salesperson on the bill; a receipt records no one</span>
+              <div className="bg-white rounded-xl border border-kt-line overflow-hidden">
+                <div className="bg-kt-raised border-b border-kt-line p-3">
+                  <span className="text-xs font-medium text-kt-sub">Who collected it</span>
+                  <span className="block text-xs text-kt-muted font-medium mt-0.5">Counter cash goes to the salesperson on the bill; a receipt records no one</span>
                 </div>
-                <div className="divide-y divide-slate-100">
+                <div className="divide-y divide-kt-line">
                   {collections.byCollector.map(c => (
                     <div key={c.key} className="flex justify-between items-center p-3">
-                      <span className="text-xs font-bold text-slate-700">{c.key} <span className="text-slate-400 font-medium">({c.count})</span></span>
-                      <span className="text-xs font-black text-slate-800">Rs.{c.amount.toLocaleString('en-US')}</span>
+                      <span className="text-xs font-medium text-kt-ink">{c.key} <span className="text-kt-muted font-medium">({c.count})</span></span>
+                      <span className="text-xs font-semibold text-kt-ink">Rs.{c.amount.toLocaleString('en-US')}</span>
                     </div>
                   ))}
-                  {collections.byCollector.length === 0 && <p className="p-4 text-center text-xs text-slate-400">—</p>}
+                  {collections.byCollector.length === 0 && <p className="p-4 text-center text-xs text-kt-muted">—</p>}
                 </div>
               </div>
             </div>
 
             {collections.byCustomer.length > 0 && (
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                <div className="bg-slate-50 border-b border-slate-200 p-3">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Who paid</span>
+              <div className="bg-white rounded-xl border border-kt-line overflow-hidden">
+                <div className="bg-kt-raised border-b border-kt-line p-3">
+                  <span className="text-xs font-medium text-kt-sub">Who paid</span>
                 </div>
-                <div className="divide-y divide-slate-100 max-h-96 overflow-y-auto">
+                <div className="divide-y divide-kt-line max-h-96 overflow-y-auto">
                   {collections.byCustomer.map(c => (
                     <div key={c.key} className="flex justify-between items-center p-3 gap-2">
                       <button
-                        className="flex-1 min-w-0 text-left text-xs font-bold text-slate-800 truncate hover:text-indigo-600"
+                        className="flex-1 min-w-0 text-left text-xs font-medium text-kt-ink truncate hover:text-kt-blue"
                         onClick={() => { if (c.id !== undefined) { setSelectedLedgerId(c.id); setShowLedgerModal(true); } }}
-                      >{c.name} <span className="text-slate-400 font-medium">({c.count})</span></button>
-                      <span className="text-xs font-black text-emerald-600 shrink-0">Rs.{c.amount.toLocaleString('en-US')}</span>
+                      >{c.name} <span className="text-kt-muted font-medium">({c.count})</span></button>
+                      <span className="text-xs font-semibold text-kt-green shrink-0">Rs.{c.amount.toLocaleString('en-US')}</span>
                     </div>
                   ))}
                 </div>
@@ -1245,32 +1257,32 @@ return (
             )}
 
             {collections.rows.length > 0 && (
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                <div className="bg-slate-50 border-b border-slate-200 p-3">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Every collection · newest first</span>
+              <div className="bg-white rounded-xl border border-kt-line overflow-hidden">
+                <div className="bg-kt-raised border-b border-kt-line p-3">
+                  <span className="text-xs font-medium text-kt-sub">Every collection · newest first</span>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs whitespace-nowrap">
-                    <thead className="bg-slate-50 text-slate-500 uppercase font-bold tracking-wider border-b border-slate-200">
+                    <thead className="bg-kt-raised text-kt-sub font-medium border-b border-kt-line">
                       <tr><th className="p-3">Date</th><th className="p-3">Reference</th><th className="p-3">Customer</th><th className="p-3">Method</th><th className="p-3 text-right">Received</th></tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
+                    <tbody className="divide-y divide-kt-line font-semibold text-kt-ink">
                       {collections.rows.map(r => (
-                        <tr key={r.id} className="hover:bg-slate-50">
-                          <td className="p-3 text-slate-500">{formatDateDisp(r.date)}</td>
-                          <td className="p-3 font-bold text-slate-800">{r.ref}</td>
+                        <tr key={r.id} className="hover:bg-kt-raised">
+                          <td className="p-3 text-kt-sub">{formatDateDisp(r.date)}</td>
+                          <td className="p-3 font-medium text-kt-ink">{r.ref}</td>
                           <td className="p-3">
-                            <button className="hover:text-indigo-600 text-left" onClick={() => { if (r.customerId !== undefined) { setSelectedLedgerId(r.customerId); setShowLedgerModal(true); } }}>{r.customerName}</button>
+                            <button className="hover:text-kt-blue text-left" onClick={() => { if (r.customerId !== undefined) { setSelectedLedgerId(r.customerId); setShowLedgerModal(true); } }}>{r.customerName}</button>
                           </td>
-                          <td className="p-3 text-slate-500">{r.method}{r.note ? ` · ${r.note}` : ''}</td>
-                          <td className="p-3 text-right font-black text-emerald-600">Rs.{r.received.toLocaleString('en-US')}{r.discount > 0 && <span className="block text-[10px] font-bold text-amber-600">+ Rs.{r.discount.toLocaleString('en-US')} disc.</span>}</td>
+                          <td className="p-3 text-kt-sub">{r.method}{r.note ? ` · ${r.note}` : ''}</td>
+                          <td className="p-3 text-right font-semibold text-kt-green">Rs.{r.received.toLocaleString('en-US')}{r.discount > 0 && <span className="block text-xs font-medium text-kt-amber">+ Rs.{r.discount.toLocaleString('en-US')} disc.</span>}</td>
                         </tr>
                       ))}
                     </tbody>
-                    <tfoot className="bg-slate-50 border-t-2 border-slate-300 font-black text-slate-800 text-xs">
+                    <tfoot className="bg-kt-raised border-t-2 border-kt-line font-semibold text-kt-ink text-xs">
                       <tr>
-                        <td className="p-3 uppercase tracking-wider text-slate-600" colSpan={4}>Total received</td>
-                        <td className="p-3 text-right text-emerald-700">Rs.{t.received.toLocaleString('en-US')}</td>
+                        <td className="p-3 text-kt-sub" colSpan={4}>Total received</td>
+                        <td className="p-3 text-right text-kt-green">Rs.{t.received.toLocaleString('en-US')}</td>
                       </tr>
                     </tfoot>
                   </table>
@@ -1303,44 +1315,50 @@ return (
         return (
           <div className="space-y-4 mt-2">
             <div className="grid grid-cols-2 gap-3">
-              {insightCards.map(card => (
-                <div key={card.label} className={`bg-${card.color}-50 p-4 rounded-2xl border border-${card.color}-100 shadow-sm`}>
-                  <p className={`text-[10px] font-bold text-${card.color}-600 uppercase tracking-wider mb-1 flex items-center gap-1`}><card.icon size={11}/> {card.label}</p>
-                  <p className={`text-2xl font-black text-${card.color}-700`}>{card.value}</p>
-                  <p className={`text-[10px] text-${card.color}-500 mt-1`}>{card.sub}</p>
+              {/* Written out in full: Tailwind cannot see a class assembled as `bg-${color}-50`, so the
+                  tiles' colours depended on whether the same class happened to appear elsewhere. */}
+              {insightCards.map(card => {
+                const tone = { emerald: 'bg-kt-green/10 border-kt-green/30 text-kt-green', amber: 'bg-kt-amber/10 border-kt-amber/30 text-kt-amber',
+                  rose: 'bg-kt-red/10 border-kt-red/30 text-kt-red', indigo: 'bg-kt-blue/10 border-kt-blue/30 text-kt-blue' }[card.color] || 'bg-white border-kt-line text-kt-sub';
+                return (
+                <div key={card.label} className={`p-4 rounded-xl border ${tone}`}>
+                  <p className="text-xs font-medium mb-1 flex items-center gap-1"><card.icon size={12}/> {card.label}</p>
+                  <p className="font-display text-2xl text-kt-ink">{card.value}</p>
+                  <p className="text-xs text-kt-ink/80 mt-1">{card.sub}</p>
                 </div>
-              ))}
+                );
+              })}
             </div>
             {/* Key callouts */}
-            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
-              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5"><Zap size={12} className="text-amber-500"/> Smart Callouts</p>
-              {topProduct && <div className="flex items-start gap-2 text-sm"><span className="text-emerald-600 font-black shrink-0">★</span><p className="text-slate-700"><span className="font-bold">{topProduct[0]}</span> is your most profitable product — Rs.{topProduct[1].profit.toLocaleString('en-US')} GP ({topProduct[1].qty} units sold)</p></div>}
-              {topCustomer && <div className="flex items-start gap-2 text-sm"><span className="text-indigo-600 font-black shrink-0">★</span><p className="text-slate-700"><button className="font-bold hover:text-indigo-600 transition-colors" onClick={() => { if (topCustomer.id !== undefined) { setSelectedLedgerId(topCustomer.id); setShowLedgerModal(true); } }}>{topCustomer.label}</button> is your top customer — Rs.{(topCustomer.productRevenue||0).toLocaleString('en-US')} revenue in {topCustomer.orders} orders</p></div>}
-              {reportEngine.agingBuckets.days90plus.length > 0 && <div className="flex items-start gap-2 text-sm"><span className="text-rose-600 font-black shrink-0">!</span><p className="text-slate-700"><span className="font-bold text-rose-600">{reportEngine.agingBuckets.days90plus.length} customer{reportEngine.agingBuckets.days90plus.length>1?'s':''}</span> overdue 90+ days — Rs.{reportEngine.agingBuckets.days90plus.reduce((s,r)=>s+r.amount,0).toLocaleString('en-US')} at risk</p></div>}
-              {reportEngine.trends.revenue !== null && <div className="flex items-start gap-2 text-sm"><span className={`font-black shrink-0 ${Number(reportEngine.trends.revenue)>=0?'text-emerald-600':'text-rose-600'}`}>{Number(reportEngine.trends.revenue)>=0?'↑':'↓'}</span><p className="text-slate-700">Revenue is <span className="font-bold">{Number(reportEngine.trends.revenue)>=0?'up':'down'} {Math.abs(reportEngine.trends.revenue)}%</span> vs previous period</p></div>}
-              {kpis.deliveryBilled > kpis.transportExpense && <div className="flex items-start gap-2 text-sm"><span className="text-emerald-600 font-black shrink-0">+</span><p className="text-slate-700">Delivery net contribution: <span className="font-bold text-emerald-700">Rs.{(kpis.deliveryBilled - kpis.transportExpense).toLocaleString('en-US')}</span></p></div>}
+            <div className="bg-white p-4 rounded-xl border border-kt-line space-y-3">
+              <p className="text-xs font-medium text-kt-sub flex items-center gap-1.5"><Zap size={12} className="text-kt-amber"/> Smart Callouts</p>
+              {topProduct && <div className="flex items-start gap-2 text-sm"><span className="text-kt-green font-semibold shrink-0">★</span><p className="text-kt-ink"><span className="font-medium">{topProduct[0]}</span> is your most profitable product — Rs.{topProduct[1].profit.toLocaleString('en-US')} GP ({topProduct[1].qty} units sold)</p></div>}
+              {topCustomer && <div className="flex items-start gap-2 text-sm"><span className="text-kt-blue font-semibold shrink-0">★</span><p className="text-kt-ink"><button className="font-medium hover:text-kt-blue transition-colors" onClick={() => { if (topCustomer.id !== undefined) { setSelectedLedgerId(topCustomer.id); setShowLedgerModal(true); } }}>{topCustomer.label}</button> is your top customer — Rs.{(topCustomer.productRevenue||0).toLocaleString('en-US')} revenue in {topCustomer.orders} orders</p></div>}
+              {reportEngine.agingBuckets.days90plus.length > 0 && <div className="flex items-start gap-2 text-sm"><span className="text-kt-red font-semibold shrink-0">!</span><p className="text-kt-ink"><span className="font-medium text-kt-red">{reportEngine.agingBuckets.days90plus.length} customer{reportEngine.agingBuckets.days90plus.length>1?'s':''}</span> overdue 90+ days — Rs.{reportEngine.agingBuckets.days90plus.reduce((s,r)=>s+r.amount,0).toLocaleString('en-US')} at risk</p></div>}
+              {reportEngine.trends.revenue !== null && <div className="flex items-start gap-2 text-sm"><span className={`font-semibold shrink-0 ${Number(reportEngine.trends.revenue)>=0?'text-kt-green':'text-kt-red'}`}>{Number(reportEngine.trends.revenue)>=0?'↑':'↓'}</span><p className="text-kt-ink">Revenue is <span className="font-medium">{Number(reportEngine.trends.revenue)>=0?'up':'down'} {Math.abs(reportEngine.trends.revenue)}%</span> vs previous period</p></div>}
+              {kpis.deliveryBilled > kpis.transportExpense && <div className="flex items-start gap-2 text-sm"><span className="text-kt-green font-semibold shrink-0">+</span><p className="text-kt-ink">Delivery net contribution: <span className="font-medium text-kt-green">Rs.{(kpis.deliveryBilled - kpis.transportExpense).toLocaleString('en-US')}</span></p></div>}
             </div>
             {/* P&L summary */}
-            <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white p-5 rounded-3xl shadow-xl">
-              <p className="text-[10px] uppercase font-bold text-slate-400 mb-4 tracking-widest">P&L Summary · {filterLabel}</p>
+            <div className="bg-kt-band text-white p-5 rounded-2xl shadow-[0_8px_24px_rgba(0,0,0,0.08)]">
+              <p className="text-xs font-medium text-white/70 mb-4">P&L Summary · {filterLabel}</p>
               <div className="space-y-0">
                 {[
                   ['Gross Sales', `Rs.${(kpis.productRevenue + kpis.creditNotesTotal).toLocaleString('en-US')}`, 'text-white', false],
-                  ...(kpis.creditNotesTotal > 0 ? [['Sales Returns', `- Rs.${kpis.creditNotesTotal.toLocaleString('en-US')}`, 'text-rose-300 text-xs', false]] : []),
-                  ['COGS', `- Rs.${kpis.totalCOGS.toLocaleString('en-US')}`, 'text-rose-300', false],
-                  ['Gross Profit', `Rs.${kpis.grossMargin.toLocaleString('en-US')}`, 'text-indigo-300', gpMargin + '%'],
-                  ['Delivery Net', `+ Rs.${(kpis.deliveryBilled - kpis.transportExpense).toLocaleString('en-US')}`, 'text-slate-300', false],
-                  ['Operational Expenses', `- Rs.${kpis.totalExpenses.toLocaleString('en-US')}`, 'text-rose-300', false],
-                  ['Net Profit', `Rs.${kpis.netProfit.toLocaleString('en-US')}`, kpis.netProfit >= 0 ? 'text-emerald-400 text-base font-black' : 'text-rose-400 text-base font-black', netMargin + '%'],
+                  ...(kpis.creditNotesTotal > 0 ? [['Sales Returns', `- Rs.${kpis.creditNotesTotal.toLocaleString('en-US')}`, 'text-white/80 text-xs', false]] : []),
+                  ['COGS', `- Rs.${kpis.totalCOGS.toLocaleString('en-US')}`, 'text-white/80', false],
+                  ['Gross Profit', `Rs.${kpis.grossMargin.toLocaleString('en-US')}`, 'text-white', gpMargin + '%'],
+                  ['Delivery Net', `+ Rs.${(kpis.deliveryBilled - kpis.transportExpense).toLocaleString('en-US')}`, 'text-white/70', false],
+                  ['Operational Expenses', `- Rs.${kpis.totalExpenses.toLocaleString('en-US')}`, 'text-white/80', false],
+                  ['Net Profit', `Rs.${kpis.netProfit.toLocaleString('en-US')}`, kpis.netProfit >= 0 ? 'text-kt-yellow text-base font-semibold' : 'text-white/80 text-base font-semibold', netMargin + '%'],
                 ].map(([label, val, cls, pct]) => (
-                  <div key={label} className="flex justify-between items-center text-sm py-1.5 border-b border-slate-700 last:border-0">
-                    <span className="text-slate-400">{label}</span>
-                    <div className="text-right"><span className={`font-bold ${cls}`}>{val}</span>{pct && <span className="text-[10px] text-slate-500 ml-1.5">{pct}</span>}</div>
+                  <div key={label} className="flex justify-between items-center text-sm py-1.5 border-b border-white/15 last:border-0">
+                    <span className="text-white/70">{label}</span>
+                    <div className="text-right"><span className={`font-medium ${cls}`}>{val}</span>{pct && <span className="text-xs text-white/80 ml-1.5">{pct}</span>}</div>
                   </div>
                 ))}
-                <div className="h-px bg-slate-600 my-2"></div>
-                <div className="flex justify-between items-center text-xs py-1"><span className="text-amber-400">Outstanding Receivables</span><span className="font-bold text-amber-300">Rs.{kpis.totalReceivables.toLocaleString('en-US')}</span></div>
-                <div className="flex justify-between items-center text-xs py-0.5"><span className="text-slate-500">Collection Rate (all-time)</span><span className={`font-bold ${Number(reportEngine.collectionRate) >= 80 ? 'text-emerald-400' : Number(reportEngine.collectionRate) >= 50 ? 'text-amber-400' : 'text-rose-400'}`}>{reportEngine.collectionRate}%</span></div>
+                <div className="h-px bg-white/10 my-2"></div>
+                <div className="flex justify-between items-center text-xs py-1"><span className="text-white/80">Outstanding Receivables</span><span className="font-medium text-white/80">Rs.{kpis.totalReceivables.toLocaleString('en-US')}</span></div>
+                <div className="flex justify-between items-center text-xs py-0.5"><span className="text-white/80">Collection Rate (all-time)</span><span className={`font-medium ${Number(reportEngine.collectionRate) >= 80 ? 'text-kt-yellow' : Number(reportEngine.collectionRate) >= 50 ? 'text-white/80' : 'text-white/80'}`}>{reportEngine.collectionRate}%</span></div>
               </div>
             </div>
           </div>
@@ -1350,21 +1368,21 @@ return (
       {/* ── Monthly Trend View ── */}
       {view === 'Monthly Trend' && (() => {
         const months = Object.keys(reportEngine.monthlyData).sort().slice(-18);
-        if (months.length === 0) return <div className="text-center py-16 text-slate-400">No billing data yet.</div>;
+        if (months.length === 0) return <div className="text-center py-16 text-kt-muted">No billing data yet.</div>;
         const maxRev = Math.max(...months.map(m => reportEngine.monthlyData[m].revenue), 1);
         const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
         return (
           <div className="space-y-4 mt-2">
             {/* The trend is deliberately all-time. Nothing said so, and the chart therefore
                 disagreed silently with every other figure on the page. */}
-            <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
-              <p className="text-[10px] font-bold text-amber-700">Last {months.length} months, all time — this view ignores the <span className="underline">{filterLabel}</span> filter above.</p>
+            <div className="bg-kt-amber/10 border border-kt-amber/30 rounded-xl px-3 py-2">
+              <p className="text-xs font-medium text-kt-amber">Last {months.length} months, all time — this view ignores the <span className="underline">{filterLabel}</span> filter above.</p>
             </div>
             {/* Chart */}
-            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+            <div className="bg-white p-4 rounded-xl border border-kt-line">
               <div className="flex justify-between items-center mb-3">
-                <p className="text-[10px] font-bold uppercase text-slate-500 tracking-wider">Monthly Revenue & Profit</p>
-                <div className="flex gap-2 text-[9px] font-bold"><span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-indigo-400 inline-block"></span>Revenue</span><span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-emerald-400 inline-block"></span>Profit</span></div>
+                <p className="text-xs font-medium text-kt-sub">Monthly Revenue & Profit</p>
+                <div className="flex gap-2 text-xs font-medium"><span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-kt-muted/40 inline-block"></span>Revenue</span><span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-kt-primary inline-block"></span>Profit</span></div>
               </div>
               <div className="flex items-end gap-1.5 overflow-x-auto pb-2" style={{height:'130px'}}>
                 {months.map(m => {
@@ -1374,49 +1392,49 @@ return (
                   const [yr, mo] = m.split('-');
                   return (
                     <div key={m} className="flex flex-col items-center min-w-[28px] group relative flex-1">
-                      <div className="absolute bottom-7 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-[9px] font-bold px-2 py-1.5 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-none shadow-lg">
+                      <div className="absolute bottom-7 left-1/2 -translate-x-1/2 bg-kt-band text-white text-xs font-medium px-2 py-1.5 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-none shadow-[0_8px_24px_rgba(0,0,0,0.08)]">
                         {monthNames[parseInt(mo)-1]} {yr.slice(2)}<br/>Rev: Rs.{d.revenue.toLocaleString('en-US')}<br/>GP: Rs.{d.profit.toLocaleString('en-US')}<br/>Orders: {d.orders}
                       </div>
                       <div className="flex gap-0.5 items-end" style={{height:'100px'}}>
-                        <div className="w-3 bg-indigo-400 rounded-t-sm" style={{height:`${rH}%`}}></div>
-                        <div className="w-3 bg-emerald-400 rounded-t-sm" style={{height:`${pH}%`}}></div>
+                        <div className="w-3 bg-kt-muted/40 rounded-t-sm" style={{height:`${rH}%`}}></div>
+                        <div className="w-3 bg-kt-primary rounded-t-sm" style={{height:`${pH}%`}}></div>
                       </div>
-                      <span className="text-[8px] text-slate-400 mt-1 font-semibold">{monthNames[parseInt(mo)-1].slice(0,3)}</span>
-                      <span className="text-[7px] text-slate-300">{yr.slice(2)}</span>
+                      <span className="text-[8px] text-kt-muted mt-1 font-semibold">{monthNames[parseInt(mo)-1].slice(0,3)}</span>
+                      <span className="text-[7px] text-kt-muted">{yr.slice(2)}</span>
                     </div>
                   );
                 })}
               </div>
             </div>
             {/* Monthly table */}
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-              <div className="bg-slate-50 border-b border-slate-200 p-3">
-                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Month-by-Month Breakdown</p>
+            <div className="bg-white rounded-xl border border-kt-line overflow-hidden">
+              <div className="bg-kt-raised border-b border-kt-line p-3">
+                <p className="text-xs font-medium text-kt-sub">Month-by-Month Breakdown</p>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-xs text-left whitespace-nowrap">
-                  <thead className="bg-slate-50 text-slate-500 uppercase font-bold tracking-wider border-b border-slate-200">
-                    <tr><th className="p-3">Month</th><th className="p-3 text-center">Orders</th><th className="p-3 text-right">Revenue</th><th className="p-3 text-right">Cost</th><th className="p-3 text-right text-emerald-600">GP</th><th className="p-3 text-right text-indigo-500">Margin%</th></tr>
+                  <thead className="bg-kt-raised text-kt-sub font-medium border-b border-kt-line">
+                    <tr><th className="p-3">Month</th><th className="p-3 text-center">Orders</th><th className="p-3 text-right">Revenue</th><th className="p-3 text-right">Cost</th><th className="p-3 text-right text-kt-green">GP</th><th className="p-3 text-right text-kt-blue">Margin%</th></tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
+                  <tbody className="divide-y divide-kt-line font-semibold text-kt-ink">
                     {months.slice().reverse().map(m => {
                       const d = reportEngine.monthlyData[m];
                       const margin = d.revenue > 0 ? ((d.profit / d.revenue) * 100).toFixed(1) : 0;
                       const [yr, mo] = m.split('-');
                       return (
-                        <tr key={m} className="hover:bg-slate-50">
-                          <td className="p-3 font-bold text-slate-800">{monthNames[parseInt(mo)-1]} {yr}</td>
+                        <tr key={m} className="hover:bg-kt-raised">
+                          <td className="p-3 font-medium text-kt-ink">{monthNames[parseInt(mo)-1]} {yr}</td>
                           <td className="p-3 text-center">{d.orders}</td>
                           <td className="p-3 text-right">Rs.{d.revenue.toLocaleString('en-US')}</td>
-                          <td className="p-3 text-right text-rose-500">Rs.{d.cost.toLocaleString('en-US')}</td>
-                          <td className="p-3 text-right font-bold text-emerald-600">Rs.{d.profit.toLocaleString('en-US')}</td>
-                          <td className="p-3 text-right text-indigo-600">{margin}%</td>
+                          <td className="p-3 text-right text-kt-red">Rs.{d.cost.toLocaleString('en-US')}</td>
+                          <td className="p-3 text-right font-medium text-kt-green">Rs.{d.profit.toLocaleString('en-US')}</td>
+                          <td className="p-3 text-right text-kt-blue">{margin}%</td>
                         </tr>
                       );
                     })}
                   </tbody>
-                  <tfoot className="bg-slate-50 border-t-2 border-slate-300 font-black text-xs">
-                    {(() => { const totRev = months.reduce((s,m)=>s+reportEngine.monthlyData[m].revenue,0); const totGP = months.reduce((s,m)=>s+reportEngine.monthlyData[m].profit,0); const totOrd = months.reduce((s,m)=>s+reportEngine.monthlyData[m].orders,0); const totCost = months.reduce((s,m)=>s+reportEngine.monthlyData[m].cost,0); return (<tr><td className="p-3 text-slate-600 uppercase tracking-wider">Totals ({months.length}mo)</td><td className="p-3 text-center">{totOrd}</td><td className="p-3 text-right">Rs.{totRev.toLocaleString('en-US')}</td><td className="p-3 text-right text-rose-600">Rs.{totCost.toLocaleString('en-US')}</td><td className="p-3 text-right text-emerald-700">Rs.{totGP.toLocaleString('en-US')}</td><td className="p-3 text-right text-indigo-700">{totRev > 0 ? ((totGP/totRev)*100).toFixed(1) : 0}%</td></tr>); })()}
+                  <tfoot className="bg-kt-raised border-t-2 border-kt-line font-semibold text-xs">
+                    {(() => { const totRev = months.reduce((s,m)=>s+reportEngine.monthlyData[m].revenue,0); const totGP = months.reduce((s,m)=>s+reportEngine.monthlyData[m].profit,0); const totOrd = months.reduce((s,m)=>s+reportEngine.monthlyData[m].orders,0); const totCost = months.reduce((s,m)=>s+reportEngine.monthlyData[m].cost,0); return (<tr><td className="p-3 text-kt-sub">Totals ({months.length}mo)</td><td className="p-3 text-center">{totOrd}</td><td className="p-3 text-right">Rs.{totRev.toLocaleString('en-US')}</td><td className="p-3 text-right text-kt-red">Rs.{totCost.toLocaleString('en-US')}</td><td className="p-3 text-right text-kt-green">Rs.{totGP.toLocaleString('en-US')}</td><td className="p-3 text-right text-kt-blue">{totRev > 0 ? ((totGP/totRev)*100).toFixed(1) : 0}%</td></tr>); })()}
                   </tfoot>
                 </table>
               </div>
