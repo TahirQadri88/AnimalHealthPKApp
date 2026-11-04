@@ -56,6 +56,15 @@ for (const w of widths) {
             if (fill < 0.4) big.add(`${name(e)} ${Math.round(b.height)}px tall, contents fill ${Math.round(fill * 100)}%`); }
         }
       }
+      // A label wider than its own button or tab, wherever it sits, scrolling rows included:
+      // the 44px min-width once let tab buttons shrink below their labels, which then ran into
+      // each other, and the spill check above excused scrolling rows.
+      for (const e of document.querySelectorAll('main button, main a, header button, nav button, [role="dialog"] button')) {
+        if (!vis(e) || e.closest('.truncate') || getComputedStyle(e).textOverflow === 'ellipsis') continue;
+        const box = e.getBoundingClientRect(), range = document.createRange(); range.selectNodeContents(e);
+        const t = range.getBoundingClientRect();
+        if (t.width > box.width + 2) spill.add(`${name(e)} label ${Math.round(t.width)}px in a ${Math.round(box.width)}px button`);
+      }
       for (const list of document.querySelectorAll('main [class*="space-y-"], main .divide-y, [role="dialog"] [class*="space-y-"]')) {
         const kids = [...list.children].filter(vis);
         if (kids.length < 2) continue;
