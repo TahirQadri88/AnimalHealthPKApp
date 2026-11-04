@@ -6,6 +6,36 @@
  * screen uses them so far; the files are imported in main.jsx. EB Garamond defaults to
  * old-style figures, which do not line up in a money column, so `.font-display` asks for
  * lining, tabular figures. */
+/* ── Action icons coloured by their job, the same on every screen ─────────────────────
+ * One place, keyed on lucide's class names, so a print icon is green wherever it appears.
+ * Icons on a solid button or a green band keep the button's white (rules after these). */
+:where(main, [role="dialog"], .font-ui) :where(button, a) svg.lucide-book-open { color: rgb(var(--kt-icon-blue)); }
+:where(main, [role="dialog"], .font-ui) :where(button, a) :is(svg.lucide-receipt-text, svg.lucide-printer, svg.lucide-file-text, svg.lucide-receipt) { color: rgb(var(--kt-icon-green)); }
+:where(main, [role="dialog"], .font-ui) :where(button, a) svg.lucide-truck { color: rgb(var(--kt-icon-amber)); }
+:where(main, [role="dialog"], .font-ui) :where(button, a) :is(svg.lucide-rotate-ccw, svg.lucide-trash2, svg.lucide-trash-2) { color: rgb(var(--kt-icon-red)); }
+:where(main, [role="dialog"], .font-ui) :where(button, a) :is(svg.lucide-wallet, svg.lucide-phone-call) { color: rgb(var(--kt-icon-green)); }
+:where(main, [role="dialog"], .font-ui) :where(button, a) :is(svg.lucide-square-pen, svg.lucide-pen-line) { color: rgb(var(--kt-ink)); }
+:where(.text-white, .bg-kt-band, .bg-kt-primary, .bg-kt-red, .bg-kt-yellow, aside) svg { color: inherit !important; }
+/* The phone's bottom bar: one colour per tab, ink on the yellow pill of the current one. */
+nav[aria-label="Main"] [data-sidenav="dashboard"] svg { color: rgb(var(--kt-ink)); }
+nav[aria-label="Main"] [data-sidenav="products"] svg  { color: rgb(var(--kt-icon-amber)); }
+nav[aria-label="Main"] [data-sidenav="billing"] svg   { color: rgb(var(--kt-icon-blue)); }
+nav[aria-label="Main"] [data-sidenav="customers"] svg { color: rgb(var(--kt-icon-leaf)); }
+nav[aria-label="Main"] [data-sidenav="payments"] svg  { color: rgb(var(--kt-icon-green)); }
+nav[aria-label="Main"] [data-sidenav="admin"] svg     { color: rgb(var(--kt-sub)); }
+nav[aria-label="Main"] [aria-current="page"] svg      { color: rgb(var(--kt-ink)); }
+
+/* ── Fingertip-sized targets on a phone ──────────────────────────────────────────────
+ * Measured with tools/ui-preview/sizes.mjs: Billing's action icons were 36px, client card
+ * buttons 30px, receipt icons 27px, the admin tab arrows 24px. 44px is the common minimum
+ * for a fingertip. Phone widths only; the desktop keeps its compact rows. */
+@media (max-width: 639px) {
+  :where(main, header, nav, [role="dialog"], .font-ui) :where(button, a[href], select, input:not([type="checkbox"]):not([type="radio"])) {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
 /* Hint text in every field, app-wide. Tailwind's default grey measured 2.5:1 on white,
  * under the 4.5:1 WCAG AA asks for; kt-muted measures 5.6:1. */
 input::placeholder, textarea::placeholder { color: rgb(var(--kt-muted)); opacity: 1; }
@@ -56,6 +86,13 @@ input::placeholder, textarea::placeholder { color: rgb(var(--kt-muted)); opacity
   --kt-amber: 146 64 14;
   --kt-green: 22 101 52;
   --kt-blue: 63 95 143;
+  /* Brighter versions for ICONS only. A graphic needs 3:1 against white, not the 4.5:1 text
+   * needs, so these can carry more colour than the text tones. Never use them for words. */
+  --kt-icon-green: 22 163 74;    /* 3.3:1 */
+  --kt-icon-leaf: 47 107 79;     /* 6.6:1 */
+  --kt-icon-blue: 59 111 182;    /* 5.0:1 */
+  --kt-icon-amber: 217 119 6;    /* 3.2:1 */
+  --kt-icon-red: 220 38 38;      /* 4.8:1 */
 }
 /* The other candidates, kept for comparison in tools/ui-preview (?palette=). A third colour from the world the business works in,
  * used for the dark grounds and the main button; yellow stays the signature on top of it. */

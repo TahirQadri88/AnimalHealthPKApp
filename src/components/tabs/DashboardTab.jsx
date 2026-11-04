@@ -153,7 +153,7 @@ return (
     {topReceivables.map(c => (
       <button key={c.id} onClick={() => canLedger && (setSelectedLedgerId(c.id), setShowLedgerModal(true))} className={`w-full flex justify-between items-center gap-3 px-4 sm:px-5 py-2 sm:py-3 transition-colors text-left ${canLedger ? 'hover:bg-kt-raised cursor-pointer' : 'cursor-default'}`}>
         <div className="flex-1 min-w-0">
-          <p className="font-medium text-kt-ink truncate">{c.name}</p>
+          <p className="font-medium text-kt-blue truncate">{c.name}</p>
           {c.phone && <p className="hidden sm:block text-sm text-kt-muted mt-0.5 tabular-nums">{c.phone}</p>}
         </div>
         <div className="text-right shrink-0 flex items-center gap-2">
@@ -206,7 +206,7 @@ return (
   return (
     <div key={entry.id} className="px-4 py-2.5 sm:py-3 flex gap-3 items-center">
       <div className="flex-1 min-w-0">
-        <p className="font-medium text-kt-ink truncate">{entry.customerName}</p>
+        <p className="font-medium text-kt-blue truncate">{entry.customerName}</p>
         <p className="text-sm text-kt-sub mt-0.5 flex items-center gap-x-3 gap-y-1 flex-wrap">
           <span className="font-mono text-[13px] text-kt-ink">{entry.id}</span>
           <span className="tabular-nums">{formatDateDisp(entry.date)}</span>

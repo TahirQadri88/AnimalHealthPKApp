@@ -29,7 +29,7 @@ useEffect(() => {
 }, [onClose]);
 return (
 <div className="fixed inset-0 bg-black/50 z-[60] flex justify-center items-end sm:items-center" onMouseDown={(e) => { if(e.target === e.currentTarget) onClose(); }}>
-<div ref={panelRef} className={`font-ui bg-white w-full ${maxWidth} rounded-t-2xl sm:rounded-2xl h-[85vh] sm:h-auto max-h-[90vh] flex flex-col animate-slide-up shadow-[0_8px_24px_rgba(0,0,0,0.12)]`} onMouseDown={e => e.stopPropagation()}>
+<div ref={panelRef} role="dialog" aria-modal="true" aria-label={typeof title === 'string' ? title : undefined} className={`font-ui bg-white w-full ${maxWidth} rounded-t-2xl sm:rounded-2xl h-[85vh] sm:h-auto max-h-[90vh] flex flex-col animate-slide-up shadow-[0_8px_24px_rgba(0,0,0,0.12)]`} onMouseDown={e => e.stopPropagation()}>
 <div className="p-5 border-b border-kt-line flex justify-between items-center bg-white rounded-t-2xl sm:rounded-t-2xl">
 <h2 className="font-display text-2xl text-kt-ink leading-tight">{title}</h2>
 <button onClick={onClose} className="p-2 bg-kt-raised rounded-full text-kt-sub hover:bg-kt-line hover:text-kt-ink transition-colors"><X size={20}/></button>
