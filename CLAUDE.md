@@ -121,6 +121,18 @@ elements come back black on an invoice, and nothing overflows the 68mm box.
 
 ---
 
+## The Khyber Traders look: colours are tokens, and every one is measured
+
+The redesign (trial branch first, `docs/REDESIGN_ROLLOUT.md`) uses `kt-*` colours only:
+CSS variables in `src/index.css`, mapped in `tailwind.config.js`. A palette is a set of
+variables, so never write a raw hex or a Tailwind hue like `indigo-600` into a redesigned
+screen. Fonts are two roles, `font-ui` (DM Sans) and `font-display` (EB Garamond, with
+lining tabular figures for money), self-hosted so they work offline.
+
+Check readability by measuring, not by eye: run `npx vite`, then
+`node tools/ui-preview/contrast.mjs`. It composites every background layer and fails any
+text under WCAG AA. Reading the code passed amber and green chips that measured 4.3:1.
+
 ## A setting that nothing reads is a lie to the user
 
 Four Settings fields shipped doing nothing: `showBusinessNameOnReports` was read into a

@@ -2,6 +2,50 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Fonts for the Khyber Traders look: two roles, see tailwind.config.js. Only the Billing
+ * screen uses them so far; the files are imported in main.jsx. EB Garamond defaults to
+ * old-style figures, which do not line up in a money column, so `.font-display` asks for
+ * lining, tabular figures. */
+:root {
+  --font-ui: "DM Sans", system-ui, sans-serif;
+  --font-display: "EB Garamond", Georgia, serif;
+}
+.font-display { font-variant-numeric: lining-nums tabular-nums; font-weight: 500; }
+/* Pairing rule, measured 2026-11-04: EB Garamond's x-height is 0.41 of its size, DM Sans's
+ * 0.51, so at equal sizes the serif reads about 20% smaller. Beside 15px sans it needs 24px
+ * or more to look deliberately larger rather than accidentally smaller, and its Regular
+ * hairlines thin out on a 1x office monitor, hence Medium. tools/ui-preview/contrast.mjs
+ * fails any font-display text under 24px. */
+
+/* The Khyber Traders palette, as "R G B" so Tailwind can apply opacity. Roles:
+ *   yellow   the brand signature: the selected filter, the total figure. Never body text.
+ *   ink/sub/muted   three text roles, all at least 4.5:1 on page, card and raised.
+ *   page/raised/line   bone ground, hover and input surfaces, hairlines.
+ *   band     the dark ground of headers, summaries and the total card; white text on it.
+ *   primary  the main action button; white text on it.
+ *   red/amber/green/blue   meaning only: returns, drafts and part-paid, paid, estimates.
+ * Checked by tools/ui-preview/contrast.mjs, which measures every piece of text on screen. */
+:root {
+  --kt-yellow: 255 242 0;
+  --kt-ink: 31 27 22;
+  --kt-sub: 94 85 74;
+  --kt-muted: 107 103 92;
+  --kt-page: 238 234 224;
+  --kt-raised: 241 237 227;
+  --kt-line: 231 227 216;
+  --kt-band: 28 59 46;      /* Pasture: deep green, chosen 2026-11-04 */
+  --kt-primary: 28 59 46;
+  --kt-red: 180 35 24;
+  --kt-amber: 146 64 14;
+  --kt-green: 22 101 52;
+  --kt-blue: 63 95 143;
+}
+/* The other candidates, kept for comparison in tools/ui-preview (?palette=). A third colour from the world the business works in,
+ * used for the dark grounds and the main button; yellow stays the signature on top of it. */
+[data-palette="ledger"]  { --kt-band: 20 20 20; --kt-primary: 20 20 20; }
+[data-palette="ink"]     { --kt-band: 20 35 57; --kt-primary: 20 35 57; }
+[data-palette="cocoa"]   { --kt-band: 46 33 24; --kt-primary: 46 33 24; }
+
 /* ── Keyboard focus ──────────────────────────────────────────────────────────
  *
  * 46 controls in this app carry Tailwind's `outline-none` with nothing put back,
