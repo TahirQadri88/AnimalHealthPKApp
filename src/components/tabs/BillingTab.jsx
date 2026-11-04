@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useContext } from 'react';
+import { useState, useEffect, useRef, useContext, Fragment } from 'react';
 import { Plus, Search, X, Edit, Trash2, Save, Truck, MapPin, Calendar,
          AlertCircle, BookOpen, FileText, ReceiptText, RotateCcw, Gift } from 'lucide-react';
 // nextDocNumber comes through context, not by import: ../../lib/claimDocNumber pulls in
@@ -488,15 +488,24 @@ const unpaidCount = billedDocs.filter(o => getPaymentStatus(o) !== 'Paid').lengt
 const openDrafts = inPeriod.filter(o => o.status === 'Estimate' || o.status === 'Booked').length;
 return (
 <div className="font-ui p-4 sm:p-6 flex flex-col h-full bg-kt-page">
-<div className="bg-kt-band text-white rounded-xl px-5 py-4 mb-4 flex flex-wrap items-end gap-x-8 gap-y-3">
-  <div className="mr-auto">
-    <p className="text-sm text-white/60">Billed · {dateFilter}</p>
-    <p className="font-display text-4xl text-kt-yellow leading-tight">Rs. {billedSum.toLocaleString('en-US')}</p>
+{/* On a phone the four counts became four stacked blocks and the band filled the screen.
+    There they are one line of text under the total; from sm up, columns. */}
+<div className="bg-kt-band text-white rounded-xl px-4 py-3 sm:px-5 sm:py-4 mb-4 sm:flex sm:flex-wrap sm:items-end sm:gap-x-8 sm:gap-y-3">
+  <div className="sm:mr-auto">
+    <p className="text-sm text-white/70">Billed · {dateFilter}</p>
+    <p className="font-display text-3xl sm:text-4xl text-kt-yellow leading-tight">Rs. {billedSum.toLocaleString('en-US')}</p>
   </div>
-  <div><p className="text-sm text-white/60">Bills</p><p className="font-display text-2xl leading-tight">{billedDocs.length}</p></div>
-  <div><p className="text-sm text-white/60">Not fully paid</p><p className="font-display text-2xl leading-tight">{unpaidCount}</p></div>
-  <div><p className="text-sm text-white/60">Quotes and orders</p><p className="font-display text-2xl leading-tight">{openDrafts}</p></div>
-  {returnsSum > 0 && <div><p className="text-sm text-white/60">Returns</p><p className="font-display text-2xl leading-tight">Rs. {returnsSum.toLocaleString('en-US')}</p></div>}
+  <p className="sm:hidden text-sm text-white/80 mt-1 leading-snug">
+    {/* Each figure stays whole across a line break: "Rs." must never end a line. */}
+    {[`${billedDocs.length} bill${billedDocs.length !== 1 ? 's' : ''}`, `${unpaidCount} not fully paid`,
+      `${openDrafts} quote${openDrafts !== 1 ? 's' : ''} or order${openDrafts !== 1 ? 's' : ''}`,
+      ...(returnsSum > 0 ? [`Rs. ${returnsSum.toLocaleString('en-US')} returns`] : [])]
+      .map((t, i) => <Fragment key={t}>{i > 0 && ' · '}<span className="whitespace-nowrap">{t}</span></Fragment>)}
+  </p>
+  <div className="hidden sm:block"><p className="text-sm text-white/70">Bills</p><p className="font-display text-2xl leading-tight">{billedDocs.length}</p></div>
+  <div className="hidden sm:block"><p className="text-sm text-white/70">Not fully paid</p><p className="font-display text-2xl leading-tight">{unpaidCount}</p></div>
+  <div className="hidden sm:block"><p className="text-sm text-white/70">Quotes and orders</p><p className="font-display text-2xl leading-tight">{openDrafts}</p></div>
+  {returnsSum > 0 && <div className="hidden sm:block"><p className="text-sm text-white/70">Returns</p><p className="font-display text-2xl leading-tight">Rs. {returnsSum.toLocaleString('en-US')}</p></div>}
 </div>
 <div className="flex gap-2 mb-3">
 <div className="relative flex-1"><Search className="absolute left-3 top-3.5 text-kt-muted" size={16} strokeWidth={1.5} /><input placeholder="Search invoices" className="w-full h-11 pl-9 pr-3 bg-white border border-kt-line rounded-lg text-sm text-kt-ink placeholder-kt-muted outline-none focus:border-kt-ink transition-colors" value={search} onChange={e => setSearch(e.target.value)} onKeyDown={e => { if (e.key === 'Escape' && search) { e.stopPropagation(); setSearch(''); } }} /></div>

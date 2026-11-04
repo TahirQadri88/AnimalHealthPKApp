@@ -6,6 +6,19 @@
  * screen uses them so far; the files are imported in main.jsx. EB Garamond defaults to
  * old-style figures, which do not line up in a money column, so `.font-display` asks for
  * lining, tabular figures. */
+/* ── No zoom on tapping a field (iPhone) ──────────────────────────────────────
+ *
+ * iOS Safari zooms the page in whenever a text field under 16px gets focus, and does not
+ * zoom back out, so every search left the screen magnified. The cure that keeps pinch-zoom
+ * is 16px text in fields on phone widths; maximum-scale=1 in the viewport would stop it too,
+ * but it also takes zoom away from anyone who needs it. App-wide, so every screen's fields
+ * are covered, not only the ones already redesigned. */
+@media (max-width: 639px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea {
+    font-size: 16px !important;
+  }
+}
+
 :root {
   --font-ui: "DM Sans", system-ui, sans-serif;
   --font-display: "EB Garamond", Georgia, serif;

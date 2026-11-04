@@ -52,6 +52,11 @@ for (const palette of palettes) {
         }
         if (el.tagName === 'SELECT') check(el, el.options[el.selectedIndex]?.text || '', getComputedStyle(el).color);
       }
+      // iPhone zooms on focusing a field under 16px and stays zoomed. Phone widths only.
+      if (innerWidth < 640) for (const el of document.querySelectorAll('input:not([type=checkbox]):not([type=radio]), select, textarea')) {
+        const px = parseFloat(getComputedStyle(el).fontSize);
+        if (px < 16) out.push({ text: `field under 16px zooms on iPhone: ${el.placeholder || el.value || el.tagName}`, ratio: 0, need: 1, px, smallSerif: false });
+      }
       return out;
     });
     for (const f of found) worst.push({ ...f, where: `${view} @${width}` });
