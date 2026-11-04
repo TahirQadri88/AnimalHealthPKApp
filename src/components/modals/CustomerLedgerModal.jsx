@@ -20,64 +20,65 @@ const printData = { ...fullLedger, dateRange: { start: startDate, end: endDate }
 return (
 <ModalWrapper title={`${fullLedger.customerName} - Account Ledger`} onClose={() => setShowLedgerModal(false)} maxWidth="max-w-3xl">
 <div className="space-y-4 pb-10">
-<div className="flex items-center gap-2 mb-4 bg-slate-50 p-3 rounded-2xl border border-slate-200">
-<div className="flex-1"><label className="text-[9px] font-bold uppercase text-slate-500 block mb-1 tracking-wider">Start Date</label><input type="date" value={startDate} onChange={e=>setStartDate(e.target.value)} className="w-full p-2 text-xs font-semibold rounded-lg border border-slate-300 outline-none focus:border-indigo-500 bg-white" /></div>
-<div className="flex-1"><label className="text-[9px] font-bold uppercase text-slate-500 block mb-1 tracking-wider">End Date</label><input type="date" value={endDate} onChange={e=>setEndDate(e.target.value)} className="w-full p-2 text-xs font-semibold rounded-lg border border-slate-300 outline-none focus:border-indigo-500 bg-white" /></div>
-<div className="ml-2 text-right bg-rose-50 px-2.5 py-2 rounded-xl border border-rose-200 shadow-sm shrink-0"><p className="text-[9px] font-bold uppercase text-rose-600 tracking-widest whitespace-nowrap">Balance</p><p className="text-sm font-black text-rose-700 mt-0.5 whitespace-nowrap">Rs.{fullLedger.closingBal.toLocaleString('en-US')}</p></div>
+<div className="flex flex-wrap items-end gap-2 mb-4 bg-kt-raised p-3 rounded-xl border border-kt-line">
+<div className="flex-1 min-w-[130px]"><label className="text-xs font-medium text-kt-sub block mb-1">Start date</label><input type="date" value={startDate} onChange={e=>setStartDate(e.target.value)} className="w-full p-2 text-xs font-semibold rounded-lg border border-kt-line outline-none focus:border-kt-blue/30 bg-white" /></div>
+<div className="flex-1 min-w-[130px]"><label className="text-xs font-medium text-kt-sub block mb-1">End date</label><input type="date" value={endDate} onChange={e=>setEndDate(e.target.value)} className="w-full p-2 text-xs font-semibold rounded-lg border border-kt-line outline-none focus:border-kt-blue/30 bg-white" /></div>
+{/* The figure the customer asks about, as the band every screen uses for its key number. */}
+<div className="w-full sm:w-auto sm:ml-2 flex sm:block items-baseline justify-between text-right bg-kt-band text-white px-3 py-2 rounded-xl shrink-0"><p className="text-xs text-white/70 whitespace-nowrap">Balance</p><p className="font-display text-2xl text-kt-yellow leading-tight whitespace-nowrap">Rs. {fullLedger.closingBal.toLocaleString('en-US')}</p></div>
 </div>
 {/* Ledger mode toggle */}
-<div className="flex bg-slate-100 p-1 rounded-xl gap-1">
-  <button onClick={() => setLedgerMode('simple')} className={`flex-1 py-2 px-3 rounded-lg font-bold text-xs transition-colors ${ledgerMode==='simple'?'bg-indigo-600 text-white shadow-sm':'text-slate-500 hover:bg-slate-200 hover:text-slate-700'}`}>Simple Ledger</button>
-  <button onClick={() => setLedgerMode('detailed')} className={`flex-1 py-2 px-3 rounded-lg font-bold text-xs transition-colors ${ledgerMode==='detailed'?'bg-indigo-600 text-white shadow-sm':'text-slate-500 hover:bg-slate-200 hover:text-slate-700'}`}>Detailed (Items)</button>
+<div className="flex bg-kt-raised p-1 rounded-xl gap-1">
+  <button onClick={() => setLedgerMode('simple')} className={`flex-1 py-2 px-3 rounded-lg font-medium text-xs transition-colors ${ledgerMode==='simple'?'bg-kt-primary text-white ':'text-kt-sub hover:bg-kt-line hover:text-kt-ink'}`}>Simple Ledger</button>
+  <button onClick={() => setLedgerMode('detailed')} className={`flex-1 py-2 px-3 rounded-lg font-medium text-xs transition-colors ${ledgerMode==='detailed'?'bg-kt-primary text-white ':'text-kt-sub hover:bg-kt-line hover:text-kt-ink'}`}>Detailed (Items)</button>
 </div>
 {/* Summary row */}
 <div className="grid grid-cols-3 gap-2 text-center">
-  <div className="bg-slate-50 border border-slate-200 rounded-xl px-2 py-2"><p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Debit</p><p className="font-black text-indigo-700 text-sm tabular-nums">Rs.{periodTotalDebit.toLocaleString('en-US')}</p></div>
-  <div className="bg-slate-50 border border-slate-200 rounded-xl px-2 py-2"><p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Credit</p><p className="font-black text-emerald-600 text-sm tabular-nums">Rs.{periodTotalCredit.toLocaleString('en-US')}</p></div>
-  <div className="bg-rose-50 border border-rose-200 rounded-xl px-2 py-2"><p className="text-[9px] font-bold text-rose-400 uppercase tracking-wider">Period Bal</p><p className="font-black text-rose-700 text-sm tabular-nums">Rs.{(periodOpeningBal+periodTotalDebit-periodTotalCredit).toLocaleString('en-US')}</p></div>
+  <div className="bg-kt-raised border border-kt-line rounded-xl px-2 py-2"><p className="text-xs font-medium text-kt-muted">Debit</p><p className="font-semibold text-kt-blue text-sm tabular-nums">Rs.{periodTotalDebit.toLocaleString('en-US')}</p></div>
+  <div className="bg-kt-raised border border-kt-line rounded-xl px-2 py-2"><p className="text-xs font-medium text-kt-muted">Credit</p><p className="font-semibold text-kt-green text-sm tabular-nums">Rs.{periodTotalCredit.toLocaleString('en-US')}</p></div>
+  <div className="bg-kt-red/10 border border-kt-red/30 rounded-xl px-2 py-2"><p className="text-xs font-medium text-kt-red">Period Bal</p><p className="font-semibold text-kt-red text-sm tabular-nums">Rs.{(periodOpeningBal+periodTotalDebit-periodTotalCredit).toLocaleString('en-US')}</p></div>
 </div>
 <div className="flex gap-2">
-{isAdmin && <button onClick={() => { setEditingPayment(null); setSelectedCustomerForPayment(fullLedger.id); setShowPaymentModal(true); }} className="flex-1 bg-emerald-500 hover:bg-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-400 text-white font-bold py-3 rounded-xl flex justify-center items-center gap-1.5 shadow-sm active:scale-[0.98] transition-all text-xs"><Wallet size={15} /> Receive Payment</button>}
-{isAdmin && <button onClick={() => { setEditingCreditNote({customerId: fullLedger.id, id: ''}); setShowCreditNoteModal(true); }} className="flex-1 bg-rose-500 hover:bg-rose-600 focus:outline-none focus:ring-2 focus:ring-rose-400 text-white font-bold py-3 rounded-xl flex justify-center items-center gap-1.5 shadow-sm active:scale-[0.98] transition-all text-xs"><RotateCcw size={15} /> Credit Note</button>}
-<button onClick={() => setPrintConfig({docType: 'ledger', format: 'a5', data: printData})} className="flex-1 bg-slate-800 hover:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-500 text-white font-bold py-3 rounded-xl flex justify-center items-center gap-1.5 shadow-sm active:scale-[0.98] transition-all text-xs"><FileSpreadsheet size={15} /> Print Ledger</button>
+{isAdmin && <button onClick={() => { setEditingPayment(null); setSelectedCustomerForPayment(fullLedger.id); setShowPaymentModal(true); }} className="flex-1 bg-kt-primary hover:bg-kt-primary/90 text-white font-medium h-11 rounded-lg flex justify-center items-center gap-1.5 active:scale-[0.98] transition-colors text-sm"><Wallet size={16} strokeWidth={1.5} className="shrink-0" /> <span className="whitespace-nowrap">Receive<span className="hidden sm:inline"> payment</span></span></button>}
+{isAdmin && <button onClick={() => { setEditingCreditNote({customerId: fullLedger.id, id: ''}); setShowCreditNoteModal(true); }} className="flex-1 bg-white border border-kt-line text-kt-red hover:bg-kt-red/5 font-medium h-11 rounded-lg flex justify-center items-center gap-1.5 active:scale-[0.98] transition-colors text-sm"><RotateCcw size={16} strokeWidth={1.5} className="shrink-0" /> <span className="whitespace-nowrap">Credit note</span></button>}
+<button onClick={() => setPrintConfig({docType: 'ledger', format: 'a5', data: printData})} className="flex-1 bg-white border border-kt-line text-kt-ink hover:bg-kt-raised font-medium h-11 rounded-lg flex justify-center items-center gap-1.5 active:scale-[0.98] transition-colors text-sm"><FileSpreadsheet size={16} strokeWidth={1.5} className="shrink-0" /> <span className="whitespace-nowrap">Print<span className="hidden sm:inline"> ledger</span></span></button>
 </div>
-<div className="border border-slate-200 rounded-2xl overflow-hidden shadow-sm bg-white">
+<div className="border border-kt-line rounded-xl overflow-hidden bg-white">
 <div className="overflow-x-auto">
-<table className="w-full text-left text-[11px] sm:text-xs min-w-[500px]">
-<thead className="bg-slate-50 text-slate-500 border-b border-slate-200"><tr><th className="py-2.5 px-3 font-bold uppercase tracking-wider">Date</th><th className="py-2.5 px-3 font-bold uppercase tracking-wider">Particulars</th><th className="py-2.5 px-3 text-right font-bold uppercase tracking-wider">Debit</th><th className="py-2.5 px-3 text-right font-bold uppercase tracking-wider">Credit</th><th className="py-2.5 px-3 text-right font-bold uppercase tracking-wider">Balance</th><th className="py-2.5 px-2 text-center"></th></tr></thead>
-<tbody className="divide-y divide-slate-100 text-slate-800">
-<tr className="bg-slate-50/30"><td className="py-2 px-3 text-slate-500 font-medium text-[10px]" colSpan={4}>Opening Balance <span className="text-[9px]">(as of {formatDateDisp(startDate)})</span></td><td className="py-2 px-3 text-right font-bold text-slate-700 tabular-nums">Rs.{periodOpeningBal.toLocaleString('en-US')}</td><td></td></tr>
+<table className="w-full text-left text-xs sm:text-xs min-w-[500px]">
+<thead className="bg-kt-raised text-kt-sub border-b border-kt-line"><tr><th className="py-2.5 px-3 font-medium">Date</th><th className="py-2.5 px-3 font-medium">Particulars</th><th className="py-2.5 px-3 text-right font-medium">Debit</th><th className="py-2.5 px-3 text-right font-medium">Credit</th><th className="py-2.5 px-3 text-right font-medium">Balance</th><th className="py-2.5 px-2 text-center"></th></tr></thead>
+<tbody className="divide-y divide-kt-line text-kt-ink">
+<tr className="bg-kt-raised/30"><td className="py-2 px-3 text-kt-sub font-medium text-xs" colSpan={4}>Opening Balance <span className="text-xs">(as of {formatDateDisp(startDate)})</span></td><td className="py-2 px-3 text-right font-medium text-kt-ink tabular-nums">Rs.{periodOpeningBal.toLocaleString('en-US')}</td><td></td></tr>
 {filteredRows.map(row => (
-<tr key={row.id} className="hover:bg-slate-50 transition-colors">
-<td className="py-2.5 px-3 font-medium text-slate-600 whitespace-nowrap">{formatDateDisp(row.date)}</td>
+<tr key={row.id} className="hover:bg-kt-raised transition-colors">
+<td className="py-2.5 px-3 font-medium text-kt-sub whitespace-nowrap">{formatDateDisp(row.date)}</td>
 <td className="py-2.5 px-3 max-w-[200px]">
-<span className={`font-bold block ${row.isCreditNote ? 'text-rose-700' : 'text-slate-800'}`}>{row.desc}</span>
-<span className="block text-[9px] text-slate-400 mt-0.5">{row.ref}</span>
-{row.isCreditNote && <span className="text-[9px] bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded font-bold uppercase mt-1 inline-block">Credit Note</span>}
+<span className={`font-medium block ${row.isCreditNote ? 'text-kt-red' : 'text-kt-ink'}`}>{row.desc}</span>
+<span className="block text-xs text-kt-muted mt-0.5">{row.ref}</span>
+{row.isCreditNote && <span className="text-xs bg-kt-red/10 text-kt-red px-1.5 py-0.5 rounded font-medium mt-1 inline-block">Credit Note</span>}
 {ledgerMode === 'detailed' && (row.lineItems || []).length > 0 && (
-  <div className="mt-2 border-t border-slate-100 pt-2">
-    <table className="w-full text-[9.5px]" style={{borderCollapse:'collapse'}}>
+  <div className="mt-2 border-t border-kt-line pt-2">
+    <table className="w-full text-xs" style={{borderCollapse:'collapse'}}>
       <thead>
-        <tr className="text-slate-400 border-b border-slate-100">
-          <th className="text-left font-bold pb-1 pr-2">Product</th>
-          <th className="text-center font-bold pb-1 px-1 whitespace-nowrap">Qty</th>
-          <th className="text-right font-bold pb-1 px-1 whitespace-nowrap">Rate</th>
-          <th className="text-right font-bold pb-1 pl-1 whitespace-nowrap">Subtotal</th>
+        <tr className="text-kt-muted border-b border-kt-line">
+          <th className="text-left font-medium pb-1 pr-2">Product</th>
+          <th className="text-center font-medium pb-1 px-1 whitespace-nowrap">Qty</th>
+          <th className="text-right font-medium pb-1 px-1 whitespace-nowrap">Rate</th>
+          <th className="text-right font-medium pb-1 pl-1 whitespace-nowrap">Subtotal</th>
         </tr>
       </thead>
       <tbody>
         {row.lineItems.map((li, idx) => (
-          <tr key={idx} className={idx % 2 === 0 ? '' : 'bg-slate-50/50'}>
-            <td className="py-0.5 pr-2 font-semibold text-slate-700 leading-tight">{li.isBonus && <span className="mr-0.5">🎁</span>}{li.name}</td>
-            <td className="py-0.5 px-1 text-center text-slate-500 tabular-nums">{li.qty}</td>
-            <td className="py-0.5 px-1 text-right text-slate-500 tabular-nums">{li.isBonus ? '—' : `Rs.${(li.price||0).toLocaleString('en-US')}`}</td>
-            <td className="py-0.5 pl-1 text-right font-bold text-slate-700 tabular-nums">{li.isBonus ? <span className="text-emerald-600 font-bold text-[9px]">FREE</span> : `Rs.${(li.subtotal||0).toLocaleString('en-US')}`}</td>
+          <tr key={idx} className={idx % 2 === 0 ? '' : 'bg-kt-raised/50'}>
+            <td className="py-0.5 pr-2 font-semibold text-kt-ink leading-tight">{li.isBonus && <span className="mr-1 text-xs font-medium text-kt-green">Bonus</span>}{li.name}</td>
+            <td className="py-0.5 px-1 text-center text-kt-sub tabular-nums">{li.qty}</td>
+            <td className="py-0.5 px-1 text-right text-kt-sub tabular-nums">{li.isBonus ? '—' : `Rs.${(li.price||0).toLocaleString('en-US')}`}</td>
+            <td className="py-0.5 pl-1 text-right font-medium text-kt-ink tabular-nums">{li.isBonus ? <span className="text-kt-green font-medium text-xs">FREE</span> : `Rs.${(li.subtotal||0).toLocaleString('en-US')}`}</td>
           </tr>
         ))}
         {(row.deliveryBilled || 0) > 0 && (
-          <tr className="border-t border-slate-100">
-            <td colSpan={3} className="pt-1 pr-2 text-slate-400 font-semibold">+ Delivery Charge</td>
-            <td className="pt-1 pl-1 text-right font-bold text-slate-600 tabular-nums">Rs.{row.deliveryBilled.toLocaleString('en-US')}</td>
+          <tr className="border-t border-kt-line">
+            <td colSpan={3} className="pt-1 pr-2 text-kt-muted font-semibold">+ Delivery Charge</td>
+            <td className="pt-1 pl-1 text-right font-medium text-kt-sub tabular-nums">Rs.{row.deliveryBilled.toLocaleString('en-US')}</td>
           </tr>
         )}
       </tbody>
@@ -85,19 +86,19 @@ return (
   </div>
 )}
 </td>
-<td className="py-2.5 px-3 text-right font-extrabold text-indigo-600 tabular-nums">{row.debit > 0 ? row.debit.toLocaleString('en-US') : '-'}</td>
-<td className="py-2.5 px-3 text-right font-extrabold text-emerald-600 tabular-nums">{row.credit > 0 ? row.credit.toLocaleString('en-US') : '-'}</td>
-<td className="py-2.5 px-3 text-right font-extrabold text-slate-800 tabular-nums">{row.balance.toLocaleString('en-US')}</td>
+<td className="py-2.5 px-3 text-right font-semibold text-kt-blue tabular-nums">{row.debit > 0 ? row.debit.toLocaleString('en-US') : '-'}</td>
+<td className="py-2.5 px-3 text-right font-semibold text-kt-green tabular-nums">{row.credit > 0 ? row.credit.toLocaleString('en-US') : '-'}</td>
+<td className="py-2.5 px-3 text-right font-semibold text-kt-ink tabular-nums">{row.balance.toLocaleString('en-US')}</td>
 <td className="py-2.5 px-2 text-center">
 <div className="flex gap-1 justify-center flex-wrap">
-{row.debit > 0 && !row.isCreditNote && (<button onClick={() => { const inv = invoices.find(o => o.id === row.id); if(inv) setPrintConfig({docType:'invoice', format:'thermal', data: inv}); }} title="Print Invoice" className="p-1.5 bg-indigo-50 hover:bg-indigo-100 focus:outline-none focus:ring-1 focus:ring-indigo-400 text-indigo-500 rounded-lg transition-colors"><ReceiptText size={13}/></button>)}
-{isAdmin && row.debit > 0 && !row.isCreditNote && (<button onClick={() => { const inv = invoices.find(o => o.id === row.id); if(inv){ setCurrentInvoice(inv); setBillingView('form'); setActiveTab('billing'); setShowLedgerModal(false); }}} title="Edit Invoice" className="p-1.5 bg-amber-50 hover:bg-amber-100 focus:outline-none focus:ring-1 focus:ring-amber-400 text-amber-600 rounded-lg transition-colors"><Edit size={13}/></button>)}
-{row.isCreditNote && (<button onClick={() => { const cn = invoices.find(o => o.id === row.id); if(cn) setPrintConfig({docType:'creditnote', format:'a4', data: cn}); }} title="Print Credit Note" className="p-1.5 bg-rose-50 hover:bg-rose-100 focus:outline-none focus:ring-1 focus:ring-rose-400 text-rose-500 rounded-lg transition-colors"><FileText size={13}/></button>)}
-{row.isCreditNote && isAdmin && (<button onClick={() => { setEditingCreditNote({ customerId: fullLedger.id, id: row.id }); setShowLedgerModal(false); setShowCreditNoteModal(true); }} title="Edit Credit Note" className="p-1.5 bg-amber-50 hover:bg-amber-100 focus:outline-none focus:ring-1 focus:ring-amber-400 text-amber-600 rounded-lg transition-colors"><Edit size={13}/></button>)}
-{row.isCreditNote && isAdmin && (<button onClick={async () => { const cn = invoices.find(o => o.id === row.id); if (!cn) return; const reason = await showPrompt(`Void credit note ${row.id}?\n\nIt stays on file and drops out of the balance.`, { placeholder: 'e.g. entered twice' }); if (reason === null) return; await voidRecord('invoices', cn, { label: row.id, reason }); showToast(`${row.id} voided`); }} title="Void Credit Note" className="p-1.5 bg-rose-50 hover:bg-rose-100 focus:outline-none focus:ring-1 focus:ring-rose-400 text-rose-500 rounded-lg transition-colors"><Trash2 size={13}/></button>)}
-{row.credit > 0 && !row.isCreditNote && (<button onClick={() => setPrintConfig({docType: 'receipt', format: 'thermal', data: generateReceiptData(fullLedger, row.id)})} title="Print Receipt" className="p-1.5 bg-emerald-50 hover:bg-emerald-100 focus:outline-none focus:ring-1 focus:ring-emerald-400 text-emerald-600 rounded-lg transition-colors"><Receipt size={13}/></button>)}
+{row.debit > 0 && !row.isCreditNote && (<button onClick={() => { const inv = invoices.find(o => o.id === row.id); if(inv) setPrintConfig({docType:'invoice', format:'thermal', data: inv}); }} title="Print Invoice" className="p-1.5 bg-kt-blue/10 hover:bg-kt-blue/10 focus:outline-none focus:ring-1 focus:ring-kt-blue/30 text-kt-blue rounded-lg transition-colors"><ReceiptText size={13}/></button>)}
+{isAdmin && row.debit > 0 && !row.isCreditNote && (<button onClick={() => { const inv = invoices.find(o => o.id === row.id); if(inv){ setCurrentInvoice(inv); setBillingView('form'); setActiveTab('billing'); setShowLedgerModal(false); }}} title="Edit Invoice" className="p-1.5 bg-kt-amber/10 hover:bg-kt-amber/10 focus:outline-none focus:ring-1 focus:ring-kt-amber/30 text-kt-amber rounded-lg transition-colors"><Edit size={13}/></button>)}
+{row.isCreditNote && (<button onClick={() => { const cn = invoices.find(o => o.id === row.id); if(cn) setPrintConfig({docType:'creditnote', format:'a4', data: cn}); }} title="Print Credit Note" className="p-1.5 bg-kt-red/10 hover:bg-kt-red/10 focus:outline-none focus:ring-1 focus:ring-kt-red/30 text-kt-red rounded-lg transition-colors"><FileText size={13}/></button>)}
+{row.isCreditNote && isAdmin && (<button onClick={() => { setEditingCreditNote({ customerId: fullLedger.id, id: row.id }); setShowLedgerModal(false); setShowCreditNoteModal(true); }} title="Edit Credit Note" className="p-1.5 bg-kt-amber/10 hover:bg-kt-amber/10 focus:outline-none focus:ring-1 focus:ring-kt-amber/30 text-kt-amber rounded-lg transition-colors"><Edit size={13}/></button>)}
+{row.isCreditNote && isAdmin && (<button onClick={async () => { const cn = invoices.find(o => o.id === row.id); if (!cn) return; const reason = await showPrompt(`Void credit note ${row.id}?\n\nIt stays on file and drops out of the balance.`, { placeholder: 'e.g. entered twice' }); if (reason === null) return; await voidRecord('invoices', cn, { label: row.id, reason }); showToast(`${row.id} voided`); }} title="Void Credit Note" className="p-1.5 bg-kt-red/10 hover:bg-kt-red/10 focus:outline-none focus:ring-1 focus:ring-kt-red/30 text-kt-red rounded-lg transition-colors"><Trash2 size={13}/></button>)}
+{row.credit > 0 && !row.isCreditNote && (<button onClick={() => setPrintConfig({docType: 'receipt', format: 'thermal', data: generateReceiptData(fullLedger, row.id)})} title="Print Receipt" className="p-1.5 bg-kt-green/10 hover:bg-kt-green/10 focus:outline-none focus:ring-1 focus:ring-kt-green/30 text-kt-green rounded-lg transition-colors"><Receipt size={13}/></button>)}
 {isAdmin && row.credit > 0 && row.id.startsWith('REC-') && (
-<button title="Edit Payment" onClick={() => { const pay = payments.find(p => p.id === row.id); if(pay){ setEditingPayment(pay); setSelectedCustomerForPayment(fullLedger.id); setShowPaymentModal(true); }}} className="p-1.5 bg-amber-50 hover:bg-amber-100 focus:outline-none focus:ring-1 focus:ring-amber-400 text-amber-600 rounded-lg transition-colors"><Edit size={13}/></button>
+<button title="Edit Payment" onClick={() => { const pay = payments.find(p => p.id === row.id); if(pay){ setEditingPayment(pay); setSelectedCustomerForPayment(fullLedger.id); setShowPaymentModal(true); }}} className="p-1.5 bg-kt-amber/10 hover:bg-kt-amber/10 focus:outline-none focus:ring-1 focus:ring-kt-amber/30 text-kt-amber rounded-lg transition-colors"><Edit size={13}/></button>
 )}
 {isAdmin && row.credit > 0 && !row.isCreditNote && (
 <button title="Void Payment" onClick={async () => {
@@ -117,16 +118,16 @@ return (
     }
   }
   showToast('Payment voided');
-}} className="p-1.5 bg-rose-50 hover:bg-rose-100 focus:outline-none focus:ring-1 focus:ring-rose-400 text-rose-500 rounded-lg transition-colors"><Trash2 size={14}/></button>
+}} className="p-1.5 bg-kt-red/10 hover:bg-kt-red/10 focus:outline-none focus:ring-1 focus:ring-kt-red/30 text-kt-red rounded-lg transition-colors"><Trash2 size={14}/></button>
 )}
 </div>
 </td>
 </tr>
 ))}
-{filteredRows.length === 0 && (<tr><td colSpan={6} className="text-center py-6 text-slate-400 font-medium">No transactions in this period.</td></tr>)}
+{filteredRows.length === 0 && (<tr><td colSpan={6} className="text-center py-6 text-kt-muted font-medium">No transactions in this period.</td></tr>)}
 </tbody>
-<tfoot className="bg-slate-50 border-t border-slate-200">
-<tr><td colSpan={2} className="py-2.5 px-3 font-bold text-right uppercase tracking-wider text-slate-500 text-[10px]">Period Totals:</td><td className="py-2.5 px-3 text-right font-black text-indigo-700 tabular-nums">Rs.{periodTotalDebit.toLocaleString('en-US')}</td><td className="py-2.5 px-3 text-right font-black text-emerald-600 tabular-nums">Rs.{periodTotalCredit.toLocaleString('en-US')}</td><td colSpan={2}></td></tr>
+<tfoot className="bg-kt-raised border-t border-kt-line">
+<tr><td colSpan={2} className="py-2.5 px-3 font-medium text-right text-kt-sub text-xs">Period Totals:</td><td className="py-2.5 px-3 text-right font-semibold text-kt-blue tabular-nums">Rs.{periodTotalDebit.toLocaleString('en-US')}</td><td className="py-2.5 px-3 text-right font-semibold text-kt-green tabular-nums">Rs.{periodTotalCredit.toLocaleString('en-US')}</td><td colSpan={2}></td></tr>
 </tfoot>
 </table>
 </div>

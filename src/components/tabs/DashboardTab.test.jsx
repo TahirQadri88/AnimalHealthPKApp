@@ -46,7 +46,7 @@ describe('DashboardTab', () => {
   it('still lists each document at its own value in Recent Activity', () => {
     // Same row, not "within N characters": styling between the two is not the point.
     const html = render();
-    const rowOf = (id) => html.slice(html.indexOf(`>${id}<`)).split('px-4 py-3 flex gap-3')[0];
+    const rowOf = (id) => html.slice(html.indexOf(`>${id}<`)).split('flex gap-3 items-center')[0];
     expect(rowOf('INV-1')).toContain('Rs. 75,000');
     expect(rowOf('CN-1')).toContain('Rs. 15,000');
   });

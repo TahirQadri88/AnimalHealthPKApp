@@ -119,10 +119,10 @@ const SearchableSelect = ({
   const itemClass = (v, idx) =>
     `w-full text-left px-3 py-2 text-sm font-semibold transition-colors ${
       String(v) === String(value)
-        ? 'bg-indigo-50 text-indigo-700'
+        ? 'bg-kt-blue/10 text-kt-blue'
         : idx === hi
-          ? 'bg-slate-100 text-slate-800'
-          : 'text-slate-700 hover:bg-slate-50'
+          ? 'bg-kt-raised text-kt-ink'
+          : 'text-kt-ink hover:bg-kt-raised'
     }`;
 
   return (
@@ -138,12 +138,12 @@ const SearchableSelect = ({
         aria-expanded={open}
         aria-label={selectedLabel || placeholder}
       >
-        <span className={`flex-1 truncate ${selectedLabel ? '' : 'text-slate-400'}`}>
+        <span className={`flex-1 truncate ${selectedLabel ? '' : 'text-kt-muted'}`}>
           {selectedLabel || placeholder}
         </span>
         <ChevronDown
           size={14}
-          className={`shrink-0 text-slate-400 transition-transform duration-150 ${open ? 'rotate-180' : ''}`}
+          className={`shrink-0 text-kt-muted transition-transform duration-150 ${open ? 'rotate-180' : ''}`}
         />
       </button>
 
@@ -163,18 +163,18 @@ const SearchableSelect = ({
           {/* Dropdown — above backdrop (z-9999) so its taps never reach the backdrop */}
           <div
             style={{ position: 'fixed', top: pos.top, left: pos.left, width: pos.width, zIndex: 9999 }}
-            className="bg-white rounded-xl border border-slate-200 shadow-2xl overflow-hidden"
+            className="bg-white rounded-xl border border-kt-line overflow-hidden"
             onMouseDown={e => e.preventDefault()} // keep focus in search input on desktop
           >
             {/* Search input */}
-            <div className="p-2 border-b border-slate-100">
+            <div className="p-2 border-b border-kt-line">
               <input
                 ref={inputRef}
                 value={search}
                 onChange={e => { setSearch(e.target.value); setHi(0); }}
                 onKeyDown={handleKeyDown}
                 placeholder="Search…"
-                className="w-full px-2.5 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 font-medium placeholder-slate-400"
+                className="w-full px-2.5 py-1.5 text-sm bg-kt-raised border border-kt-line rounded-lg outline-none focus:border-kt-blue/30 focus:ring-2 focus:ring-kt-blue/30 font-medium placeholder-kt-muted"
               />
             </div>
 
@@ -184,13 +184,13 @@ const SearchableSelect = ({
               <button
                 type="button"
                 onClick={() => emit('')}
-                className="w-full text-left px-3 py-2 text-[11px] text-slate-400 hover:bg-slate-50 font-medium border-b border-slate-100"
+                className="w-full text-left px-3 py-2 text-xs text-kt-muted hover:bg-kt-raised font-medium border-b border-kt-line"
               >
                 {placeholder}
               </button>
 
               {filtered.length === 0 && (
-                <div className="px-3 py-4 text-center text-sm text-slate-400 font-medium">
+                <div className="px-3 py-4 text-center text-sm text-kt-muted font-medium">
                   No results for &ldquo;{search}&rdquo;
                 </div>
               )}
@@ -205,7 +205,7 @@ const SearchableSelect = ({
                 >
                   {item.label}
                   {search && item._group && (
-                    <span className="ml-1.5 text-[10px] font-normal text-slate-400">
+                    <span className="ml-1.5 text-xs font-normal text-kt-muted">
                       · {item._group}
                     </span>
                   )}
@@ -214,7 +214,7 @@ const SearchableSelect = ({
 
               {!search && isGrouped && options.map(grp => (
                 <div key={grp.group}>
-                  <div className="px-3 pt-2 pb-0.5 text-[9px] font-black uppercase tracking-widest text-slate-400 bg-slate-50/80">
+                  <div className="px-3 pt-2 pb-0.5 text-xs font-semibold text-kt-muted bg-kt-raised/80">
                     {grp.group}
                   </div>
                   {grp.options.map(item => (
@@ -224,8 +224,8 @@ const SearchableSelect = ({
                       onClick={() => emit(item.value)}
                       className={`w-full text-left px-4 py-1.5 text-sm font-semibold transition-colors ${
                         String(item.value) === String(value)
-                          ? 'bg-indigo-50 text-indigo-700'
-                          : 'text-slate-700 hover:bg-slate-50'
+                          ? 'bg-kt-blue/10 text-kt-blue'
+                          : 'text-kt-ink hover:bg-kt-raised'
                       }`}
                     >
                       {item.label}

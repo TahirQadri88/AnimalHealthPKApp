@@ -20,7 +20,7 @@ useEffect(() => {
   return () => { el?.removeEventListener('scroll', check); ro.disconnect(); };
 }, [children]);
 const scroll = (d) => ref.current?.scrollBy({ left: d * 100, behavior: 'smooth' });
-const btnBase = `shrink-0 p-1 rounded-lg border border-slate-300 text-slate-500 hover:text-slate-800 transition-all ${bgClass || 'bg-white'}`;
+const btnBase = `shrink-0 p-1 rounded-lg border border-kt-line text-kt-sub hover:text-kt-ink transition-colors ${bgClass || 'bg-white'}`;
 return (
   <div className={`flex items-center gap-1 ${className}`}>
     <button onClick={() => scroll(-1)} tabIndex={showLeft ? 0 : -1} aria-label="Scroll tabs left" className={`${btnBase} ${showLeft ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}><ChevronLeft size={14}/></button>
