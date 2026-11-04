@@ -6,13 +6,20 @@
 //
 //   npx vite --port 5173   (in another shell)
 //   node tools/ui-preview/contrast.mjs [palette,palette,...]
+//
+// Or the whole app, through the full-app preview, one tab at a time:
+//   npx vite --config tools/ui-preview/vite.config.mjs --port 5174
+//   node tools/ui-preview/contrast.mjs --app=dashboard,billing,customers
 import { createRequire } from 'node:module';
 
 // The project's own playwright if installed, else a machine-wide one (require honours NODE_PATH).
 const { chromium } = await import('playwright').catch(() => createRequire(import.meta.url)('playwright'));
 
-const palettes = (process.argv[2] || 'ledger').split(',');
-const pages = [['list', 1280], ['form', 1280], ['list', 390], ['form', 390]];
+const appArg = process.argv.find(a => a.startsWith('--app='));
+const palettes = appArg ? ['pasture'] : (process.argv[2] || 'pasture').split(',');
+const pages = appArg
+  ? appArg.slice(6).split(',').flatMap(tab => [[tab, 1280], [tab, 390]])
+  : [['list', 1280], ['form', 1280], ['list', 390], ['form', 390]];
 
 const browser = await chromium.launch();
 let failures = 0;
@@ -20,7 +27,14 @@ for (const palette of palettes) {
   const worst = [];
   for (const [view, width] of pages) {
     const page = await browser.newPage({ viewport: { width, height: 900 } });
-    await page.goto(`http://localhost:5173/tools/ui-preview/billing.html?view=${view}&palette=${palette}`, { waitUntil: 'networkidle' });
+    if (appArg) {
+      await page.goto('http://localhost:5174/tools/ui-preview/app.html', { waitUntil: 'networkidle' });
+      await page.waitForTimeout(600);
+      await page.click(`[data-sidenav="${view}"] >> visible=true`);
+      await page.waitForTimeout(500);
+    } else {
+      await page.goto(`http://localhost:5173/tools/ui-preview/billing.html?view=${view}&palette=${palette}`, { waitUntil: 'networkidle' });
+    }
     await page.evaluate(() => document.fonts.ready);
     const found = await page.evaluate(() => {
       const parse = (c) => { const m = c.match(/[\d.]+/g).map(Number); return { r: m[0], g: m[1], b: m[2], a: m.length > 3 ? m[3] : 1 }; };

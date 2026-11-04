@@ -735,8 +735,8 @@ useEffect(() => {
 // silently swallowed every login error, including "Invalid Credentials" on a wrong
 // password. The screen simply did nothing.
 const toastEl = toast && (
-  <div className={`fixed top-6 right-6 lg:left-auto left-1/2 lg:-translate-x-0 -translate-x-1/2 px-5 py-3 rounded-2xl shadow-xl z-[100] font-semibold text-white flex items-center gap-2.5 text-sm transition-all animate-slide-up ${toast.type === 'error' ? 'bg-rose-600' : 'bg-slate-800'}`}>
-    {toast.type === 'error' ? <AlertCircle size={18}/> : <CheckCircle2 size={18} className="text-emerald-400"/>}
+  <div role="status" className={`font-ui fixed top-6 right-6 lg:left-auto left-1/2 lg:-translate-x-0 -translate-x-1/2 max-w-[calc(100vw-2rem)] px-4 py-3 rounded-xl shadow-[0_8px_24px_rgba(0,0,0,0.12)] z-[100] font-medium text-white flex items-center gap-2.5 text-sm animate-slide-up ${toast.type === 'error' ? 'bg-kt-red' : 'bg-kt-band'}`}>
+    {toast.type === 'error' ? <AlertCircle size={18} strokeWidth={1.5} className="shrink-0"/> : <CheckCircle2 size={18} strokeWidth={1.5} className="text-kt-yellow shrink-0"/>}
     {toast.msg}
   </div>
 );
@@ -744,36 +744,36 @@ const toastEl = toast && (
 // — Auth Screen —
 if (!currentUser) {
 return (
-<div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-[Inter,system-ui,sans-serif]">
-<div className="bg-white p-8 rounded-3xl w-full max-w-sm shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100">
-<div className="text-center mb-10">
-<h1 className="text-4xl font-extrabold bg-gradient-to-r from-indigo-700 to-blue-500 bg-clip-text text-transparent tracking-tight">{APP_NAME}</h1>
-<p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-2">Customer Management App</p>
+<div className="font-ui min-h-screen bg-kt-band flex items-center justify-center p-4">
+<div className="bg-white p-8 rounded-2xl w-full max-w-sm shadow-[0_8px_24px_rgba(0,0,0,0.2)]">
+<div className="text-center mb-8">
+<h1 className="font-display text-4xl text-kt-ink">{APP_NAME}</h1>
+<p className="text-sm text-kt-sub mt-2">Khyber Traders · customer management</p>
 </div>
 <form onSubmit={handleLogin} className="space-y-5">
 <div>
-<label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1">Username</label>
-<input type="text" className="w-full bg-slate-50 border border-slate-200 p-4 rounded-2xl font-semibold mt-1.5 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-800" value={loginForm.name} onChange={e => setLoginForm({...loginForm, name: e.target.value})} />
+<label className="text-sm font-medium text-kt-sub">Username</label>
+<input type="text" className="w-full h-12 px-4 bg-white border border-kt-line rounded-lg mt-1.5 outline-none focus:border-kt-ink transition-colors text-kt-ink" value={loginForm.name} onChange={e => setLoginForm({...loginForm, name: e.target.value})} />
 </div>
 <div>
-<label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1">Password</label>
-<input type="password" className="w-full bg-slate-50 border border-slate-200 p-4 rounded-2xl font-semibold mt-1.5 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-800" value={loginForm.password} onChange={e => setLoginForm({...loginForm, password: e.target.value})} />
+<label className="text-sm font-medium text-kt-sub">Password</label>
+<input type="password" className="w-full h-12 px-4 bg-white border border-kt-line rounded-lg mt-1.5 outline-none focus:border-kt-ink transition-colors text-kt-ink" value={loginForm.password} onChange={e => setLoginForm({...loginForm, password: e.target.value})} />
 </div>
 {/* Said before the attempt, not after it fails. Signing in is the one thing this app
     genuinely cannot do without a connection, and the login screen is the only place a
     person meets that limit. */}
 {sync.state !== 'live' && sync.state !== 'syncing' && (
-  <div className="mt-6 bg-amber-50 border border-amber-200 rounded-2xl p-3">
-    <p className="text-[11px] font-bold text-amber-800">No connection to the server</p>
-    <p className="text-[11px] text-amber-700 mt-1 leading-relaxed">
+  <div className="mt-6 bg-kt-amber/10 rounded-lg p-3">
+    <p className="text-sm font-medium text-kt-amber">No connection to the server</p>
+    <p className="text-sm text-kt-ink mt-1 leading-relaxed">
       Signing in needs the internet — your password is checked on Firebase&apos;s server, not on
       this device, so no password is ever kept here. Nothing you did has been lost: it is
       saved and will sync as soon as you reconnect.
     </p>
   </div>
 )}
-<button type="submit" disabled={sync.state === 'offline'} className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 disabled:shadow-none text-white font-bold py-4 rounded-2xl text-lg shadow-lg shadow-indigo-600/20 mt-8 active:scale-[0.98] transition-all">
-  {sync.state === 'offline' ? 'Waiting for a connection…' : 'Access System'}
+<button type="submit" disabled={sync.state === 'offline'} className="w-full h-12 bg-kt-primary hover:bg-kt-primary/90 disabled:bg-kt-muted text-white font-medium rounded-lg text-base mt-8 active:scale-[0.98] transition-[background-color,transform]">
+  {sync.state === 'offline' ? 'Waiting for a connection…' : 'Sign in'}
 </button>
 </form>
 </div>
@@ -833,15 +833,17 @@ migrateUsersToAuth, resetUserLogin, repairLoginIndex, saveUserAccount, logout,
 return (
 <AppContext.Provider value={ctx}>
 {/* ── Responsive wrapper: side-by-side on desktop, stacked on mobile ── */}
-<div className="h-screen bg-slate-100 text-slate-900 font-[Inter,system-ui,sans-serif] flex flex-row print:hidden" style={{fontFamily:"'Inter',system-ui,sans-serif"}}>
+{/* No font on the root: printed documents and their on-screen previews are siblings of the
+    chrome below and keep Inter through the rule in the <style> block. The chrome sets font-ui. */}
+<div className="h-screen bg-kt-page text-kt-ink flex flex-row print:hidden">
 
   {/* ── Desktop Sidebar Navigation (hidden on mobile) ── */}
-  <aside className="hidden lg:flex flex-col w-56 bg-white border-r border-slate-200 shadow-sm z-20 shrink-0">
-    <div className="px-5 py-5 border-b border-slate-100">
-      <h1 className="text-base font-extrabold bg-gradient-to-r from-indigo-700 to-blue-500 bg-clip-text text-transparent tracking-tight leading-none">{APP_NAME}</h1>
-      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1.5 flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>{currentUser?.name}</p>
+  <aside className="font-ui hidden lg:flex flex-col w-60 bg-kt-band text-white z-20 shrink-0">
+    <div className="px-5 pt-6 pb-5">
+      <h1 className="font-display text-2xl leading-none">{APP_NAME}</h1>
+      <p className="text-sm text-white/70 mt-2 flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-kt-yellow"></span>{currentUser?.name}</p>
     </div>
-    <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+    <nav className="flex-1 px-3 py-2 space-y-0.5 overflow-y-auto">
       {TABS.map(tab => {
         if (!canSeeTab(tab)) return null;
         const active = activeTab === tab.id;
@@ -852,66 +854,69 @@ return (
           <button key={tab.id} data-sidenav={tab.id} tabIndex={active ? 0 : -1} onClick={() => setActiveTab(tab.id)} title={`Alt+${tab.label[0].toLowerCase()}`}
             aria-current={active ? 'page' : undefined}
             onKeyDown={makeArrowNav(TABS.filter(t=>canSeeTab(t)).map(t=>t.id), activeTab, setActiveTab, 'data-sidenav')}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-semibold text-sm transition-all ${active ? 'bg-indigo-50 text-indigo-700 shadow-sm' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'}`}>
-            <div className="relative shrink-0">
-              <tab.icon size={18} strokeWidth={active ? 2.5 : 2} />
-              {draftCount > 0 && <span className="absolute -top-1.5 -right-1.5 bg-amber-500 text-white text-[7px] font-black w-3.5 h-3.5 rounded-full flex items-center justify-center leading-none">{draftCount > 9 ? '9+' : draftCount}</span>}{costCount > 0 && <span title="Products waiting for a cost price" className="absolute -top-1.5 -right-1.5 bg-rose-500 text-white text-[7px] font-black w-3.5 h-3.5 rounded-full flex items-center justify-center leading-none">{costCount > 9 ? '9+' : costCount}</span>}
-            </div>
+            className={`w-full h-10 flex items-center gap-3 px-3 rounded-lg text-sm transition-colors ${active ? 'bg-kt-yellow text-black font-medium' : 'text-white/80 hover:bg-white/10 hover:text-white'}`}>
+            <tab.icon size={18} strokeWidth={1.5} className="shrink-0" />
             <span>{tab.label}</span>
-            {active && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-indigo-500"></span>}
+            {/* Counts as quiet numbers at the end of the row, not dots on the icon. */}
+            {draftCount > 0 && <span title="Open quotes and draft orders" className={`ml-auto text-xs font-medium tabular-nums px-1.5 h-5 inline-flex items-center rounded ${active ? 'bg-black/10' : 'bg-white/15'}`}>{draftCount}</span>}
+            {costCount > 0 && <span title="Products waiting for a cost price" className="ml-auto text-xs font-medium tabular-nums px-1.5 h-5 inline-flex items-center rounded bg-kt-red text-white">{costCount}</span>}
           </button>
         );
       })}
     </nav>
-    <div className="px-3 py-3 border-t border-slate-100">
-      <div className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mb-2 px-1">Shortcuts: Ctrl+K=Search, Alt+B=Billing, Alt+C=Clients</div>
-      <button onClick={logout} className="w-full text-xs font-bold uppercase tracking-widest text-slate-500 bg-slate-100 px-3 py-2 rounded-lg hover:bg-slate-200 transition-colors">Log Out</button>
+    <div className="px-4 py-4 border-t border-white/15 space-y-3">
+      <div className="text-xs text-white/70 space-y-1.5">
+        {[['Ctrl', 'K', 'Search'], ['Alt', 'B', 'Billing'], ['Alt', 'C', 'Clients']].map(([a, b, l]) => (
+          <div key={l} className="flex items-center gap-2"><kbd className="font-mono text-[11px] px-1.5 rounded bg-white/10 border border-white/15">{a}+{b}</kbd>{l}</div>
+        ))}
+      </div>
+      <button onClick={logout} className="w-full h-9 text-sm text-white/80 border border-white/20 rounded-lg hover:bg-white/10 hover:text-white transition-colors">Log out</button>
     </div>
   </aside>
 
   {/* ── Main content area ── */}
   <div className="flex-1 flex flex-col overflow-hidden min-w-0">
     {/* Mobile/tablet header */}
-    <header className="lg:hidden bg-white/90 backdrop-blur-md px-5 py-4 flex justify-between items-center shadow-sm z-10 sticky top-0 border-b border-slate-100">
-      <div>
-        <h1 className="text-xl font-extrabold bg-gradient-to-r from-indigo-700 to-blue-500 bg-clip-text text-transparent tracking-tight leading-none pb-0.5">{APP_NAME}</h1>
-        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1.5 flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>{currentUser?.name}</p>
+    <header className="font-ui lg:hidden bg-kt-band text-white px-4 py-3 flex justify-between items-center z-10 sticky top-0">
+      <div className="min-w-0">
+        <h1 className="font-display text-2xl leading-none">{APP_NAME}</h1>
+        <p className="text-sm text-white/70 mt-1 flex items-center gap-2 truncate"><span className="w-1.5 h-1.5 rounded-full bg-kt-yellow shrink-0"></span>{currentUser?.name}</p>
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 shrink-0">
         <SyncPill />
-        <button onClick={() => setShowSearchModal(true)} aria-label="Search everything" title="Search everything" className="p-2 bg-slate-100 rounded-lg text-slate-600 hover:bg-slate-200"><Search size={16}/></button>
-        <button onClick={logout} className="text-[10px] font-bold uppercase tracking-widest text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg hover:bg-slate-200">Log Out</button>
+        <button onClick={() => setShowSearchModal(true)} aria-label="Search everything" title="Search everything" className="w-9 h-9 flex items-center justify-center rounded-lg text-white/80 hover:bg-white/10 hover:text-white transition-colors"><Search size={18} strokeWidth={1.5}/></button>
+        <button onClick={logout} className="h-9 px-3 text-sm text-white/80 border border-white/20 rounded-lg hover:bg-white/10 hover:text-white transition-colors">Log out</button>
       </div>
     </header>
 
     {/* Desktop top bar */}
-    <header className="hidden lg:flex bg-white border-b border-slate-200 px-6 py-3 items-center justify-between shadow-sm z-10">
-      <div className="flex items-center gap-4 min-w-0">
-        <h2 className="text-base font-bold text-slate-800 capitalize shrink-0">{TABS.find(t=>t.id===activeTab)?.label || ''}</h2>
+    <header className="font-ui hidden lg:flex bg-white border-b border-kt-line px-6 h-16 items-center justify-between z-10">
+      <div className="flex items-center gap-5 min-w-0">
+        <h2 className="font-display text-2xl text-kt-ink capitalize shrink-0">{TABS.find(t=>t.id===activeTab)?.label || ''}</h2>
         <button
           onClick={() => setShowSearchModal(true)}
           aria-label="Search everything"
-          className="flex items-center gap-2 w-72 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-400 hover:bg-slate-100 hover:border-slate-300 transition-colors"
+          className="flex items-center gap-2 w-80 h-9 px-3 bg-kt-page border border-kt-line rounded-lg text-kt-muted hover:border-kt-muted/50 transition-colors"
         >
-          <Search size={14} className="shrink-0"/>
-          <span className="text-xs font-semibold truncate">Customer, invoice no., product…</span>
-          <kbd className="ml-auto text-[9px] bg-white border border-slate-200 px-1.5 py-0.5 rounded font-mono shrink-0">Ctrl+K</kbd>
+          <Search size={16} strokeWidth={1.5} className="shrink-0"/>
+          <span className="text-sm truncate">Customers, invoice numbers, products</span>
+          <kbd className="ml-auto text-[11px] text-kt-sub bg-white border border-kt-line px-1.5 rounded font-mono shrink-0">Ctrl+K</kbd>
         </button>
       </div>
       <div className="flex items-center gap-3">
         {activeTab === 'billing' && billingView === 'list' && (
-          <button onClick={() => { setCurrentInvoice({ id: null, customerId: '', customerName: '', customerDetails: {}, items: [], deliveryBilled: 0, transportExpense: 0, discount: 0, vehicle: VEHICLES[0], paymentStatus: 'Pending', receivedAmount: 0, transportCompany: '', biltyNumber: '', driverName: '', driverPhone: '', riderId: '', deliveryAddressKey: 'address1', notes: '' }); setBillingView('form'); }} className="flex items-center gap-1.5 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700 transition-colors shadow-sm"><Plus size={16}/> New Invoice <kbd className="ml-1 text-[9px] bg-indigo-500 px-1.5 py-0.5 rounded font-mono">Alt+B</kbd></button>
+          <button onClick={() => { setCurrentInvoice({ id: null, customerId: '', customerName: '', customerDetails: {}, items: [], deliveryBilled: 0, transportExpense: 0, discount: 0, vehicle: VEHICLES[0], paymentStatus: 'Pending', receivedAmount: 0, transportCompany: '', biltyNumber: '', driverName: '', driverPhone: '', riderId: '', deliveryAddressKey: 'address1', notes: '' }); setBillingView('form'); }} className="h-9 flex items-center gap-2 bg-kt-primary text-white px-4 rounded-lg text-sm font-medium hover:bg-kt-primary/90 transition-colors"><Plus size={16} strokeWidth={1.5}/> New invoice <kbd className="text-[11px] bg-white/15 px-1.5 rounded font-mono">Alt+B</kbd></button>
         )}
         {activeTab === 'customers' && hasPermission('receivePayments') && (
-          <button onClick={() => { setSelectedCustomerForPayment(null); setShowPaymentModal(true); }} className="flex items-center gap-1.5 bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-emerald-600 transition-colors shadow-sm"><Wallet size={16}/> Receive Payment</button>
+          <button onClick={() => { setSelectedCustomerForPayment(null); setShowPaymentModal(true); }} className="h-9 flex items-center gap-2 bg-kt-primary text-white px-4 rounded-lg text-sm font-medium hover:bg-kt-primary/90 transition-colors"><Wallet size={16} strokeWidth={1.5}/> Receive payment</button>
         )}
         <SyncPill />
-        <span className="text-[10px] text-slate-400 font-medium">Esc = back/close</span>
+        <span className="text-xs text-kt-muted flex items-center gap-1.5"><kbd className="font-mono text-[11px] text-kt-sub px-1.5 rounded border border-kt-line">Esc</kbd>back or close</span>
       </div>
     </header>
 
-    <main className="flex-1 overflow-hidden h-full bg-slate-50 lg:bg-slate-100">
-      <div className="relative h-full lg:max-w-4xl lg:mx-auto lg:my-0 bg-slate-50 lg:shadow-sm overflow-hidden flex flex-col">
+    <main className="font-ui flex-1 overflow-hidden h-full bg-kt-page">
+      <div className="relative h-full lg:max-w-4xl lg:mx-auto lg:my-0 bg-kt-page overflow-hidden flex flex-col">
         {activeTab === 'dashboard' && <DashboardTab />}
         {activeTab === 'products' && <ProductsTab />}
         {activeTab === 'billing' && <BillingTab />}
@@ -922,7 +927,7 @@ return (
     </main>
 
     {/* Mobile bottom nav */}
-    <nav aria-label="Main" className="lg:hidden fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md border-t border-slate-200 flex items-center justify-between pb-6 pt-3 px-2 z-10 shadow-[0_-10px_20px_rgba(0,0,0,0.03)]">
+    <nav aria-label="Main" className="font-ui lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-kt-line flex items-center justify-between pb-6 pt-2 px-1 z-10">
       {TABS.map(tab => {
         if (!canSeeTab(tab)) return null;
         const active = activeTab === tab.id;
@@ -933,12 +938,12 @@ return (
           <button key={tab.id} data-sidenav={tab.id} tabIndex={active ? 0 : -1} onClick={() => setActiveTab(tab.id)}
             aria-current={active ? 'page' : undefined}
             onKeyDown={makeArrowNav(TABS.filter(t=>canSeeTab(t)).map(t=>t.id), activeTab, setActiveTab, 'data-sidenav')}
-            className={`flex flex-col items-center justify-center w-full min-h-[48px] transition-all ${active ? 'text-indigo-600' : 'text-slate-400'}`}>
-            <div className={`relative p-1.5 rounded-xl transition-all ${active ? 'bg-indigo-50 shadow-sm' : ''}`}>
-              <tab.icon size={22} strokeWidth={active ? 2.5 : 2} />
-              {draftCount > 0 && <span className="absolute -top-1 -right-1 bg-amber-500 text-white text-[8px] font-black w-4 h-4 rounded-full flex items-center justify-center leading-none">{draftCount > 9 ? '9+' : draftCount}</span>}{costCount > 0 && <span title="Products waiting for a cost price" className="absolute -top-1 -right-1 bg-rose-500 text-white text-[8px] font-black w-4 h-4 rounded-full flex items-center justify-center leading-none">{costCount > 9 ? '9+' : costCount}</span>}
+            className={`flex flex-col items-center justify-center w-full min-h-[52px] transition-colors ${active ? 'text-kt-ink' : 'text-kt-muted'}`}>
+            <div className={`relative px-4 py-1 rounded-full transition-colors ${active ? 'bg-kt-yellow' : ''}`}>
+              <tab.icon size={22} strokeWidth={1.5} />
+              {draftCount > 0 && <span className="absolute -top-1 right-1 bg-kt-amber text-white text-[10px] font-medium min-w-4 h-4 px-1 rounded-full flex items-center justify-center leading-none tabular-nums">{draftCount > 9 ? '9+' : draftCount}</span>}{costCount > 0 && <span title="Products waiting for a cost price" className="absolute -top-1 right-1 bg-kt-red text-white text-[10px] font-medium min-w-4 h-4 px-1 rounded-full flex items-center justify-center leading-none tabular-nums">{costCount > 9 ? '9+' : costCount}</span>}
             </div>
-            <span className={`text-[9px] font-bold uppercase tracking-widest ${active ? 'text-indigo-700 mt-1' : 'mt-0.5'}`}>{tab.label}</span>
+            <span className={`text-xs mt-1 ${active ? 'font-medium' : ''}`}>{tab.label}</span>
           </button>
         );
       })}
@@ -975,7 +980,7 @@ return (
 
   <style>{`
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
-    * { font-family: 'Inter', system-ui, sans-serif; }
+    *:not(.font-ui, .font-ui *) { font-family: 'Inter', system-ui, sans-serif; }
     @keyframes slide-up { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
     .animate-slide-up { animation: slide-up 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
     .scrollbar-hide::-webkit-scrollbar { display: none; }
