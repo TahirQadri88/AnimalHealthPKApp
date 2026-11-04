@@ -9,7 +9,7 @@ import { getNextSeqNum } from '../../lib/docNumbers';
 
 export const CreditNoteModal = () => {
 const { currentUser, products, customers, invoices, showToast, saveToFirebase, setShowCreditNoteModal, editingCreditNote, setEditingCreditNote, getCompanyName, logSave, invoicesRaw, nextDocNumber } = useContext(AppContext);
-const inputClass = "w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all shadow-sm text-slate-800 placeholder-slate-400";
+const inputClass = "w-full h-11 px-3 bg-white border border-kt-line rounded-lg text-sm text-kt-ink placeholder-kt-muted focus:outline-none focus:border-kt-ink transition-colors";
 
 // Editing an existing CN (id starts with 'CN-') vs new
 const existingCN = editingCreditNote?.id?.startsWith('CN-') ? invoices.find(o => o.id === editingCreditNote.id) : null;
@@ -122,26 +122,26 @@ const historyList = prodSearch
   : purchaseHistory;
 
 return (
-<div className="h-full flex flex-col bg-slate-50 absolute inset-0 z-20 animate-slide-up"
+<div className="font-ui h-full flex flex-col bg-kt-page absolute inset-0 z-20 animate-slide-up"
   onKeyDown={e => { if (e.ctrlKey && e.key === 'Enter') { e.preventDefault(); save(); } }}>
 
 {/* Header */}
-<div className="bg-white/80 backdrop-blur-md p-4 border-b border-slate-200 flex justify-between items-center sticky top-0 z-30 shadow-sm">
+<div className="bg-kt-band text-white px-5 sm:px-6 py-4 flex justify-between items-center sticky top-0 z-30">
   <div>
-    <h2 className="text-lg font-extrabold text-slate-800 tracking-tight">Sales Return / Credit Note</h2>
+    <h2 className="font-display text-2xl leading-tight">Sales return / credit note</h2>
     <input type="date" value={form.date} onChange={e => setForm(f=>({...f,date:e.target.value}))}
-      className="text-[11px] font-bold text-slate-500 bg-transparent border-0 outline-none cursor-pointer hover:text-rose-600 mt-0.5 p-0" />
+      className="text-sm text-white/70 bg-transparent border-0 outline-none cursor-pointer hover:text-white mt-1 p-0 tabular-nums [color-scheme:dark]" />
   </div>
-  <button onClick={() => { setEditingCreditNote(null); setShowCreditNoteModal(false); }} className="p-2 bg-slate-100 rounded-full text-slate-600 hover:bg-slate-200 transition-colors"><X size={20}/></button>
+  <button onClick={() => { setEditingCreditNote(null); setShowCreditNoteModal(false); }} title="Close" aria-label="Close" className="w-9 h-9 flex items-center justify-center rounded-lg text-white/70 hover:bg-white/10 hover:text-white transition-colors"><X size={18} strokeWidth={1.5}/></button>
 </div>
 
 <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-32">
 
   {/* ── Customer ── */}
-  <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-    <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5"><Users size={12}/> Customer</h3>
+  <div className="bg-white p-4 rounded-xl border border-kt-line">
+    <h3 className="text-xs font-medium text-kt-muted mb-3 flex items-center gap-1.5"><Users size={12}/> Customer</h3>
     <div className="relative">
-      <Search size={16} className="absolute left-3.5 top-3.5 text-slate-400 pointer-events-none z-10"/>
+      <Search size={16} className="absolute left-3.5 top-3.5 text-kt-muted pointer-events-none z-10"/>
       <input ref={custSearchRef} autoFocus={!form.customerId}
         className={`pl-10 ${inputClass}`} placeholder="Search customer…"
         value={showCustDrop ? custSearch : (customers.find(c => c.id === custId)?.name || '')}
@@ -157,14 +157,14 @@ return (
         }}
       />
       {showCustDrop && (
-        <div className="absolute z-50 w-full mt-1 border border-rose-200 bg-white rounded-xl max-h-52 overflow-y-auto shadow-lg">
+        <div className="absolute z-50 w-full mt-1 border border-kt-red/30 bg-white rounded-xl max-h-52 overflow-y-auto shadow-[0_8px_24px_rgba(0,0,0,0.08)]">
           {customers.filter(c => !custSearch || c.name.toLowerCase().includes(custSearch.toLowerCase())).map((c, idx) => (
             <button type="button" key={c.id}
-              className={`w-full text-left px-4 py-2.5 text-sm font-semibold transition-colors ${c.id === custId || idx === hiCust ? 'bg-rose-50 text-rose-700' : 'text-slate-800 hover:bg-rose-50'}`}
+              className={`w-full text-left px-4 py-2.5 text-sm font-semibold transition-colors ${c.id === custId || idx === hiCust ? 'bg-kt-red/10 text-kt-red' : 'text-kt-ink hover:bg-kt-red/10'}`}
               onMouseDown={e => { e.preventDefault(); pickCustomer(c); }}>{c.name}</button>
           ))}
           {customers.filter(c => !custSearch || c.name.toLowerCase().includes(custSearch.toLowerCase())).length === 0 && (
-            <p className="px-4 py-3 text-sm text-slate-400">No customers found</p>
+            <p className="px-4 py-3 text-sm text-kt-muted">No customers found</p>
           )}
         </div>
       )}
@@ -172,15 +172,15 @@ return (
   </div>
 
   {/* ── Items ── */}
-  <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-    <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+  <div className="bg-white p-4 rounded-xl border border-kt-line">
+    <h3 className="text-xs font-medium text-kt-muted mb-3 flex items-center gap-1.5">
       <Package size={12}/> Returned Items
-      {form.items.length > 0 && <span className="ml-1 text-rose-600 font-bold normal-case tracking-normal">{form.items.length} SKU{form.items.length!==1?'s':''} · {form.items.reduce((s,i)=>s+(i.quantity||0),0)} units</span>}
+      {form.items.length > 0 && <span className="ml-1 text-kt-red font-medium normal-case tracking-normal">{form.items.length} SKU{form.items.length!==1?'s':''} · {form.items.reduce((s,i)=>s+(i.quantity||0),0)} units</span>}
     </h3>
 
     {/* Search input — shows history items when no query, all products when typing */}
     <div className="relative mb-3">
-      <Search size={16} className="absolute left-3.5 top-3.5 text-slate-400"/>
+      <Search size={16} className="absolute left-3.5 top-3.5 text-kt-muted"/>
       <input ref={prodSearchRef}
         placeholder={custId ? 'Search to add… (history shown below)' : 'Select a customer first…'}
         disabled={!custId}
@@ -206,18 +206,18 @@ return (
 
     {/* Dropdown list: purchase history OR search results */}
     {custId && (prodSearch ? filteredProds.length > 0 : historyList.length > 0) && (
-      <div className="border border-rose-200 bg-rose-50/30 rounded-xl mb-4 max-h-56 overflow-y-auto p-2 space-y-1 shadow-inner">
+      <div className="border border-kt-red/30 bg-kt-red/10 rounded-xl mb-4 max-h-56 overflow-y-auto p-2 space-y-1">
         {prodSearch ? (
           // Search results from all products
           filteredProds.map((p, idx) => {
             const inList = form.items.some(i => String(i.productId) === String(p.id));
             return (
-              <div key={p.id} className={`p-2 rounded-lg border flex items-center justify-between ${idx === hiProd ? 'bg-rose-100 border-rose-300' : 'bg-white border-rose-100'}`}>
-                <button type="button" className="flex-1 text-left font-semibold text-sm text-slate-800 hover:text-rose-700" onClick={() => addProduct(p)}>
+              <div key={p.id} className={`p-2 rounded-lg border flex items-center justify-between ${idx === hiProd ? 'bg-kt-red/10 border-kt-red/30' : 'bg-white border-kt-red/30'}`}>
+                <button type="button" className="flex-1 text-left font-semibold text-sm text-kt-ink hover:text-kt-red" onClick={() => addProduct(p)}>
                   {p.name}
-                  <span className="ml-2 text-[10px] font-bold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded">Rs.{p.sellingPrice}</span>
+                  <span className="ml-2 text-xs font-medium text-kt-red bg-kt-red/10 px-1.5 py-0.5 rounded">Rs.{p.sellingPrice}</span>
                 </button>
-                {inList && <span className="text-[10px] font-bold text-rose-500 ml-2">✓</span>}
+                {inList && <span className="text-xs font-medium text-kt-red ml-2">✓</span>}
               </div>
             );
           })
@@ -227,25 +227,25 @@ return (
             const k = itemKey(item);
             const inList = addedKeys.has(k);
             return (
-              <div key={k} className={`p-2 rounded-lg border flex items-center justify-between gap-2 ${idx === hiProd ? 'bg-rose-100 border-rose-300' : 'bg-white border-rose-100'}`}>
+              <div key={k} className={`p-2 rounded-lg border flex items-center justify-between gap-2 ${idx === hiProd ? 'bg-kt-red/10 border-kt-red/30' : 'bg-white border-kt-red/30'}`}>
                 <button type="button" className="flex-1 text-left" onClick={() => addHistoryItem(item)}>
-                  <span className="font-semibold text-sm text-slate-800">{item.name}</span>
-                  <span className="ml-2 text-[10px] font-bold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded">Rs.{item.price}</span>
-                  <span className="ml-1 text-[10px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">×{item._soldQty || item.quantity}</span>
-                  {item._invId && <span className="ml-1 text-[10px] text-slate-400">{item._invId}</span>}
+                  <span className="font-semibold text-sm text-kt-ink">{item.name}</span>
+                  <span className="ml-2 text-xs font-medium text-kt-red bg-kt-red/10 px-1.5 py-0.5 rounded">Rs.{item.price}</span>
+                  <span className="ml-1 text-xs font-medium text-kt-muted bg-kt-raised px-1.5 py-0.5 rounded">×{item._soldQty || item.quantity}</span>
+                  {item._invId && <span className="ml-1 text-xs text-kt-muted">{item._invId}</span>}
                 </button>
-                {inList && <span className="text-[10px] font-bold text-rose-500 shrink-0">✓ Added</span>}
+                {inList && <span className="text-xs font-medium text-kt-red shrink-0">✓ Added</span>}
               </div>
             );
           })
         )}
         {prodSearch && filteredProds.length === 0 && (
-          <p className="text-center text-slate-400 text-sm py-3">No products found</p>
+          <p className="text-center text-kt-muted text-sm py-3">No products found</p>
         )}
       </div>
     )}
     {custId && !prodSearch && historyList.length === 0 && (
-      <p className="text-sm text-slate-400 text-center py-3 mb-3">No purchase history — type to search all products</p>
+      <p className="text-sm text-kt-muted text-center py-3 mb-3">No purchase history — type to search all products</p>
     )}
 
     {/* Added return items */}
@@ -253,50 +253,50 @@ return (
       {form.items.map((item, idx) => {
         const k = itemKey(item);
         return (
-          <div key={k} data-item-row="1" className="bg-slate-50 p-3 rounded-xl border border-slate-200 shadow-sm">
+          <div key={k} data-item-row="1" className="bg-kt-raised p-3 rounded-xl border border-kt-line">
             <div className="flex justify-between items-start mb-2">
               <div>
-                <p className="font-bold text-sm text-slate-800 leading-tight">{item.name}</p>
-                {item._soldQty && <span className="text-[10px] text-slate-400">Sold: ×{item._soldQty}</span>}
+                <p className="font-medium text-sm text-kt-ink leading-tight">{item.name}</p>
+                {item._soldQty && <span className="text-xs text-kt-muted">Sold: ×{item._soldQty}</span>}
               </div>
-              <button tabIndex={-1} onClick={() => setForm(f=>({...f, items: f.items.filter(i => itemKey(i) !== k)}))} className="text-slate-300 hover:text-rose-500 transition-colors"><X size={16}/></button>
+              <button tabIndex={-1} onClick={() => setForm(f=>({...f, items: f.items.filter(i => itemKey(i) !== k)}))} className="text-kt-muted hover:text-kt-red transition-colors"><X size={16}/></button>
             </div>
             <div className="flex items-center justify-between">
               <div className="flex flex-col">
-                <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5 ml-1">Rate (Rs)</label>
+                <label className="text-xs font-medium text-kt-muted mb-0.5 ml-1">Rate (Rs)</label>
                 <input type="number" data-item-rate="1"
-                  className="w-24 p-1.5 text-sm font-extrabold text-rose-700 bg-white border border-rose-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-500 shadow-inner"
+                  className="w-24 p-1.5 text-sm font-semibold text-kt-red bg-white border border-kt-red/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-kt-red/30"
                   value={item.price}
                   onChange={e => setForm(f=>({...f, items: f.items.map(i => itemKey(i)===k ? {...i, price: Number(e.target.value)} : i)}))}
                   onKeyDown={e => { if (e.key==='Enter') { e.preventDefault(); const q = e.target.closest('[data-item-row]')?.querySelector('[data-item-qty]'); q?.focus(); q?.select(); } }} />
               </div>
               <div className="flex flex-col items-center">
-                <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Qty</label>
-                <div className="flex items-center bg-white border border-slate-200 rounded-lg p-0.5 shadow-sm">
-                  <button tabIndex={-1} onClick={() => setForm(f=>({...f, items: f.items.map(i => itemKey(i)===k ? {...i, quantity: i.quantity-1} : i).filter(i=>i.quantity>0)}))} className="w-8 h-8 rounded-md bg-slate-50 text-slate-600 font-bold hover:bg-slate-100">-</button>
+                <label className="text-xs font-medium text-kt-muted mb-0.5">Qty</label>
+                <div className="flex items-center bg-white border border-kt-line rounded-lg p-0.5">
+                  <button tabIndex={-1} onClick={() => setForm(f=>({...f, items: f.items.map(i => itemKey(i)===k ? {...i, quantity: i.quantity-1} : i).filter(i=>i.quantity>0)}))} className="w-8 h-8 rounded-md bg-kt-raised text-kt-sub font-medium hover:bg-kt-raised">-</button>
                   <input data-item-qty="1" type="number" ref={idx === form.items.length-1 ? lastQtyRef : null}
-                    className="w-12 text-center text-sm font-bold bg-transparent outline-none appearance-none"
+                    className="w-12 text-center text-sm font-medium bg-transparent outline-none appearance-none"
                     value={item.quantity}
                     onChange={e => setForm(f=>({...f, items: f.items.map(i => itemKey(i)===k ? {...i, quantity: Number(e.target.value)||1} : i)}))}
                     onKeyDown={e => { if (e.key==='Enter') { e.preventDefault(); prodSearchRef.current?.focus(); } }} />
-                  <button tabIndex={-1} onClick={() => setForm(f=>({...f, items: f.items.map(i => itemKey(i)===k ? {...i, quantity: i.quantity+1} : i)}))} className="w-8 h-8 rounded-md bg-rose-50 text-rose-600 font-bold hover:bg-rose-100">+</button>
+                  <button tabIndex={-1} onClick={() => setForm(f=>({...f, items: f.items.map(i => itemKey(i)===k ? {...i, quantity: i.quantity+1} : i)}))} className="w-8 h-8 rounded-md bg-kt-red/10 text-kt-red font-medium hover:bg-kt-red/10">+</button>
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-[9px] text-slate-400 font-bold uppercase">Subtotal</p>
-                <p className="font-extrabold text-rose-700 text-sm">Rs.{(item.price * item.quantity).toLocaleString('en-US')}</p>
+                <p className="text-xs text-kt-muted font-medium">Subtotal</p>
+                <p className="font-semibold text-kt-red text-sm">Rs.{(item.price * item.quantity).toLocaleString('en-US')}</p>
               </div>
             </div>
           </div>
         );
       })}
-      {form.items.length === 0 && custId && <p className="text-center text-slate-400 text-sm py-2">Pick items from the list above to return</p>}
+      {form.items.length === 0 && custId && <p className="text-center text-kt-muted text-sm py-2">Pick items from the list above to return</p>}
     </div>
   </div>
 
   {/* ── Return details (reason + invoice ref) ── */}
-  <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-    <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Return Reason &amp; Reference</h3>
+  <div className="bg-white p-4 rounded-xl border border-kt-line">
+    <h3 className="text-xs font-medium text-kt-muted mb-3">Return Reason &amp; Reference</h3>
     <div className="grid grid-cols-2 gap-3">
       <div className="col-span-2"><input placeholder="Reason: Expired, Wrong item, Excess stock…" className={inputClass} value={form.reason} onChange={e=>setForm(f=>({...f,reason:e.target.value}))} /></div>
       <div className="col-span-2"><input placeholder="Original Invoice (optional): INV-XXXX" className={inputClass} value={form.originalInvoiceId} onChange={e=>setForm(f=>({...f,originalInvoiceId:e.target.value}))} /></div>
@@ -305,17 +305,18 @@ return (
 
   {/* ── Total ── */}
   {form.items.length > 0 && (
-    <div className="bg-gradient-to-br from-rose-50 to-pink-50 p-5 rounded-2xl border border-rose-100 text-center shadow-sm">
-      <p className="text-rose-600 font-bold uppercase text-[10px] tracking-widest mb-1">{form.items.length} SKU{form.items.length!==1?'s':''} · Total Credit</p>
-      <p className="text-4xl font-black text-rose-800 tracking-tight">Rs. {grandTotal.toLocaleString('en-US')}</p>
+    <div className="bg-white p-5 rounded-xl border border-kt-red/30 flex items-baseline justify-between gap-4">
+      {/* A return gives money back, so its total is in the returns red, not the billing green. */}
+      <p className="text-sm text-kt-sub">{form.items.length} SKU{form.items.length!==1?'s':''} · Total credit</p>
+      <p className="font-display text-4xl text-kt-red leading-none">Rs. {grandTotal.toLocaleString('en-US')}</p>
     </div>
   )}
 </div>
 
 {/* Footer */}
-<div className="p-4 bg-white/80 backdrop-blur-md border-t border-slate-200 fixed bottom-0 w-full max-w-md flex gap-3 z-30">
-  <button onClick={() => { setEditingCreditNote(null); setShowCreditNoteModal(false); }} className="flex-1 bg-white text-slate-700 border border-slate-300 py-3.5 rounded-xl font-bold shadow-sm flex justify-center items-center gap-2"><X size={18}/> Cancel</button>
-  <button onClick={save} className="flex-[2] bg-rose-600 hover:bg-rose-700 text-white py-3.5 rounded-xl font-bold shadow-md flex justify-center items-center gap-2 active:scale-95 transition-all"><RotateCcw size={18}/> Save · Ctrl+↵</button>
+<div className="p-4 bg-white/80 border-t border-kt-line fixed bottom-0 w-full max-w-md flex gap-3 z-30">
+  <button onClick={() => { setEditingCreditNote(null); setShowCreditNoteModal(false); }} className="flex-1 bg-white text-kt-ink border border-kt-line py-3.5 rounded-xl font-medium flex justify-center items-center gap-2"><X size={18}/> Cancel</button>
+  <button onClick={save} className="flex-[2] bg-kt-red hover:bg-kt-red/90 text-white py-3.5 rounded-xl font-medium flex justify-center items-center gap-2 active:scale-[0.98] transition-colors"><RotateCcw size={18}/> Save · Ctrl+↵</button>
 </div>
 </div>
 );

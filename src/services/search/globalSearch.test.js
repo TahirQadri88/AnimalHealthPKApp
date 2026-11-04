@@ -220,3 +220,19 @@ describe('scoreDocId — zero padding is on the paper, not in anyone\'s head', (
     expect(scoreDocId('REC-0012', 'INV-12')).toBe(0);
   });
 });
+
+// The shape ProductModal actually saves: sellingPrice and companyId, no price, no company.
+// Search read the other two, so live search showed every product at Rs.0.
+describe('products as they are saved', () => {
+  const saved = { id: 31, name: 'Trifas Suspension 1 Litre', companyId: 7, sellingPrice: 2850, unit: 'btl' };
+  const productHits = (q) => globalSearch(q, { products: [saved], companies: [{ id: 7, name: 'Leads Pharma' }] })
+    .groups.find(g => g.kind === 'product')?.results || [];
+  it('shows the selling price', () => {
+    expect(productHits('trifas')[0].amount).toBe(2850);
+  });
+  it('names the company from companyId, and finds the product by it', () => {
+    const hit = productHits('leads')[0];
+    expect(hit?.title).toBe('Trifas Suspension 1 Litre');
+    expect(hit.subtitle).toContain('Leads Pharma');
+  });
+});

@@ -35,30 +35,30 @@ export const MultiPicker = ({ label, Icon, items, selected, onToggle, onClear })
   return (
     <div className="relative shrink-0">
       <button ref={btnRef} onClick={handleOpen}
-        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border shadow-sm font-bold text-[11px] transition-colors ${count > 0 ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-700 border-slate-200'}`}>
+        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border  font-medium text-xs transition-colors ${count > 0 ? 'bg-kt-primary text-white border-kt-primary' : 'bg-white text-kt-ink border-kt-line'}`}>
         {Icon && <Icon size={12}/>} {count > 0 ? `${label} (${count})` : label} <ChevronDown size={10}/>
       </button>
       {open && createPortal(
         <div ref={dropdownRef} style={{ position: 'fixed', top: dropdownPos.top, left: dropdownPos.left, zIndex: 9999 }}
-          className="bg-white border border-slate-200 rounded-xl shadow-xl min-w-[190px] max-h-[300px] flex flex-col p-1.5">
+          className="bg-white border border-kt-line rounded-xl shadow-[0_8px_24px_rgba(0,0,0,0.08)] min-w-[190px] max-h-[300px] flex flex-col p-1.5">
           {items.length > 6 && (
-            <div className="px-1 pb-1.5 border-b border-slate-100 mb-1">
+            <div className="px-1 pb-1.5 border-b border-kt-line mb-1">
               <input autoFocus type="text" placeholder={`Search ${label}...`} value={pickerSearch} onChange={e => setPickerSearch(e.target.value)}
-                className="w-full px-2.5 py-1.5 text-[11px] font-medium border border-slate-200 rounded-lg outline-none focus:border-indigo-400 bg-slate-50" />
+                className="w-full px-2.5 py-1.5 text-xs font-medium border border-kt-line rounded-lg outline-none focus:border-kt-blue/30 bg-kt-raised" />
             </div>
           )}
-          <div className="flex justify-between px-2 py-1 text-[10px] text-slate-500 font-semibold border-b border-slate-100 mb-1">
-            <button type="button" onClick={() => { if (allSelected) { onClear(); } else { items.forEach(i => { if (!selected.has(String(i.id))) onToggle(i.id); }); } }} className="hover:text-indigo-600">{allSelected ? 'Deselect All' : 'Select All'}</button>
-            <button type="button" onClick={onClear} className="text-rose-500 hover:text-rose-700">Clear</button>
+          <div className="flex justify-between px-2 py-1 text-xs text-kt-sub font-semibold border-b border-kt-line mb-1">
+            <button type="button" onClick={() => { if (allSelected) { onClear(); } else { items.forEach(i => { if (!selected.has(String(i.id))) onToggle(i.id); }); } }} className="hover:text-kt-blue">{allSelected ? 'Deselect All' : 'Select All'}</button>
+            <button type="button" onClick={onClear} className="text-kt-red hover:text-kt-red">Clear</button>
           </div>
           <div className="overflow-y-auto flex-1">
             {filteredItems.map(item => (
-              <label key={item.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-50 cursor-pointer text-[11px] font-medium text-slate-700">
-                <input type="checkbox" checked={selected.has(String(item.id))} onChange={() => onToggle(item.id)} className="accent-indigo-600 rounded" />
+              <label key={item.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-kt-raised cursor-pointer text-xs font-medium text-kt-ink">
+                <input type="checkbox" checked={selected.has(String(item.id))} onChange={() => onToggle(item.id)} className="accent-kt-primary rounded" />
                 {item.name}
               </label>
             ))}
-            {filteredItems.length === 0 && <p className="text-center py-3 text-[10px] text-slate-400">No results</p>}
+            {filteredItems.length === 0 && <p className="text-center py-3 text-xs text-kt-muted">No results</p>}
           </div>
         </div>,
         document.body

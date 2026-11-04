@@ -140,13 +140,18 @@ export const globalSearch = (query, {
     });
   });
 
+  // A saved product carries `sellingPrice` and `companyId` (ProductModal writes them). This
+  // read `price` and `company`, which no saved product has, so every product in search showed
+  // Rs.0 and searching a company's name found none of its products.
+  const companyName = (p) => p.company || companies.find(c => String(c.id) === String(p.companyId))?.name || '';
   products.forEach(p => {
-    const score = Math.max(scoreText(p.name, q), scoreText(p.company, q) - 10);
+    const company = companyName(p);
+    const score = Math.max(scoreText(p.name, q), scoreText(company, q) - 10);
     push('product', score, {
       id: String(p.id), entity: p,
       title: p.name || 'Unnamed product',
-      subtitle: [p.company, p.unit].filter(Boolean).join(' · '),
-      amount: Number(p.price) || 0,
+      subtitle: [company, p.unit].filter(Boolean).join(' · '),
+      amount: Number(p.sellingPrice ?? p.price) || 0,
     });
   });
 
