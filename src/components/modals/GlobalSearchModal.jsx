@@ -83,7 +83,7 @@ return (
       onChange={e => setQuery(e.target.value)}
       placeholder="Customer, phone, invoice no., receipt no., product, brand…"
       aria-label="Search customers, invoices, receipts, products and brands"
-      className="w-full pl-10 pr-3 py-3 bg-white border border-kt-line rounded-xl text-sm font-semibold outline-none focus:border-kt-blue/30 focus:ring-2 focus:ring-kt-blue/30"
+      className="w-full pl-10 pr-3 py-3 bg-white border border-kt-line rounded-xl text-sm font-semibold outline-none focus:border-kt-ink"
     />
   </div>
 

@@ -8,7 +8,7 @@ export const ExpenseCategoryModal = () => {
 const { expenseCategories, saveToFirebase, deleteFromFirebase, showToast, setShowExpenseCatModal, showConfirm } = useContext(AppContext);
 const [newCat, setNewCat] = useState('');
 const [newGroup, setNewGroup] = useState('Transportation');
-const inputCls = "w-full p-3 bg-white border border-kt-line rounded-xl text-sm font-semibold focus:outline-none focus:border-kt-blue/30 ";
+const inputCls = "w-full p-3 bg-white border border-kt-line rounded-xl text-sm font-semibold focus:outline-none focus:border-kt-ink ";
 const addCat = async () => {
 if(!newCat) return;
 if(expenseCategories.some(c => c.name.toLowerCase() === newCat.toLowerCase())) return showToast("Category exists", "error");

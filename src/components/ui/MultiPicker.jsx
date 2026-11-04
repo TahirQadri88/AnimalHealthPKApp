@@ -44,7 +44,7 @@ export const MultiPicker = ({ label, Icon, items, selected, onToggle, onClear })
           {items.length > 6 && (
             <div className="px-1 pb-1.5 border-b border-kt-line mb-1">
               <input autoFocus type="text" placeholder={`Search ${label}...`} value={pickerSearch} onChange={e => setPickerSearch(e.target.value)}
-                className="w-full px-2.5 py-1.5 text-xs font-medium border border-kt-line rounded-lg outline-none focus:border-kt-blue/30 bg-kt-raised" />
+                className="w-full px-2.5 py-1.5 text-xs font-medium border border-kt-line rounded-lg outline-none focus:border-kt-ink bg-kt-raised" />
             </div>
           )}
           <div className="flex justify-between px-2 py-1 text-xs text-kt-sub font-semibold border-b border-kt-line mb-1">

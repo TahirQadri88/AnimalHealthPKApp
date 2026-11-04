@@ -57,7 +57,7 @@ return (
 {/* ── Cities Tab ── */}
 {tab === 'cities' && <>
   <div className="flex gap-2">
-    <input type="text" placeholder="New City..." className="flex-1 p-3 bg-kt-raised border border-kt-line rounded-xl font-semibold outline-none focus:border-kt-blue/30 text-sm" value={newCityName} onChange={e=>setNewCityName(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')addCity();}} />
+    <input type="text" placeholder="New City..." className="flex-1 p-3 bg-kt-raised border border-kt-line rounded-xl font-semibold outline-none focus:border-kt-ink text-sm" value={newCityName} onChange={e=>setNewCityName(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')addCity();}} />
     <button onClick={addCity} className="bg-kt-primary text-white px-4 rounded-xl font-medium hover:bg-kt-primary/90 transition-colors">Add</button>
   </div>
   <div className="space-y-2">
@@ -118,7 +118,7 @@ return (
           ))}
           {/* Add area inline */}
           <div className="flex gap-2 p-3">
-            <input type="text" placeholder={`New area in ${city.name}...`} className="flex-1 p-2 bg-white border border-kt-line rounded-lg font-semibold outline-none focus:border-kt-blue/30 text-sm" value={expandedCityId === city.id ? newAreaName : ''} onChange={e=>setNewAreaName(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')addArea(city.name);}} />
+            <input type="text" placeholder={`New area in ${city.name}...`} className="flex-1 p-2 bg-white border border-kt-line rounded-lg font-semibold outline-none focus:border-kt-ink text-sm" value={expandedCityId === city.id ? newAreaName : ''} onChange={e=>setNewAreaName(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')addArea(city.name);}} />
             <button onClick={()=>addArea(city.name)} className="bg-kt-primary text-white px-3 rounded-lg font-medium text-xs hover:bg-kt-primary transition-colors">Add</button>
           </div>
         </div>
@@ -162,7 +162,7 @@ return (
 {/* ── Types Tab ── */}
 {tab === 'types' && <>
   <div className="flex gap-2">
-    <input type="text" placeholder="New Type..." className="flex-1 p-3 bg-kt-raised border border-kt-line rounded-xl font-semibold outline-none focus:border-kt-blue/30 text-sm" value={newTypeName} onChange={e=>setNewTypeName(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')addType();}} />
+    <input type="text" placeholder="New Type..." className="flex-1 p-3 bg-kt-raised border border-kt-line rounded-xl font-semibold outline-none focus:border-kt-ink text-sm" value={newTypeName} onChange={e=>setNewTypeName(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')addType();}} />
     <button onClick={addType} className="bg-kt-primary text-white px-4 rounded-xl font-medium hover:bg-kt-primary/90 transition-colors">Add</button>
   </div>
   <div className="bg-white border border-kt-line rounded-xl overflow-hidden">

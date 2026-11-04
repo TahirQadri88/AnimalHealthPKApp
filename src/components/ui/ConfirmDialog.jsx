@@ -34,7 +34,7 @@ return (
       <div className="mt-4">
         <label className="text-xs font-medium text-kt-sub block mb-1">{prompt.label}</label>
         <input autoFocus value={reason} onChange={e => setReason(e.target.value)} placeholder={prompt.placeholder || ''}
-          className="w-full p-2.5 bg-white border border-kt-line rounded-xl text-sm font-semibold outline-none focus:border-kt-blue/30" />
+          className="w-full p-2.5 bg-white border border-kt-line rounded-xl text-sm font-semibold outline-none focus:border-kt-ink" />
         {blocked && <p className="text-xs text-kt-red font-medium mt-1">A reason is required — it goes in the audit log.</p>}
       </div>
     )}

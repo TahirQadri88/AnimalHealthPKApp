@@ -17,44 +17,44 @@ const tabConfig = [
 ];
 return (
 <div className="flex-1 overflow-y-auto p-4 pb-6 space-y-4">
-  <div className="bg-slate-100 p-1 rounded-xl">
-  <ScrollableTabBar bgClass="bg-slate-100">
+  <div className="bg-kt-raised p-1 rounded-xl">
+  <ScrollableTabBar bgClass="bg-kt-raised">
     {tabConfig.map(t=>(
       <button key={t.id} data-masterstab={t.id} tabIndex={tab===t.id?0:-1}
         onClick={()=>{setTab(t.id);setSearch('');}}
         onKeyDown={makeArrowNav(tabConfig.map(x=>x.id),tab,id=>{setTab(id);setSearch('');}, 'data-masterstab')}
-        className={`py-2 px-3 rounded-lg font-bold text-xs whitespace-nowrap transition-colors ${tab===t.id?'bg-white text-teal-700 shadow-sm':'text-slate-500'}`}>{t.label}</button>
+        className={`py-2 px-3 rounded-lg font-medium text-xs whitespace-nowrap transition-colors ${tab===t.id?'bg-white text-kt-green ':'text-kt-sub'}`}>{t.label}</button>
     ))}
   </ScrollableTabBar>
   </div>
   <div className="flex gap-2">
-    <div className="relative flex-1"><Search className="absolute left-3 top-3 text-slate-400" size={14}/><input placeholder="Search..." className="w-full pl-9 pr-3 py-2.5 bg-white border border-slate-200 rounded-xl font-semibold outline-none text-sm shadow-sm focus:border-indigo-400" value={search} onChange={e=>setSearch(e.target.value)} /></div>
+    <div className="relative flex-1"><Search className="absolute left-3 top-3 text-kt-muted" size={14}/><input placeholder="Search..." className="w-full pl-9 pr-3 py-2.5 bg-white border border-kt-line rounded-xl font-semibold outline-none text-sm focus:border-kt-ink" value={search} onChange={e=>setSearch(e.target.value)} /></div>
     {tab !== 'companies' && tab !== 'categories' && (
       <button onClick={() => {
         if (tab === 'products') { setEditingProduct(null); setShowProductModal(true); }
         else if (tab === 'customers') { setEditingCustomer(null); setShowCustomerModal(true); }
-      }} className="bg-indigo-600 text-white px-4 py-2.5 rounded-xl font-bold text-sm shadow-sm hover:bg-indigo-700 transition-colors flex items-center gap-1.5">
+      }} className="bg-kt-primary text-white px-4 py-2.5 rounded-xl font-medium text-sm hover:bg-kt-primary/90 transition-colors flex items-center gap-1.5">
         <Plus size={16}/> Add
       </button>
     )}
     {tab === 'categories' && (
-      <button onClick={()=>setShowExpenseCatModal(true)} className="bg-indigo-600 text-white px-4 py-2.5 rounded-xl font-bold text-sm shadow-sm hover:bg-indigo-700 transition-colors flex items-center gap-1.5"><Plus size={16}/> Add</button>
+      <button onClick={()=>setShowExpenseCatModal(true)} className="bg-kt-primary text-white px-4 py-2.5 rounded-xl font-medium text-sm hover:bg-kt-primary/90 transition-colors flex items-center gap-1.5"><Plus size={16}/> Add</button>
     )}
   </div>
 
   {tab === 'products' && (
     <div className="space-y-2 pb-10">
       {products.filter(p=>p.name.toLowerCase().includes(search.toLowerCase())).map(p=>(
-        <div key={p.id} className={`p-3 rounded-xl border shadow-sm flex justify-between items-center ${p.archived?'bg-amber-50/40 border-amber-200 opacity-75':'bg-white border-slate-200'}`}>
+        <div key={p.id} className={`p-3 rounded-xl border  flex justify-between items-center ${p.archived?'bg-kt-amber/10 border-kt-amber/30 opacity-75':'bg-white border-kt-line'}`}>
           <div className="flex-1 min-w-0 mr-2">
-            <p className="font-bold text-slate-800 text-sm truncate">{p.name}{p.archived&&<span className="ml-2 px-1.5 py-0.5 text-[9px] font-bold bg-amber-100 text-amber-700 rounded-full uppercase align-middle">Archived</span>}</p>
-            <p className="text-[10px] text-slate-400 font-medium mt-0.5 uppercase tracking-wider">{getCompanyName(p.companyId)} &bull; {p.unit} &bull; Cost: {p.costPrice} &bull; Sell: {p.sellingPrice}</p>
-            <span className={`text-[9px] font-bold mt-1 inline-block px-1.5 py-0.5 rounded uppercase ${p.available?'bg-emerald-50 text-emerald-600 border border-emerald-100':'bg-rose-50 text-rose-500 border border-rose-100'}`}>{p.available?'In Stock':'Out of Stock'}</span>
+            <p className="font-medium text-kt-ink text-sm truncate">{p.name}{p.archived&&<span className="ml-2 px-1.5 py-0.5 text-xs font-medium bg-kt-amber/10 text-kt-amber rounded-full align-middle">Archived</span>}</p>
+            <p className="text-xs text-kt-muted font-medium mt-0.5">{getCompanyName(p.companyId)} &bull; {p.unit} &bull; Cost: {p.costPrice} &bull; Sell: {p.sellingPrice}</p>
+            <span className={`text-xs font-medium mt-1 inline-block px-1.5 py-0.5 rounded  ${p.available?'bg-kt-green/10 text-kt-green border border-kt-green/30':'bg-kt-red/10 text-kt-red border border-kt-red/30'}`}>{p.available?'In Stock':'Out of Stock'}</span>
           </div>
           <div className="flex gap-1.5 shrink-0">
-            <button onClick={()=>{setEditingProduct(p);setShowProductModal(true);}} className="p-2 bg-slate-50 text-slate-600 rounded-lg hover:bg-indigo-50 hover:text-indigo-600 transition-colors"><Edit size={14}/></button>
+            <button onClick={()=>{setEditingProduct(p);setShowProductModal(true);}} className="p-2 bg-kt-raised text-kt-sub rounded-lg hover:bg-kt-blue/10 hover:text-kt-blue transition-colors"><Edit size={14}/></button>
             {p.archived
-              ? <button onClick={async()=>{await saveToFirebase('products',p.id,{...p,archived:false});}} className="p-2 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition-colors" title="Unarchive"><RotateCcw size={14}/></button>
+              ? <button onClick={async()=>{await saveToFirebase('products',p.id,{...p,archived:false});}} className="p-2 bg-kt-green/10 text-kt-green rounded-lg hover:bg-kt-green/10 transition-colors" title="Unarchive"><RotateCcw size={14}/></button>
               : <button onClick={async()=>{
                   const billCount=invoices.filter(inv=>inv.items?.some(it=>String(it.productId||it.uniqueId||'')===String(p.id))).length;
                   if(billCount>0){
@@ -63,7 +63,7 @@ return (
                     if(!await showConfirm(`Permanently delete "${p.name}"? Cannot be undone.`))return;
                   }else{if(!await showConfirm(`Delete ${p.name}?`))return;}
                   await deleteFromFirebase('products',p.id);
-                }} className="p-2 bg-rose-50 text-rose-500 rounded-lg hover:bg-rose-100 transition-colors"><Trash2 size={14}/></button>
+                }} className="p-2 bg-kt-red/10 text-kt-red rounded-lg hover:bg-kt-red/10 transition-colors"><Trash2 size={14}/></button>
             }
           </div>
         </div>
@@ -74,13 +74,13 @@ return (
   {tab === 'customers' && (
     <div className="space-y-2 pb-10">
       {customers.filter(c=>c.name.toLowerCase().includes(search.toLowerCase())).map(c=>(
-        <div key={c.id} className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex justify-between items-center">
+        <div key={c.id} className="bg-white p-3 rounded-xl border border-kt-line flex justify-between items-center">
           <div className="flex-1 min-w-0 mr-2">
-            <p className="font-bold text-slate-800 text-sm truncate">{c.name}</p>
-            <p className="text-[10px] text-slate-400 font-medium mt-0.5 truncate">{[c.contactPerson, c.phone, c.city].filter(Boolean).join(' • ')}</p>
+            <p className="font-medium text-kt-ink text-sm truncate">{c.name}</p>
+            <p className="text-xs text-kt-muted font-medium mt-0.5 truncate">{[c.contactPerson, c.phone, c.city].filter(Boolean).join(' • ')}</p>
           </div>
           <div className="flex gap-1.5 shrink-0">
-            <button onClick={()=>{setEditingCustomer(c);setShowCustomerModal(true);}} className="p-2 bg-slate-50 text-slate-600 rounded-lg hover:bg-indigo-50 hover:text-indigo-600 transition-colors"><Edit size={14}/></button>
+            <button onClick={()=>{setEditingCustomer(c);setShowCustomerModal(true);}} className="p-2 bg-kt-raised text-kt-sub rounded-lg hover:bg-kt-blue/10 hover:text-kt-blue transition-colors"><Edit size={14}/></button>
             <button onClick={async()=>{
   const relInvoices = invoices.filter(o => o.customerId === c.id);
   const relPayments = payments.filter(p => p.customerId === c.id);
@@ -98,7 +98,7 @@ return (
   }
   await deleteFromFirebase('customers', c.id);
   showToast(`${c.name} deleted`);
-}} className="p-2 bg-rose-50 text-rose-500 rounded-lg hover:bg-rose-100 transition-colors"><Trash2 size={14}/></button>
+}} className="p-2 bg-kt-red/10 text-kt-red rounded-lg hover:bg-kt-red/10 transition-colors"><Trash2 size={14}/></button>
           </div>
         </div>
       ))}
@@ -110,9 +110,9 @@ return (
   {tab === 'categories' && (
     <div className="space-y-2 pb-10">
       {expenseCategories.filter(c=>c.name.toLowerCase().includes(search.toLowerCase())).map(c=>(
-        <div key={c.id} className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex justify-between items-center">
-          <span className="font-semibold text-slate-700 text-sm flex items-center gap-2"><Tag size={14} className="text-slate-400"/> {c.name}</span>
-          <button onClick={async()=>{if(await showConfirm(`Delete category "${c.name}"?`)) await deleteFromFirebase('expenseCategories',c.id);}} className="p-2 bg-rose-50 text-rose-500 rounded-lg hover:bg-rose-100 transition-colors"><Trash2 size={14}/></button>
+        <div key={c.id} className="bg-white p-3 rounded-xl border border-kt-line flex justify-between items-center">
+          <span className="font-semibold text-kt-ink text-sm flex items-center gap-2"><Tag size={14} className="text-kt-muted"/> {c.name}</span>
+          <button onClick={async()=>{if(await showConfirm(`Delete category "${c.name}"?`)) await deleteFromFirebase('expenseCategories',c.id);}} className="p-2 bg-kt-red/10 text-kt-red rounded-lg hover:bg-kt-red/10 transition-colors"><Trash2 size={14}/></button>
         </div>
       ))}
     </div>
