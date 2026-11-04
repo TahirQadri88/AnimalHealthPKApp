@@ -32,8 +32,9 @@ describe('MultiPicker', () => {
   });
 
   it('goes solid once something is picked, so an active filter is visible', () => {
-    expect(render(new Set(['1']))).toContain('bg-indigo-600');
-    expect(render()).not.toContain('bg-indigo-600');
+    // The brand primary since the redesign; it was indigo. Solid when picked, plain when not.
+    expect(render(new Set(['1']))).toContain('bg-kt-primary');
+    expect(render()).not.toContain('bg-kt-primary');
   });
 
   it('starts closed — the list is portalled and only exists while open', () => {

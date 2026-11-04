@@ -163,7 +163,7 @@ const SearchableSelect = ({
           {/* Dropdown — above backdrop (z-9999) so its taps never reach the backdrop */}
           <div
             style={{ position: 'fixed', top: pos.top, left: pos.left, width: pos.width, zIndex: 9999 }}
-            className="bg-white rounded-xl border border-kt-line overflow-hidden"
+            className="bg-white rounded-xl border border-kt-line shadow-[0_8px_24px_rgba(0,0,0,0.08)] overflow-hidden"
             onMouseDown={e => e.preventDefault()} // keep focus in search input on desktop
           >
             {/* Search input */}

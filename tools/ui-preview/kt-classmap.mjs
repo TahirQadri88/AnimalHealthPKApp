@@ -18,7 +18,10 @@ const map = (t) => {
   if (t === 'font-black' || t === 'font-extrabold') return 'font-semibold';
   if (t === 'font-bold') return 'font-medium';
   if (['uppercase', 'tracking-wider', 'tracking-widest', 'tracking-wide', 'tracking-tight', 'italic',
-       'shadow', 'shadow-sm', 'shadow-md', 'shadow-lg', 'shadow-xl', 'shadow-2xl', 'shadow-inner', 'backdrop-blur-sm', 'backdrop-blur-md'].includes(t)) return '';
+       'shadow', 'shadow-sm', 'shadow-md', 'shadow-inner', 'backdrop-blur-sm', 'backdrop-blur-md'].includes(t)) return '';
+  // Large shadows belong to things that float (menus, pop-ups, toasts): they keep one soft,
+  // neutral shadow so they stand off what is behind them. Cards lose theirs to a hairline.
+  if (['shadow-lg', 'shadow-xl', 'shadow-2xl'].includes(t)) return 'shadow-[0_8px_24px_rgba(0,0,0,0.08)]';
   if (/^shadow-[a-z]+-\d{2,3}(\/\d+)?$/.test(t)) return '';
   if (t === 'rounded-2xl') return 'rounded-xl';
   if (t === 'rounded-3xl') return 'rounded-2xl';

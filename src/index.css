@@ -75,11 +75,14 @@ input::placeholder, textarea::placeholder { color: rgb(var(--kt-muted)); opacity
  * anyone using a pointer. `!important` is needed because `outline-none` is a
  * utility class in this same stylesheet and would otherwise win on source order.
  *
- * indigo-500 rather than the darker brand indigo: this has to be visible on the
- * slate-900 sidebar as well as on white. */
+ * kt-blue on light grounds, Khyber Yellow on the green ones (rule below). */
 :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
-  outline: 3px solid #6366f1 !important;
+  outline: 3px solid rgb(var(--kt-blue)) !important;
   outline-offset: 2px !important;
+}
+/* On the green grounds (side menu, phone header, bands) blue would barely show: yellow. */
+:where(.bg-kt-band) :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline-color: rgb(var(--kt-yellow)) !important;
 }
 
 /* ── Modal entrance ──────────────────────────────────────────────────────────
