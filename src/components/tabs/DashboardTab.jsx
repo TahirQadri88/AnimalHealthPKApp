@@ -116,21 +116,22 @@ return (
 
 {/* The period in one band: sales in Khyber Yellow, receivables beside it for an admin,
     today's bills and collections underneath. It replaces three separately coloured boxes. */}
-<div className="bg-kt-band text-white rounded-xl p-4 sm:p-5">
-  <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-3">
+{/* Compact on a phone: smaller figures, receivables on one row, today on one line. */}
+<div className="bg-kt-band text-white rounded-xl px-4 py-3 sm:p-5">
+  <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-2 sm:gap-y-3">
     <div>
       <p className="text-sm text-white/70 flex items-center gap-1.5"><TrendingUp size={16} strokeWidth={1.5}/> {dateFilter} {ownOnly ? 'My Sales' : 'Sales'}</p>
-      <p className="font-display text-4xl text-kt-yellow leading-tight">{money(revenue)}</p>
-      {momChange !== null && <p className="text-sm text-white/80 mt-0.5">{Number(momChange) >= 0 ? '▲' : '▼'} {Math.abs(momChange)}% vs last month</p>}
+      <p className="font-display text-3xl sm:text-4xl text-kt-yellow leading-tight">{money(revenue)}</p>
+      {momChange !== null && <p className="text-sm text-white/80">{Number(momChange) >= 0 ? '▲' : '▼'} {Math.abs(momChange)}% vs last month</p>}
     </div>
     {isAdmin && (
-    <button onClick={() => { setSelectedLedgerId(null); setShowLedgerModal(false); setActiveTab('customers'); }} className="text-left sm:text-right rounded-lg -m-2 p-2 hover:bg-white/10 transition-colors">
+    <button onClick={() => { setSelectedLedgerId(null); setShowLedgerModal(false); setActiveTab('customers'); }} className="w-full sm:w-auto flex sm:block items-baseline justify-between gap-3 text-left sm:text-right rounded-lg -mx-2 px-2 py-1 sm:-m-2 sm:p-2 hover:bg-white/10 transition-colors">
       <p className="text-sm text-white/70 flex items-center sm:justify-end gap-1.5"><DollarSign size={16} strokeWidth={1.5}/> Receivables{topReceivables.length > 0 && <span className="text-white/70"> · {topReceivables.length} high</span>}</p>
-      <p className="font-display text-3xl leading-tight">{money(totalReceivables)}</p>
+      <p className="font-display text-2xl sm:text-3xl leading-tight">{money(totalReceivables)}</p>
     </button>
     )}
   </div>
-  <div className="mt-4 pt-3 border-t border-white/15 flex flex-wrap gap-x-6 gap-y-1 text-sm">
+  <div className="mt-2 pt-2 sm:mt-4 sm:pt-3 border-t border-white/15 flex flex-wrap gap-x-4 sm:gap-x-6 gap-y-0.5 text-sm">
     <span className="flex items-center gap-1.5 text-white/80"><ReceiptText size={16} strokeWidth={1.5}/> Today <span className="text-white font-medium">{todayInvoices.length} bill{todayInvoices.length !== 1 ? 's' : ''}</span>{todayRevenue > 0 && <span className="text-white font-medium tabular-nums">· {money(todayRevenue)}</span>}</span>
     <span className="flex items-center gap-1.5 text-white/80"><Wallet size={16} strokeWidth={1.5}/> Collected today <span className="text-white font-medium tabular-nums">{money(todayCollected)}</span></span>
   </div>
