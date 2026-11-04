@@ -891,12 +891,12 @@ return (
 
     {/* Desktop top bar */}
     <header className="font-ui hidden lg:flex bg-white border-b border-kt-line px-6 h-16 items-center justify-between z-10">
-      <div className="flex items-center gap-5 min-w-0">
+      <div className="flex flex-1 items-center gap-5 min-w-0">
         <h2 className="font-display text-2xl text-kt-ink capitalize shrink-0">{TABS.find(t=>t.id===activeTab)?.label || ''}</h2>
         <button
           onClick={() => setShowSearchModal(true)}
           aria-label="Search everything"
-          className="flex items-center gap-2 w-80 h-9 px-3 bg-kt-page border border-kt-line rounded-lg text-kt-muted hover:border-kt-muted/50 transition-colors"
+          className="flex items-center gap-2 w-full max-w-80 min-w-0 h-9 px-3 bg-kt-page border border-kt-line rounded-lg text-kt-muted hover:border-kt-muted/50 transition-colors"
         >
           <Search size={16} strokeWidth={1.5} className="shrink-0"/>
           <span className="text-sm truncate">Customers, invoice numbers, products</span>
