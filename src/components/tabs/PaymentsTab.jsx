@@ -70,7 +70,7 @@ return (
       <div key={p.id} className="bg-white p-4 rounded-xl border border-kt-line hover:border-kt-green/30 transition-colors">
         <div className="flex justify-between items-center">
           <div className="flex-1 min-w-0">
-            <p className="font-medium text-kt-ink text-sm truncate">{p.customerName}</p>
+            <p className="font-medium text-kt-blue text-base truncate">{p.customerName}</p>
             <p className="text-xs text-kt-sub font-medium mt-0.5">{p.id} &bull; {formatDateDisp(p.date)}</p>
             {p.note && <p className="text-xs text-kt-muted mt-0.5 truncate">{p.note}</p>}
           </div>

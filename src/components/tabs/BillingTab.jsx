@@ -533,7 +533,7 @@ return (
 }).map(o => (
 <div key={o.id} className="bg-white px-5 py-4 rounded-xl border border-kt-line shadow-[0_1px_2px_rgba(20,20,20,0.05)] hover:shadow-[0_6px_20px_rgba(20,20,20,0.07)] transition-shadow">
 <div className="flex justify-between gap-4">
-<div className="min-w-0"><h4 className="font-medium text-kt-ink text-base truncate">{o.customerName}</h4></div>
+<div className="min-w-0"><h4 className="font-medium text-kt-blue text-base truncate">{o.customerName}</h4></div>
 <div className="text-right shrink-0"><p className={`font-display text-2xl leading-tight ${o.status==='CreditNote'?'text-kt-red':'text-kt-ink'}`}>{o.status==='CreditNote'?'− ':''}Rs. {o.total.toLocaleString('en-US')}</p>
 
 </div>

@@ -67,7 +67,7 @@ return (
 <div key={c.id} className="bg-white p-4 rounded-xl border border-kt-line flex justify-between items-start hover:border-kt-blue/30 transition-colors">
 <div className="flex-1 min-w-0">
 <button type="button" className="w-full text-left" onClick={() => { setSelectedLedgerId(c.id); setShowLedgerModal(true); }}>
-<h4 className="font-medium text-kt-ink text-sm hover:text-kt-blue">{c.name}</h4>
+<h4 className="font-medium text-kt-blue text-base hover:underline">{c.name}</h4>
 <p className="text-xs font-medium text-kt-sub mt-0.5">{c.contactPerson ? `${c.contactPerson} - ` : ''}{c.phone}</p>
 {incompleteIds.has(c.id) && <div className="flex flex-wrap gap-1 mt-1">{!c.city && <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-kt-amber/10 text-kt-amber">No City</span>}{!c.area && <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-kt-amber/10 text-kt-amber">No Area</span>}{!c.customerType && <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-kt-amber/10 text-kt-amber">No Type</span>}</div>}
 <div className="mt-2.5">
