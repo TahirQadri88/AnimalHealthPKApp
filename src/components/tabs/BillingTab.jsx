@@ -127,7 +127,7 @@ setBillingView('list');
 const inputClass = "w-full h-11 px-3 bg-white border border-kt-line rounded-lg text-sm text-kt-ink placeholder-kt-muted focus:outline-none focus:border-kt-ink transition-colors";
 const labelClass = "text-xs font-medium text-kt-sub mb-1.5 block";
 const sectionClass = "bg-white p-5 sm:p-6 rounded-xl border border-kt-line shadow-[0_1px_2px_rgba(20,20,20,0.05)]";
-const sectionTitleClass = "font-display text-xl text-kt-ink mb-4 flex items-center gap-3";
+const sectionTitleClass = "font-display text-2xl text-kt-ink mb-4 flex items-center gap-3";
 // The signature detail: sections numbered like the parts of a bill book, in the order a bill is written.
 const Step = ({ n }) => <span aria-hidden="true" className="font-ui w-6 h-6 shrink-0 rounded-full bg-kt-primary text-white text-xs font-medium flex items-center justify-center">{n}</span>;
 const iconBtn = "w-11 h-11 shrink-0 flex items-center justify-center rounded-lg border border-kt-line bg-white text-kt-sub hover:bg-kt-raised hover:text-kt-ink transition-colors";
@@ -266,7 +266,7 @@ return (
 <div key={itemKey} data-item-row="1" className="bg-kt-page/50 p-4 rounded-lg border border-kt-line">
 <div className="flex justify-between items-start gap-3 mb-3">
 <p className="font-medium text-[15px] text-kt-ink leading-tight">{item.name}{item.isBonus && <span className="ml-2 text-xs font-medium text-kt-green bg-kt-green/10 px-1.5 py-0.5 rounded">Bonus</span>}</p>
-<span className="ml-auto font-display text-lg text-kt-ink leading-none whitespace-nowrap">{item.isBonus ? 'Free' : `Rs. ${((Number(item.price) || 0) * (Number(item.quantity) || 0)).toLocaleString('en-US')}`}</span>
+<span className="ml-auto font-display text-2xl text-kt-ink leading-none whitespace-nowrap">{item.isBonus ? 'Free' : `Rs. ${((Number(item.price) || 0) * (Number(item.quantity) || 0)).toLocaleString('en-US')}`}</span>
 <button tabIndex={-1} onClick={() => setCurrentInvoice({...currentInvoice, items: currentInvoice.items.filter(i => (i.uniqueId || i.productId) !== itemKey)})} title="Remove" aria-label="Remove" className="text-kt-muted hover:text-kt-red transition-colors"><X size={16} strokeWidth={1.5}/></button>
 </div>
 <div className="flex items-center justify-between">

@@ -39,7 +39,9 @@ for (const palette of palettes) {
         const bg = backdrop(el), fg = over(parse(colour), bg);
         const px = parseFloat(cs.fontSize), large = px >= 24 || (px >= 18.66 && Number(cs.fontWeight) >= 700);
         const v = ratio(fg, bg);
-        out.push({ text: text.trim().slice(0, 40), ratio: Math.round(v * 100) / 100, need: large ? 3 : 4.5, px });
+        out.push({ text: text.trim().slice(0, 40), ratio: Math.round(v * 100) / 100, need: large ? 3 : 4.5, px,
+          // The serif must stay clearly larger than the sans beside it; see index.css.
+          smallSerif: !!el.closest('.font-display') && !el.closest('.font-ui:not(.font-display) .font-ui') && cs.fontFamily.includes('Garamond') && px < 24 });
       };
       for (const el of document.querySelectorAll('body *')) {
         const own = [...el.childNodes].filter(n => n.nodeType === 3 && n.textContent.trim()).map(n => n.textContent).join(' ');
@@ -55,6 +57,9 @@ for (const palette of palettes) {
     for (const f of found) worst.push({ ...f, where: `${view} @${width}` });
     await page.close();
   }
+  const small = worst.filter(f => f.smallSerif);
+  failures += small.length;
+  for (const f of small) console.log(`  FAIL serif at ${f.px}px, under the 24px minimum  "${f.text}"  (${f.where})`);
   const bad = worst.filter(f => f.ratio < f.need);
   failures += bad.length;
   const min = worst.reduce((m, f) => (f.ratio / f.need < m.ratio / m.need ? f : m), worst[0]);
