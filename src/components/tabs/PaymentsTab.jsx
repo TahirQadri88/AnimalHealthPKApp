@@ -44,46 +44,46 @@ const totalAmount = filtered.reduce((sum, p) => sum + p.amount, 0);
 return (
 <div className="p-4 flex flex-col h-full">
   <div className="flex justify-between items-center mb-4">
-    <h2 className="text-2xl font-extrabold text-slate-800 tracking-tight">Receipts</h2>
+    <h2 className="font-display text-3xl text-kt-ink">Receipts</h2>
     {canReceive && (
       <button onClick={() => { setEditingPayment(null); setSelectedCustomerForPayment(null); setShowPaymentModal(true); }}
-        className="bg-emerald-500 text-white px-3 py-2.5 rounded-xl shadow-md font-bold flex items-center gap-1.5 text-xs active:scale-95 transition-all">
+        className="bg-kt-primary text-white px-3 py-2.5 rounded-xl font-medium flex items-center gap-1.5 text-xs active:scale-[0.98] transition-colors">
         <Plus size={16}/> New Receipt
       </button>
     )}
   </div>
   <div className="space-y-2 mb-3">
-    <div className="relative"><Search className="absolute left-3.5 top-3.5 text-slate-400" size={16}/><input placeholder="Search client or receipt ID..." className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl font-semibold outline-none shadow-sm text-sm" value={search} onChange={e=>setSearch(e.target.value)} /></div>
+    <div className="relative"><Search className="absolute left-3.5 top-3.5 text-kt-muted" size={16}/><input placeholder="Search client or receipt ID..." className="w-full pl-10 pr-4 py-3 bg-white border border-kt-line rounded-xl font-semibold outline-none text-sm" value={search} onChange={e=>setSearch(e.target.value)} /></div>
     <div className="flex gap-2">
-      <select value={dateFilter} onChange={e=>setDateFilter(e.target.value)} className="flex-1 bg-white border border-slate-200 px-3 py-2 rounded-lg font-bold text-sm text-slate-700 outline-none shadow-sm">
+      <select value={dateFilter} onChange={e=>setDateFilter(e.target.value)} className="flex-1 bg-white border border-kt-line px-3 py-2 rounded-lg font-medium text-sm text-kt-ink outline-none">
         <option>All Time</option><option>Today</option><option>This Week</option><option>This Month</option><option>This Year</option>
       </select>
-      <SearchableSelect value={customerFilter} onChange={e=>setCustomerFilter(e.target.value)} className="flex-1 bg-white border border-slate-200 px-3 py-2 rounded-lg font-semibold text-sm text-slate-700 outline-none shadow-sm" placeholder="All Clients" options={customers.map(c=>({value:String(c.id),label:c.name}))} />
+      <SearchableSelect value={customerFilter} onChange={e=>setCustomerFilter(e.target.value)} className="flex-1 bg-white border border-kt-line px-3 py-2 rounded-lg font-semibold text-sm text-kt-ink outline-none" placeholder="All Clients" options={customers.map(c=>({value:String(c.id),label:c.name}))} />
     </div>
   </div>
-  <div className="bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-2.5 mb-3 flex justify-between items-center">
-    <span className="text-xs font-bold text-emerald-700 uppercase tracking-widest">{filtered.length} Receipts</span>
-    <span className="font-black text-emerald-800 text-sm">Total: Rs. {totalAmount.toLocaleString('en-US')}</span>
+  <div className="bg-kt-green/10 border border-kt-green/30 rounded-xl px-4 py-2.5 mb-3 flex justify-between items-center">
+    <span className="text-xs font-medium text-kt-green">{filtered.length} Receipts</span>
+    <span className="font-semibold text-kt-green text-sm">Total: Rs. {totalAmount.toLocaleString('en-US')}</span>
   </div>
   <div className="flex-1 overflow-y-auto space-y-2.5 pb-24 pr-1">
     {filtered.map(p => (
-      <div key={p.id} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm hover:border-emerald-200 transition-colors">
+      <div key={p.id} className="bg-white p-4 rounded-xl border border-kt-line hover:border-kt-green/30 transition-colors">
         <div className="flex justify-between items-center">
           <div className="flex-1 min-w-0">
-            <p className="font-bold text-slate-800 text-sm truncate">{p.customerName}</p>
-            <p className="text-[11px] text-slate-500 font-medium mt-0.5">{p.id} &bull; {formatDateDisp(p.date)}</p>
-            {p.note && <p className="text-[11px] text-slate-400 mt-0.5 italic truncate">{p.note}</p>}
+            <p className="font-medium text-kt-ink text-sm truncate">{p.customerName}</p>
+            <p className="text-xs text-kt-sub font-medium mt-0.5">{p.id} &bull; {formatDateDisp(p.date)}</p>
+            {p.note && <p className="text-xs text-kt-muted mt-0.5 truncate">{p.note}</p>}
           </div>
           <div className="text-right ml-3 shrink-0">
-            <p className="font-extrabold text-emerald-600 text-base">Rs. {p.amount.toLocaleString('en-US')}</p>
+            <p className="font-semibold text-kt-green text-base">Rs. {p.amount.toLocaleString('en-US')}</p>
             <div className="flex gap-1 mt-1.5 justify-end">
               <button onClick={() => {
                 const ledger = getCustomerLedger(p.customerId);
                 const receiptData = generateReceiptData(ledger, p.id);
                 if (receiptData) setPrintConfig({ docType: 'receipt', format: 'thermal', data: receiptData });
-              }} title="Print Receipt" className="p-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 rounded-lg border border-emerald-100 transition-colors"><Printer size={13}/></button>
+              }} title="Print Receipt" className="p-1.5 bg-kt-green/10 hover:bg-kt-green/10 text-kt-green rounded-lg border border-kt-green/30 transition-colors"><Printer size={13}/></button>
               {isAdmin && p.type === 'receipt' && (
-                <button onClick={() => { setEditingPayment(p.raw); setSelectedCustomerForPayment(p.customerId); setShowPaymentModal(true); }} className="p-1.5 bg-slate-50 hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 rounded-lg border border-slate-200 transition-colors"><Edit size={13}/></button>
+                <button onClick={() => { setEditingPayment(p.raw); setSelectedCustomerForPayment(p.customerId); setShowPaymentModal(true); }} className="p-1.5 bg-kt-raised hover:bg-kt-blue/10 text-kt-muted hover:text-kt-blue rounded-lg border border-kt-line transition-colors"><Edit size={13}/></button>
               )}
               {isAdmin && (p.type === 'receipt' || p.type === 'invoice') && (
                 <button onClick={async()=>{
@@ -97,7 +97,7 @@ return (
                     if(inv) { const after = {...inv, receivedAmount: 0, paymentStatus: 'Pending'}; await saveToFirebase('invoices', inv.id, after); await logSave('invoices', inv, after, inv.id); }
                   }
                   showToast('Payment deleted');
-                }} className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-500 rounded-lg border border-rose-100 transition-colors"><Trash2 size={13}/></button>
+                }} className="p-1.5 bg-kt-red/10 hover:bg-kt-red/10 text-kt-red rounded-lg border border-kt-red/30 transition-colors"><Trash2 size={13}/></button>
               )}
             </div>
           </div>
@@ -106,8 +106,8 @@ return (
     ))}
     {filtered.length === 0 && (
       <div className="text-center py-16">
-        <Receipt size={40} className="text-slate-200 mx-auto mb-3"/>
-        <p className="text-slate-400 font-medium text-sm">No receipts found for this period.</p>
+        <Receipt size={40} className="text-kt-muted mx-auto mb-3"/>
+        <p className="text-kt-muted font-medium text-sm">No receipts found for this period.</p>
       </div>
     )}
   </div>

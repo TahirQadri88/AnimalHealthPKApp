@@ -10,6 +10,7 @@
 // Or the whole app, through the full-app preview, one tab at a time:
 //   npx vite --config tools/ui-preview/vite.config.mjs --port 5174
 //   node tools/ui-preview/contrast.mjs --app=dashboard,billing,customers
+//   (tab@selector opens something from the tab first: customers@main h4 checks a ledger)
 import { createRequire } from 'node:module';
 
 // The project's own playwright if installed, else a machine-wide one (require honours NODE_PATH).
@@ -30,8 +31,11 @@ for (const palette of palettes) {
     if (appArg) {
       await page.goto('http://localhost:5174/tools/ui-preview/app.html', { waitUntil: 'networkidle' });
       await page.waitForTimeout(600);
-      await page.click(`[data-sidenav="${view}"] >> visible=true`);
+      const [tab, then] = view.split('@');
+      await page.click(`[data-sidenav="${tab}"] >> visible=true`);
       await page.waitForTimeout(500);
+      // tab@selector also opens something from that tab, e.g. customers@main h4 for a ledger.
+      if (then) { await page.click(`${then} >> nth=0`); await page.waitForTimeout(500); }
     } else {
       await page.goto(`http://localhost:5173/tools/ui-preview/billing.html?view=${view}&palette=${palette}`, { waitUntil: 'networkidle' });
     }

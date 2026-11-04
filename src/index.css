@@ -6,6 +6,10 @@
  * screen uses them so far; the files are imported in main.jsx. EB Garamond defaults to
  * old-style figures, which do not line up in a money column, so `.font-display` asks for
  * lining, tabular figures. */
+/* Hint text in every field, app-wide. Tailwind's default grey measured 2.5:1 on white,
+ * under the 4.5:1 WCAG AA asks for; kt-muted measures 5.6:1. */
+input::placeholder, textarea::placeholder { color: rgb(var(--kt-muted)); opacity: 1; }
+
 /* ── No zoom on tapping a field (iPhone) ──────────────────────────────────────
  *
  * iOS Safari zooms the page in whenever a text field under 16px gets focus, and does not

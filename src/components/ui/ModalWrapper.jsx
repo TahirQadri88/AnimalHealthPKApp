@@ -28,13 +28,13 @@ useEffect(() => {
   return () => window.removeEventListener('keydown', onKey);
 }, [onClose]);
 return (
-<div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex justify-center items-end sm:items-center" onMouseDown={(e) => { if(e.target === e.currentTarget) onClose(); }}>
-<div ref={panelRef} className={`bg-white w-full ${maxWidth} rounded-t-3xl sm:rounded-3xl h-[85vh] sm:h-auto max-h-[90vh] flex flex-col animate-slide-up shadow-2xl`} onMouseDown={e => e.stopPropagation()}>
-<div className="p-5 border-b border-slate-100 flex justify-between items-center bg-white rounded-t-3xl sm:rounded-t-3xl">
-<h2 className="text-lg font-bold text-slate-800">{title}</h2>
-<button onClick={onClose} className="p-2 bg-slate-100 rounded-full text-slate-500 hover:bg-slate-200 hover:text-slate-800 transition-colors"><X size={20}/></button>
+<div className="fixed inset-0 bg-black/50 z-[60] flex justify-center items-end sm:items-center" onMouseDown={(e) => { if(e.target === e.currentTarget) onClose(); }}>
+<div ref={panelRef} className={`font-ui bg-white w-full ${maxWidth} rounded-t-2xl sm:rounded-2xl h-[85vh] sm:h-auto max-h-[90vh] flex flex-col animate-slide-up `} onMouseDown={e => e.stopPropagation()}>
+<div className="p-5 border-b border-kt-line flex justify-between items-center bg-white rounded-t-2xl sm:rounded-t-2xl">
+<h2 className="font-display text-2xl text-kt-ink leading-tight">{title}</h2>
+<button onClick={onClose} className="p-2 bg-kt-raised rounded-full text-kt-sub hover:bg-kt-line hover:text-kt-ink transition-colors"><X size={20}/></button>
 </div>
-<div className="flex-1 overflow-y-auto p-5 bg-slate-50/50">{children}</div>
+<div className="flex-1 overflow-y-auto p-5 bg-kt-raised/50">{children}</div>
 </div>
 </div>
 );
