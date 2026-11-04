@@ -1,0 +1,10 @@
+<!doctype html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>App preview</title>
+<script>
+  // Signed in as the admin, or as Ghousia with ?as=staff. The stub serves the matching uid.
+  const staff = new URLSearchParams(location.search).get('as') === 'staff';
+  localStorage.setItem('app_currentUser', JSON.stringify(staff
+    ? { id: '2', name: 'Ghousia', role: 'staff', authUid: 'uid-staff', permissions: { viewDashboard: true, viewCustomers: true, receivePayments: true, collectOnBill: true, editOwnInvoices: true, salesReturns: true, addCustomers: true, addEditProducts: true } }
+    : { id: '1', name: 'Tahir', role: 'admin', authUid: 'uid-admin', permissions: {} }));
+</script></head>
+<body><div id="root"></div><script type="module" src="/src/main.jsx"></script></body></html>

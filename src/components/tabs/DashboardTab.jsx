@@ -74,87 +74,91 @@ const recentActivity = useMemo(() => {
 // counts as pure profit, so the admin is told here rather than left to find it on Items.
 const costPending = isAdmin ? productsNeedingCost(products) : [];
 const costPendingBills = billsAffected(costPending, invoices);
+const money = (n) => `Rs. ${Number(n || 0).toLocaleString('en-US')}`;
+const canLedger = hasPermission('viewLedger');
+const maxTop = Math.max(1, ...topStats.topValue.map(t => t.revenue));
+const shownActivity = recentActivity.filter(entry => !activitySearch || entry.customerName.toLowerCase().includes(activitySearch.toLowerCase()) || entry.id.toLowerCase().includes(activitySearch.toLowerCase()));
+// Khyber Traders look: each kind of document keeps one meaning colour, as on the Billing screen.
+const kindConfig = {
+  invoice:    { label: 'Invoice',     chip: 'bg-kt-raised text-kt-ink',     amount: 'text-kt-ink' },
+  payment:    { label: 'Payment',     chip: 'bg-kt-green/10 text-kt-green', amount: 'text-kt-green' },
+  estimate:   { label: 'Estimate',    chip: 'bg-kt-blue/10 text-kt-blue',   amount: 'text-kt-ink' },
+  creditnote: { label: 'Credit Note', chip: 'bg-kt-red/10 text-kt-red',     amount: 'text-kt-red' },
+  draft:      { label: 'Draft',       chip: 'bg-kt-amber/10 text-kt-amber', amount: 'text-kt-ink' },
+};
+const payChip = (ps) => ps === 'Paid' ? 'bg-kt-green/10 text-kt-green' : ps === 'Partial' ? 'bg-kt-amber/10 text-kt-amber' : 'bg-kt-red/10 text-kt-red';
+const card = "bg-white rounded-xl border border-kt-line shadow-[0_1px_2px_rgba(20,20,20,0.05)]";
 return (
-<div className="h-full overflow-y-auto">
-<div className="p-5 space-y-6 pb-24">
+<div className="font-ui h-full overflow-y-auto bg-kt-page">
+<div className="p-4 sm:p-6 space-y-4 pb-24">
 {costPending.length > 0 && (
-<button onClick={() => setActiveTab('products')} className="w-full text-left bg-rose-50 border border-rose-200 rounded-2xl p-4 flex items-start gap-3 hover:bg-rose-100 transition-colors">
-  <Bell size={18} className="text-rose-600 shrink-0 mt-0.5" />
+<button onClick={() => setActiveTab('products')} className="w-full text-left bg-white border border-kt-red/30 rounded-xl p-4 flex items-start gap-3 hover:bg-kt-red/5 transition-colors">
+  <Bell size={18} strokeWidth={1.5} className="text-kt-red shrink-0 mt-0.5" />
   <span className="flex-1 min-w-0">
-    <span className="block text-sm font-bold text-rose-800">
+    <span className="block text-sm font-medium text-kt-red">
       {costPending.length} product{costPending.length !== 1 ? 's' : ''} need{costPending.length === 1 ? 's' : ''} a cost price
     </span>
-    <span className="block text-[11px] text-rose-700 mt-0.5 leading-relaxed">
+    <span className="block text-sm text-kt-sub mt-0.5 leading-relaxed">
       Added by staff: {costPending.slice(0, 3).map(p => p.name).join(', ')}{costPending.length > 3 ? ` and ${costPending.length - 3} more` : ''}.
       {costPendingBills > 0 ? ` Sold on ${costPendingBills} bill${costPendingBills !== 1 ? 's' : ''} so far, counted as pure profit until you set the cost.` : ' Set the cost before it is sold, or its sales count as pure profit.'}
     </span>
   </span>
-  <ChevronRight size={16} className="text-rose-400 shrink-0 mt-0.5" />
+  <ChevronRight size={16} strokeWidth={1.5} className="text-kt-muted shrink-0 mt-0.5" />
 </button>
 )}
-<div className="flex justify-between items-center">
-<h2 className="text-2xl font-extrabold text-slate-800 tracking-tight">Overview</h2>
-<div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-full border border-slate-200 shadow-sm">
-<Calendar size={14} className="text-indigo-500" />
-<select value={dateFilter} onChange={e => setDateFilter(e.target.value)} className="bg-transparent font-bold text-xs text-slate-700 outline-none cursor-pointer"><option>Today</option><option>This Week</option><option>This Month</option><option>This Year</option><option>All Time</option></select>
+<div className="flex justify-between items-center gap-3">
+<h2 className="font-display text-3xl text-kt-ink">Overview</h2>
+<div className="relative">
+<Calendar size={16} strokeWidth={1.5} className="absolute left-3 top-3 text-kt-muted pointer-events-none" />
+<select value={dateFilter} onChange={e => setDateFilter(e.target.value)} aria-label="Period" className="h-10 pl-9 pr-3 bg-white border border-kt-line rounded-lg text-sm text-kt-ink outline-none cursor-pointer"><option>Today</option><option>This Week</option><option>This Month</option><option>This Year</option><option>All Time</option></select>
 </div>
 </div>
 
-{/* Today's Summary Bar */}
-<div className="bg-slate-800 text-white rounded-2xl px-4 py-3 flex justify-between items-center gap-3 flex-wrap shadow-sm">
-  <div className="flex items-center gap-1.5">
-    <ReceiptText size={14} className="text-indigo-300 shrink-0"/>
-    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Today</span>
-    <span className="text-sm font-extrabold text-white ml-1">{todayInvoices.length} bill{todayInvoices.length!==1?'s':''}</span>
-    {todayRevenue > 0 && <span className="text-sm font-bold text-indigo-300">· Rs.{todayRevenue.toLocaleString('en-US')}</span>}
+{/* The period in one band: sales in Khyber Yellow, receivables beside it for an admin,
+    today's bills and collections underneath. It replaces three separately coloured boxes. */}
+<div className="bg-kt-band text-white rounded-xl p-4 sm:p-5">
+  <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-3">
+    <div>
+      <p className="text-sm text-white/70 flex items-center gap-1.5"><TrendingUp size={16} strokeWidth={1.5}/> {dateFilter} {ownOnly ? 'My Sales' : 'Sales'}</p>
+      <p className="font-display text-4xl text-kt-yellow leading-tight">{money(revenue)}</p>
+      {momChange !== null && <p className="text-sm text-white/80 mt-0.5">{Number(momChange) >= 0 ? '▲' : '▼'} {Math.abs(momChange)}% vs last month</p>}
+    </div>
+    {isAdmin && (
+    <button onClick={() => { setSelectedLedgerId(null); setShowLedgerModal(false); setActiveTab('customers'); }} className="text-left sm:text-right rounded-lg -m-2 p-2 hover:bg-white/10 transition-colors">
+      <p className="text-sm text-white/70 flex items-center sm:justify-end gap-1.5"><DollarSign size={16} strokeWidth={1.5}/> Receivables{topReceivables.length > 0 && <span className="text-white/70"> · {topReceivables.length} high</span>}</p>
+      <p className="font-display text-3xl leading-tight">{money(totalReceivables)}</p>
+    </button>
+    )}
   </div>
-  <div className="w-px h-5 bg-slate-600 shrink-0 hidden sm:block"/>
-  <div className="flex items-center gap-1.5">
-    <Wallet size={14} className="text-emerald-300 shrink-0"/>
-    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Collected today</span>
-    <span className={`text-sm font-extrabold ml-1 ${todayCollected > 0 ? 'text-emerald-300' : 'text-slate-500'}`}>Rs.{todayCollected.toLocaleString('en-US')}</span>
+  <div className="mt-4 pt-3 border-t border-white/15 flex flex-wrap gap-x-6 gap-y-1 text-sm">
+    <span className="flex items-center gap-1.5 text-white/80"><ReceiptText size={16} strokeWidth={1.5}/> Today <span className="text-white font-medium">{todayInvoices.length} bill{todayInvoices.length !== 1 ? 's' : ''}</span>{todayRevenue > 0 && <span className="text-white font-medium tabular-nums">· {money(todayRevenue)}</span>}</span>
+    <span className="flex items-center gap-1.5 text-white/80"><Wallet size={16} strokeWidth={1.5}/> Collected today <span className="text-white font-medium tabular-nums">{money(todayCollected)}</span></span>
   </div>
-</div>
-
-<div className={`grid gap-4 ${isAdmin ? 'grid-cols-2' : 'grid-cols-1'}`}>
-<div className="bg-gradient-to-br from-indigo-600 to-indigo-800 text-white p-5 rounded-2xl shadow-lg shadow-indigo-600/20">
-<p className="text-[10px] uppercase font-bold text-indigo-100 flex items-center gap-1.5 tracking-wider"><TrendingUp size={14}/> {dateFilter} {ownOnly ? 'My Sales' : 'Sales'}</p>
-<p className="text-xl sm:text-2xl font-black mt-2 tracking-tight">Rs. {revenue.toLocaleString('en-US')}</p>
-{momChange !== null && <p className={`text-[10px] font-bold mt-1 ${Number(momChange)>=0?'text-emerald-300':'text-rose-300'}`}>{Number(momChange)>=0?'▲':'▼'} {Math.abs(momChange)}% vs last month</p>}
-</div>
-{isAdmin && (
-<button onClick={() => { setSelectedLedgerId(null); setShowLedgerModal(false); setActiveTab('customers'); }} className="bg-gradient-to-br from-rose-500 to-rose-600 text-white p-5 rounded-2xl shadow-lg shadow-rose-500/20 text-left w-full">
-<p className="text-[10px] uppercase font-bold text-rose-100 flex items-center gap-1.5 tracking-wider">
-  <DollarSign size={14}/> Receivables
-  {topReceivables.length > 0 && <span className="ml-auto bg-white/30 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full">{topReceivables.length}</span>}
-</p>
-<p className="text-xl sm:text-2xl font-black mt-2 tracking-tight">Rs. {totalReceivables.toLocaleString('en-US')}</p>
-</button>
-)}
 </div>
 
 {/* Receivables Quick View — admin only (shows all customers' balances) */}
 {isAdmin && topReceivables.length > 0 && (
-<div className="bg-white border border-rose-100 rounded-2xl shadow-sm overflow-hidden">
-  <div className="flex justify-between items-center px-4 pt-4 pb-2">
-    <h3 className="text-[11px] font-bold text-rose-700 uppercase tracking-widest flex items-center gap-1.5">
-      <Bell size={13}/> Outstanding Balances
-      <span className="bg-rose-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full">{topReceivables.length}</span>
+<div className={`${card} overflow-hidden`}>
+  <div className="flex justify-between items-center px-5 pt-4 pb-2">
+    <h3 className="font-display text-2xl text-kt-ink flex items-center gap-3">
+      Outstanding balances
+      <span className="font-ui text-xs font-medium bg-kt-red/10 text-kt-red px-2 h-6 inline-flex items-center rounded-md">{topReceivables.length}</span>
     </h3>
-    <button onClick={() => { setActiveTab('admin'); setAdminView('analytics'); setAnalyticsView('Receivables'); }} className="text-[10px] font-bold text-rose-600 flex items-center gap-0.5">View All <ChevronRight size={12}/></button>
+    <button onClick={() => { setActiveTab('admin'); setAdminView('analytics'); setAnalyticsView('Receivables'); }} className="text-sm font-medium text-kt-ink hover:underline flex items-center gap-0.5">View all <ChevronRight size={16} strokeWidth={1.5}/></button>
   </div>
-  <div className="divide-y divide-rose-50">
+  <div className="divide-y divide-kt-line">
     {topReceivables.map(c => (
-      <button key={c.id} onClick={() => hasPermission('viewLedger') && (setSelectedLedgerId(c.id), setShowLedgerModal(true))} className={`w-full flex justify-between items-center px-4 py-3 transition-colors text-left ${hasPermission('viewLedger') ? 'hover:bg-rose-50 cursor-pointer' : 'cursor-default'}`}>
+      <button key={c.id} onClick={() => canLedger && (setSelectedLedgerId(c.id), setShowLedgerModal(true))} className={`w-full flex justify-between items-center gap-3 px-5 py-3 transition-colors text-left ${canLedger ? 'hover:bg-kt-raised cursor-pointer' : 'cursor-default'}`}>
         <div className="flex-1 min-w-0">
-          <p className="font-bold text-slate-800 text-sm truncate">{c.name}</p>
-          {c.phone && <p className="text-[10px] text-slate-400 mt-0.5">{c.phone}</p>}
+          <p className="font-medium text-kt-ink truncate">{c.name}</p>
+          {c.phone && <p className="text-sm text-kt-muted mt-0.5 tabular-nums">{c.phone}</p>}
         </div>
-        <div className="text-right ml-3 shrink-0">
-          <p className={`font-extrabold text-sm ${c.balance >= 100000 ? 'text-rose-600' : c.balance >= 50000 ? 'text-amber-600' : 'text-slate-700'}`}>Rs. {c.balance.toLocaleString('en-US')}</p>
-          {c.balance >= 100000 && <span className="text-[9px] font-bold text-rose-500 uppercase tracking-wider">High</span>}
+        <div className="text-right shrink-0 flex items-center gap-2">
+          {/* On a phone the red figure says it; the label would push the name out. */}
+          {c.balance >= 100000 && <span className="text-xs font-medium bg-kt-red/10 text-kt-red px-2 h-6 hidden sm:inline-flex items-center rounded-md">High</span>}
+          <p className={`font-display text-2xl ${c.balance >= 100000 ? 'text-kt-red' : c.balance >= 50000 ? 'text-kt-amber' : 'text-kt-ink'}`}>{money(c.balance)}</p>
         </div>
-        {hasPermission('viewLedger') && <ChevronRight size={14} className="text-slate-300 ml-2 shrink-0"/>}
+        {canLedger && <ChevronRight size={16} strokeWidth={1.5} className="text-kt-muted shrink-0"/>}
       </button>
     ))}
   </div>
@@ -162,65 +166,57 @@ return (
 )}
 
 {isAdmin && (
-<button type="button" className="w-full bg-white border border-slate-200 p-5 rounded-2xl shadow-sm flex justify-between items-center hover:border-indigo-200 transition-colors text-left" onClick={() => {setActiveTab('admin'); setAdminView('expenses');}}>
-<div><p className="text-[10px] uppercase font-bold text-slate-500 flex items-center gap-1.5 tracking-wider"><TrendingDown size={14}/> Operational Expenses</p><p className="text-xl font-black text-slate-800 mt-1">Rs. {totalExpenses.toLocaleString('en-US')}</p></div>
-<span className="p-3 bg-slate-50 text-slate-400 rounded-xl"><ChevronRight size={20}/></span>
+<div className="grid sm:grid-cols-2 gap-4">
+<button type="button" className={`${card} p-5 flex justify-between items-center hover:border-kt-muted/40 transition-colors text-left`} onClick={() => {setActiveTab('admin'); setAdminView('expenses');}}>
+<div><p className="text-sm text-kt-sub flex items-center gap-1.5"><TrendingDown size={16} strokeWidth={1.5}/> Operational expenses · {dateFilter}</p><p className="font-display text-3xl text-kt-ink mt-1">{money(totalExpenses)}</p></div>
+<ChevronRight size={20} strokeWidth={1.5} className="text-kt-muted"/>
 </button>
-)}
-{isAdmin && (
-<div className="space-y-4">
-<h3 className="text-base font-bold text-slate-800 border-b border-slate-200 pb-2">Top 5 Products ({dateFilter})</h3>
-<div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
-<h4 className="text-[10px] font-bold uppercase tracking-widest text-indigo-600 mb-3 flex items-center gap-1.5"><Award size={14}/> By Sales Value</h4>
-<div className="space-y-2.5">
-{topStats.topValue.map((item, i) => (<div key={i} className="flex justify-between items-center"><span className="text-sm font-semibold text-slate-700 truncate mr-2">{i+1}. {item.name}</span><span className="font-bold text-slate-800 text-sm shrink-0">Rs. {item.revenue.toLocaleString('en-US')}</span></div>))}
-{topStats.topValue.length === 0 && <p className="text-xs text-slate-400">No data.</p>}
+{/* Top products as a ranked list with thin bars: the bar is the share of the top seller. */}
+<div className={`${card} p-5`}>
+<h3 className="text-sm text-kt-sub mb-3 flex items-center gap-1.5"><Award size={16} strokeWidth={1.5}/> Top 5 products by sales · {dateFilter}</h3>
+<div className="space-y-3">
+{topStats.topValue.map((item, i) => (
+  <div key={i}>
+    <div className="flex justify-between items-baseline gap-3 text-sm"><span className="text-kt-ink truncate">{i+1}. {item.name}</span><span className="font-medium text-kt-ink shrink-0 tabular-nums">{money(item.revenue)}</span></div>
+    <div className="mt-1 h-1.5 rounded-full bg-kt-raised overflow-hidden"><div className="h-full rounded-full bg-kt-band" style={{ width: `${Math.max(4, Math.round(item.revenue / maxTop * 100))}%` }}></div></div>
+  </div>
+))}
+{topStats.topValue.length === 0 && <p className="text-sm text-kt-muted">No sales in this period</p>}
 </div>
 </div>
 </div>
 )}
 
 {/* Recent Activity */}
-<div>
-<div className="flex justify-between items-end mb-3 mt-2">
-<h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
-  Recent Activity
-  {recentActivity.length > 0 && <span className="bg-indigo-100 text-indigo-700 text-[10px] font-black px-2 py-0.5 rounded-full">{recentActivity.length}</span>}
+<div className="pt-2">
+<div className="flex justify-between items-center mb-3">
+<h3 className="font-display text-2xl text-kt-ink flex items-center gap-3">
+  Recent activity
+  {recentActivity.length > 0 && <span className="font-ui text-xs font-medium bg-kt-raised text-kt-sub px-2 h-6 inline-flex items-center rounded-md tabular-nums">{recentActivity.length}</span>}
 </h3>
-<button onClick={() => setActiveTab('billing')} className="text-xs font-bold text-indigo-600 flex items-center gap-0.5">View All <ChevronRight size={14}/></button>
+<button onClick={() => setActiveTab('billing')} className="text-sm font-medium text-kt-ink hover:underline flex items-center gap-0.5">View all <ChevronRight size={16} strokeWidth={1.5}/></button>
 </div>
-<div className="relative mb-3"><Search className="absolute left-3.5 top-3 text-slate-400" size={15}/><input placeholder="Search activity..." className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl font-semibold outline-none shadow-sm text-sm" value={activitySearch} onChange={e => setActivitySearch(e.target.value)} /></div>
-<div className="space-y-2.5">
-{recentActivity.filter(entry => !activitySearch || entry.customerName.toLowerCase().includes(activitySearch.toLowerCase()) || entry.id.toLowerCase().includes(activitySearch.toLowerCase())).map(entry => {
-  const kindConfig = {
-    invoice: { dot: 'bg-indigo-500', label: 'Invoice', labelCls: 'bg-indigo-100 text-indigo-700', amountCls: 'text-indigo-700' },
-    payment: { dot: 'bg-emerald-500', label: 'Payment', labelCls: 'bg-emerald-100 text-emerald-700', amountCls: 'text-emerald-600' },
-    estimate: { dot: 'bg-purple-400', label: 'Estimate', labelCls: 'bg-purple-100 text-purple-700', amountCls: 'text-slate-700' },
-    creditnote: { dot: 'bg-rose-400', label: 'Credit Note', labelCls: 'bg-rose-100 text-rose-600', amountCls: 'text-rose-600' },
-    draft: { dot: 'bg-amber-400', label: 'Draft', labelCls: 'bg-amber-100 text-amber-700', amountCls: 'text-slate-700' },
-  };
+<div className="relative mb-3"><Search className="absolute left-3 top-3 text-kt-muted" size={16} strokeWidth={1.5}/><input placeholder="Search activity" className="w-full h-10 pl-9 pr-3 bg-white border border-kt-line rounded-lg text-sm text-kt-ink placeholder-kt-muted outline-none focus:border-kt-ink transition-colors" value={activitySearch} onChange={e => setActivitySearch(e.target.value)} /></div>
+<div className={`${card} divide-y divide-kt-line overflow-hidden`}>
+{shownActivity.map(entry => {
   const cfg = kindConfig[entry.kind] || kindConfig.draft;
   return (
-    <div key={entry.id} className="bg-white p-3.5 rounded-2xl border border-slate-200 flex gap-3 items-center shadow-sm">
-      <div className={`w-2 h-2 rounded-full shrink-0 ${cfg.dot}`}/>
+    <div key={entry.id} className="px-4 py-3 flex gap-3 items-center">
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <p className="font-bold text-slate-800 text-sm truncate">{entry.customerName}</p>
-          <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${cfg.labelCls}`}>{cfg.label}</span>
-        </div>
-        <p className="text-[10px] text-slate-400 font-medium mt-0.5">
-          {entry.id} &bull; {formatDateDisp(entry.date)}
-          {entry.kind === 'invoice' && entry.paymentStatus && (
-            <span className={`ml-1.5 font-bold ${entry.paymentStatus==='Paid'?'text-emerald-600':entry.paymentStatus==='Partial'?'text-amber-600':'text-rose-500'}`}>&bull; {entry.paymentStatus}</span>
-          )}
-          {entry.kind === 'payment' && entry.note && <span className="ml-1 italic">&bull; {entry.note}</span>}
+        <p className="font-medium text-kt-ink truncate">{entry.customerName}</p>
+        <p className="text-sm text-kt-sub mt-0.5 flex items-center gap-x-3 gap-y-1 flex-wrap">
+          <span className="font-mono text-[13px] text-kt-ink">{entry.id}</span>
+          <span className="tabular-nums">{formatDateDisp(entry.date)}</span>
+          <span className={`inline-flex items-center h-6 px-2 rounded-md text-xs font-medium ${cfg.chip}`}>{cfg.label}</span>
+          {entry.kind === 'invoice' && entry.paymentStatus && <span className={`inline-flex items-center h-6 px-2 rounded-md text-xs font-medium ${payChip(entry.paymentStatus)}`}>{entry.paymentStatus === 'Pending' ? 'Unpaid' : entry.paymentStatus}</span>}
+          {entry.kind === 'payment' && entry.note && <span className="text-kt-muted">{entry.note}</span>}
         </p>
       </div>
-      <p className={`font-extrabold text-sm shrink-0 ${cfg.amountCls}`}>Rs. {entry.amount.toLocaleString('en-US')}</p>
+      <p className={`font-medium shrink-0 tabular-nums ${cfg.amount}`}>{entry.kind === 'creditnote' ? '− ' : ''}{money(entry.amount)}</p>
     </div>
   );
 })}
-{recentActivity.filter(e => !activitySearch || e.customerName.toLowerCase().includes(activitySearch.toLowerCase()) || e.id.toLowerCase().includes(activitySearch.toLowerCase())).length === 0 && <p className="text-center text-slate-400 text-sm py-8 font-medium">{activitySearch ? 'No matching activity.' : 'No activity for this period.'}</p>}
+{shownActivity.length === 0 && <p className="text-center text-kt-muted text-sm py-8">{activitySearch ? 'No matching activity' : 'No activity for this period'}</p>}
 </div>
 </div>
 </div>

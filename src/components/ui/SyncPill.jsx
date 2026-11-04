@@ -7,11 +7,13 @@ import { useState } from 'react';
 import { Cloud, CloudOff, RefreshCw, AlertTriangle } from 'lucide-react';
 import { useSyncStatus } from '../../hooks/useSyncStatus';
 
+// White so it reads on the green phone header and the white desktop bar alike; the colour
+// of the icon and word carries the state.
 const LOOK = {
-  live:    { Icon: Cloud,         cls: 'bg-emerald-50 text-emerald-600 border-emerald-100', label: '' },
-  syncing: { Icon: RefreshCw,     cls: 'bg-indigo-50 text-indigo-600 border-indigo-100',    label: 'Syncing' },
-  offline: { Icon: CloudOff,      cls: 'bg-amber-50 text-amber-700 border-amber-200',       label: 'Offline' },
-  stale:   { Icon: AlertTriangle, cls: 'bg-amber-50 text-amber-700 border-amber-200',       label: 'No connection' },
+  live:    { Icon: Cloud,         cls: 'bg-white text-kt-green border-kt-line',     label: '' },
+  syncing: { Icon: RefreshCw,     cls: 'bg-white text-kt-blue border-kt-line',      label: 'Syncing' },
+  offline: { Icon: CloudOff,      cls: 'bg-white text-kt-amber border-kt-amber/40', label: 'Offline' },
+  stale:   { Icon: AlertTriangle, cls: 'bg-white text-kt-amber border-kt-amber/40', label: 'No connection' },
 };
 
 const EXPLAIN = {
@@ -33,36 +35,36 @@ return (
     onClick={() => setOpen(v => !v)}
     aria-label={`Connection: ${state}${pending > 0 ? `, ${pending} changes waiting to sync` : ''}`}
     aria-expanded={open}
-    className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg border text-[10px] font-bold transition-colors ${cls}`}
+    className={`flex items-center gap-1.5 h-9 px-2.5 rounded-lg border text-xs font-medium transition-colors ${cls}`}
   >
-    <Icon size={13} className={state === 'syncing' ? 'animate-spin' : ''}/>
-    {text && <span className="uppercase tracking-wider">{text}</span>}
+    <Icon size={16} strokeWidth={1.5} className={state === 'syncing' ? 'animate-spin' : ''}/>
+    {text && <span>{text}</span>}
   </button>
 
   {open && (
     <>
       <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} aria-hidden="true"></div>
-      <div className="absolute right-0 mt-2 w-72 bg-white border border-slate-200 rounded-2xl shadow-xl z-50 p-4 text-left">
-        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Connection</p>
-        <p className="text-sm font-bold text-slate-800 mb-2">
+      <div className="font-ui absolute right-0 mt-2 w-72 bg-white border border-kt-line rounded-xl shadow-[0_8px_24px_rgba(0,0,0,0.08)] z-50 p-4 text-left text-kt-ink">
+        <p className="text-xs text-kt-sub mb-1">Connection</p>
+        <p className="text-sm font-medium text-kt-ink mb-2">
           {state === 'live' ? 'Everything is saved' : (label + (pending > 0 ? ` · ${pending} waiting` : ''))}
         </p>
-        <p className="text-[11px] text-slate-500 leading-relaxed">{EXPLAIN[state]}</p>
+        <p className="text-sm text-kt-sub leading-relaxed">{EXPLAIN[state]}</p>
 
         {lastSyncedAt && (
-          <p className="text-[10px] text-slate-400 mt-2">
+          <p className="text-xs text-kt-muted mt-2">
             Last in touch with the server at {new Date(lastSyncedAt).toLocaleTimeString()}
           </p>
         )}
 
         {(state === 'offline' || state === 'stale') && (
-          <div className="mt-3 pt-3 border-t border-slate-100 space-y-1.5">
-            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">While there is no connection</p>
-            <p className="text-[11px] text-emerald-700">✓ Billing, receipts, returns, expenses, customers and products</p>
-            <p className="text-[11px] text-emerald-700">✓ Ledgers, balances, receivables and printing</p>
+          <div className="mt-3 pt-3 border-t border-kt-line space-y-1.5">
+            <p className="text-xs text-kt-sub">While there is no connection</p>
+            <p className="text-sm text-kt-green">✓ Billing, receipts, returns, expenses, customers and products</p>
+            <p className="text-sm text-kt-green">✓ Ledgers, balances, receivables and printing</p>
             {/* The two that catch people out, and the reason this panel exists. */}
-            <p className="text-[11px] text-rose-700">✗ Signing in — your password is checked on the server, so do not sign out</p>
-            <p className="text-[11px] text-rose-700">✗ Adding or editing users and permissions</p>
+            <p className="text-sm text-kt-red">✗ Signing in — your password is checked on the server, so do not sign out</p>
+            <p className="text-sm text-kt-red">✗ Adding or editing users and permissions</p>
           </div>
         )}
       </div>
