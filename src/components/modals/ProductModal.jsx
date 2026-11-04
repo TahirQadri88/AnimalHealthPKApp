@@ -89,8 +89,8 @@ return (
 <div><label className="text-xs font-medium text-kt-sub ml-1 mb-1 block">Units per Box *</label><input type="number" placeholder="Qty" className={inputClass} value={form.unitsInBox} onChange={e => setForm({...form, unitsInBox: e.target.value})} /></div>
 </div>
 <div className="grid grid-cols-2 gap-4 pt-2">
-{isAdmin && (<div className="col-span-2 sm:col-span-1"><label className="text-xs font-medium text-kt-sub ml-1 mb-1 block">Cost Price *</label><input type="number" placeholder="Cost" className={`${inputClass} !border-indigo-200 !bg-indigo-50/50 focus:!border-indigo-500`} value={form.costPrice} onChange={e => setForm({...form, costPrice: e.target.value})} /></div>)}
-<div className={isAdmin ? 'col-span-2 sm:col-span-1' : 'col-span-2'}><label className="text-xs font-medium text-kt-sub ml-1 mb-1 block">Selling Price *</label><input type="number" placeholder="Selling" className={`${inputClass} !border-emerald-200 !bg-emerald-50/50 focus:!border-emerald-500 text-kt-green font-medium`} value={form.sellingPrice} onChange={e => setForm({...form, sellingPrice: e.target.value})} /></div>
+{isAdmin && (<div className="col-span-2 sm:col-span-1"><label className="text-xs font-medium text-kt-sub ml-1 mb-1 block">Cost Price *</label><input type="number" placeholder="Cost" className={`${inputClass} !border-kt-blue/30 !bg-kt-blue/10 focus:!border-kt-ink`} value={form.costPrice} onChange={e => setForm({...form, costPrice: e.target.value})} /></div>)}
+<div className={isAdmin ? 'col-span-2 sm:col-span-1' : 'col-span-2'}><label className="text-xs font-medium text-kt-sub ml-1 mb-1 block">Selling Price *</label><input type="number" placeholder="Selling" className={`${inputClass} !border-kt-green/30 !bg-kt-green/10 focus:!border-kt-ink text-kt-green font-medium`} value={form.sellingPrice} onChange={e => setForm({...form, sellingPrice: e.target.value})} /></div>
 </div>
 {costChanged && isAdmin && (
 <div className="bg-kt-amber/10 p-4 rounded-xl border border-kt-amber/30 animate-slide-up mt-2">
@@ -100,7 +100,7 @@ return (
   cost you actually paid, so the profit already reported stays correct.<br/>
   <strong>Correcting a mistake?</strong> Set it back to when the wrong figure started.
 </p>
-<input type="date" className={`${inputClass} !bg-white !border-amber-300 !text-amber-900`} value={effectiveDate} onChange={e => setEffectiveDate(e.target.value)} />
+<input type="date" className={`${inputClass} !bg-white !border-kt-amber/30 !text-kt-amber`} value={effectiveDate} onChange={e => setEffectiveDate(e.target.value)} />
 {earliestSale < getLocalDateStr() && (
   <button type="button" onClick={() => setEffectiveDate(earliestSale)}
     className="mt-2 text-xs font-medium text-kt-amber underline">

@@ -92,8 +92,8 @@ return (
 </div>
 {isAdmin && (
 <div className="bg-kt-red/10 p-3 rounded-xl border border-kt-red/30 mt-2 space-y-3">
-<div><label className="text-xs font-medium text-kt-red ml-1 mb-1 block">Opening Balance (Dr)</label><input type="number" placeholder="0.00" className={`${inputClass} !border-rose-200 focus:!border-rose-500`} value={form.openingBalance} onChange={e => setForm({...form, openingBalance: e.target.value})} /></div>
-<div><label className="text-xs font-medium text-kt-amber ml-1 mb-1 block">Credit Limit (Rs) — 0 = no limit</label><input type="number" placeholder="0 = unlimited" className={`${inputClass} !border-amber-200 !bg-amber-50/50 focus:!border-amber-500`} value={form.creditLimit||0} onChange={e => setForm({...form, creditLimit: e.target.value})} /></div>
+<div><label className="text-xs font-medium text-kt-red ml-1 mb-1 block">Opening Balance (Dr)</label><input type="number" placeholder="0.00" className={`${inputClass} !border-kt-red/30 focus:!border-kt-ink`} value={form.openingBalance} onChange={e => setForm({...form, openingBalance: e.target.value})} /></div>
+<div><label className="text-xs font-medium text-kt-amber ml-1 mb-1 block">Credit Limit (Rs) — 0 = no limit</label><input type="number" placeholder="0 = unlimited" className={`${inputClass} !border-kt-amber/30 !bg-kt-amber/10 focus:!border-kt-ink`} value={form.creditLimit||0} onChange={e => setForm({...form, creditLimit: e.target.value})} /></div>
 </div>
 )}
 <button type="submit" className="w-full bg-kt-primary hover:bg-kt-primary/90 text-white font-medium py-4 rounded-xl mt-4 active:scale-[0.98] transition-colors">Save Customer Profile</button>

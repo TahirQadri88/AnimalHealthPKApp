@@ -387,7 +387,7 @@ const renderTable = (dataObj, type, dimension) => {
                       <div className="flex items-center gap-1.5">
                         <span className={`text-xs font-semibold px-1 py-0.5 rounded border ${tierColors[row.abcTier]}`}>{row.abcTier}</span>
                         <button
-                          className="font-medium text-kt-ink hover:text-kt-blue text-left transition-colors underline decoration-dotted decoration-slate-300 underline-offset-2"
+                          className="font-medium text-kt-ink hover:text-kt-blue text-left transition-colors underline decoration-dotted decoration-kt-line underline-offset-2"
                           title={`Show the transactions behind ${row.label || row.key}`}
                           onClick={() => openDrill(dimension, row.key, row.label || row.key)}
                         >{row.label || row.key}</button>
@@ -456,7 +456,7 @@ const renderSegmentTable = (dataObj, label, dimension) => {
                 <tr key={i} className="hover:bg-kt-raised">
                   <td className="p-3">
                     <button
-                      className="font-medium text-kt-ink hover:text-kt-blue text-left transition-colors underline decoration-dotted decoration-slate-300 underline-offset-2"
+                      className="font-medium text-kt-ink hover:text-kt-blue text-left transition-colors underline decoration-dotted decoration-kt-line underline-offset-2"
                       title={`Show the transactions behind ${row.key}`}
                       onClick={() => openDrill(dimension, row.key)}
                     >{row.key || '—'}</button>
@@ -677,7 +677,7 @@ return (
              const gpPct = k.productRevenue > 0 ? ((k.grossMargin / k.productRevenue) * 100).toFixed(1) : '0.0';
              const netPct = k.productRevenue > 0 ? ((k.netProfit / k.productRevenue) * 100).toFixed(1) : '0.0';
              return (
-               <div className="bg-kt-band text-white p-6 rounded-2xl shadow-[0_8px_24px_rgba(0,0,0,0.08)] border border-white/15">
+               <div className="bg-kt-band text-white p-6 rounded-xl shadow-[0_8px_24px_rgba(0,0,0,0.08)] border border-white/15">
                  <p className="text-xs font-medium text-white/70 mb-5 flex justify-between"><span>P&L Dashboard</span><span className="text-white">{filterLabel}</span></p>
                  <div className="space-y-3">
                    <div className="flex justify-between items-center text-sm font-medium"><span className="text-white/70">Gross Product Sales</span><span className="font-medium text-white">Rs.{(k.productRevenue + k.creditNotesTotal).toLocaleString('en-US')}</span></div>
@@ -1339,7 +1339,7 @@ return (
               {kpis.deliveryBilled > kpis.transportExpense && <div className="flex items-start gap-2 text-sm"><span className="text-kt-green font-semibold shrink-0">+</span><p className="text-kt-ink">Delivery net contribution: <span className="font-medium text-kt-green">Rs.{(kpis.deliveryBilled - kpis.transportExpense).toLocaleString('en-US')}</span></p></div>}
             </div>
             {/* P&L summary */}
-            <div className="bg-kt-band text-white p-5 rounded-2xl shadow-[0_8px_24px_rgba(0,0,0,0.08)]">
+            <div className="bg-kt-band text-white p-5 rounded-xl shadow-[0_8px_24px_rgba(0,0,0,0.08)]">
               <p className="text-xs font-medium text-white/70 mb-4">P&L Summary · {filterLabel}</p>
               <div className="space-y-0">
                 {[

@@ -33,5 +33,10 @@
     "tailwindcss": "^3.4.1",
     "vite": "^5.1.4",
     "vitest": "^4.1.11"
+  },
+  "overrides": {
+    "undici": "^6.29.1",
+    "websocket-driver": "^0.7.5",
+    "@grpc/grpc-js": "^1.14.7"
   }
 }

@@ -53,8 +53,8 @@ return (
 )}</div>
 {form.customerId && (<div className="bg-kt-raised p-3 rounded-xl border border-kt-line text-center"><p className="text-sm text-kt-sub">Current outstanding balance</p><p className="font-display text-3xl text-kt-red mt-0.5">Rs. {getCustomerBalance(Number(form.customerId)).toLocaleString('en-US')}</p></div>)}
 <div className="grid grid-cols-2 gap-3">
-<div className="col-span-2"><label className="text-xs font-medium text-kt-green ml-1 mb-1 block">Amount Received (Cash / Cheque)</label><input type="number" placeholder="0.00" className={`${inputClass} !border-emerald-200 !text-emerald-700 !font-extrabold text-lg`} value={form.amount} onChange={e=>setForm({...form, amount: e.target.value})} /></div>
-<div><label className="text-xs font-medium text-kt-amber ml-1 mb-1 block">Round-off Discount</label><input type="number" placeholder="0" className={`${inputClass} !border-amber-200 !text-amber-700 !font-bold`} value={form.discount || ''} onChange={e=>setForm({...form, discount: Number(e.target.value)||0})} /></div>
+<div className="col-span-2"><label className="text-xs font-medium text-kt-green ml-1 mb-1 block">Amount Received (Cash / Cheque)</label><input type="number" placeholder="0.00" className={`${inputClass} !border-kt-green/30 !text-kt-green !font-semibold text-lg`} value={form.amount} onChange={e=>setForm({...form, amount: e.target.value})} /></div>
+<div><label className="text-xs font-medium text-kt-amber ml-1 mb-1 block">Round-off Discount</label><input type="number" placeholder="0" className={`${inputClass} !border-kt-amber/30 !text-kt-amber !font-medium`} value={form.discount || ''} onChange={e=>setForm({...form, discount: Number(e.target.value)||0})} /></div>
 <div className="bg-kt-amber/10 border border-kt-amber/30 rounded-xl p-3 flex flex-col justify-center">
   <p className="text-xs font-medium text-kt-amber">Total Credit</p>
   <p className="text-lg font-semibold text-kt-amber">Rs. {totalCredit.toLocaleString('en-US')}</p>

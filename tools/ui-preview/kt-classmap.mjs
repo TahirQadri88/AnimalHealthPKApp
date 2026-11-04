@@ -2,7 +2,8 @@
 //
 //   node tools/ui-preview/kt-classmap.mjs <file.jsx> [...]   rewrites in place, prints a report
 //
-// Tailwind class tokens only, with their variant prefixes (hover:, sm:, focus: ...) kept.
+// Tailwind class tokens only, with their variant prefixes (hover:, sm:, focus: ...) and the
+// ! important marker kept.
 // Colours keep their MEANING: rose/red is money owed or a warning, emerald/green is paid,
 // amber is a draft or caution, indigo/violet/blue is advance or information; the main
 // action buttons become the brand primary. Gradients are only reported: each needs a
@@ -29,13 +30,13 @@ const map = (t) => {
   if (t === 'transition-all') return 'transition-colors';
   if (t === 'scale-95') return 'scale-[0.98]';
   let m;
-  if ((m = t.match(/^(text|bg|border|divide|ring|accent|placeholder)-slate-(\d{2,3})(\/\d+)?$/))) {
+  if ((m = t.match(/^(text|bg|border|divide|ring|accent|placeholder|decoration)-slate-(\d{2,3})(\/\d+)?$/))) {
     const [, k, n, op] = m; const v = Number(n);
     if (k === 'text' || k === 'placeholder') return `${k}-kt-${v >= 700 ? 'ink' : v >= 500 ? 'sub' : 'muted'}`;
     if (k === 'bg') return v >= 800 ? (op && v === 900 ? 'bg-black/50' : 'bg-kt-band') : v >= 200 ? 'bg-kt-line' : `bg-kt-raised${op || ''}`;
     return `${k}-kt-line`;
   }
-  if ((m = t.match(/^(text|bg|border|ring|accent|divide|placeholder)-(rose|red|emerald|green|teal|amber|orange|yellow|indigo|violet|purple|blue|sky)-(\d{2,3})(\/\d+)?$/))) {
+  if ((m = t.match(/^(text|bg|border|ring|accent|divide|placeholder|decoration)-(rose|red|emerald|green|teal|amber|orange|yellow|indigo|violet|purple|blue|sky)-(\d{2,3})(\/\d+)?$/))) {
     const [, k, hue, n] = m; const v = Number(n); const s = semantic(hue);
     if (k === 'bg') {
       if (v <= 100) return `bg-kt-${s}/10`;
@@ -55,7 +56,7 @@ for (const file of process.argv.slice(2)) {
   let src = readFileSync(file, 'utf8'), changed = 0;
   const gradients = new Set();
   // A class-ish token: optional variant prefixes, then the utility, bounded by quote/space/backtick/brace.
-  src = src.replace(/(?<=[\s"'`{])((?:[a-z0-9-]+:)*)([a-z][a-z0-9.\-/\[\]]*)(?=[\s"'`}])/g, (all, prefix, base) => {
+  src = src.replace(/(?<=[\s"'`{])((?:[a-z0-9-]+:)*!?)([a-z][a-z0-9.\-/\[\]]*)(?=[\s"'`}])/g, (all, prefix, base) => {
     if (/^(bg-gradient-|from-|via-|to-)/.test(base) && /-\d{2,3}$/.test(base)) { gradients.add(base); return all; }
     const to = map(base);
     if (to === null) return all;
