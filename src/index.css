@@ -36,6 +36,12 @@ nav[aria-label="Main"] [aria-current="page"] svg      { color: rgb(var(--kt-ink)
   }
 }
 
+/* A row built to scroll sideways keeps every item at its natural width and scrolls; its items
+ * never shrink. They used to be able to: once the 44px min-width replaced the flex default
+ * min-width:auto (never narrower than the label), the Admin and Analytics tab buttons shrank to
+ * 44px on a phone and their labels ran into each other (live, 2026-11-05). */
+.scrollbar-hide > *, .overflow-x-auto > :not(table) { flex-shrink: 0; }
+
 /* Hint text in every field, app-wide. Tailwind's default grey measured 2.5:1 on white,
  * under the 4.5:1 WCAG AA asks for; kt-muted measures 5.6:1. */
 input::placeholder, textarea::placeholder { color: rgb(var(--kt-muted)); opacity: 1; }
