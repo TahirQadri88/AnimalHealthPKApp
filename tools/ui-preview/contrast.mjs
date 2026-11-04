@@ -1,4 +1,4 @@
-/* global getComputedStyle -- used inside page.evaluate, which runs in the browser */
+/* global getComputedStyle, innerWidth -- used inside page.evaluate, which runs in the browser */
 // Measures the contrast of every piece of text on a preview screen against what is actually
 // behind it, and fails below WCAG AA: 4.5:1 for body text, 3:1 for large text (24px, or
 // 18.66px bold). Reading colours off the code is how a pale label on a tinted chip gets
