@@ -13,9 +13,10 @@ still taken first, because "nothing touches data" is a claim and a backup is a f
 1. **Data backup (owner, 1 minute).** Admin → Settings → Backup & Data Safety →
    **Full Backup (JSON)**. Save the file somewhere outside this computer (Google Drive).
    Check the Firebase Auto-Backup on the same page shows a recent date.
-2. **Code restore point (Claude).** Tag the commit that is live now and push the tag:
-   `git tag before-redesign <live commit> && git push origin before-redesign`.
-   A tag does not deploy: `deploy.yml` runs on branch pushes only.
+2. **Code restore point (Claude).** Done 2026-11-04: branch `backup/before-redesign` on
+   GitHub points at `eae2d17`, the version that was live. A tag was the first plan, but
+   this session's connection to GitHub refuses tag pushes; a branch outside `main` and
+   `claude/**` does the same job and does not deploy.
 3. **Checks on the branch (Claude).** `npm run verify` (lint, 998+ tests, build) and
    `node tools/ui-preview/contrast.mjs <palette>` (every text colour at WCAG AA).
 
