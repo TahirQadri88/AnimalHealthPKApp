@@ -5,6 +5,7 @@ import { Search, Calendar, ChevronDown, Download, Printer, Share2, Users, Packag
 import { AppContext } from '../../context/AppContext';
 import { ScrollableTabBar } from '../ui/ScrollableTabBar';
 import { MultiPicker } from '../ui/MultiPicker';
+import { FilterSelect } from '../ui/FilterSelect';
 
 // Meaning colours as whole class strings, so Tailwind can find them. Analytics used to build
 // names like `bg-${color}-50` at run time, which only rendered when the same class happened to
@@ -507,13 +508,9 @@ return (
     {/* Two by two on a phone, a row from sm up. Every pill is the same build: the date one used to be
         a bordered box around a select, which the phone's minimum sizes made taller than the rest. */}
     <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 mb-3 shrink-0">
-       <div className="relative sm:shrink-0">
-         <Calendar size={14} strokeWidth={1.5} className="absolute left-3 top-1/2 -translate-y-1/2 text-kt-blue pointer-events-none"/>
-         <select value={dateFilter} onChange={e => setDateFilter(e.target.value)} aria-label="Period" className="h-11 sm:h-9 w-full sm:w-auto appearance-none pl-9 pr-9 bg-white border border-kt-line rounded-lg font-medium text-base sm:text-xs text-kt-ink outline-none cursor-pointer">
-           <option>Today</option><option>This Week</option><option>This Month</option><option>This Year</option><option>All Time</option><option>Custom</option>
-         </select>
-         <ChevronDown size={14} strokeWidth={1.5} className="absolute right-3 top-1/2 -translate-y-1/2 text-kt-muted pointer-events-none"/>
-       </div>
+       <FilterSelect compact className="sm:shrink-0" value={dateFilter} onChange={e => setDateFilter(e.target.value)} label="Period" icon={Calendar}>
+         <option>Today</option><option>This Week</option><option>This Month</option><option>This Year</option><option>All Time</option><option>Custom</option>
+       </FilterSelect>
        <MultiPicker label="Brand" Icon={Filter} items={companies} selected={filterCompanies}
          onToggle={id=>toggleFilter(setFilterCompanies,id)} onClear={()=>clearFilter(setFilterCompanies)} />
        <MultiPicker label="Client" Icon={Users} items={customers} selected={filterCustomers}

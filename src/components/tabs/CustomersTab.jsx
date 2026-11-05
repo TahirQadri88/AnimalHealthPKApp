@@ -2,6 +2,7 @@ import { useState, useMemo, useContext } from 'react';
 import { Plus, Search, X, Edit, Trash2, Wallet, AlertCircle, BookOpen, ReceiptText, PhoneCall } from 'lucide-react';
 import { AppContext } from '../../context/AppContext';
 import { ScrollableTabBar } from '../ui/ScrollableTabBar';
+import { FilterSelect } from '../ui/FilterSelect';
 import SearchableSelect from '../SearchableSelect';
 import { buildCustomerCard, balanceReminderText, waNumber } from '../../services/customers/customerCard';
 import { customerAging } from '../../services/analytics/receivables';
@@ -32,16 +33,16 @@ return (
 <ScrollableTabBar className="mb-3 shrink-0">
   <SearchableSelect value={filterCity} onChange={e=>{setFilterCity(e.target.value);setFilterArea('');}} className="h-11 sm:h-9 px-3 rounded-lg border border-kt-line bg-white font-medium text-base sm:text-xs text-kt-ink outline-none shrink-0 min-w-[110px]" placeholder="All Cities" options={cities.map(c=>({value:c.name,label:c.name}))} />
   <SearchableSelect value={filterArea} onChange={e=>setFilterArea(e.target.value)} className="h-11 sm:h-9 px-3 rounded-lg border border-kt-line bg-white font-medium text-base sm:text-xs text-kt-ink outline-none shrink-0 min-w-[110px]" placeholder="All Areas" options={areas.filter(a=>!filterCity||!a.cityName||a.cityName===filterCity).map(a=>({value:a.name,label:a.name}))} />
-  <select value={filterType} onChange={e=>setFilterType(e.target.value)} className="h-11 sm:h-9 px-3 rounded-lg border border-kt-line bg-white font-medium text-base sm:text-xs text-kt-ink outline-none shrink-0">
+  <FilterSelect compact className="shrink-0 min-w-[130px]" value={filterType} onChange={e=>setFilterType(e.target.value)} label="Customer type">
     <option value="">All Types</option>
     {customerTypes.map(t=><option key={t.id} value={t.name}>{t.name}</option>)}
-  </select>
-  <select value={filterBalance} onChange={e=>setFilterBalance(e.target.value)} className="h-11 sm:h-9 px-3 rounded-lg border border-kt-line bg-white font-medium text-base sm:text-xs text-kt-ink outline-none shrink-0">
+  </FilterSelect>
+  <FilterSelect compact className="shrink-0 min-w-[130px]" value={filterBalance} onChange={e=>setFilterBalance(e.target.value)} label="Balance">
     <option value="All">All Balances</option>
     <option value="Outstanding">Outstanding (Dr)</option>
     <option value="Advance">Advance (Cr)</option>
     <option value="Clear">Cleared</option>
-  </select>
+  </FilterSelect>
   <button onClick={() => setShowIncompleteOnly(v => !v)} className={`shrink-0 h-11 sm:h-9 px-3 text-base sm:text-xs font-medium rounded-lg flex items-center gap-1.5 border transition-colors ${showIncompleteOnly ? 'bg-kt-amber text-white border-kt-amber/30' : 'bg-white text-kt-amber border-kt-amber/30 hover:bg-kt-amber/10'}`}><AlertCircle size={10}/> Incomplete{incompleteIds.size > 0 ? ` (${incompleteIds.size})` : ''}</button>
   {activeFilters && <button onClick={clearFilters} className="shrink-0 h-11 sm:h-9 px-3 text-base sm:text-xs font-medium text-kt-red bg-kt-red/10 border border-kt-red/30 rounded-lg flex items-center gap-1.5 hover:bg-kt-red/10 transition-colors"><X size={10}/> Clear</button>}
 </ScrollableTabBar>
@@ -107,10 +108,10 @@ Bal: Rs. {bal.toLocaleString('en-US')} {bal > 0 ? '(Dr)' : bal < 0 ? '(Cr)' : ''
 </div>
 </button>
 {/* The four actions §14 asks for. Ledger is the card itself; these are the other three. */}
-<div className="flex flex-wrap gap-1.5 mt-2.5">
+<div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 sm:gap-1.5 mt-2.5">
   <button
     onClick={() => { setSelectedLedgerId(c.id); setShowLedgerModal(true); }}
-    className="flex items-center gap-1 text-xs font-medium px-2 py-1.5 rounded-lg bg-kt-raised text-kt-sub border border-kt-line hover:bg-kt-raised"
+    className="flex items-center justify-center sm:justify-start gap-1.5 text-sm sm:text-xs font-medium px-2 py-1.5 rounded-lg bg-kt-raised text-kt-sub border border-kt-line hover:bg-kt-raised"
   ><BookOpen size={11}/> Ledger</button>
   {(isAdmin || hasPermission('issueInvoices')) && (
     <button
@@ -119,13 +120,13 @@ Bal: Rs. {bal.toLocaleString('en-US')} {bal > 0 ? '(Dr)' : bal < 0 ? '(Cr)' : ''
         setBillingView('form');
         setActiveTab('billing');
       }}
-      className="flex items-center gap-1 text-xs font-medium px-2 py-1.5 rounded-lg bg-kt-blue/10 text-kt-blue border border-kt-blue/30 hover:bg-kt-blue/10"
+      className="flex items-center justify-center sm:justify-start gap-1.5 text-sm sm:text-xs font-medium px-2 py-1.5 rounded-lg bg-kt-blue/10 text-kt-blue border border-kt-blue/30 hover:bg-kt-blue/10"
     ><ReceiptText size={11}/> New Invoice</button>
   )}
   {(isAdmin || hasPermission('receivePayments')) && (
     <button
       onClick={() => { setSelectedCustomerForPayment(c.id); setShowPaymentModal(true); }}
-      className="flex items-center gap-1 text-xs font-medium px-2 py-1.5 rounded-lg bg-kt-green/10 text-kt-green border border-kt-green/30 hover:bg-kt-green/10"
+      className="flex items-center justify-center sm:justify-start gap-1.5 text-sm sm:text-xs font-medium px-2 py-1.5 rounded-lg bg-kt-green/10 text-kt-green border border-kt-green/30 hover:bg-kt-green/10"
     ><Wallet size={11}/> Receive</button>
   )}
   {wa && (
@@ -133,7 +134,7 @@ Bal: Rs. {bal.toLocaleString('en-US')} {bal > 0 ? '(Dr)' : bal < 0 ? '(Cr)' : ''
       href={`https://wa.me/${wa}?text=${encodeURIComponent(balanceReminderText(c, bal, APP_NAME))}`}
       target="_blank" rel="noopener noreferrer"
       title={`WhatsApp ${c.name}`}
-      className="flex items-center gap-1 text-xs font-medium px-2 py-1.5 rounded-lg bg-kt-green/10 text-kt-green border border-kt-green/30 hover:bg-kt-green/10"
+      className="flex items-center justify-center sm:justify-start gap-1.5 text-sm sm:text-xs font-medium px-2 py-1.5 rounded-lg bg-kt-green/10 text-kt-green border border-kt-green/30 hover:bg-kt-green/10"
     ><PhoneCall size={11}/> WhatsApp</a>
   )}
 </div>

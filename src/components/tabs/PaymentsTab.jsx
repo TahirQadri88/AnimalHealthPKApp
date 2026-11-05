@@ -1,6 +1,7 @@
 import { useState, useMemo, useContext } from 'react';
 import { Plus, Search, Edit, Trash2, Receipt, Printer } from 'lucide-react';
 import { AppContext } from '../../context/AppContext';
+import { FilterSelect } from '../ui/FilterSelect';
 import SearchableSelect from '../SearchableSelect';
 import { formatDateDisp, checkDateFilter } from '../../helpers';
 
@@ -55,15 +56,15 @@ return (
   <div className="space-y-2 mb-3">
     <div className="relative"><Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-kt-muted" size={16}/><input placeholder="Search client or receipt ID..." className="w-full pl-10 pr-4 py-3 bg-white border border-kt-line rounded-xl font-semibold outline-none text-sm" value={search} onChange={e=>setSearch(e.target.value)} /></div>
     <div className="flex gap-2">
-      <select value={dateFilter} onChange={e=>setDateFilter(e.target.value)} className="flex-1 bg-white border border-kt-line px-3 py-2 rounded-lg font-medium text-sm text-kt-ink outline-none">
+      <FilterSelect className="flex-1" value={dateFilter} onChange={e=>setDateFilter(e.target.value)} label="Period">
         <option>All Time</option><option>Today</option><option>This Week</option><option>This Month</option><option>This Year</option>
-      </select>
-      <SearchableSelect value={customerFilter} onChange={e=>setCustomerFilter(e.target.value)} className="flex-1 bg-white border border-kt-line px-3 py-2 rounded-lg font-semibold text-sm text-kt-ink outline-none" placeholder="All Clients" options={customers.map(c=>({value:String(c.id),label:c.name}))} />
+      </FilterSelect>
+      <SearchableSelect value={customerFilter} onChange={e=>setCustomerFilter(e.target.value)} className="flex-1 h-11 sm:h-9 px-3 rounded-lg border border-kt-line bg-white font-medium text-base sm:text-sm text-kt-ink outline-none" placeholder="All Clients" options={customers.map(c=>({value:String(c.id),label:c.name}))} />
     </div>
   </div>
-  <div className="bg-kt-green/10 border border-kt-green/30 rounded-xl px-4 py-2.5 mb-3 flex justify-between items-center">
-    <span className="text-xs font-medium text-kt-green">{filtered.length} Receipts</span>
-    <span className="font-semibold text-kt-green text-sm">Total: Rs. {totalAmount.toLocaleString('en-US')}</span>
+  <div className="bg-white border border-kt-line rounded-xl px-4 py-2.5 mb-3 flex justify-between items-center">
+    <span className="text-sm text-kt-sub">{filtered.length} Receipts</span>
+    <span className="text-sm text-kt-sub">Total: <span className="font-display text-2xl text-kt-green leading-none align-middle">Rs. {totalAmount.toLocaleString('en-US')}</span></span>
   </div>
   <div className="flex-1 overflow-y-auto space-y-2.5 pb-24 pr-1">
     {filtered.map(p => (

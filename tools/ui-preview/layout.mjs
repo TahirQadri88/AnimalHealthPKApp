@@ -101,7 +101,12 @@ for (const w of widths) {
           continue;
         }
         const t = textRect(par);
-        if (t && t.height < 40) { const d = Math.abs(sy - (t.top + t.height / 2)); if (d > 2.5) mis.add(`icon ${d.toFixed(1)}px off its label's centre: ${name(par).slice(0, 50)}`); }
+        if (t && t.height < 40) {
+          const d = Math.abs(sy - (t.top + t.height / 2)); if (d > 2.5) mis.add(`icon ${d.toFixed(1)}px off its label's centre: ${name(par).slice(0, 50)}`);
+          // a leading icon stays beside its label: auto margins once threw it to the far edge of the button
+          const gapX = t.left - sb.right;
+          if (par.firstElementChild === svg && gapX > 18) mis.add(`icon ${Math.round(gapX)}px away from its label: ${name(par).slice(0, 50)}`);
+        }
         else if (!par.textContent.trim() && par.children.length === 1 && par.matches('button, a')) {
           const dx = Math.abs(sb.left + sb.width / 2 - (pb.left + pb.width / 2)), dy = Math.abs(sy - (pb.top + pb.height / 2));
           if (dx > 1.5 || dy > 1.5) mis.add(`icon-only button's icon is off-centre by ${dx.toFixed(1)}/${dy.toFixed(1)}px: ${par.getAttribute('title') || par.getAttribute('aria-label') || name(par).slice(0, 30)}`);

@@ -47,7 +47,10 @@ nav[aria-label="Main"] [aria-current="page"] svg      { color: rgb(var(--kt-ink)
  * and a block child is NOT centred by text-align, so once a phone's 44px minimum made the button
  * wider than its icon the icon stayed pinned to the left padding: 5-10px off on every icon-only
  * button (print, share, edit, the connection badge, the tab arrows). Found by layout.mjs. */
-:where(button, a[href]) > svg:only-child { margin-inline: auto; }
+:where(button, a[href]):not(.flex, .inline-flex, .grid) > svg:only-child { margin-inline: auto; }
+/* Not in a flex or grid button: there auto margins swallow the free space, and an icon beside a
+ * text label (`:only-child` counts elements, not text nodes) was thrown to the far left while the
+ * label stayed in the middle. Flex buttons centre their content with justify-center. */
 
 /* Hint text in every field, app-wide. Tailwind's default grey measured 2.5:1 on white,
  * under the 4.5:1 WCAG AA asks for; kt-muted measures 5.6:1. */
