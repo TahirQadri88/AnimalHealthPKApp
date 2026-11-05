@@ -1,6 +1,7 @@
 import { useState, useContext } from 'react';
 import { Users, Plus, Search, Edit, Trash2, Lock, Download, Calendar } from 'lucide-react';
 import { AppContext } from '../../context/AppContext';
+import { FilterSelect } from '../ui/FilterSelect';
 import { formatDateDisp, checkDateFilter, exportToCSV } from '../../helpers';
 import { loginSlug } from '../../lib/loginNames';
 
@@ -30,13 +31,10 @@ return (
 </div>
 <button onClick={() => { setEditingUser(null); setShowUserModal(true); }} className="bg-kt-primary text-white px-3 py-2 rounded-lg text-xs font-medium flex items-center gap-1 hover:bg-kt-primary/90 transition-colors"><Plus size={14}/> Add User</button>
 </div>
-<div className="relative mb-3"><Search className="absolute left-3 top-2.5 text-kt-muted" size={14}/><input placeholder="Search users..." className="w-full pl-8 pr-3 py-2 bg-white border border-kt-line rounded-xl font-semibold outline-none text-sm focus:border-kt-ink" value={userSearch} onChange={e=>setUserSearch(e.target.value)} /></div>
-<div className="flex items-center gap-1.5 bg-white px-2.5 py-1.5 rounded-lg border border-kt-line mb-4 w-fit">
-<Calendar size={13} className="text-kt-blue"/>
-<select value={userDateFilter} onChange={e=>setUserDateFilter(e.target.value)} className="bg-transparent font-medium text-xs text-kt-ink outline-none cursor-pointer">
+<div className="relative mb-3"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-kt-muted" size={14}/><input placeholder="Search users..." className="w-full pl-8 pr-3 py-2 bg-white border border-kt-line rounded-xl font-semibold outline-none text-sm focus:border-kt-ink" value={userSearch} onChange={e=>setUserSearch(e.target.value)} /></div>
+<FilterSelect compact className="mb-4 w-fit" value={userDateFilter} onChange={e=>setUserDateFilter(e.target.value)} label="Period" icon={Calendar}>
 <option>Today</option><option>This Week</option><option>This Month</option><option>This Year</option><option>All Time</option>
-</select>
-</div>
+</FilterSelect>
 <div className="space-y-3">
 {appUsers.filter(u => !userSearch || u.name.toLowerCase().includes(userSearch.toLowerCase()) || u.role.toLowerCase().includes(userSearch.toLowerCase())).map(u => {
 const userInvoices = invoices.filter(inv => inv.salespersonId === u.id && inv.status === 'Billed' && checkDateFilter(inv.date, userDateFilter));

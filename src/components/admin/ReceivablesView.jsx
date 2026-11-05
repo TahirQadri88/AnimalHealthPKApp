@@ -93,14 +93,14 @@ return (
         {report.customerCount} customer{report.customerCount !== 1 ? 's' : ''} owing {money(report.grandTotal)} · as at {formatDateDisp(asOf)}
       </p>
     </div>
-    <div className="flex items-center gap-1.5 shrink-0">
+    <div className="flex items-center gap-2 shrink-0">
       <button onClick={exportCsv} title="Download as CSV (Excel)"
-        className="flex items-center gap-1.5 px-2.5 py-1.5 bg-kt-green/10 border border-kt-green/30 text-kt-green rounded-lg font-medium text-xs hover:bg-kt-green/10 transition-colors">
-        <FileSpreadsheet size={13}/> CSV
+        className="h-11 sm:h-9 flex items-center gap-2 px-3 rounded-lg border border-kt-line bg-white text-kt-ink font-medium text-sm sm:text-xs hover:bg-kt-raised transition-colors">
+        <FileSpreadsheet size={16} strokeWidth={1.5}/> CSV
       </button>
       <button onClick={openPrintView} title="Print, PDF, image or WhatsApp text — A4, A5 or thermal"
-        className="flex items-center gap-1.5 px-2.5 py-1.5 bg-kt-band text-white rounded-lg font-medium text-xs hover:bg-kt-band transition-colors">
-        <FileDown size={13}/> PDF / Print
+        className="h-11 sm:h-9 flex items-center gap-2 px-3 rounded-lg border border-kt-line bg-white text-kt-ink font-medium text-sm sm:text-xs hover:bg-kt-raised transition-colors">
+        <FileDown size={16} strokeWidth={1.5}/> PDF / Print
       </button>
     </div>
     <p className="w-full text-xs text-kt-muted -mt-1">
@@ -120,7 +120,7 @@ return (
   </div>
 
   <div className="relative">
-    <Search className="absolute left-3 top-2.5 text-kt-muted" size={14}/>
+    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-kt-muted" size={14}/>
     <input placeholder="Search customer or phone..." value={search} onChange={e => setSearch(e.target.value)}
       className="w-full pl-8 pr-3 py-2 bg-white border border-kt-line rounded-xl font-semibold outline-none text-sm focus:border-kt-ink" />
   </div>

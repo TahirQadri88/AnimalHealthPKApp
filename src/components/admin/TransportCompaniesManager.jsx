@@ -122,7 +122,7 @@ return (
 {addForm}
 <div className="bg-white border border-kt-line rounded-xl overflow-hidden">
   <div className="px-4 py-3 border-b border-kt-line flex items-center gap-2"><Truck size={14} className="text-kt-amber"/><span className="text-xs font-medium text-kt-sub">Transport Companies</span><span className="ml-auto text-xs font-semibold text-kt-amber">{transportCompanies.length}</span></div>
-  <div className="px-3 pt-3 pb-2"><div className="relative"><Search className="absolute left-3 top-2.5 text-kt-muted" size={14}/><input placeholder="Search companies..." className="w-full pl-8 pr-3 py-2 bg-kt-raised border border-kt-line rounded-lg font-semibold outline-none text-sm focus:border-kt-ink" value={search} onChange={e=>setSearch(e.target.value)} /></div></div>
+  <div className="px-3 pt-3 pb-2"><div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-kt-muted" size={14}/><input placeholder="Search companies..." className="w-full pl-8 pr-3 py-2 bg-kt-raised border border-kt-line rounded-lg font-semibold outline-none text-sm focus:border-kt-ink" value={search} onChange={e=>setSearch(e.target.value)} /></div></div>
   {transportCompanies.length === 0 && <p className="text-center py-8 text-sm text-kt-muted font-medium">No transport companies registered yet.</p>}
   {list}
 </div>

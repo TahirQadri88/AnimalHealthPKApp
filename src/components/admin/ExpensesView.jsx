@@ -2,6 +2,7 @@ import { useState, useContext } from 'react';
 import { Calendar, Download, Search, Tag } from 'lucide-react';
 import { AppContext } from '../../context/AppContext';
 import { EXPENSE_GROUPS, EXPENSE_GROUP_COLORS } from '../../lib/constants';
+import { FilterSelect } from '../ui/FilterSelect';
 import { getLocalDateStr, formatDateDisp, checkDateFilter, exportToCSV } from '../../helpers';
 import SearchableSelect from '../SearchableSelect';
 
@@ -53,20 +54,14 @@ return (
 <div className="mb-4"><label className="text-xs font-medium text-kt-sub ml-1 mb-1 block">Short Note</label><input type="text" placeholder="e.g. Paid to Ali for DHA drop" className="w-full p-2.5 bg-kt-raised border border-kt-line rounded-lg text-sm font-semibold outline-none" value={note} onChange={e=>setNote(e.target.value)}/></div>
 <button type="submit" className={`w-full font-medium py-3.5 rounded-xl  text-white bg-kt-primary hover:bg-kt-primary/90`}>{editingExpense ? 'Update Expense' : 'Record Expense'}</button>
 </form>
-<div className="relative mb-2"><Search className="absolute left-3 top-2.5 text-kt-muted" size={14}/><input placeholder="Search by category or note..." className="w-full pl-8 pr-3 py-2 bg-white border border-kt-line rounded-xl font-semibold outline-none text-sm focus:border-kt-ink" value={expSearch} onChange={e=>setExpSearch(e.target.value)} /></div>
+<div className="relative mb-2"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-kt-muted" size={14}/><input placeholder="Search by category or note..." className="w-full pl-8 pr-3 py-2 bg-white border border-kt-line rounded-xl font-semibold outline-none text-sm focus:border-kt-ink" value={expSearch} onChange={e=>setExpSearch(e.target.value)} /></div>
 <div className="flex items-center gap-2 mb-3 flex-wrap">
-<div className="flex items-center gap-1.5 bg-white px-2.5 py-1.5 rounded-lg border border-kt-line">
-<Calendar size={13} className="text-kt-red"/>
-<select value={expFilter} onChange={e=>setExpFilter(e.target.value)} className="bg-transparent font-medium text-xs text-kt-ink outline-none cursor-pointer">
+<FilterSelect compact value={expFilter} onChange={e=>setExpFilter(e.target.value)} label="Period" icon={Calendar}>
 <option>Today</option><option>This Week</option><option>This Month</option><option>This Year</option><option>All Time</option>
-</select>
-</div>
-<div className="flex items-center gap-1.5 bg-white px-2.5 py-1.5 rounded-lg border border-kt-line">
-<Tag size={11} className="text-kt-blue"/>
-<select value={groupFilter} onChange={e=>setGroupFilter(e.target.value)} className="bg-transparent font-medium text-xs text-kt-ink outline-none cursor-pointer">
+</FilterSelect>
+<FilterSelect compact value={groupFilter} onChange={e=>setGroupFilter(e.target.value)} label="Expense group" icon={Tag}>
 <option value="All">All Groups</option>{EXPENSE_GROUPS.map(g=><option key={g} value={g}>{g}</option>)}
-</select>
-</div>
+</FilterSelect>
 <div className="ml-auto text-right">
 <p className="text-xs text-kt-muted font-medium">Total</p>
 <p className="font-semibold text-kt-red text-base">Rs.{filteredTotal.toLocaleString('en-US')}</p>

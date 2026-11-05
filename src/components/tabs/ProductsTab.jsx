@@ -9,7 +9,7 @@ const [search, setSearch] = useState('');
 return (
 <div className="p-4 flex flex-col h-full">
 <div className="flex gap-2 mb-4">
-<div className="relative flex-1"><Search className="absolute left-3.5 top-3.5 text-kt-muted" size={18} /><input placeholder="Search products" className="w-full pl-10 pr-4 py-3 bg-white border border-kt-line rounded-xl font-semibold outline-none text-sm" value={search} onChange={e => setSearch(e.target.value)} onKeyDown={e => { if (e.key === 'Escape' && search) { e.stopPropagation(); setSearch(''); } }} /></div>
+<div className="relative flex-1"><Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-kt-muted" size={18} /><input placeholder="Search products" className="w-full pl-10 pr-4 py-3 bg-white border border-kt-line rounded-xl font-semibold outline-none text-sm" value={search} onChange={e => setSearch(e.target.value)} onKeyDown={e => { if (e.key === 'Escape' && search) { e.stopPropagation(); setSearch(''); } }} /></div>
 <button onClick={() => { setEditingProduct(null); setShowProductModal(true); }} className="bg-kt-primary text-white p-3 rounded-xl"><Plus size={20}/></button>
 </div>
 <div className="flex-1 overflow-y-auto space-y-3 pb-24 pr-1">

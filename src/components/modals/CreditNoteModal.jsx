@@ -141,7 +141,7 @@ return (
   <div className="bg-white p-4 rounded-xl border border-kt-line">
     <h3 className="text-xs font-medium text-kt-muted mb-3 flex items-center gap-1.5"><Users size={12}/> Customer</h3>
     <div className="relative">
-      <Search size={16} className="absolute left-3.5 top-3.5 text-kt-muted pointer-events-none z-10"/>
+      <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-kt-muted pointer-events-none z-10"/>
       <input ref={custSearchRef} autoFocus={!form.customerId}
         className={`pl-10 ${inputClass}`} placeholder="Search customer…"
         value={showCustDrop ? custSearch : (customers.find(c => c.id === custId)?.name || '')}
@@ -180,7 +180,7 @@ return (
 
     {/* Search input — shows history items when no query, all products when typing */}
     <div className="relative mb-3">
-      <Search size={16} className="absolute left-3.5 top-3.5 text-kt-muted"/>
+      <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-kt-muted"/>
       <input ref={prodSearchRef}
         placeholder={custId ? 'Search to add… (history shown below)' : 'Select a customer first…'}
         disabled={!custId}

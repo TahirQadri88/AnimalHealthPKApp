@@ -1,6 +1,7 @@
 import { useState, useMemo, useContext } from 'react';
 import { Search, Calendar, Wallet, TrendingUp, TrendingDown, DollarSign, ChevronRight, Award, Bell, ReceiptText } from 'lucide-react';
 import { AppContext } from '../../context/AppContext';
+import { FilterSelect } from '../ui/FilterSelect';
 import { getLocalDateStr, formatDateDisp, checkDateFilter } from '../../helpers';
 import { netBilled, topProducts, momChangePct } from '../../services/analytics/dashboard';
 import { productsNeedingCost, billsAffected } from '../../lib/costPending';
@@ -110,10 +111,7 @@ return (
 )}
 <div className="flex justify-between items-center gap-3">
 <h2 className="font-display text-[28px] sm:text-3xl text-kt-ink">Overview</h2>
-<div className="relative">
-<Calendar size={16} strokeWidth={1.5} className="absolute left-3 top-3 text-kt-muted pointer-events-none" />
-<select value={dateFilter} onChange={e => setDateFilter(e.target.value)} aria-label="Period" className="h-9 sm:h-10 pl-9 pr-3 bg-white border border-kt-line rounded-lg text-sm text-kt-ink outline-none cursor-pointer"><option>Today</option><option>This Week</option><option>This Month</option><option>This Year</option><option>All Time</option></select>
-</div>
+<FilterSelect value={dateFilter} onChange={e => setDateFilter(e.target.value)} label="Period" icon={Calendar}><option>Today</option><option>This Week</option><option>This Month</option><option>This Year</option><option>All Time</option></FilterSelect>
 </div>
 
 {/* The period in one band: sales in Khyber Yellow, receivables beside it for an admin,
@@ -199,7 +197,7 @@ return (
 </h3>
 <button onClick={() => setActiveTab('billing')} className="text-sm font-medium text-kt-ink hover:underline flex items-center gap-0.5">View all <ChevronRight size={16} strokeWidth={1.5}/></button>
 </div>
-<div className="relative mb-3"><Search className="absolute left-3 top-3 text-kt-muted" size={16} strokeWidth={1.5}/><input placeholder="Search activity" className="w-full h-10 pl-9 pr-3 bg-white border border-kt-line rounded-lg text-sm text-kt-ink placeholder-kt-muted outline-none focus:border-kt-ink transition-colors" value={activitySearch} onChange={e => setActivitySearch(e.target.value)} /></div>
+<div className="relative mb-3"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-kt-muted" size={16} strokeWidth={1.5}/><input placeholder="Search activity" className="w-full h-10 pl-9 pr-3 bg-white border border-kt-line rounded-lg text-sm text-kt-ink placeholder-kt-muted outline-none focus:border-kt-ink transition-colors" value={activitySearch} onChange={e => setActivitySearch(e.target.value)} /></div>
 <div className={`${card} divide-y divide-kt-line overflow-hidden`}>
 {shownActivity.map(entry => {
   const cfg = kindConfig[entry.kind] || kindConfig.draft;

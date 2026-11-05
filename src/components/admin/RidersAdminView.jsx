@@ -41,7 +41,7 @@ return (
 </form>
 <div className="bg-white border border-kt-line rounded-xl overflow-hidden">
   <div className="px-4 py-3 border-b border-kt-line flex items-center gap-2"><Truck size={14} className="text-kt-blue"/><span className="text-xs font-medium text-kt-sub">Registered Riders</span><span className="ml-auto text-xs font-semibold text-kt-blue">{riders.length}</span></div>
-  <div className="px-3 pt-3 pb-2"><div className="relative"><Search className="absolute left-3 top-2.5 text-kt-muted" size={14}/><input placeholder="Search riders..." className="w-full pl-8 pr-3 py-2 bg-kt-raised border border-kt-line rounded-lg font-semibold outline-none text-sm focus:border-kt-ink" value={riderSearch} onChange={e=>setRiderSearch(e.target.value)} /></div></div>
+  <div className="px-3 pt-3 pb-2"><div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-kt-muted" size={14}/><input placeholder="Search riders..." className="w-full pl-8 pr-3 py-2 bg-kt-raised border border-kt-line rounded-lg font-semibold outline-none text-sm focus:border-kt-ink" value={riderSearch} onChange={e=>setRiderSearch(e.target.value)} /></div></div>
   {riders.length === 0 && <p className="text-center py-8 text-sm text-kt-muted font-medium">No riders registered yet.</p>}
   <ul className="divide-y divide-kt-line">
     {riders.filter(r => !riderSearch || r.name.toLowerCase().includes(riderSearch.toLowerCase()) || (r.phone||'').includes(riderSearch) || (r.vehicleNumber||'').toLowerCase().includes(riderSearch.toLowerCase())).map(rider => (

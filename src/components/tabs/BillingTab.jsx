@@ -5,6 +5,7 @@ import { Plus, Search, X, Edit, Trash2, Save, Truck, MapPin, Calendar,
 // ../firebase, which initialises Auth on import and would make this — the screen that
 // bills every invoice — impossible to load from a test.
 import { AppContext } from '../../context/AppContext';
+import { FilterSelect } from '../ui/FilterSelect';
 import { VEHICLES, getLocalDateStr, formatDateDisp, checkDateFilter } from '../../helpers';
 import { makeArrowNav } from '../../lib/a11y';
 import { getNextSeqNum, prefixForStatus, needsRenumber } from '../../lib/docNumbers';
@@ -170,7 +171,7 @@ return (
 <h3 className={sectionTitleClass}><Step n={1}/> Customer</h3>
 <div className="flex gap-2 items-center">
 <div className="relative flex-1">
-  <Search size={16} strokeWidth={1.5} className="absolute left-3 top-3.5 text-kt-muted pointer-events-none z-10"/>
+  <Search size={16} strokeWidth={1.5} className="absolute left-3 top-1/2 -translate-y-1/2 text-kt-muted pointer-events-none z-10"/>
   <input
     autoFocus={!currentInvoice.customerId}
     className={`pl-10 ${inputClass}`}
@@ -246,7 +247,7 @@ return (
 <div className={sectionClass}>
 <h3 className={sectionTitleClass}><Step n={2}/> Products{currentInvoice.items.length > 0 && <span className="font-ui ml-auto text-sm text-kt-muted font-normal tabular-nums">{currentInvoice.items.length} SKU{currentInvoice.items.length !== 1 ? 's' : ''} · {currentInvoice.items.reduce((s,i)=>s+(i.quantity||0),0)} units</span>}</h3>
 <div className="flex gap-2 items-center mb-4">
-  <div className="relative flex-1"><Search size={16} strokeWidth={1.5} className="absolute left-3 top-3.5 text-kt-muted"/><input ref={prodSearchRef} placeholder="Search products" className={`pl-10 ${inputClass}`} value={prodSearch} onChange={e=>{ setProdSearch(e.target.value); setHiProduct(-1); }} onKeyDown={e => { const filtP = products.filter(p => p.available && !p.archived && p.name.toLowerCase().includes(prodSearch.toLowerCase())); if (e.key === 'ArrowDown') { e.preventDefault(); setHiProduct(h => Math.min(h + 1, filtP.length - 1)); } else if (e.key === 'ArrowUp') { e.preventDefault(); setHiProduct(h => Math.max(h - 1, 0)); } else if (e.key === 'Enter') { e.preventDefault(); const p = hiProduct >= 0 ? filtP[hiProduct] : filtP.length === 1 ? filtP[0] : null; if (p) { justAddedRef.current = true; handleAddItem(p, false); setProdSearch(''); setHiProduct(-1); } } else if (e.key === 'Escape') { setProdSearch(''); setHiProduct(-1); } }} /></div>
+  <div className="relative flex-1"><Search size={16} strokeWidth={1.5} className="absolute left-3 top-1/2 -translate-y-1/2 text-kt-muted"/><input ref={prodSearchRef} placeholder="Search products" className={`pl-10 ${inputClass}`} value={prodSearch} onChange={e=>{ setProdSearch(e.target.value); setHiProduct(-1); }} onKeyDown={e => { const filtP = products.filter(p => p.available && !p.archived && p.name.toLowerCase().includes(prodSearch.toLowerCase())); if (e.key === 'ArrowDown') { e.preventDefault(); setHiProduct(h => Math.min(h + 1, filtP.length - 1)); } else if (e.key === 'ArrowUp') { e.preventDefault(); setHiProduct(h => Math.max(h - 1, 0)); } else if (e.key === 'Enter') { e.preventDefault(); const p = hiProduct >= 0 ? filtP[hiProduct] : filtP.length === 1 ? filtP[0] : null; if (p) { justAddedRef.current = true; handleAddItem(p, false); setProdSearch(''); setHiProduct(-1); } } else if (e.key === 'Escape') { setProdSearch(''); setHiProduct(-1); } }} /></div>
   {hasPermission('addEditProducts') && <button type="button" onClick={() => { setProductPreFill(prodSearch.trim()); setEditingProduct(null); setShowProductModal(true); }} className="shrink-0 h-11 flex items-center gap-1.5 px-4 bg-white text-kt-ink border border-kt-line rounded-lg text-sm font-medium hover:bg-kt-raised transition-colors" title="Register a new product"><Plus size={16} strokeWidth={1.5}/> New</button>}
 </div>
 {prodSearch && (
@@ -297,7 +298,7 @@ return (
   <div className="col-span-2">
     <label className={labelClass}>Pick from Registry</label>
     <div className="relative">
-      <Search size={16} strokeWidth={1.5} className="absolute left-3 top-3.5 text-kt-muted pointer-events-none z-10"/>
+      <Search size={16} strokeWidth={1.5} className="absolute left-3 top-1/2 -translate-y-1/2 text-kt-muted pointer-events-none z-10"/>
       <input
         className={`pl-10 ${inputClass}`}
         placeholder="Search transport companies"
@@ -339,7 +340,7 @@ return (
   <div className="col-span-2">
     <label className={labelClass}>Pick Booking Person</label>
     <div className="relative">
-      <Search size={16} strokeWidth={1.5} className="absolute left-3 top-3.5 text-kt-muted pointer-events-none z-10"/>
+      <Search size={16} strokeWidth={1.5} className="absolute left-3 top-1/2 -translate-y-1/2 text-kt-muted pointer-events-none z-10"/>
       <input
         className={`pl-10 ${inputClass}`}
         placeholder="Search riders and drivers"
@@ -382,7 +383,7 @@ return (
   <div className="col-span-2">
     <label className={labelClass}>Pick from Registry</label>
     <div className="relative">
-      <Search size={16} strokeWidth={1.5} className="absolute left-3 top-3.5 text-kt-muted pointer-events-none z-10"/>
+      <Search size={16} strokeWidth={1.5} className="absolute left-3 top-1/2 -translate-y-1/2 text-kt-muted pointer-events-none z-10"/>
       <input
         className={`pl-10 ${inputClass}`}
         placeholder="Search riders"
@@ -508,14 +509,14 @@ return (
   {returnsSum > 0 && <div className="hidden sm:block"><p className="text-sm text-white/70">Returns</p><p className="font-display text-2xl leading-tight">Rs. {returnsSum.toLocaleString('en-US')}</p></div>}
 </div>
 <div className="flex gap-2 mb-3">
-<div className="relative flex-1"><Search className="absolute left-3 top-3.5 text-kt-muted" size={16} strokeWidth={1.5} /><input placeholder="Search invoices" className="w-full h-11 pl-9 pr-3 bg-white border border-kt-line rounded-lg text-sm text-kt-ink placeholder-kt-muted outline-none focus:border-kt-ink transition-colors" value={search} onChange={e => setSearch(e.target.value)} onKeyDown={e => { if (e.key === 'Escape' && search) { e.stopPropagation(); setSearch(''); } }} /></div>
+<div className="relative flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-kt-muted" size={16} strokeWidth={1.5} /><input placeholder="Search invoices" className="w-full h-11 pl-9 pr-3 bg-white border border-kt-line rounded-lg text-sm text-kt-ink placeholder-kt-muted outline-none focus:border-kt-ink transition-colors" value={search} onChange={e => setSearch(e.target.value)} onKeyDown={e => { if (e.key === 'Escape' && search) { e.stopPropagation(); setSearch(''); } }} /></div>
 {statusFilter === 'CreditNote'
   ? hasPermission('salesReturns') && <button onClick={() => { setEditingCreditNote({ customerId: '', id: '' }); setShowCreditNoteModal(true); }} className="h-11 bg-kt-primary hover:bg-kt-primary/90 text-white px-4 rounded-lg font-medium text-sm flex items-center gap-2 active:scale-[0.98] transition-[background-color,transform] whitespace-nowrap"><RotateCcw size={16} strokeWidth={1.5}/> New return</button>
   : <button onClick={startNewInvoice} className="h-11 bg-kt-primary hover:bg-kt-primary/90 text-white px-4 rounded-lg font-medium text-sm flex items-center gap-2 active:scale-[0.98] transition-[background-color,transform]"><Plus size={16} strokeWidth={1.5}/> New</button>
 }
 </div>
 <div className="flex flex-col sm:flex-row gap-2 mb-4">
-<div className="relative sm:w-48 shrink-0"><Calendar size={16} strokeWidth={1.5} className="absolute left-3 top-3 text-kt-muted pointer-events-none" /><select value={dateFilter} onChange={e => setDateFilter(e.target.value)} aria-label="Period" className="w-full h-10 bg-white border border-kt-line pl-9 pr-3 rounded-lg text-sm text-kt-ink outline-none"><option>All Time</option><option>Today</option><option>This Week</option><option>This Month</option><option>This Year</option></select></div>
+<FilterSelect tall className="sm:w-48 shrink-0" value={dateFilter} onChange={e => setDateFilter(e.target.value)} label="Period" icon={Calendar}><option>All Time</option><option>Today</option><option>This Week</option><option>This Month</option><option>This Year</option></FilterSelect>
 <div className="flex flex-1 gap-1 p-1 bg-white border border-kt-line rounded-lg">
 {[{v:'All',l:'All'},{v:'Estimate',l:'Quotes'},{v:'Booked',l:'Orders'},{v:'Billed',l:'Invoices'},{v:'CreditNote',l:'Returns'}].map(({v,l}) => (
 <button key={v} data-billingstatus={v} tabIndex={statusFilter===v?0:-1}
@@ -542,7 +543,7 @@ return (
 <div className="text-sm text-kt-sub flex items-center gap-x-3 gap-y-0.5 flex-wrap"><span className="font-mono text-[13px] text-kt-ink">{o.id}</span><span className="tabular-nums">{formatDateDisp(o.date)}</span><span className={`inline-flex items-center h-6 px-2 rounded-md text-xs font-medium ${o.status==='CreditNote'?'bg-kt-red/10 text-kt-red':o.status==='Estimate'?'bg-kt-blue/10 text-kt-blue':o.status==='Booked'?'bg-kt-amber/10 text-kt-amber':'bg-kt-raised text-kt-ink'}`}>{o.status==='CreditNote'?'Credit Note':o.status==='Booked'?'Draft Order':o.status}</span>{/* The derived status, the same one the edge used to be coloured from. The label used to read
     the stored field, so a bill settled by a later receipt could say Pending in green. */}
 {o.status==='Billed' && (() => { const ps = getPaymentStatus(o); return <span className={`inline-flex items-center h-6 px-2 rounded-md text-xs font-medium ${ps==='Paid'?'bg-kt-green/10 text-kt-green':ps==='Partial'?'bg-kt-amber/10 text-kt-amber':'bg-kt-red/10 text-kt-red'}`}>{ps==='Pending'?'Unpaid':ps}</span>; })()}</div>
-<div className="flex gap-1">
+<div className="flex gap-1 w-full justify-between sm:w-auto sm:justify-end">
 {o.status === 'Estimate' && hasPermission('issueInvoices') && <button onClick={async () => { await saveToFirebase('invoices', o.id, {...o, status: 'Booked'}); showToast('Converted to Draft Order'); }} title="Convert to Draft Order" className="w-9 h-9 flex items-center justify-center rounded-md text-kt-sub hover:bg-kt-raised hover:text-kt-ink transition-colors"><Save size={16} strokeWidth={1.5}/></button>}
 {(o.status === 'Estimate' || o.status === 'Booked') && hasPermission('issueInvoices') && <button onClick={async () => { const invGuess = getNextSeqNum(invoicesRaw, 'INV'); const invNum = await nextDocNumber('INV', invGuess); if (invNum === null) return showToast("No invoice numbers left offline. Reconnect once to reserve more.", "error"); const newId = `INV-${String(invNum).padStart(4, '0')}`; const issued = {...o, id: newId, status: 'Billed', date: getLocalDateStr()}; await saveToFirebase('invoices', newId, issued); await logSave('invoices', null, issued, newId); await deleteFromFirebase('invoices', o.id); await logDelete('invoices', o, `Issued as ${newId}`, o.id); showToast(`Converted to Invoice: ${newId}`); }} title="Issue as Invoice" className="w-9 h-9 flex items-center justify-center rounded-md text-kt-sub hover:bg-kt-raised hover:text-kt-ink transition-colors"><ReceiptText size={16} strokeWidth={1.5}/></button>}
 {o.status === 'Billed' && hasPermission('salesReturns') && <button onClick={() => { setEditingCreditNote({customerId: o.customerId, id: o.id}); setShowCreditNoteModal(true); }} title="Issue Credit Note / Return" className="w-9 h-9 flex items-center justify-center rounded-md text-kt-sub hover:bg-kt-raised hover:text-kt-ink transition-colors"><RotateCcw size={16} strokeWidth={1.5}/></button>}

@@ -35,7 +35,7 @@ return (
     onClick={() => setOpen(v => !v)}
     aria-label={`Connection: ${state}${pending > 0 ? `, ${pending} changes waiting to sync` : ''}`}
     aria-expanded={open}
-    className={`flex items-center gap-1.5 h-9 px-2.5 rounded-lg border text-xs font-medium transition-colors ${cls}`}
+    className={`flex items-center justify-center gap-1.5 h-9 px-2.5 rounded-lg border text-xs font-medium transition-colors ${cls}`}
   >
     <Icon size={16} strokeWidth={1.5} className={state === 'syncing' ? 'animate-spin' : ''}/>
     {text && <span>{text}</span>}

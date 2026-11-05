@@ -23,12 +23,12 @@ return (
       <button key={t.id} data-masterstab={t.id} tabIndex={tab===t.id?0:-1}
         onClick={()=>{setTab(t.id);setSearch('');}}
         onKeyDown={makeArrowNav(tabConfig.map(x=>x.id),tab,id=>{setTab(id);setSearch('');}, 'data-masterstab')}
-        className={`py-2 px-3 rounded-lg font-medium text-xs whitespace-nowrap transition-colors ${tab===t.id?'bg-white text-kt-green ':'text-kt-sub'}`}>{t.label}</button>
+        className={`h-11 sm:h-8 px-3 rounded-lg font-medium text-sm sm:text-xs whitespace-nowrap transition-colors ${tab===t.id?'bg-white text-kt-green ':'text-kt-sub'}`}>{t.label}</button>
     ))}
   </ScrollableTabBar>
   </div>
   <div className="flex gap-2">
-    <div className="relative flex-1"><Search className="absolute left-3 top-3 text-kt-muted" size={14}/><input placeholder="Search..." className="w-full pl-9 pr-3 py-2.5 bg-white border border-kt-line rounded-xl font-semibold outline-none text-sm focus:border-kt-ink" value={search} onChange={e=>setSearch(e.target.value)} /></div>
+    <div className="relative flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-kt-muted" size={14}/><input placeholder="Search..." className="w-full pl-9 pr-3 py-2.5 bg-white border border-kt-line rounded-xl font-semibold outline-none text-sm focus:border-kt-ink" value={search} onChange={e=>setSearch(e.target.value)} /></div>
     {tab !== 'companies' && tab !== 'categories' && (
       <button onClick={() => {
         if (tab === 'products') { setEditingProduct(null); setShowProductModal(true); }
