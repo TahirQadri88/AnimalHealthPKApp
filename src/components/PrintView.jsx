@@ -1039,22 +1039,22 @@ return (
     {/* ── Header ── */}
     <div className="keep-together" style={{ textAlign: 'center', marginBottom: sz('14px','12px','14px'), borderRadius: isThermal ? '0' : sz('','6px 6px 0 0','8px 8px 0 0'), overflow: 'hidden', border: '2px solid #0f172a' }}>
       {showBizName && (
-        <div data-dk="1" style={{ background: BLK.fill, padding: sz('12px 10px','18px 20px','22px 24px') }}>
-          <div className={isThermal ? undefined : 'doc-serif'} style={{ fontSize: `${mastheadFontPx}px`, fontWeight: 900, letterSpacing: '1px', textTransform: 'uppercase', color: BLK.ink, lineHeight: 1.2 }}>
+        <div data-dk="1" style={{ background: BLK.fill, padding: sz('12px 10px','10px 16px','12px 20px') }}>
+          <div className={isThermal ? undefined : 'doc-serif'} style={{ fontSize: `${mastheadFontPx}px`, fontWeight: 900, letterSpacing: '1px', textTransform: 'uppercase', color: BLK.ink, lineHeight: isThermal ? 1.2 : 1.1 }}>
             {bizName}
           </div>
-          {bizTagline && <div style={{ fontSize: `${taglineFontPx}px`, textTransform: 'uppercase', letterSpacing: '2px', fontWeight: 600, color: BLK.inkMuted, marginTop: '4px' }}>
+          {bizTagline && <div style={{ fontSize: `${taglineFontPx}px`, textTransform: 'uppercase', letterSpacing: '2px', fontWeight: 600, color: BLK.inkMuted, marginTop: isThermal ? '4px' : '2px' }}>
             {bizTagline}
           </div>}
           {/* Contact line. Brighter than the tagline because it is the actionable part —
               a phone number someone squints at, not decoration. overflowWrap keeps a long
               address inside the 68mm box instead of overrunning the head. */}
-          {bizContact && <div style={{ fontSize: `${taglineFontPx}px`, letterSpacing: '0.3px', fontWeight: 600, color: BLK.inkMuted, marginTop: '3px', lineHeight: 1.5, overflowWrap: 'anywhere' }}>
+          {bizContact && <div style={{ fontSize: `${taglineFontPx}px`, letterSpacing: '0.3px', fontWeight: 600, color: BLK.inkMuted, marginTop: isThermal ? '3px' : '1px', lineHeight: isThermal ? 1.5 : 1.35, overflowWrap: 'anywhere' }}>
             {bizContact}
           </div>}
           {!isThermal && (
-            <div style={{ marginTop: sz('', '10px', '12px') }}>
-              <span style={{ display: 'inline-block', background: BLK.ink, color: BLK.fill, padding: sz('', '3px 14px', '4px 18px'), borderRadius: '4px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '2.5px', fontSize: sz('', '8.5px', '9.5px'), lineHeight: 1.5 }}>{docLabel}</span>
+            <div style={{ marginTop: sz('', '6px', '8px') }}>
+              <span style={{ display: 'inline-block', background: BLK.ink, color: BLK.fill, padding: sz('', '2px 14px', '3px 18px'), borderRadius: '4px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '2.5px', fontSize: sz('', '8.5px', '9.5px'), lineHeight: 1.5 }}>{docLabel}</span>
             </div>
           )}
         </div>
@@ -1081,7 +1081,7 @@ return (
 
     {/* ── Customer / Doc Meta ── */}
     {docType !== 'report' && data && (
-      <div className="keep-together" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: sz('14px','16px','20px'), gap: '8px', background: '#f8fafc', borderRadius: sz('6px','7px','8px'), borderLeft: `3px solid #0f172a`, padding: sz('8px 6px','10px 10px','12px 14px') }}>
+      <div className="keep-together" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: sz('14px','16px','20px'), gap: '8px', background: '#f8fafc', borderRadius: sz('6px','7px','8px'), borderLeft: `3px solid #0f172a`, padding: sz('8px 6px','8px 12px 8px 9px','10px 14px 10px 11px') }}>
         {/* Left: customer */}
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: sz('7px','8.5px','9px'), textTransform: 'uppercase', fontWeight: 700, letterSpacing: '1.2px', color: '#1d4ed8', marginBottom: '3px' }}>
@@ -1469,7 +1469,7 @@ return (
         <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', marginBottom: sz('16px','20px','24px'), fontSize: sz('9.5px','11px','12px') }}>
           <thead>
             <tr data-dk="1" style={{ background: BLK.fill }}>
-              <th style={{ padding: sz('6px 2px 6px 0','5px 4px 5px 8px','5px 6px 5px 10px'), textAlign: 'left', fontWeight: 800, color: BLK.ink, textTransform: 'uppercase', fontSize: sz('7.5px','8.5px','9px'), letterSpacing: '0.5px', width: isThermal ? (docType === 'dispatch' ? '65%' : '48%') : (docType === 'dispatch' ? '65%' : '50%') }}>
+              <th style={{ padding: sz('6px 2px 6px 0','5px 4px 5px 12px','5px 6px 5px 14px'), textAlign: 'left', fontWeight: 800, color: BLK.ink, textTransform: 'uppercase', fontSize: sz('7.5px','8.5px','9px'), letterSpacing: '0.5px', width: isThermal ? (docType === 'dispatch' ? '65%' : '48%') : (docType === 'dispatch' ? '65%' : '50%') }}>
                 Description
               </th>
               <th style={{ padding: sz('6px 2px','5px 4px','5px 6px'), textAlign: 'center', fontWeight: 800, color: BLK.ink, textTransform: 'uppercase', fontSize: sz('7.5px','8.5px','9px'), letterSpacing: '0.5px', whiteSpace: 'nowrap', width: isThermal ? (docType === 'dispatch' ? '35%' : '10%') : (docType === 'dispatch' ? '35%' : '9%') }}>
@@ -1481,7 +1481,7 @@ return (
                 </th>
               )}
               {showAmountCol && (
-                <th style={{ padding: sz('','5px 8px 5px 4px','5px 10px 5px 4px'), textAlign: 'right', fontWeight: 800, color: BLK.ink, textTransform: 'uppercase', fontSize: sz('','8.5px','9px'), letterSpacing: '0.5px', whiteSpace: 'nowrap', width: '24%' }}>
+                <th style={{ padding: sz('','5px 12px 5px 4px','5px 14px 5px 4px'), textAlign: 'right', fontWeight: 800, color: BLK.ink, textTransform: 'uppercase', fontSize: sz('','8.5px','9px'), letterSpacing: '0.5px', whiteSpace: 'nowrap', width: '24%' }}>
                   Amount
                 </th>
               )}
@@ -1490,7 +1490,7 @@ return (
           <tbody>
             {safeItems.map((item, idx) => (
               <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9', pageBreakInside: 'avoid', breakInside: 'avoid', background: idx % 2 === 1 ? '#f8fafc' : '#ffffff' }}>
-                <td style={{ padding: sz('6px 2px 6px 0','5px 4px 5px 8px','5px 6px 5px 10px'), fontWeight: 600, wordBreak: 'break-word', lineHeight: sz('1.5','1.35','1.35'), color: '#1e293b' }}>
+                <td style={{ padding: sz('6px 2px 6px 0','5px 4px 5px 12px','5px 6px 5px 14px'), fontWeight: 600, wordBreak: 'break-word', lineHeight: sz('1.5','1.35','1.35'), color: '#1e293b' }}>
                   {item?.name || '—'}
                   {item?.isBonus && (
                     <span style={{ marginLeft: '5px', padding: '1px 5px', background: '#d1fae5', color: '#059669', fontSize: '6.5px', fontWeight: 800, borderRadius: '4px', textTransform: 'uppercase', border: '1px solid #a7f3d0', letterSpacing: '0.5px' }}>
@@ -1549,7 +1549,7 @@ return (
                   </td>
                 )}
                 {showAmountCol && (
-                  <td style={{ padding: sz('','5px 8px 5px 4px','5px 10px 5px 4px'), textAlign: 'right', fontWeight: 800, color: '#1e293b', whiteSpace: 'nowrap' }}>
+                  <td style={{ padding: sz('','5px 12px 5px 4px','5px 14px 5px 4px'), textAlign: 'right', fontWeight: 800, color: '#1e293b', whiteSpace: 'nowrap' }}>
                     {item?.isBonus
                       ? <span style={{ color: '#059669' }}>Rs. 0</span>
                       : `Rs. ${((item?.price || 0) * (item?.quantity || 0)).toLocaleString('en-US')}`}
@@ -1616,7 +1616,7 @@ return (
           {docType === 'invoice' && safeItems.length > 0 && (
             <tfoot>
               <tr style={{ borderTop: '2px solid #1e293b' }}>
-                <td style={{ padding: sz('6px 2px','5px 4px','5px 6px'), fontWeight: 700, fontSize: sz('8px','9px','10px'), color: '#1e293b' }}>
+                <td style={{ padding: sz('6px 2px','5px 4px 5px 12px','5px 6px 5px 14px'), fontWeight: 700, fontSize: sz('8px','9px','10px'), color: '#1e293b' }}>
                   Total SKUs: <strong style={{ color: '#1e293b' }}>{safeItems.length}</strong>
                 </td>
                 <td style={{ padding: sz('6px 2px','5px 4px','5px 6px'), textAlign: 'center', fontWeight: 800, color: '#1e293b', fontSize: sz('8px','9px','10px') }}>
@@ -1665,7 +1665,7 @@ return (
                 (data.deliveryBilled || 0) > 0 && { label: 'Delivery', val: `Rs. ${Number(data.deliveryBilled).toLocaleString('en-US')}`, muted: true },
                 { label: 'Estimated Total', val: `Rs. ${estimateGrandTotal.toLocaleString('en-US')}`, bold: true, large: true, divider: true },
               ].filter(Boolean).map((row, i) => (
-                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: sz('3px','4px','5px'), borderTop: row.divider ? '1px solid #e2e8f0' : 'none', paddingTop: row.divider ? sz('4px','5px','7px') : 0, marginTop: row.divider ? sz('3px','4px','5px') : 0, fontWeight: row.bold ? 800 : 500, fontSize: row.large ? sz('10px','12px','13px') : sz('8px','9px','10px'), fontVariantNumeric: 'tabular-nums' }}>
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: sz('3px','4px','5px'), paddingRight: sz('','12px','14px'), borderTop: row.divider ? '1px solid #e2e8f0' : 'none', paddingTop: row.divider ? sz('4px','5px','7px') : 0, marginTop: row.divider ? sz('3px','4px','5px') : 0, fontWeight: row.bold ? 800 : 500, fontSize: row.large ? sz('10px','12px','13px') : sz('8px','9px','10px'), fontVariantNumeric: 'tabular-nums' }}>
                   <span style={{ color: row.muted ? '#1e293b' : '#1e293b' }}>{row.label}:</span>
                   <span style={{ color: row.bold ? '#7c3aed' : '#1e293b' }}>{row.val}</span>
                 </div>
@@ -1692,7 +1692,7 @@ return (
                 showPrevBal && { label: 'Subtotal', val: `Rs. ${(prevBalance + (data.total || 0)).toLocaleString('en-US')}`, bold: true },
                 received > 0 && { label: 'Payment Received', val: `− Rs. ${received.toLocaleString('en-US')}`, color: '#15803d' },
               ].filter(Boolean).map((row, i) => row && (
-                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: sz('3px','4px','5px'), borderTop: row.divider || row.top ? '1px solid #e2e8f0' : 'none', paddingTop: row.divider || row.top ? sz('4px','5px','7px') : 0, marginTop: row.divider || row.top ? sz('3px','4px','5px') : 0, fontWeight: row.bold ? 800 : 500, fontSize: row.large ? sz('10px','12px','13px') : sz('8px','9px','10px') }}>
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: sz('3px','4px','5px'), paddingRight: sz('','12px','14px'), borderTop: row.divider || row.top ? '1px solid #e2e8f0' : 'none', paddingTop: row.divider || row.top ? sz('4px','5px','7px') : 0, marginTop: row.divider || row.top ? sz('3px','4px','5px') : 0, fontWeight: row.bold ? 800 : 500, fontSize: row.large ? sz('10px','12px','13px') : sz('8px','9px','10px') }}>
                   <span style={{ color: '#334155' }}>{row.label}:</span>
                   <span style={{ color: row.color || '#0f172a', fontVariantNumeric: 'tabular-nums' }}>{row.val}</span>
                 </div>
@@ -1722,7 +1722,7 @@ return (
                 { label: 'Previous Balance', val: `Rs. ${prevBalance.toLocaleString('en-US')}`, top: true },
                 { label: 'Balance After Return', val: `Rs. ${newBalance.toLocaleString('en-US')}`, bold: true, color: newBalance <= 0 ? '#059669' : '#1e293b' },
               ].map((row, i) => (
-                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: sz('3px','4px','5px'), borderTop: row.divider || row.top ? '1px solid #e2e8f0' : 'none', paddingTop: row.divider || row.top ? sz('4px','5px','7px') : 0, marginTop: row.divider || row.top ? sz('3px','4px','5px') : 0, fontWeight: row.bold ? 800 : 500, fontSize: row.large ? sz('10px','12px','13px') : sz('8px','9px','10px'), fontVariantNumeric: 'tabular-nums' }}>
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: sz('3px','4px','5px'), paddingRight: sz('','12px','14px'), borderTop: row.divider || row.top ? '1px solid #e2e8f0' : 'none', paddingTop: row.divider || row.top ? sz('4px','5px','7px') : 0, marginTop: row.divider || row.top ? sz('3px','4px','5px') : 0, fontWeight: row.bold ? 800 : 500, fontSize: row.large ? sz('10px','12px','13px') : sz('8px','9px','10px'), fontVariantNumeric: 'tabular-nums' }}>
                   <span style={{ color: '#1e293b' }}>{row.label}:</span>
                   <span style={{ color: row.color || '#1e293b' }}>{row.val}</span>
                 </div>
@@ -1780,7 +1780,7 @@ return (
           <div data-dk="1" style={{ background: BLK.fill, color: BLK.ink, padding: sz('4px 8px','5px 12px','6px 14px'), fontWeight: 900, textAlign: 'center', letterSpacing: '0.5px', textTransform: 'uppercase', fontSize: sz('6.5px','7px','8px'), borderRadius: '6px 6px 0 0' }}>
             "No" Return / Exchange Policy on Some Items
           </div>
-          <div style={{ padding: sz('6px 8px','6px 12px','8px 14px'), background: '#f8fafc', borderRadius: '0 0 6px 6px' }}>
+          <div style={{ padding: sz('6px 8px','6px 10.5px','8px 12.5px'), background: '#f8fafc', borderRadius: '0 0 6px 6px' }}>
             <div style={{ color: '#334155', lineHeight: sz('1.7','1.45','1.45'), marginBottom: sz('4px','4px','5px') }}>
               To ensure <strong>"Reliable, Authentic &amp; Storage Maintained"</strong> Vet. Medical Supplies, there is a <strong>No Return / No Exchange</strong> policy for the following items:
             </div>
