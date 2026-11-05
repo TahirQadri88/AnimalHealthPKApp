@@ -90,15 +90,25 @@ actually works.
 
 ---
 
-## The document's typeface: Poppins on screen, Inter on paper
+## The A4/A5 document's look: the app's brand on screen, Inter and black on paper
 
-The brand's face is Poppins, so the A4/A5 document is set in it for the preview, the PDF and the
-image. It is marked `font-doc`, which the app-wide Inter rule in `App.jsx` excludes. Paper is
-unchanged on purpose: `buildHtmlDoc` copies the document, drops its class and resets its font, so
-the print popup gets Inter exactly as before; thermal never gets `font-doc` at all. Prove it by
-capturing what Print writes (stub `window.open`) before and after a change: the only difference
-allowed is unused `@font-face` text. Poppins is wider than Inter, so after touching a document
-check A4 and A5 for text past its box (`PrintView.bar.test.jsx` pins where the class is and is not).
+A4/A5 documents match the rest of the app: Pasture green blocks with Khyber Yellow lettering
+(`PASTURE` in `printTheme.js`), DM Sans for everything, and EB Garamond for the business name only.
+**Figures are DM Sans, never Garamond**: its numerals are thin and small at table sizes and were hard
+to read. Thermal keeps `YELLOW` and Inter, byte for byte (`const BLK = isThermal ? YELLOW : PASTURE`).
+
+The document is marked `font-doc`, which the app-wide Inter rule in `App.jsx` excludes; the name carries
+`doc-serif`, keyed in `index.css` to `.font-doc` so it only applies on screen. Paper is unchanged in look
+on purpose: `buildHtmlDoc` copies the document, drops the root class and resets the root font, so the
+print popup gets Inter and the black-bar pass exactly as before. The moved "INVOICE" pill has no
+`data-dk` for the same reason (a black pill inside a black bar would vanish on paper).
+
+"Save / Share" is a separate standalone file: `lib/docFonts.js` fetches the faces once when a document
+opens and embeds them as data, so it looks right on any device. `?inline` does NOT embed a woff2.
+
+Density: A4/A5 item rows are about 28px (were 38px) at the same 12px/11px type, so about 40% more
+lines fit a page. Prove changes here by capturing what Print writes (stub `window.open`) and comparing
+thermal byte for byte, then open the shared file on its own and check A4 and A5 for text past its box.
 
 ## Two looks, not three: screen and paper
 

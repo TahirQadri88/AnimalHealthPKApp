@@ -106,7 +106,7 @@ describe('dispatch note can be signed for', () => {
 // A4 — the box was never too wide, the name was too small.
 describe('masthead name is sized to the box', () => {
   const titlePx = (html) => {
-    const m = html.match(/<div style="font-size:([\d.]+)px;font-weight:900;letter-spacing:1px/);
+    const m = html.match(/<div (?:class="doc-serif" )?style="font-size:([\d.]+)px;font-weight:900;letter-spacing:1px/);
     return m ? parseFloat(m[1]) : null;
   };
   const render2 = (format, businessName) => renderToStaticMarkup(

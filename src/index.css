@@ -179,3 +179,7 @@ input::placeholder, textarea::placeholder { color: rgb(var(--kt-muted)); opacity
   tbody tr { page-break-inside: avoid !important; break-inside: avoid !important; }
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
 }
+
+/* The business name on an A4/A5 document: EB Garamond, large enough to read. Keyed to .font-doc, which
+   buildHtmlDoc drops from the print copy, so paper never picks it up. The shared file carries its own rule. */
+.font-doc .doc-serif { font-family: 'EB Garamond', Georgia, serif !important; font-weight: 500 !important; letter-spacing: 0.5px !important; }

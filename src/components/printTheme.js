@@ -20,6 +20,16 @@ export const YELLOW = {
   edge: '#000000',        // a block's own border
 };
 
+// The blocks on A4/A5, in the app's own look: Pasture green with Khyber Yellow lettering. Thermal
+// keeps YELLOW (its markup is locked byte-for-byte), and paper bakes monochrome either way, so this
+// only ever reaches the screen, the shared file and the image.
+export const PASTURE = {
+  fill: '#1C3B2E',
+  ink: '#FFF200',
+  inkMuted: '#E9E4A6',   // the tagline and contact line on green: 8.9:1
+  edge: '#1C3B2E',
+};
+
 // Anything darker than this is treated as a block. #1e293b (the table header) sits at 0.16
 // and #64748b — a muted label, not a block — sits at 0.45, so the line falls between them.
 export const BLOCK_MAX_LUM = 0.45;
