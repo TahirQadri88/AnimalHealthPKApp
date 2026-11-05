@@ -544,9 +544,9 @@ const buildHtmlDoc = (screenHide = false, colour = false) => {
   // The colour PDF opens in its own window. On a phone that window can be full screen with nothing around
   // it, so it carries its own two buttons (hidden when printing): Print / Save as PDF, and Close.
   const pdfBar = colour ? `<style>
-.pdf-bar{position:sticky;top:0;z-index:10;display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 12px;background:#1C3B2E;color:#fff;font:500 14px 'DM Sans',system-ui,sans-serif;margin:-16px -16px 14px}
+.pdf-bar{position:sticky;top:0;z-index:10;display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 12px;background:#142339;color:#fff;font:500 14px 'DM Sans',system-ui,sans-serif;margin:-16px -16px 14px}
 .pdf-bar button{min-height:44px;padding:0 16px;border-radius:8px;border:1px solid rgba(255,255,255,.35);background:transparent;color:#fff;font:600 14px 'DM Sans',system-ui,sans-serif}
-.pdf-bar button.main{background:#FFF200;color:#1C3B2E;border-color:#FFF200}
+.pdf-bar button.main{background:#FFF200;color:#142339;border-color:#FFF200}
 .pdf-bar span{flex:1 1 100%;font-size:12px;opacity:.8}
 @media print{.pdf-bar{display:none!important}}
 </style>

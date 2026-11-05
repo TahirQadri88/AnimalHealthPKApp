@@ -118,8 +118,8 @@ saw it, because the sample names were short. `tools/ui-preview/sample-data.js` n
 
 ## The A4/A5 document's look: the app's brand on screen, Inter and black on paper
 
-A4/A5 documents match the rest of the app: Pasture green blocks with Khyber Yellow lettering
-(`PASTURE` in `printTheme.js`), DM Sans for everything, and EB Garamond for the business name only.
+A4/A5 documents match the rest of the app: Ink navy blocks (`#142339`, the app's band) with Khyber Yellow lettering
+(`PASTURE` in `printTheme.js`, name kept from the green days), DM Sans for everything, and EB Garamond for the business name only.
 **Figures are DM Sans, never Garamond**: its numerals are thin and small at table sizes and were hard
 to read. Thermal keeps `YELLOW` and Inter, byte for byte (`const BLK = isThermal ? YELLOW : PASTURE`).
 

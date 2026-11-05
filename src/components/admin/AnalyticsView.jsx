@@ -850,7 +850,7 @@ return (
               <div className="bg-white rounded-xl border border-kt-red/30 overflow-hidden">
                 <div className="bg-kt-red p-3 flex justify-between items-center">
                   <span className="text-xs font-medium text-white flex items-center gap-1.5"><AlertCircle size={13}/> Top Overdue Balances</span>
-                  <span className="text-xs font-semibold text-kt-red">{overdue.length} accounts · 31+ days</span>
+                  <span className="text-xs font-semibold text-white">{overdue.length} accounts · 31+ days</span>
                 </div>
                 <div className="divide-y divide-kt-line">
                   {overdue.map((r,i) => (
