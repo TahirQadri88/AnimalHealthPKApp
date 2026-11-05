@@ -349,21 +349,18 @@ const renderTable = (dataObj, type, dimension) => {
   const tierColors = { A: 'bg-kt-green/10 text-kt-green border-kt-green/30', B: 'bg-kt-amber/10 text-kt-amber border-kt-amber/30', C: 'bg-kt-raised text-kt-sub border-kt-line' };
   return (
     <div className="bg-white rounded-xl border border-kt-line overflow-hidden mt-3">
-       <div className="bg-kt-raised border-b border-kt-line p-2 flex justify-between items-center">
-         <div className="flex items-center gap-2 ml-1">
-           <span className="text-xs font-medium text-kt-sub">{arrWithABC.length} {type}s</span>
-           <span className="text-xs text-kt-muted font-medium">| ABC = revenue tier</span>
-         </div>
-         <select value={sortBy} onChange={e=>setSortBy(e.target.value)} className="bg-white border border-kt-line rounded px-2 py-1 text-xs font-medium text-kt-sub outline-none">
+       <div className="bg-kt-raised border-b border-kt-line p-2 flex flex-wrap justify-between items-center gap-2">
+         <span className="text-xs font-medium text-kt-sub ml-1 whitespace-nowrap">{arrWithABC.length} {type}s <span className="text-kt-muted hidden sm:inline">· ABC = revenue tier</span></span>
+         <FilterSelect compact className="w-44 sm:w-52 shrink-0" value={sortBy} onChange={e=>setSortBy(e.target.value)} label="Sort">
            <option value="profit">Sort: Highest GP</option>
            <option value="revenue">Sort: Highest Revenue</option>
            <option value="margin">Sort: Best Margin</option>
            <option value="marginWorst">Sort: Worst Margin</option>
            {type !== 'Customer' && <option value="qty">Sort: Highest Qty</option>}
-         </select>
+         </FilterSelect>
        </div>
        <div className="overflow-x-auto">
-         <table className="w-full text-left text-xs whitespace-nowrap">
+         <table className="w-full min-w-[34rem] sm:min-w-0 text-left text-xs whitespace-nowrap">
             <thead className="bg-kt-raised text-kt-sub font-medium border-b border-kt-line">
               <tr>
                 <th className="p-3">{type}</th>
@@ -384,17 +381,19 @@ const renderTable = (dataObj, type, dimension) => {
                 const barW = maxProfit > 0 ? Math.max((gp / maxProfit) * 100, 0) : 0;
                 return (
                   <tr key={i} className="hover:bg-kt-raised">
-                    <td className="p-3">
-                      <div className="flex items-center gap-1.5">
-                        <span className={`text-xs font-semibold px-1 py-0.5 rounded border ${tierColors[row.abcTier]}`}>{row.abcTier}</span>
-                        <button
-                          className="font-medium text-kt-ink hover:text-kt-blue text-left transition-colors underline decoration-dotted decoration-slate-300 underline-offset-2"
-                          title={`Show the transactions behind ${row.label || row.key}`}
-                          onClick={() => openDrill(dimension, row.key, row.label || row.key)}
-                        >{row.label || row.key}</button>
-                      </div>
-                      {row.company && <div className="text-xs text-kt-muted mt-0.5">{row.company}</div>}
-                      <div className="w-full bg-kt-raised rounded-full h-1 mt-1.5 max-w-[100px]"><div className="bg-kt-primary h-1 rounded-full" style={{width:`${barW}%`}}></div></div>
+                    <td className="px-3 py-2 sm:p-3">
+                      <button
+                        className="text-left block whitespace-normal max-w-[15rem] sm:max-w-none"
+                        title={`Show the transactions behind ${row.label || row.key}`}
+                        onClick={() => openDrill(dimension, row.key, row.label || row.key)}
+                      >
+                        <span className="flex items-center gap-1.5">
+                          <span title="Revenue tier: A = top sellers, C = smallest" className={`text-xs font-semibold px-1 py-0.5 rounded border ${tierColors[row.abcTier]}`}>{row.abcTier}</span>
+                          <span className="font-medium text-kt-ink underline decoration-dotted decoration-kt-muted underline-offset-2">{row.label || row.key}</span>
+                        </span>
+                        {row.company && <span className="block text-xs text-kt-muted">{row.company}</span>}
+                        <span className="block w-full bg-kt-raised rounded-full h-1 mt-1 max-w-[100px]"><span className="block bg-kt-primary h-1 rounded-full" style={{width:`${barW}%`}}></span></span>
+                      </button>
                     </td>
                     {type !== 'Customer' && <td className="p-3 text-center bg-kt-raised/50 font-medium">{(row.qty||0).toLocaleString('en-US')}</td>}
                     {type === 'Customer' && <td className="p-3 text-center bg-kt-raised/50 font-medium">{row.orders||0}</td>}
@@ -433,17 +432,17 @@ const renderSegmentTable = (dataObj, label, dimension) => {
   const maxRev = arr[0]?.revenue || 1;
   return (
     <div className="bg-white rounded-xl border border-kt-line overflow-hidden mt-3">
-      <div className="bg-kt-raised border-b border-kt-line p-2 flex justify-between items-center">
+      <div className="bg-kt-raised border-b border-kt-line p-2 flex flex-wrap justify-between items-center gap-2">
         <span className="text-xs font-medium text-kt-sub ml-2">{arr.length} {label}s</span>
-        <select value={sortBy} onChange={e=>setSortBy(e.target.value)} className="bg-white border border-kt-line rounded px-2 py-1 text-xs font-medium text-kt-sub outline-none">
+        <FilterSelect compact className="w-44 sm:w-52 shrink-0" value={sortBy} onChange={e=>setSortBy(e.target.value)} label="Sort">
           <option value="revenue">Sort: Highest Revenue</option>
           <option value="profit">Sort: Highest GP</option>
           <option value="margin">Sort: Best Margin</option>
           <option value="marginWorst">Sort: Worst Margin</option>
-        </select>
+        </FilterSelect>
       </div>
       <div className="overflow-x-auto">
-        <table className="w-full text-left text-xs whitespace-nowrap">
+        <table className="w-full min-w-[34rem] sm:min-w-0 text-left text-xs whitespace-nowrap">
           <thead className="bg-kt-raised text-kt-sub font-medium border-b border-kt-line">
             <tr><th className="p-3">{label}</th><th className="p-3 text-center">Orders</th><th className="p-3 text-right">Revenue</th><th className="p-3 text-right text-kt-green">GP</th><th className="p-3 text-right text-kt-blue">Margin%</th></tr>
           </thead>
@@ -455,13 +454,15 @@ const renderSegmentTable = (dataObj, label, dimension) => {
               const barW = maxRev > 0 ? Math.max((rev / maxRev) * 100, 0) : 0;
               return (
                 <tr key={i} className="hover:bg-kt-raised">
-                  <td className="p-3">
+                  <td className="px-3 py-2 sm:p-3">
                     <button
-                      className="font-medium text-kt-ink hover:text-kt-blue text-left transition-colors underline decoration-dotted decoration-slate-300 underline-offset-2"
+                      className="text-left block whitespace-normal max-w-[15rem] sm:max-w-none"
                       title={`Show the transactions behind ${row.key}`}
                       onClick={() => openDrill(dimension, row.key)}
-                    >{row.key || '—'}</button>
-                    <div className="w-full bg-kt-raised rounded-full h-1 mt-1.5 max-w-[100px]"><div className="bg-kt-primary h-1 rounded-full" style={{width:`${barW}%`}}></div></div>
+                    >
+                      <span className="font-medium text-kt-ink underline decoration-dotted decoration-kt-muted underline-offset-2">{row.key || '—'}</span>
+                      <span className="block w-full bg-kt-raised rounded-full h-1 mt-1 max-w-[100px]"><span className="block bg-kt-primary h-1 rounded-full" style={{width:`${barW}%`}}></span></span>
+                    </button>
                   </td>
                   <td className="p-3 text-center bg-kt-raised/50 font-medium">{row.orders||0}</td>
                   <td className="p-3 text-right font-medium text-kt-ink">Rs.{rev.toLocaleString('en-US')}</td>
@@ -757,7 +758,7 @@ return (
                 </div>
                 <div className="bg-white rounded-xl border border-kt-line overflow-hidden">
                   <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs whitespace-nowrap">
+                    <table className="w-full min-w-[34rem] sm:min-w-0 text-left text-xs whitespace-nowrap">
                       <thead className="bg-kt-raised text-kt-sub font-medium border-b border-kt-line">
                         <tr><th className="p-3">Date</th><th className="p-3">Customer</th><th className="p-3">Invoice</th><th className="p-3">Product</th><th className="p-3 text-center">Qty</th><th className="p-3 text-right">Rate</th><th className="p-3 text-right">Amount</th></tr>
                       </thead>
@@ -792,7 +793,7 @@ return (
             <p className="text-xs font-medium text-kt-sub">{Object.keys(reportEngine.bySalesperson).length} Staff Members</p>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs whitespace-nowrap">
+            <table className="w-full min-w-[34rem] sm:min-w-0 text-left text-xs whitespace-nowrap">
               <thead className="bg-kt-raised text-kt-sub font-medium border-b border-kt-line">
                 <tr><th className="p-3">Staff</th><th className="p-3 text-center">Orders</th><th className="p-3 text-right">Revenue</th><th className="p-3 text-right text-kt-green">GP</th><th className="p-3 text-right text-kt-blue">Margin%</th></tr>
               </thead>
@@ -1016,7 +1017,7 @@ return (
                   <span className="text-xs font-medium text-kt-sub">Every expense · newest first</span>
                 </div>
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs whitespace-nowrap">
+                  <table className="w-full min-w-[34rem] sm:min-w-0 text-left text-xs whitespace-nowrap">
                     <thead className="bg-kt-raised text-kt-sub font-medium border-b border-kt-line">
                       <tr><th className="p-3">Date</th><th className="p-3">Category</th><th className="p-3">Group</th><th className="p-3">Note</th><th className="p-3 text-right">Amount</th></tr>
                     </thead>
@@ -1111,7 +1112,7 @@ return (
                     <span className="text-xs font-medium text-kt-sub">Every credit note · newest first</span>
                   </div>
                   <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs whitespace-nowrap">
+                    <table className="w-full min-w-[34rem] sm:min-w-0 text-left text-xs whitespace-nowrap">
                       <thead className="bg-kt-raised text-kt-sub font-medium border-b border-kt-line">
                         <tr><th className="p-3">Date</th><th className="p-3">Credit Note</th><th className="p-3">Customer</th><th className="p-3">Reason</th><th className="p-3 text-center">Days Out</th><th className="p-3 text-right">Value</th></tr>
                       </thead>
@@ -1263,7 +1264,7 @@ return (
                   <span className="text-xs font-medium text-kt-sub">Every collection · newest first</span>
                 </div>
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs whitespace-nowrap">
+                  <table className="w-full min-w-[34rem] sm:min-w-0 text-left text-xs whitespace-nowrap">
                     <thead className="bg-kt-raised text-kt-sub font-medium border-b border-kt-line">
                       <tr><th className="p-3">Date</th><th className="p-3">Reference</th><th className="p-3">Customer</th><th className="p-3">Method</th><th className="p-3 text-right">Received</th></tr>
                     </thead>
