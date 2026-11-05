@@ -30,7 +30,7 @@ return (
 </div>
 <button onClick={() => { setEditingUser(null); setShowUserModal(true); }} className="bg-kt-primary text-white px-3 py-2 rounded-lg text-xs font-medium flex items-center gap-1 hover:bg-kt-primary/90 transition-colors"><Plus size={14}/> Add User</button>
 </div>
-<div className="relative mb-3"><Search className="absolute left-3 top-2.5 text-kt-muted" size={14}/><input placeholder="Search users..." className="w-full pl-8 pr-3 py-2 bg-white border border-kt-line rounded-xl font-semibold outline-none text-sm focus:border-kt-ink" value={userSearch} onChange={e=>setUserSearch(e.target.value)} /></div>
+<div className="relative mb-3"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-kt-muted" size={14}/><input placeholder="Search users..." className="w-full pl-8 pr-3 py-2 bg-white border border-kt-line rounded-xl font-semibold outline-none text-sm focus:border-kt-ink" value={userSearch} onChange={e=>setUserSearch(e.target.value)} /></div>
 <div className="flex items-center gap-1.5 bg-white px-2.5 py-1.5 rounded-lg border border-kt-line mb-4 w-fit">
 <Calendar size={13} className="text-kt-blue"/>
 <select value={userDateFilter} onChange={e=>setUserDateFilter(e.target.value)} className="bg-transparent font-medium text-xs text-kt-ink outline-none cursor-pointer">

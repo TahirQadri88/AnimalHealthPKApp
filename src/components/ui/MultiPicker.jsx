@@ -33,10 +33,10 @@ export const MultiPicker = ({ label, Icon, items, selected, onToggle, onClear })
   const filteredItems = pickerSearch ? items.filter(i => i.name.toLowerCase().includes(pickerSearch.toLowerCase())) : items;
   const allSelected = items.length > 0 && items.every(i => selected.has(String(i.id)));
   return (
-    <div className="relative shrink-0">
+    <div className="relative sm:shrink-0">
       <button ref={btnRef} onClick={handleOpen}
-        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border  font-medium text-xs transition-colors ${count > 0 ? 'bg-kt-primary text-white border-kt-primary' : 'bg-white text-kt-ink border-kt-line'}`}>
-        {Icon && <Icon size={12}/>} {count > 0 ? `${label} (${count})` : label} <ChevronDown size={10}/>
+        className={`h-11 sm:h-9 w-full sm:w-auto px-3 rounded-lg border font-medium text-base sm:text-xs flex items-center justify-between sm:justify-start gap-2 transition-colors ${count > 0 ? 'bg-kt-primary text-white border-kt-primary' : 'bg-white text-kt-ink border-kt-line'}`}>
+        <span className="flex items-center gap-2 min-w-0">{Icon && <Icon size={14} strokeWidth={1.5} className="shrink-0"/>}<span className="truncate">{count > 0 ? `${label} (${count})` : label}</span></span> <ChevronDown size={14} strokeWidth={1.5} className="shrink-0"/>
       </button>
       {open && createPortal(
         <div ref={dropdownRef} style={{ position: 'fixed', top: dropdownPos.top, left: dropdownPos.left, zIndex: 9999 }}

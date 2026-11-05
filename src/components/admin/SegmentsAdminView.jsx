@@ -66,7 +66,7 @@ return (
 <div className="bg-kt-line p-1 rounded-xl">
 <ScrollableTabBar bgClass="bg-kt-line">
 {['cities','areas','customerTypes','vehicleTypes'].map(t => (
-<button key={t} onClick={() => { setTab(t); setNewVal(''); setEditingId(null); setSegSearch(''); setNewVtRequiresRider(false); }} className={`py-2 px-3 rounded-lg font-medium text-xs whitespace-nowrap transition-colors ${tab===t?'bg-white text-kt-blue ':'text-kt-sub'}`}>{t==='vehicleTypes'?'Transport':labelMap[t]+'s'}</button>
+<button key={t} onClick={() => { setTab(t); setNewVal(''); setEditingId(null); setSegSearch(''); setNewVtRequiresRider(false); }} className={`h-11 sm:h-8 px-3 rounded-lg font-medium text-sm sm:text-xs whitespace-nowrap transition-colors ${tab===t?'bg-white text-kt-blue ':'text-kt-sub'}`}>{t==='vehicleTypes'?'Transport':labelMap[t]+'s'}</button>
 ))}
 </ScrollableTabBar>
 </div>
@@ -81,7 +81,7 @@ return (
 <button onClick={add} className="bg-kt-primary text-white px-4 rounded-xl font-medium hover:bg-kt-primary/90 transition-colors shrink-0">Add</button>
 </div>
 {tab === 'vehicleTypes' && <p className="text-xs text-kt-muted -mt-2">Tap <span className="font-medium">🚛</span> before adding if riders should be assignable (local delivery). Leave off for intercity/self-pickup types.</p>}
-<div className="relative"><Search className="absolute left-3 top-2.5 text-kt-muted" size={14}/><input placeholder={`Search ${labelMap[tab]}s...`} className="w-full pl-8 pr-3 py-2 bg-white border border-kt-line rounded-xl font-semibold outline-none text-sm focus:border-kt-ink" value={segSearch} onChange={e=>setSegSearch(e.target.value)} /></div>
+<div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-kt-muted" size={14}/><input placeholder={`Search ${labelMap[tab]}s...`} className="w-full pl-8 pr-3 py-2 bg-white border border-kt-line rounded-xl font-semibold outline-none text-sm focus:border-kt-ink" value={segSearch} onChange={e=>setSegSearch(e.target.value)} /></div>
 <div className="bg-white border border-kt-line rounded-xl overflow-hidden">
 {list.length === 0 && <p className="text-center py-6 text-sm text-kt-muted">No {labelMap[tab]}s yet.</p>}
 <ul className="divide-y divide-kt-line">

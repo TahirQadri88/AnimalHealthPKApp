@@ -10,6 +10,8 @@
 //          scrolling sideways.
 // too big  a bordered box at least 96px tall whose contents fill under 40% of its height.
 // aligned  boxes stacked in one list whose left edges differ by more than 2px.
+// misaligned  an icon off the centre line of its label or field; controls side by side (pills,
+//          filters, button rows) of different heights; a scrolling row that starts with dead space.
 import { createRequire } from 'node:module';
 const { chromium } = await import('playwright').catch(() => createRequire(import.meta.url)('playwright'));
 
@@ -71,13 +73,80 @@ for (const w of widths) {
         const lefts = kids.map(k => Math.round(k.getBoundingClientRect().left));
         if (Math.max(...lefts) - Math.min(...lefts) > 2) off.add(`list of ${kids.length} under ${name(list).slice(0, 40)}: left edges ${[...new Set(lefts)].join('/')}px`);
       }
-      return { spill: [...spill], big: [...big], off: [...off] };
+      // ── Alignment: icons against their text, controls in a row against each other ─────────────
+      const textRect = (el) => {
+        for (const n of el.childNodes) {
+          const target = n.nodeType === 3 ? (n.textContent.trim() ? n : null) : (n.nodeType === 1 && !n.matches('svg, kbd') && n.textContent.trim() ? n : null);
+          if (!target) continue;
+          if (target.nodeType === 1) {
+            const pos = getComputedStyle(target).position;
+            if (pos === 'absolute' || pos === 'fixed') continue;           // a count badge, not the label
+            if (target.getBoundingClientRect().height > 30) return false;  // a multi-line block: the icon centres on the whole
+          }
+          const r = document.createRange(); r.selectNodeContents(target);
+          const rects = [...r.getClientRects()].filter(x => x.width > 0);
+          if (rects.length) return rects[0];
+        }
+        return null;
+      };
+      const mis = new Set();
+      for (const svg of document.querySelectorAll('main svg.lucide, header svg.lucide, nav svg.lucide, aside svg.lucide, [role="dialog"] svg.lucide')) {
+        if (!vis(svg)) continue;
+        const sb = svg.getBoundingClientRect(), par = svg.parentElement, pb = par.getBoundingClientRect();
+        const sy = sb.top + sb.height / 2;
+        if (getComputedStyle(svg).position === 'absolute') {
+          // an icon laid over a field: it must sit on the field's centre line
+          const field = par.querySelector('input, select, textarea, button');
+          if (field) { const fb = field.getBoundingClientRect(); const d = Math.abs(sy - (fb.top + fb.height / 2)); if (d > 1.5) mis.add(`icon over a field is ${d.toFixed(1)}px off its centre: ${name(par).slice(0, 50)}`); }
+          continue;
+        }
+        const t = textRect(par);
+        if (t && t.height < 40) { const d = Math.abs(sy - (t.top + t.height / 2)); if (d > 2.5) mis.add(`icon ${d.toFixed(1)}px off its label's centre: ${name(par).slice(0, 50)}`); }
+        else if (!par.textContent.trim() && par.children.length === 1 && par.matches('button, a')) {
+          const dx = Math.abs(sb.left + sb.width / 2 - (pb.left + pb.width / 2)), dy = Math.abs(sy - (pb.top + pb.height / 2));
+          if (dx > 1.5 || dy > 1.5) mis.add(`icon-only button's icon is off-centre by ${dx.toFixed(1)}/${dy.toFixed(1)}px: ${par.getAttribute('title') || par.getAttribute('aria-label') || name(par).slice(0, 30)}`);
+        }
+      }
+      // controls side by side that should be one height: pills, filters, button rows
+      // The control a child stands for: itself, or the one button/select/input inside a plain wrapper
+      // (the date pill is a wrapper around a select; measuring the wrapper missed its height).
+      const controlOf = (c) => {
+        const styled = (e) => parseFloat(getComputedStyle(e).borderTopWidth) > 0 || getComputedStyle(e).backgroundColor !== 'rgba(0, 0, 0, 0)';
+        if (c.matches('button, a[href], select, input')) return styled(c) ? c : null;
+        const inner = c.querySelectorAll('button, select, input');
+        if (inner.length === 1 && !c.querySelector('p, h1, h2, h3, h4') && styled(inner[0])) return inner[0];
+        // a bordered pill built from a few parts (the searchable pills): a control if it is pill-sized
+        if (styled(c) && c.getBoundingClientRect().height <= 60 && !c.querySelector('p, h1, h2, h3, h4') && inner.length >= 1) return c;
+        return null;
+      };
+      for (const row of document.querySelectorAll('main *, header *, [role="dialog"] *')) {
+        if (!/(flex|grid)/.test(getComputedStyle(row).display) || row.closest('table')) continue;
+        const kids = [...row.children].filter(vis).map(c => [c, controlOf(c)]).filter(x => x[1]);
+        if (kids.length < 2) continue;
+        const lines = {};
+        for (const [k, ctl] of kids) { const b = ctl.getBoundingClientRect(); (lines[Math.round(b.top / 8)] ||= []).push([k, b.height]); }
+        for (const g of Object.values(lines)) {
+          if (g.length < 2) continue;
+          const hs = g.map(x => x[1]);
+          if (Math.max(...hs) - Math.min(...hs) > 3) mis.add(`controls in one row differ in height (${hs.map(Math.round).join('/')}px): ${g.map(x => name(x[0]).slice(0, 18)).join(', ')}`);
+        }
+      }
+      // scroll rows that start with dead space
+      for (const sc of document.querySelectorAll('.scrollbar-hide, .overflow-x-auto')) {
+        if (!vis(sc) || sc.tagName === 'TABLE' || sc.scrollLeft > 0) continue;
+        const first = [...sc.children].find(vis); if (!first) continue;
+        const root = sc.parentElement.getBoundingClientRect();
+        // from the parent's content edge: a card's own padding is not dead space
+        const gap = first.getBoundingClientRect().left - (root.left + parseFloat(getComputedStyle(sc.parentElement).paddingLeft));
+        if (gap > 14) mis.add(`scrolling row starts ${Math.round(gap)}px in from its edge: ${name(first).slice(0, 30)}`);
+      }
+      return { spill: [...spill], big: [...big], off: [...off], mis: [...mis] };
     });
-    const n = r.spill.length + r.big.length + r.off.length; total += n;
+    const n = r.spill.length + r.big.length + r.off.length + r.mis.length; total += n;
     if (n) {
       console.log(`\n${tab} @${w}px:`);
-      for (const [k, list] of [['spill', r.spill], ['too big', r.big], ['out of line', r.off]]) for (const x of list.slice(0, 6)) console.log(`  ${k.padEnd(11)} ${x}`);
-      for (const [k, list] of [['spill', r.spill], ['too big', r.big], ['out of line', r.off]]) if (list.length > 6) console.log(`  ${k.padEnd(11)} ...and ${list.length - 6} more`);
+      for (const [k, list] of [['spill', r.spill], ['too big', r.big], ['out of line', r.off], ['misaligned', r.mis]]) for (const x of list.slice(0, 6)) console.log(`  ${k.padEnd(11)} ${x}`);
+      for (const [k, list] of [['spill', r.spill], ['too big', r.big], ['out of line', r.off], ['misaligned', r.mis]]) if (list.length > 6) console.log(`  ${k.padEnd(11)} ...and ${list.length - 6} more`);
     }
   }
   await page.close();

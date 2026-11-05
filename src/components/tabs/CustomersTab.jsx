@@ -28,22 +28,22 @@ return (
 {isAdmin && <button onClick={() => { setEditingCustomer(null); setShowCustomerModal(true); }} className="bg-kt-primary text-white p-2 rounded-xl"><Plus size={18}/></button>}
 </div>
 </div>
-<div className="relative mb-2"><Search className="absolute left-3.5 top-3.5 text-kt-muted" size={18} /><input placeholder="Search clients" className="w-full pl-10 pr-4 py-3 bg-white border border-kt-line rounded-xl font-semibold outline-none text-sm" value={search} onChange={e => setSearch(e.target.value)} onKeyDown={e => { if (e.key === 'Escape' && search) { e.stopPropagation(); setSearch(''); } }} /></div>
+<div className="relative mb-2"><Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-kt-muted" size={18} /><input placeholder="Search clients" className="w-full pl-10 pr-4 py-3 bg-white border border-kt-line rounded-xl font-semibold outline-none text-sm" value={search} onChange={e => setSearch(e.target.value)} onKeyDown={e => { if (e.key === 'Escape' && search) { e.stopPropagation(); setSearch(''); } }} /></div>
 <ScrollableTabBar className="mb-3 shrink-0">
-  <SearchableSelect value={filterCity} onChange={e=>{setFilterCity(e.target.value);setFilterArea('');}} className="bg-white border border-kt-line px-2.5 py-1.5 rounded-lg font-medium text-xs text-kt-ink outline-none shrink-0 min-w-[90px]" placeholder="All Cities" options={cities.map(c=>({value:c.name,label:c.name}))} />
-  <SearchableSelect value={filterArea} onChange={e=>setFilterArea(e.target.value)} className="bg-white border border-kt-line px-2.5 py-1.5 rounded-lg font-medium text-xs text-kt-ink outline-none shrink-0 min-w-[90px]" placeholder="All Areas" options={areas.filter(a=>!filterCity||!a.cityName||a.cityName===filterCity).map(a=>({value:a.name,label:a.name}))} />
-  <select value={filterType} onChange={e=>setFilterType(e.target.value)} className="bg-white border border-kt-line px-2.5 py-1.5 rounded-lg font-medium text-xs text-kt-ink outline-none shrink-0">
+  <SearchableSelect value={filterCity} onChange={e=>{setFilterCity(e.target.value);setFilterArea('');}} className="h-11 sm:h-9 px-3 rounded-lg border border-kt-line bg-white font-medium text-base sm:text-xs text-kt-ink outline-none shrink-0 min-w-[110px]" placeholder="All Cities" options={cities.map(c=>({value:c.name,label:c.name}))} />
+  <SearchableSelect value={filterArea} onChange={e=>setFilterArea(e.target.value)} className="h-11 sm:h-9 px-3 rounded-lg border border-kt-line bg-white font-medium text-base sm:text-xs text-kt-ink outline-none shrink-0 min-w-[110px]" placeholder="All Areas" options={areas.filter(a=>!filterCity||!a.cityName||a.cityName===filterCity).map(a=>({value:a.name,label:a.name}))} />
+  <select value={filterType} onChange={e=>setFilterType(e.target.value)} className="h-11 sm:h-9 px-3 rounded-lg border border-kt-line bg-white font-medium text-base sm:text-xs text-kt-ink outline-none shrink-0">
     <option value="">All Types</option>
     {customerTypes.map(t=><option key={t.id} value={t.name}>{t.name}</option>)}
   </select>
-  <select value={filterBalance} onChange={e=>setFilterBalance(e.target.value)} className="bg-white border border-kt-line px-2.5 py-1.5 rounded-lg font-medium text-xs text-kt-ink outline-none shrink-0">
+  <select value={filterBalance} onChange={e=>setFilterBalance(e.target.value)} className="h-11 sm:h-9 px-3 rounded-lg border border-kt-line bg-white font-medium text-base sm:text-xs text-kt-ink outline-none shrink-0">
     <option value="All">All Balances</option>
     <option value="Outstanding">Outstanding (Dr)</option>
     <option value="Advance">Advance (Cr)</option>
     <option value="Clear">Cleared</option>
   </select>
-  <button onClick={() => setShowIncompleteOnly(v => !v)} className={`shrink-0 text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center gap-1 border transition-colors ${showIncompleteOnly ? 'bg-kt-amber text-white border-kt-amber/30' : 'bg-white text-kt-amber border-kt-amber/30 hover:bg-kt-amber/10'}`}><AlertCircle size={10}/> Incomplete{incompleteIds.size > 0 ? ` (${incompleteIds.size})` : ''}</button>
-  {activeFilters && <button onClick={clearFilters} className="shrink-0 text-xs font-medium text-kt-red bg-kt-red/10 border border-kt-red/30 px-2.5 py-1.5 rounded-lg flex items-center gap-1 hover:bg-kt-red/10 transition-colors"><X size={10}/> Clear</button>}
+  <button onClick={() => setShowIncompleteOnly(v => !v)} className={`shrink-0 h-11 sm:h-9 px-3 text-base sm:text-xs font-medium rounded-lg flex items-center gap-1.5 border transition-colors ${showIncompleteOnly ? 'bg-kt-amber text-white border-kt-amber/30' : 'bg-white text-kt-amber border-kt-amber/30 hover:bg-kt-amber/10'}`}><AlertCircle size={10}/> Incomplete{incompleteIds.size > 0 ? ` (${incompleteIds.size})` : ''}</button>
+  {activeFilters && <button onClick={clearFilters} className="shrink-0 h-11 sm:h-9 px-3 text-base sm:text-xs font-medium text-kt-red bg-kt-red/10 border border-kt-red/30 rounded-lg flex items-center gap-1.5 hover:bg-kt-red/10 transition-colors"><X size={10}/> Clear</button>}
 </ScrollableTabBar>
 <div className="flex-1 overflow-y-auto space-y-3 pb-24 pr-1">
 {customers.filter(c => {

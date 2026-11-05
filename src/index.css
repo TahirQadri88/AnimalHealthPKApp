@@ -10,7 +10,8 @@
  * One place, keyed on lucide's class names, so a print icon is green wherever it appears.
  * Icons on a solid button or a green band keep the button's white (rules after these). */
 :where(main, [role="dialog"], .font-ui) :where(button, a) svg.lucide-book-open { color: rgb(var(--kt-icon-blue)); }
-:where(main, [role="dialog"], .font-ui) :where(button, a) :is(svg.lucide-receipt-text, svg.lucide-printer, svg.lucide-file-text, svg.lucide-receipt) { color: rgb(var(--kt-icon-green)); }
+:where(main, [role="dialog"], .font-ui) :where(button, a) :is(svg.lucide-receipt-text, svg.lucide-printer, svg.lucide-file-text, svg.lucide-receipt, svg.lucide-share-2, svg.lucide-file-spreadsheet) { color: rgb(var(--kt-icon-green)); }
+:where(main, [role="dialog"], .font-ui) :where(button, a) svg.lucide-download { color: rgb(var(--kt-ink)); }
 :where(main, [role="dialog"], .font-ui) :where(button, a) svg.lucide-truck { color: rgb(var(--kt-icon-amber)); }
 :where(main, [role="dialog"], .font-ui) :where(button, a) :is(svg.lucide-rotate-ccw, svg.lucide-trash2, svg.lucide-trash-2) { color: rgb(var(--kt-icon-red)); }
 :where(main, [role="dialog"], .font-ui) :where(button, a) :is(svg.lucide-wallet, svg.lucide-phone-call) { color: rgb(var(--kt-icon-green)); }
@@ -41,6 +42,12 @@ nav[aria-label="Main"] [aria-current="page"] svg      { color: rgb(var(--kt-ink)
  * min-width:auto (never narrower than the label), the Admin and Analytics tab buttons shrank to
  * 44px on a phone and their labels ran into each other (live, 2026-11-05). */
 .scrollbar-hide > *, .overflow-x-auto > :not(table) { flex-shrink: 0; }
+
+/* An icon alone in a button or link sits in the middle of it. Tailwind makes every svg a block,
+ * and a block child is NOT centred by text-align, so once a phone's 44px minimum made the button
+ * wider than its icon the icon stayed pinned to the left padding: 5-10px off on every icon-only
+ * button (print, share, edit, the connection badge, the tab arrows). Found by layout.mjs. */
+:where(button, a[href]) > svg:only-child { margin-inline: auto; }
 
 /* Hint text in every field, app-wide. Tailwind's default grey measured 2.5:1 on white,
  * under the 4.5:1 WCAG AA asks for; kt-muted measures 5.6:1. */

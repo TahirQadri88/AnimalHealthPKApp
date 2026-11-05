@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useContext } from 'react';
-import { Search, Calendar, Download, Printer, Share2, Users, Package, Zap, PhoneCall,
+import { Search, Calendar, ChevronDown, Download, Printer, Share2, Users, Package, Zap, PhoneCall,
          AlertCircle, CheckCircle2, X,
          Award, Clock, DollarSign, Filter, Receipt, TrendingUp, Wallet } from 'lucide-react';
 import { AppContext } from '../../context/AppContext';
@@ -504,12 +504,15 @@ const filterLabel = (() => {
 return (
   <div className="h-full flex flex-col p-4">
     {/* Filter Bar */}
-    <div className="flex flex-wrap gap-2 mb-3 shrink-0 pb-1">
-       <div className="flex items-center gap-1.5 bg-white px-2.5 py-1.5 rounded-lg border border-kt-line shrink-0">
-         <Calendar size={13} className="text-kt-blue"/>
-         <select value={dateFilter} onChange={e => setDateFilter(e.target.value)} className="bg-transparent font-medium text-xs text-kt-ink outline-none cursor-pointer">
+    {/* Two by two on a phone, a row from sm up. Every pill is the same build: the date one used to be
+        a bordered box around a select, which the phone's minimum sizes made taller than the rest. */}
+    <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 mb-3 shrink-0">
+       <div className="relative sm:shrink-0">
+         <Calendar size={14} strokeWidth={1.5} className="absolute left-3 top-1/2 -translate-y-1/2 text-kt-blue pointer-events-none"/>
+         <select value={dateFilter} onChange={e => setDateFilter(e.target.value)} aria-label="Period" className="h-11 sm:h-9 w-full sm:w-auto appearance-none pl-9 pr-9 bg-white border border-kt-line rounded-lg font-medium text-base sm:text-xs text-kt-ink outline-none cursor-pointer">
            <option>Today</option><option>This Week</option><option>This Month</option><option>This Year</option><option>All Time</option><option>Custom</option>
          </select>
+         <ChevronDown size={14} strokeWidth={1.5} className="absolute right-3 top-1/2 -translate-y-1/2 text-kt-muted pointer-events-none"/>
        </div>
        <MultiPicker label="Brand" Icon={Filter} items={companies} selected={filterCompanies}
          onToggle={id=>toggleFilter(setFilterCompanies,id)} onClear={()=>clearFilter(setFilterCompanies)} />
@@ -533,7 +536,7 @@ return (
          <button key={v} data-analytictab={v} tabIndex={view===v?0:-1}
            onClick={() => setView(v)}
            onKeyDown={makeArrowNav(['Overview','Insights','Monthly Trend','By Product','By Company','By Customer','By City','By Area','By Type','By Salesperson','Receivables','Collections','Returns','Expenses','Item Sales'],view,setView,'data-analytictab')}
-           className={`px-3 py-1.5 rounded-xl font-medium text-xs whitespace-nowrap  transition-colors ${view === v ? 'bg-kt-band text-white' : 'bg-white text-kt-sub border border-kt-line'}`}>{v}</button>
+           className={`h-11 sm:h-8 px-3 rounded-xl font-medium text-sm sm:text-xs whitespace-nowrap transition-colors ${view === v ? 'bg-kt-band text-white' : 'bg-white text-kt-sub border border-kt-line'}`}>{v}</button>
        ))}
     </ScrollableTabBar>
 
@@ -556,12 +559,13 @@ return (
     )}
 
     {/* Export bar */}
-    <div className="flex justify-between items-center bg-kt-blue/10 border border-kt-blue/30 p-2 rounded-xl my-2 shrink-0">
-        <span className="text-xs font-medium text-kt-blue ml-1 truncate">{filterLabel}</span>
-        <div className="flex gap-1.5">
-           <button onClick={()=>handleExport('text')} title="WhatsApp" className="p-2 bg-kt-green text-white rounded-lg"><Share2 size={15}/></button>
-           <button onClick={()=>handleExport('csv')} title="CSV" className="p-2 bg-white text-kt-sub rounded-lg border border-kt-line"><Download size={15}/></button>
-           <button onClick={()=>handleExport('pdf')} title="PDF, Image or Save — opens the document" className="p-2 bg-kt-primary text-white rounded-lg"><Printer size={15}/></button>
+    <div className="flex justify-between items-center gap-3 bg-white border border-kt-line px-3 py-2 rounded-xl my-2 shrink-0">
+        <span className="text-sm font-medium text-kt-ink truncate">{filterLabel}</span>
+        <div className="flex gap-2 shrink-0">
+           {/* Three equal buttons: they used to be solid green, white and solid dark. */}
+           <button onClick={()=>handleExport('text')} title="WhatsApp" aria-label="Share on WhatsApp" className="w-11 h-11 sm:w-9 sm:h-9 flex items-center justify-center rounded-lg border border-kt-line bg-white hover:bg-kt-raised transition-colors"><Share2 size={16} strokeWidth={1.5}/></button>
+           <button onClick={()=>handleExport('csv')} title="CSV" aria-label="Download CSV" className="w-11 h-11 sm:w-9 sm:h-9 flex items-center justify-center rounded-lg border border-kt-line bg-white hover:bg-kt-raised transition-colors"><Download size={16} strokeWidth={1.5}/></button>
+           <button onClick={()=>handleExport('pdf')} title="PDF, Image or Save — opens the document" aria-label="Print, PDF or image" className="w-11 h-11 sm:w-9 sm:h-9 flex items-center justify-center rounded-lg border border-kt-line bg-white hover:bg-kt-raised transition-colors"><Printer size={16} strokeWidth={1.5}/></button>
         </div>
     </div>
 
@@ -718,11 +722,11 @@ return (
               <p className="text-xs font-medium text-kt-sub flex items-center gap-1.5"><Search size={11}/> Filter</p>
               <div className="grid grid-cols-2 gap-2">
                 <div className="relative">
-                  <Search size={13} className="absolute left-2.5 top-2.5 text-kt-muted pointer-events-none"/>
+                  <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-kt-muted pointer-events-none"/>
                   <input className="w-full pl-8 pr-3 py-2 bg-kt-raised border border-kt-line rounded-xl text-xs font-semibold outline-none focus:border-kt-ink focus:ring-1" placeholder="Product name…" value={itemProdFilter} onChange={e => setItemProdFilter(e.target.value)}/>
                 </div>
                 <div className="relative">
-                  <Users size={13} className="absolute left-2.5 top-2.5 text-kt-muted pointer-events-none"/>
+                  <Users size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-kt-muted pointer-events-none"/>
                   <input className="w-full pl-8 pr-3 py-2 bg-kt-raised border border-kt-line rounded-xl text-xs font-semibold outline-none focus:border-kt-ink focus:ring-1" placeholder="Customer name…" value={itemCustFilter} onChange={e => setItemCustFilter(e.target.value)}/>
                 </div>
               </div>

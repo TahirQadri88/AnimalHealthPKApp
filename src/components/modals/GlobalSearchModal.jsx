@@ -75,7 +75,7 @@ return (
 <div className="space-y-3 pb-10">
 
   <div className="relative">
-    <Search size={16} className="absolute left-3 top-3.5 text-kt-muted pointer-events-none"/>
+    <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-kt-muted pointer-events-none"/>
     <input
       ref={inputRef}
       type="search"

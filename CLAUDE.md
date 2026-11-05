@@ -133,6 +133,20 @@ Check readability by measuring, not by eye: run `npx vite`, then
 `node tools/ui-preview/contrast.mjs`. It composites every background layer and fails any
 text under WCAG AA. Reading the code passed amber and green chips that measured 4.3:1.
 
+**Four measuring tools, and what each one cannot see** (`tools/ui-preview/`, all against
+`npx vite --config tools/ui-preview/vite.config.mjs --port 5174`):
+`contrast.mjs` (text readability), `sizes.mjs` (44px tap targets), `layout.mjs` (spill, boxes too
+big, out of line, icons off their centre line, controls in a row of different heights, scrolling
+rows that start with dead space) and `admin-edges.mjs` (headings against the cards below them).
+None of them replaces looking at a screenshot of the screen you changed, at 390, 768 and 1280px.
+Passing them is not the same as looking right: on 2026-11-05 a `min-width: 44px` on every
+button replaced the flex default `min-width: auto`, squashed the Admin tab labels into each
+other, and pinned every icon to the left of its button. Every check was green, because none
+measured it. Prove a new check the way these were: plant the fault with `--inject=<css>` and
+see it caught. And a `min-width` or `min-height` applied to a whole class of element needs a
+look at what that class contains: pills built around a select, rows built to scroll, buttons
+whose only child is an icon (Tailwind's `svg {display: block}` leaves it at the left edge).
+
 ## A setting that nothing reads is a lie to the user
 
 Four Settings fields shipped doing nothing: `showBusinessNameOnReports` was read into a

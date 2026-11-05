@@ -53,7 +53,7 @@ return (
     )}
   </div>
   <div className="space-y-2 mb-3">
-    <div className="relative"><Search className="absolute left-3.5 top-3.5 text-kt-muted" size={16}/><input placeholder="Search client or receipt ID..." className="w-full pl-10 pr-4 py-3 bg-white border border-kt-line rounded-xl font-semibold outline-none text-sm" value={search} onChange={e=>setSearch(e.target.value)} /></div>
+    <div className="relative"><Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-kt-muted" size={16}/><input placeholder="Search client or receipt ID..." className="w-full pl-10 pr-4 py-3 bg-white border border-kt-line rounded-xl font-semibold outline-none text-sm" value={search} onChange={e=>setSearch(e.target.value)} /></div>
     <div className="flex gap-2">
       <select value={dateFilter} onChange={e=>setDateFilter(e.target.value)} className="flex-1 bg-white border border-kt-line px-3 py-2 rounded-lg font-medium text-sm text-kt-ink outline-none">
         <option>All Time</option><option>Today</option><option>This Week</option><option>This Month</option><option>This Year</option>

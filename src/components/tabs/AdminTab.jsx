@@ -20,7 +20,7 @@ const { isAdmin, currentUser, companies, products, customers, invoices, expenses
 if(!isAdmin) return <div className="p-10 text-center font-medium text-kt-muted flex flex-col items-center mt-20"><Lock className="mb-4 text-kt-muted" size={48}/> <p className="text-sm">Admin Access Required</p></div>;
 return (
 <div className="h-full flex flex-col">
-<div className="font-ui px-4 sm:px-6 pt-4 pb-2">
+<div className="font-ui px-4 pt-4 pb-2">
 <h2 className="font-display text-3xl text-kt-ink mb-4">Admin</h2>
 <div className="bg-white border border-kt-line p-1 rounded-xl">
 <ScrollableTabBar bgClass="bg-white">
