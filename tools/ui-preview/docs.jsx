@@ -17,13 +17,16 @@ const NAMES = ['Trifas Suspension 1 Litre', 'Hepta Sef 1g Injection', 'Oxytetrac
 const mkItems = (k) => Array.from({ length: k }, (_, i) => ({ productId: 10 + i, uniqueId: 10 + i, name: NAMES[i % NAMES.length] + (i >= NAMES.length ? ` #${i}` : ''), price: 640 + 130 * i, quantity: 2 + (i % 9), unit: 'btl', unitsInBox: 12 }));
 const items = mkItems(n);
 const total = items.reduce((s, i) => s + i.price * i.quantity, 0);
-const customers = [{ id: 1, name: 'Abdul Qadir Shan Cattle', openingBalance: 58250, phone: '0300-1234567' }];
+const CUST_ID = Number(q.get('custid') || 1);   // ?custid=1773230565823 reproduces a real timestamp-style id
+const customers = [{ id: CUST_ID, name: 'Abdul Qadir Shan Cattle', openingBalance: 58250, phone: '0300-1234567' }];
 const invoices = [
-  { id: 'INV-8801', date: '2026-10-20', customerId: 1, customerName: 'Abdul Qadir Shan Cattle', status: 'Billed', total: 47000, receivedAmount: 0, items: mkItems(3) },
-  { id: 'INV-8812', date: '2026-11-03', customerId: 1, customerName: 'Abdul Qadir Shan Cattle', status: 'Billed', total, receivedAmount: 20000, salespersonName: 'Ghousia', deliveryBilled: 400, vehicle: 'Rider', items },
+  { id: 'INV-8801', date: '2026-10-20', customerId: CUST_ID, customerName: 'Abdul Qadir Shan Cattle', status: 'Billed', total: 47000, receivedAmount: 0, items: mkItems(3) },
+  { id: 'INV-8812', date: '2026-11-03', customerId: CUST_ID, customerName: 'Abdul Qadir Shan Cattle', status: 'Billed', total, receivedAmount: 20000, salespersonName: 'Ghousia', deliveryBilled: 400, vehicle: 'Rider', items },
 ];
-const payments = [{ id: 'REC-0101', date: '2026-10-28', customerId: 1, amount: 30000, method: 'Cash' }];
-const ledger = buildCustomerLedger(1, { customers, invoices, payments });
+const payments = [{ id: 'REC-0101', date: '2026-10-28', customerId: CUST_ID, amount: 30000, method: 'Cash' }];
+// ?rows=N adds N more invoices so a ledger runs to several pages
+for (let k = 0; k < Number(q.get('rows') || 0); k++) invoices.push({ id: `INV-9${String(100 + k)}`, date: `2026-10-${String(1 + (k % 27)).padStart(2, '0')}`, customerId: CUST_ID, customerName: 'Abdul Qadir Shan Cattle', status: 'Billed', total: 5000 + k * 137, receivedAmount: 0, items: mkItems(2) });
+const ledger = buildCustomerLedger(CUST_ID, { customers, invoices, payments });
 const invoice = invoices[1];
 const payRow = ledger.rows.find(r => r.credit > 0 && !r.id.endsWith('-PAY')) || ledger.rows.find(r => r.credit > 0);
 const payIdx = ledger.rows.findIndex(r => r === payRow);
