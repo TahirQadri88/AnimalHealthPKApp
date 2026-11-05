@@ -1444,7 +1444,7 @@ return (
         <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', marginBottom: sz('16px','20px','24px'), fontSize: sz('9.5px','11px','12px') }}>
           <thead>
             <tr data-dk="1" style={{ background: YELLOW.fill }}>
-              <th style={{ padding: sz('6px 2px 6px 0','8px 4px 8px 0','9px 6px 9px 0'), textAlign: 'left', fontWeight: 800, color: YELLOW.ink, textTransform: 'uppercase', fontSize: sz('7.5px','8.5px','9px'), letterSpacing: '0.5px', width: isThermal ? (docType === 'dispatch' ? '65%' : '48%') : (docType === 'dispatch' ? '65%' : '50%') }}>
+              <th style={{ padding: sz('6px 2px 6px 0','8px 4px 8px 8px','9px 6px 9px 10px'), textAlign: 'left', fontWeight: 800, color: YELLOW.ink, textTransform: 'uppercase', fontSize: sz('7.5px','8.5px','9px'), letterSpacing: '0.5px', width: isThermal ? (docType === 'dispatch' ? '65%' : '48%') : (docType === 'dispatch' ? '65%' : '50%') }}>
                 Description
               </th>
               <th style={{ padding: sz('6px 2px','8px 4px','9px 6px'), textAlign: 'center', fontWeight: 800, color: YELLOW.ink, textTransform: 'uppercase', fontSize: sz('7.5px','8.5px','9px'), letterSpacing: '0.5px', whiteSpace: 'nowrap', width: isThermal ? (docType === 'dispatch' ? '35%' : '10%') : (docType === 'dispatch' ? '35%' : '9%') }}>
@@ -1456,7 +1456,7 @@ return (
                 </th>
               )}
               {showAmountCol && (
-                <th style={{ padding: sz('','8px 4px 8px 0','9px 0 9px 4px'), textAlign: 'right', fontWeight: 800, color: YELLOW.ink, textTransform: 'uppercase', fontSize: sz('','8.5px','9px'), letterSpacing: '0.5px', whiteSpace: 'nowrap', width: '24%' }}>
+                <th style={{ padding: sz('','8px 8px 8px 4px','9px 10px 9px 4px'), textAlign: 'right', fontWeight: 800, color: YELLOW.ink, textTransform: 'uppercase', fontSize: sz('','8.5px','9px'), letterSpacing: '0.5px', whiteSpace: 'nowrap', width: '24%' }}>
                   Amount
                 </th>
               )}
@@ -1465,7 +1465,7 @@ return (
           <tbody>
             {safeItems.map((item, idx) => (
               <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9', pageBreakInside: 'avoid', breakInside: 'avoid', background: idx % 2 === 1 ? '#f8fafc' : '#ffffff' }}>
-                <td style={{ padding: sz('6px 2px 6px 0','8px 4px 8px 0','9px 6px 9px 0'), fontWeight: 600, wordBreak: 'break-word', lineHeight: sz('1.5','1.55','1.6'), color: '#1e293b' }}>
+                <td style={{ padding: sz('6px 2px 6px 0','8px 4px 8px 8px','9px 6px 9px 10px'), fontWeight: 600, wordBreak: 'break-word', lineHeight: sz('1.5','1.55','1.6'), color: '#1e293b' }}>
                   {item?.name || '—'}
                   {item?.isBonus && (
                     <span style={{ marginLeft: '5px', padding: '1px 5px', background: '#d1fae5', color: '#059669', fontSize: '6.5px', fontWeight: 800, borderRadius: '4px', textTransform: 'uppercase', border: '1px solid #a7f3d0', letterSpacing: '0.5px' }}>
@@ -1524,7 +1524,7 @@ return (
                   </td>
                 )}
                 {showAmountCol && (
-                  <td style={{ padding: sz('','8px 4px 8px 0','9px 0 9px 4px'), textAlign: 'right', fontWeight: 800, color: '#1e293b', whiteSpace: 'nowrap' }}>
+                  <td style={{ padding: sz('','8px 8px 8px 4px','9px 10px 9px 4px'), textAlign: 'right', fontWeight: 800, color: '#1e293b', whiteSpace: 'nowrap' }}>
                     {item?.isBonus
                       ? <span style={{ color: '#059669' }}>Rs. 0</span>
                       : `Rs. ${((item?.price || 0) * (item?.quantity || 0)).toLocaleString('en-US')}`}
