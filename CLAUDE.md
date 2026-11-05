@@ -165,7 +165,17 @@ thermal byte for byte, then open the shared file on its own and check A4 and A5 
   constant (`monoPrintCss`) whose bytes must not change: Print stays identical, proven by capturing what
   it writes before and after.
 - **Print** is vector on A4/A5 and the printer's own dots on thermal; there is nothing to raise.
-- The WhatsApp button is a text-only link (it shares a summary, not a file).
+- **iPhone / iPad (any mode, including the home-screen app):** Print and PDF do not open a window at all. A web page
+  cannot reliably open the print sheet on iOS, and Safari's own print adds the page address in the footer and its own
+  margins. `handleIosPdf` builds a PDF in the app (`lib/pdfFile.js`, a small dependency-free writer: one JPEG per
+  page, breaks on row boundaries) and hands it to the share sheet, whose Print / Save to Files / WhatsApp do the rest.
+  Print is black and white (a filter on the capture), PDF keeps the navy. If iOS has lost the tap by the time the file
+  is ready, a bar asks for one more tap. Computers and Android keep the popup paths, byte-identical. Thermal is never
+  routed here. Not yet seen on a real iPhone. The filter string is built from parts: Tailwind scans source text for
+  class names and would otherwise mint an unused `.grayscale` rule that the A4/A5 Print popup copies.
+- The WhatsApp button shares a **text summary**, not a file: plain WhatsApp formatting (bold, blank lines), no rule
+  lines or emoji, the business name rather than the app's, the letterhead phone only while the business name is shown.
+  `PrintView.share.test.jsx` decodes it for every document type and fails on rules, `%` codes, `undefined`/`NaN`.
 
 ## Two looks, not three: screen and paper
 
