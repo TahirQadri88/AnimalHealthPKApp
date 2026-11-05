@@ -20,14 +20,15 @@ export const YELLOW = {
   edge: '#000000',        // a block's own border
 };
 
-// The blocks on A4/A5, in the app's own look: Pasture green with Khyber Yellow lettering. Thermal
+// The blocks on A4/A5, in the app's own look: Ink navy (#142339, the app's band) with Khyber Yellow lettering.
+// The constant is still called PASTURE from when the band was green. Thermal
 // keeps YELLOW (its markup is locked byte-for-byte), and paper bakes monochrome either way, so this
 // only ever reaches the screen, the shared file and the image.
 export const PASTURE = {
-  fill: '#1C3B2E',
+  fill: '#142339',
   ink: '#FFF200',
   inkMuted: '#E9E4A6',   // the tagline and contact line on green: 8.9:1
-  edge: '#1C3B2E',
+  edge: '#142339',
 };
 
 // Anything darker than this is treated as a block. #1e293b (the table header) sits at 0.16
