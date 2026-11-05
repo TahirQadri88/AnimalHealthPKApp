@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "lint": "eslint src tools --max-warnings 0",
     "verify": "npm run lint && npm run test && npm run build",
+    "lock:thermal": "node tools/ui-preview/thermal-lock.mjs",
     "lint:scope": "eslint src --config eslint.scope.config.mjs --no-config-lookup",
     "test": "vitest run",
     "test:watch": "vitest",
