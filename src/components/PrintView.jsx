@@ -5,6 +5,7 @@ import { splitDispatchLine } from '../lib/packaging';
 import { isCashSale } from '../lib/cashCustomer';
 import { YELLOW, PASTURE, isBlockBackground } from './printTheme';
 import { preloadDocFonts, getDocFontCss, DOC_FONT_STACK, DOC_FONT_STACK_LIVE } from '../lib/docFonts';
+import { buildPdf, pageBreaks } from '../lib/pdfFile';
 
 // Format: 'thermal' | 'a5' | 'a4'
 //
@@ -217,8 +218,20 @@ const getShareCaption = () => {
 // ── WhatsApp share text ────────────────────────────────────────────────────
 const generateShareText = () => {
   if (!data) return '';
-  let text = `*${bizAppName}*\n`;
-  const hr = '─'.repeat(28);
+  // Plain WhatsApp text: bold for what a person looks for, blank lines between parts, no rules or
+  // emoji. It used to open with the app's name, repeat a 28-character rule, and (for reports) read
+  // fields that do not exist, so every name came out empty.
+  const rs = (n) => `Rs. ${(Number(n) || 0).toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
+  const d = (v) => formatDateDisp(v);
+  const items = data.items || [];
+  const lines = [];
+  const add = (...l) => lines.push(...l);
+  const head = (title) => add(`*${showBizName ? bizName : bizAppName}*`, `*${title}*`);
+  const itemLine = (i, n, withRate = true) => {
+    const qty = i.quantity || 0;
+    if (i.isBonus) return `${n}. ${i.name} – ${qty} (free)`;
+    return withRate ? `${n}. ${i.name} – ${qty} × ${rs(i.price)} = ${rs((i.price || 0) * qty)}` : `${n}. ${i.name} – ${qty}`;
+  };
 
   if (docType === 'invoice') {
     const ledger = data.customerId ? getCustomerLedger(data.customerId) : null;
@@ -230,168 +243,137 @@ const generateShareText = () => {
       else prevBal = ledger.closingBal || 0;
     }
     const received = data.receivedAmount || 0;
-    const netBal = prevBal + (data.total || 0) - received;
-    let savings = 0;
-
-    text += `*INVOICE #${data.id}*\n`;
-    text += `${hr}\n`;
-    text += `Date: ${formatDateDisp(data.date)}\n`;
-    text += `Customer: *${data.customerName}*\n\n`;
-    text += `*Items:*\n`;
-    (data.items || []).forEach(i => {
-      const lineTotal = i.isBonus ? 'FREE' : `Rs.${((i.price || 0) * (i.quantity || 0)).toLocaleString('en-US')}`;
-      text += `• ${i.name}${i.isBonus ? ' 🎁' : ''} x${i.quantity} = ${lineTotal}\n`;
-      if (i.isBonus) savings += (i.originalPrice || 0) * (i.quantity || 0);
-    });
-    if ((data.deliveryBilled || 0) > 0) text += `🚚 Delivery: Rs.${Number(data.deliveryBilled).toLocaleString('en-US')}\n`;
-    text += `${hr}\n`;
-    text += `*Current Bill: Rs.${(data.total || 0).toLocaleString('en-US')}*\n`;
-    if (savings > 0) text += `🎁 Savings: Rs.${savings.toLocaleString('en-US')}\n`;
-    text += `Previous Bal: Rs.${prevBal.toLocaleString('en-US')}\n`;
-    if (received > 0) text += `Paid: Rs.${received.toLocaleString('en-US')}\n`;
-    text += `*Net Balance: Rs.${netBal.toLocaleString('en-US')}*\n`;
+    const total = data.total || 0;
+    const delivery = Number(data.deliveryBilled) || 0;
+    const discount = Number(data.discount) || 0;
+    const savings = items.reduce((sum, i) => sum + (i.isBonus ? (i.originalPrice || 0) * (i.quantity || 0) : 0), 0);
+    head(`Invoice ${data.id}`);
+    add(d(data.date), '', `Customer: *${data.customerName}*`, '', '*Items*');
+    items.forEach((i, k) => add(itemLine(i, k + 1)));
+    add('');
+    if (delivery > 0 || discount > 0) add(`Items: ${rs(total - delivery + discount)}`);
+    if (delivery > 0) add(`Delivery: ${rs(delivery)}`);
+    if (discount > 0) add(`Discount: -${rs(discount)}`);
+    add(`*Current bill: ${rs(total)}*`);
+    if (savings > 0) add(`You saved: ${rs(savings)}`);
+    if (showPrevBal) {
+      add('', `Previous balance: ${rs(prevBal)}`);
+      if (received > 0) add(`Payment received: ${rs(received)}`);
+      add(`*Balance due: ${rs(prevBal + total - received)}*`);
+    } else if (received > 0) {
+      add(`Payment received: ${rs(received)}`, `*Balance due: ${rs(total - received)}*`);
+    }
 
   } else if (docType === 'estimate') {
-    text += `*PRICE ESTIMATE / QUOTATION*\n`;
-    text += `${hr}\n`;
-    text += `Ref: ${data.id}\n`;
-    text += `Date: ${formatDateDisp(data.date)}\n`;
-    text += `For: *${data.customerName}*\n\n`;
-    text += `*Items:*\n`;
-    const estimateItemsTotal = (data.items || []).reduce((s, i) => s + (i?.isBonus ? 0 : (i?.price || 0) * (i?.quantity || 0)), 0);
-    (data.items || []).forEach(i => {
-      const lineTotal = i.isBonus ? 'FREE' : `Rs.${((i.price || 0) * (i.quantity || 0)).toLocaleString('en-US')}`;
-      text += `• ${i.name}${i.isBonus ? ' 🎁' : ''} x${i.quantity} @ Rs.${i.price || 0} = ${lineTotal}\n`;
-    });
-    if ((data.deliveryBilled || 0) > 0) text += `🚚 Delivery: Rs.${Number(data.deliveryBilled).toLocaleString('en-US')}\n`;
-    text += `${hr}\n`;
-    text += `*Estimated Total: Rs.${(estimateItemsTotal + (data.deliveryBilled || 0)).toLocaleString('en-US')}*\n\n`;
-    text += `⚠ _Rates and availability can change anytime without prior notice._\n`;
-    text += `This estimate is for reference only and does not constitute a final invoice.`;
+    const itemsTotal = items.reduce((sum, i) => sum + (i?.isBonus ? 0 : (i?.price || 0) * (i?.quantity || 0)), 0);
+    head('Price estimate');
+    add(`Ref: ${data.id}`, d(data.date), '', `For: *${data.customerName}*`, '', '*Items*');
+    items.forEach((i, k) => add(itemLine(i, k + 1)));
+    add('');
+    if ((data.deliveryBilled || 0) > 0) add(`Delivery: ${rs(data.deliveryBilled)}`);
+    add(`*Estimated total: ${rs(itemsTotal + (data.deliveryBilled || 0))}*`, '',
+      '_Rates and availability can change without notice. This estimate is for reference only and is not a final invoice._');
 
   } else if (docType === 'creditnote') {
-    text += `*CREDIT NOTE / SALES RETURN*\n`;
-    text += `${hr}\n`;
-    text += `Ref: ${data.id}\n`;
-    text += `Date: ${formatDateDisp(data.date)}\n`;
-    text += `Customer: *${data.customerName}*\n`;
-    if (data.originalInvoiceId) text += `Original Invoice: ${data.originalInvoiceId}\n`;
-    text += `\n*Items Returned:*\n`;
-    (data.items || []).forEach(i => {
-      text += `• ${i.name} ×${i.quantity} @ Rs.${i.price || 0} = Rs.${((i.price||0)*(i.quantity||0)).toLocaleString('en-US')}\n`;
-    });
-    text += `${hr}\n`;
-    text += `*Total Credit: Rs.${(data.total||0).toLocaleString('en-US')}*\n`;
-    if (data.reason) text += `Reason: ${data.reason}\n`;
-    text += `\nThis amount has been credited to your account.`;
+    head('Credit note');
+    add(`Ref: ${data.id}`, d(data.date), '', `Customer: *${data.customerName}*`);
+    if (data.originalInvoiceId) add(`Original invoice: ${data.originalInvoiceId}`);
+    add('', '*Items returned*');
+    items.forEach((i, k) => add(`${k + 1}. ${i.name} – ${i.quantity || 0} × ${rs(i.price)} = ${rs((i.price || 0) * (i.quantity || 0))}`));
+    add('', `*Total credit: ${rs(data.total)}*`);
+    if (data.reason) add(`Reason: ${data.reason}`);
+    add('', 'This amount has been credited to your account.');
 
   } else if (docType === 'dispatch') {
-    text += `*DISPATCH NOTE #${data.id}*\n`;
-    text += `${hr}\n`;
-    text += `Date: ${formatDateDisp(data.date)}\n`;
-    text += `*${data.customerName}*\n`;
-    if (data.customerDetails?.contactPerson || data.customerDetails?.phone)
-      text += `${data.customerDetails?.contactPerson || ''} ${data.customerDetails?.phone ? '- ' + data.customerDetails.phone : ''}\n`;
+    head(`Dispatch note ${data.id}`);
+    add(d(data.date), '', `Customer: *${data.customerName}*`);
+    const cd = data.customerDetails || {};
+    const contact = [cd.contactPerson, cd.phone].filter(Boolean).join(' · ');
+    if (contact) add(contact);
     const _addrKey = data.deliveryAddressKey || 'address1';
-    const _addr = _addrKey === 'address2' ? data.customerDetails?.address2 : data.customerDetails?.address1;
-    const _map = _addrKey === 'address2' ? data.customerDetails?.map2 : data.customerDetails?.map1;
-    if (_addr) text += `${_addr}\n`;
-    if (_map) text += `${_map}\n`;
-    text += `\n🚚 *${data.vehicle || 'N/A'}*`;
-    // Driven by what the invoice actually holds, not by hardcoded method names: a custom
-    // courier type would otherwise lose its company, consignment number and booking person
-    // from the shared message. The two lines are independent — an intercity job has both.
-    if (data.transportCompany || data.biltyNumber) {
-      text += `\nTransport: ${data.transportCompany || '-'} | Consignment: ${data.biltyNumber || '-'}`;
-    }
-    if (data.driverName) {
-      text += `\n${data.transportCompany ? 'Booked By' : 'Rider / Driver'}: ${data.driverName}${data.driverPhone ? ` (${data.driverPhone})` : ''}`;
-    }
-    text += `\n\n*Items to Deliver:*\n`;
-    (data.items || []).forEach(i => {
+    const _addr = _addrKey === 'address2' ? cd.address2 : cd.address1;
+    const _map = _addrKey === 'address2' ? cd.map2 : cd.map1;
+    if (_addr) add(_addr);
+    if (_map) add(_map);
+    add('', `Delivery by: *${data.vehicle || 'N/A'}*`);
+    // Driven by what the invoice actually holds, not by hardcoded method names: a custom courier type
+    // would otherwise lose its company, consignment number and booking person from the message.
+    if (data.transportCompany || data.biltyNumber) add(`Transport: ${data.transportCompany || '-'}`, `Consignment no.: ${data.biltyNumber || '-'}`);
+    if (data.driverName) add(`${data.transportCompany ? 'Booked by' : 'Rider / driver'}: ${data.driverName}${data.driverPhone ? ` (${data.driverPhone})` : ''}`);
+    add('', '*Items to deliver*');
+    items.forEach((i, k) => {
       const { qty: dQty, uib: dUib, boxes: dBoxes, loose: dLoose } = getDispatchParts(i);
       const dQtyStr = dUib <= 1 ? `${dQty}` : dBoxes > 0 && dLoose > 0 ? `${dQty} (${dBoxes} ${dBoxes===1?'Box':'Boxes'}, ${dLoose} Loose)` : dBoxes > 0 ? `${dQty} (${dBoxes} ${dBoxes===1?'Box':'Boxes'})` : `${dQty} (${dLoose} Loose)`;
-      text += `• ${i.name}${i.isBonus ? ' 🎁 BONUS' : ''} → ${dQtyStr}\n`;
+      add(`${k + 1}. ${i.name}${i.isBonus ? ' (bonus)' : ''} – ${dQtyStr}`);
     });
-    text += `${hr}\n`;
-    text += `Total SKUs: ${(data.items || []).length} | Confirm receipt upon delivery.`;
+    add('', `Total items: ${items.length}`, 'Please confirm receipt on delivery.');
 
   } else if (docType === 'receipt') {
-    text += `*PAYMENT RECEIPT*\n`;
-    text += `${hr}\n`;
-    text += `🔖 Ref: ${data.id}\n`;
-    text += `Date: ${formatDateDisp(data.date)}\n`;
-    text += `Customer: *${data.customerName}*\n`;
-    text += `${hr}\n`;
-    text += `*Amount Received: Rs.${(data.receivedAmount || 0).toLocaleString('en-US')}*\n`;
-    if (data.note) text += `📝 Mode: ${data.note}\n`;
-    text += `Previous Bal: Rs.${(data.prevBalance || 0).toLocaleString('en-US')}\n`;
-    text += `*Remaining Bal: Rs.${(data.newBalance || 0).toLocaleString('en-US')}*\n\n`;
-    text += `Thank you for your business! 🙏`;
+    head('Payment receipt');
+    add(`Ref: ${data.id}`, d(data.date), '', `Customer: *${data.customerName}*`, '',
+      `*Amount received: ${rs(data.receivedAmount)}*`);
+    if (data.note) add(`Mode: ${data.note}`);
+    add(`Previous balance: ${rs(data.prevBalance)}`, `*Remaining balance: ${rs(data.newBalance)}*`, '', 'Thank you for your business.');
 
   } else if (docType === 'ledger') {
-    text += `*ACCOUNT STATEMENT*\n`;
-    text += `${hr}\n`;
-    text += `*${data.customerName}*\n`;
-    if (data.phone) text += `${data.phone}\n`;
-    text += `Period: ${formatDateDisp(data.dateRange?.start)} to ${formatDateDisp(data.dateRange?.end)}\n`;
-    text += `${hr}\n`;
     const periodClosingBal = (data.openingBal || 0) + (data.totalDebit || 0) - (data.totalCredit || 0);
-    text += `Opening Balance: Rs.${(data.openingBal || 0).toLocaleString('en-US')}\n`;
-    text += `Total Debits: Rs.${(data.totalDebit || 0).toLocaleString('en-US')}\n`;
-    text += `Total Credits: Rs.${(data.totalCredit || 0).toLocaleString('en-US')}\n`;
-    text += `*Closing Balance: Rs.${periodClosingBal.toLocaleString('en-US')}*\n\n`;
-    text += `Please arrange payment at your earliest convenience.`;
+    head('Account statement');
+    add(`Customer: *${data.customerName}*`);
+    if (data.phone) add(data.phone);
+    add(`Period: ${d(data.dateRange?.start)} to ${d(data.dateRange?.end)}`, '',
+      `Opening balance: ${rs(data.openingBal)}`, `Total debits: ${rs(data.totalDebit)}`, `Total credits: ${rs(data.totalCredit)}`,
+      `*Closing balance: ${rs(periodClosingBal)}*`);
+    if (periodClosingBal > 0) add('', 'Please arrange payment at your earliest convenience.');
 
   } else if (isAging) {
-    // A collection list read off a phone: worst debt first, buckets under each name, and
-    // the bucket summary at the end so the total is the last thing on screen.
-    const money = (n) => `Rs.${Math.round(Number(n) || 0).toLocaleString('en-US')}`;
-    text += `*${data.title || 'Receivables Aging'}*\n`;
-    text += `${hr}\n`;
-    text += `${data.dateFilter || ''}\n\n`;
+    // A collection list read off a phone: worst debt first, buckets under each name, and the bucket
+    // summary at the end so the total is the last thing on screen.
+    const money = (n) => rs(Math.round(Number(n) || 0));
+    head(data.title || 'Receivables aging');
+    if (data.dateFilter) add(data.dateFilter);
+    add('');
     const agingRows = aging.rows || [];
     agingRows.slice(0, 25).forEach((r, i) => {
-      text += `${i + 1}. *${r.name}* — ${money(r.totalOutstanding)}\n`;
+      add(`${i + 1}. *${r.name}* – ${money(r.totalOutstanding)}`);
       const detail = [
-        `oldest ${r.oldestAgeDays}d`,
+        `oldest ${r.oldestAgeDays} days`,
         ...agingBuckets.filter(b => (r.buckets?.[b.key] || 0) > 0).map(b => `${b.label}: ${money(r.buckets[b.key])}`),
-      ].join(' | ');
-      text += `   ${detail}\n`;
-      if (r.phone) text += `   📞 ${r.phone}\n`;
+      ].join(' · ');
+      add(`   ${detail}`);
+      if (r.phone) add(`   Phone: ${r.phone}`);
     });
-    if (agingRows.length > 25) text += `... and ${agingRows.length - 25} more\n`;
-    text += `\n${hr}\n`;
-    agingBuckets.forEach(b => { text += `${b.label}: ${money(aging.totals?.[b.key])}\n`; });
-    text += `*Total Outstanding: ${money(aging.grandTotal)}* (${aging.customerCount || agingRows.length} customers)`;
+    if (agingRows.length > 25) add(`…and ${agingRows.length - 25} more`);
+    add('');
+    agingBuckets.forEach(b => add(`${b.label}: ${money(aging.totals?.[b.key])}`));
+    add(`*Total outstanding: ${money(aging.grandTotal)}* (${aging.customerCount || agingRows.length} customers)`);
 
   } else if (docType === 'report') {
-    text += `*${data.title || 'Analytics Report'}*\n`;
-    text += `${hr}\n`;
-    text += `Period: ${data.dateFilter || 'All Time'}\n\n`;
+    head(data.title || 'Analytics report');
+    add(`Period: ${data.dateFilter || 'All time'}`, '');
     if (data.view === 'Overview') {
-      const s = data.stats || {};
-      text += `*Financial Summary:*\n`;
-      text += `📦 Product Sales: Rs.${(s.productRevenue || 0).toLocaleString('en-US')}\n`;
-      text += `💸 Total COGS: Rs.${(s.totalCOGS || 0).toLocaleString('en-US')}\n`;
-      text += `📊 Gross Margin: Rs.${(s.grossMargin || 0).toLocaleString('en-US')}\n`;
-      text += `🚚 Delivery Billed: Rs.${(s.deliveryBilled || 0).toLocaleString('en-US')}\n`;
-      text += `🚗 Transport Exp: Rs.${(s.transportExpense || 0).toLocaleString('en-US')}\n`;
-      text += `🏢 Operational Exp: Rs.${(s.totalExpenses || 0).toLocaleString('en-US')}\n`;
-      text += `${hr}\n`;
-      text += `*Net Profit: Rs.${(s.netProfit || 0).toLocaleString('en-US')}*`;
+      const st = data.stats || {};
+      add('*Financial summary*', `Product sales: ${rs(st.productRevenue)}`, `Cost of goods: ${rs(st.totalCOGS)}`,
+        `Gross margin: ${rs(st.grossMargin)}`, `Delivery billed: ${rs(st.deliveryBilled)}`, `Transport expenses: ${rs(st.transportExpense)}`,
+        `Operational expenses: ${rs(st.totalExpenses)}`, `*Net profit: ${rs(st.netProfit)}*`);
     } else {
-      text += `*${data.view}:*\n`;
-      (data.rows || []).slice(0, 10).forEach((r, i) => {
-        text += `${i + 1}. *${r.Name || ''}*${r.Company ? ` (${r.Company})` : ''}\n`;
-        if (r.Qty !== undefined) text += `   Qty: ${(r.Qty || 0).toLocaleString('en-US')} | Rev: Rs.${(r.Revenue || 0).toLocaleString('en-US')} | GP: Rs.${(r.GrossProfit || 0).toLocaleString('en-US')}\n`;
-        else text += `   Balance: Rs.${(r.Amount || 0).toLocaleString('en-US')}\n`;
+      add(`*${data.view}*`);
+      const rows = data.rows || [];
+      rows.slice(0, 10).forEach((r, i) => {
+        const name = r['Product Name'] || r['Brand Name'] || r['Customer Name'] || r['Staff Name'] || r.Name || '–';
+        const brand = r.Brand || r.Company || '';
+        const qty = r['Qty Sold'] ?? r.Qty;
+        const rev = r['Revenue (Rs)'] ?? r.Revenue;
+        const gp = r['Gross Profit (Rs)'] ?? r['Outstanding (Rs)'] ?? r.GrossProfit ?? r.Amount;
+        add(`${i + 1}. *${name}*${brand ? ` (${brand})` : ''}`);
+        add(`   ${[qty !== undefined ? `Qty ${Number(qty).toLocaleString('en-US')}` : '', rev !== undefined ? `Revenue ${rs(rev)}` : '', gp !== undefined ? `${rev !== undefined ? 'Profit' : 'Amount'} ${rs(gp)}` : ''].filter(Boolean).join(' · ')}`);
       });
-      if ((data.rows || []).length > 10) text += `... and ${data.rows.length - 10} more`;
+      if (rows.length > 10) add(`…and ${rows.length - 10} more`);
     }
   }
 
-  return encodeURIComponent(text);
+  // The letterhead's phone goes away with the business name, as on the document itself.
+  if (showBizName && biz.phone) add('', `${bizName} · ${biz.phone}`);
+  return encodeURIComponent(lines.join('\n'));
 };
 
 // ── Build standalone HTML doc (shared by print + share) ──────────────────
@@ -602,7 +584,114 @@ ${popupBar}<div id="doc">${clone.outerHTML}</div>
 };
 
 // ── Print — CSS injection for all formats → native browser print at full DPI ─
+  // ── iPhone / iPad: Print and PDF as a file, through the share sheet ─────────────────────────────
+// A web page cannot reliably open the print sheet on iOS, and in the home-screen app it cannot at all
+// (no pop-up windows). Safari's own print also adds the page address in the footer and its own margins.
+// So on iOS the document is turned into a PDF here and handed to the share sheet, which offers Print,
+// Save to Files and WhatsApp. Print is black and white (paper), PDF keeps the colours.
+const isIOSDevice = () => typeof navigator !== 'undefined'
+  && (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
+
+const handleIosPdf = async (mono) => {
+  const element = document.getElementById('print-document');
+  if (!element) { showToast('Document not found', 'error'); return; }
+  showToast(mono ? 'Preparing for print…' : 'Preparing PDF…');
+  let clone = null;
+  try {
+    if (!window.htmlToImage) {
+      await new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('CDN timeout')), 10000);
+        const sc = document.createElement('script');
+        sc.src = 'https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.js';
+        sc.onload = () => { clearTimeout(timer); resolve(); };
+        sc.onerror = () => { clearTimeout(timer); reject(new Error('CDN error')); };
+        document.head.appendChild(sc);
+      });
+    }
+    const targetW = isA5 ? 559 : 794;
+    clone = element.cloneNode(true);
+    Object.assign(clone.style, {
+      position: 'fixed', top: '0', left: '0', width: targetW + 'px', maxWidth: targetW + 'px', minWidth: targetW + 'px',
+      margin: '0', boxShadow: 'none', zIndex: '-1', background: 'white', overflow: 'visible', border: 'none', borderRadius: '0',
+    });
+    // Navy blocks print as black bars and yellow text as white. Built from parts so Tailwind, which scans source
+    // text for class names, does not mint an unused utility rule that the Print popup would then copy.
+    if (mono) clone.style.filter = ['gray', 'scale(1) contr', 'ast(1.8)'].join('');
+    document.body.appendChild(clone);
+    await new Promise(r => setTimeout(r, 400));
+    const totalH = clone.scrollHeight;
+    const top = clone.getBoundingClientRect().top;
+    const at = (e) => e.getBoundingClientRect();
+    // Cuts may fall after a body row, a footer row or a whole block, never after the header row itself.
+    const marks = [...clone.querySelectorAll('tbody tr, tfoot tr, .keep-together')].map(e => Math.round(at(e).bottom - top));
+    const thead = clone.querySelector('thead');
+    const tbl = thead && thead.closest('table');
+    const headerTop = thead ? Math.round(at(thead).top - top) : 0;
+    const headerBottom = thead ? Math.round(at(thead).bottom - top) : 0;
+    const tableOpts = thead ? { headerH: headerBottom - headerTop, tableStart: headerBottom, tableEnd: Math.round(at(tbl).bottom - top) } : {};
+    // Canvas budget: Safari refuses a canvas over ~16.7M pixels.
+    const scale = Math.max(2, Math.min(3, Math.floor(Math.sqrt(16000000 / (targetW * totalH)) * 4) / 4));
+    const canvas = await window.htmlToImage.toCanvas(clone, { pixelRatio: scale, backgroundColor: '#ffffff', height: totalH });
+    document.body.removeChild(clone); clone = null;
+
+    const pageW = isA5 ? 419.53 : 595.28, pageH = isA5 ? 595.28 : 841.89, margin = 24;   // points; 24pt is about 8.5mm
+    const ptPerPx = pageW / targetW;
+    const usable = Math.floor((pageH - 2 * margin) / ptPerPx);                            // css px one page holds
+    const slice = async (a, b) => {
+      const sh = Math.max(1, Math.round((b - a) * scale));
+      const out = document.createElement('canvas');
+      out.width = canvas.width; out.height = sh;
+      const ctx = out.getContext('2d');
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, out.width, sh);
+      ctx.drawImage(canvas, 0, Math.round(a * scale), canvas.width, sh, 0, 0, out.width, sh);
+      const jpeg = new Uint8Array(await (await new Promise((res, rej) => out.toBlob(bl => bl ? res(bl) : rej(new Error('jpeg')), 'image/jpeg', 0.92))).arrayBuffer());
+      return { jpeg, pxW: out.width, pxH: sh };
+    };
+    const cuts = pageBreaks(totalH, usable, marks, tableOpts);
+    const pages = [];
+    for (let i = 0; i < cuts.length; i++) {
+      const [a, b, repeat] = cuts[i];
+      const images = [];
+      let y = pageH - margin;
+      if (repeat) {                                   // a page that starts inside the table gets its header row again
+        const hh = (headerBottom - headerTop) * ptPerPx;
+        y -= hh; images.push({ ...(await slice(headerTop, headerBottom)), x: 0, y, w: pageW, h: hh });
+      }
+      const bh = (b - a) * ptPerPx;
+      y -= bh; images.push({ ...(await slice(a, b)), x: 0, y, w: pageW, h: bh });
+      pages.push({ images, footer: cuts.length > 1 ? `${data?.id || ''}${data?.id ? '  -  ' : ''}Page ${i + 1} of ${cuts.length}` : '' });
+    }
+    const name = getFileName().replace(/\.[^.]+$/, '') + '.pdf';
+    const file = new File([buildPdf(pages, { pageW, pageH })], name, { type: 'application/pdf' });
+    const shareNow = () => navigator.share({ files: [file], title: name.replace(/\.pdf$/, '') });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try { await shareNow(); return; } catch (e) { if (e.name === 'AbortError') return; }
+      // iOS lets a share start only from a tap, and preparing the PDF took long enough to lose it:
+      // ask for one more tap, which carries the file already built.
+      const sheet = document.createElement('div');
+      sheet.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:2147483000;padding:16px;background:#142339;display:flex;gap:8px;font:600 15px system-ui,sans-serif';
+      const go = document.createElement('button'); go.textContent = mono ? 'Share to print or save' : 'Share or save PDF';
+      go.style.cssText = 'flex:1;min-height:48px;border-radius:10px;border:0;background:#FFF200;color:#142339;font:inherit';
+      go.onclick = () => { shareNow().catch(() => {}); sheet.remove(); };
+      const no = document.createElement('button'); no.textContent = 'Cancel';
+      no.style.cssText = 'min-height:48px;padding:0 16px;border-radius:10px;border:1px solid rgba(255,255,255,.4);background:transparent;color:#fff;font:inherit';
+      no.onclick = () => sheet.remove();
+      sheet.append(go, no); document.body.appendChild(sheet);
+      return;
+    }
+    const url = URL.createObjectURL(file);                       // no share sheet for files: download it
+    const a = document.createElement('a'); a.href = url; a.download = name;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+    showToast('PDF saved');
+  } catch (e) {
+    if (clone && document.body.contains(clone)) document.body.removeChild(clone);
+    showToast('Could not prepare the PDF. Check your connection and try again.', 'error');
+  }
+};
+
 const handlePrint = () => {
+  if (!isThermal && isIOSDevice()) { handleIosPdf(true); return; }
   const result = buildHtmlDoc(true);
   if (!result) { showToast('Document not found', 'error'); return; }
   const { html, docTitle } = result;
@@ -639,6 +728,7 @@ const handlePrint = () => {
 // app-wide Inter rule, and the file brings its own fonts and page-break helpers.
 const handlePdf = () => {
   if (isThermal) return;
+  if (isIOSDevice()) { handleIosPdf(false); return; }
   const result = buildHtmlDoc(false, true);
   if (!result) { showToast('Document not found', 'error'); return; }
   const { html, docTitle } = result;
