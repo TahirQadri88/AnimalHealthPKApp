@@ -120,7 +120,7 @@ Bal: Rs. {bal.toLocaleString('en-US')} {bal > 0 ? '(Dr)' : bal < 0 ? '(Cr)' : ''
         setBillingView('form');
         setActiveTab('billing');
       }}
-      className="flex items-center justify-center sm:justify-start gap-1.5 text-sm sm:text-xs font-medium px-2 py-1.5 rounded-lg bg-kt-blue/10 text-kt-blue border border-kt-blue/30 hover:bg-kt-blue/10"
+      className="flex items-center whitespace-nowrap justify-center sm:justify-start gap-1.5 text-sm sm:text-xs font-medium px-2 py-1.5 rounded-lg bg-kt-blue/10 text-kt-blue border border-kt-blue/30 hover:bg-kt-blue/10"
     ><ReceiptText size={11}/> New Invoice</button>
   )}
   {(isAdmin || hasPermission('receivePayments')) && (

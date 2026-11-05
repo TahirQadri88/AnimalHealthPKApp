@@ -19,7 +19,7 @@ export const products = [
   ['Oxytetracycline 20% 100ml', 3, 520, 390, 'vial', 24], ['Multivit Plus Powder 1kg', 4, 1150, 860, 'pkt', 20],
   ['Ivermectin 1% 50ml', 5, 460, 330, 'vial', 30], ['Calcium Borogluconate 450ml', 3, 380, 270, 'btl', 24],
   ['Albendazole 10% 1 Litre', 1, 1950, 1500, 'btl', 12], ['Tylosin 20% 100ml', 2, 890, 690, 'vial', 20],
-  ['Mineral Mixture 5kg', 4, 2400, 1900, 'bag', 4], ['Meloxicam 2% 50ml', 5, 610, 450, 'vial', 30],
+  ['MILK POWDER 20KG (26-28% Milk Fat with 34% Protein) Imported Calf Milk Replacer', 4, 2400, 1900, 'bag', 4], ['Meloxicam 2% 50ml', 5, 610, 450, 'vial', 30],
 ].map(([name, companyId, sellingPrice, costPrice, unit, unitsInBox], i) => ({ id: 101 + i, name, companyId, sellingPrice, costPrice, unit, unitsInBox, available: true }));
 // One product registered by staff, still waiting for an admin to price it.
 products.push({ id: 120, name: 'Electrolyte Sachet 100g', companyId: 4, sellingPrice: 120, costPrice: 0, costPending: true, unit: 'pkt', unitsInBox: 50, available: true });

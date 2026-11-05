@@ -36,6 +36,13 @@ describe('preview bar', () => {
     expect(render('invoice', 'thermal')).not.toMatch(/PDF<\/button>/);
   });
 
+  it('sends the WhatsApp message encoded once, so it arrives as text not as %0A and %20', () => {
+    const href = (render('invoice', 'a4').match(/href="(https:\/\/wa\.me\/\?text=[^"]+)"/) || [])[1] || '';
+    expect(href).toContain('%0A');         // a real line break, encoded once
+    expect(href).not.toContain('%250A');   // not encoded a second time
+    expect(href).not.toContain('%2520');
+  });
+
   it('leaves out A4 for a receipt, as before', () => {
     expect(render('receipt', 'a5')).not.toMatch(/>A4</);
   });

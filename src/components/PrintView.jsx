@@ -416,8 +416,11 @@ const buildHtmlDoc = (screenHide = false, colour = false) => {
         // inline !important beats any stylesheet !important — preserves dark bg
         el.style.setProperty('background-color', `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`, 'important');
         el.style.background = '';
-      } else {
-        // Clear light inline backgrounds; print CSS rule will force white
+      } else if (screenHide) {
+        // Clear light inline backgrounds; print CSS rule will force white.
+        // Only for the Print popup. The shared file is a screen document too: clearing these stripped
+        // every yellow block from it, so it opened as outlines on white while the preview was yellow.
+        // Printing that file is still black and white, because its @media print rules force white.
         el.style.background = '';
         el.style.backgroundColor = '';
       }
@@ -538,6 +541,18 @@ const buildHtmlDoc = (screenHide = false, colour = false) => {
       tr{break-inside:avoid;page-break-inside:avoid;}
     }
 `;
+  // The colour PDF opens in its own window. On a phone that window can be full screen with nothing around
+  // it, so it carries its own two buttons (hidden when printing): Print / Save as PDF, and Close.
+  const pdfBar = colour ? `<style>
+.pdf-bar{position:sticky;top:0;z-index:10;display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 12px;background:#1C3B2E;color:#fff;font:500 14px 'DM Sans',system-ui,sans-serif;margin:-16px -16px 14px}
+.pdf-bar button{min-height:44px;padding:0 16px;border-radius:8px;border:1px solid rgba(255,255,255,.35);background:transparent;color:#fff;font:600 14px 'DM Sans',system-ui,sans-serif}
+.pdf-bar button.main{background:#FFF200;color:#1C3B2E;border-color:#FFF200}
+.pdf-bar span{flex:1 1 100%;font-size:12px;opacity:.8}
+@media print{.pdf-bar{display:none!important}}
+</style>
+<script>function closePdf(){try{window.close()}catch(e){}setTimeout(function(){if(!window.closed)location.href=${JSON.stringify(window.location.href)}},200)}</script>
+<div class="pdf-bar"><button class="main" onclick="window.print()">Print / Save as PDF</button><button onclick="closePdf()">Close</button><span>In the print window, choose Save as PDF as the printer.</span></div>
+` : '';
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -574,7 +589,7 @@ const buildHtmlDoc = (screenHide = false, colour = false) => {
 ${colour ? colourPrintCss : monoPrintCss}  </style>
 </head>
 <body>
-<div id="doc">${clone.outerHTML}</div>
+${colour ? pdfBar : ''}<div id="doc">${clone.outerHTML}</div>
 </body>
 </html>`;
   return { html, docTitle };
@@ -1048,30 +1063,22 @@ return (
             onClick={handleImageShare}
             title="Share as Image (PNG/JPG) — works with WhatsApp"
             className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3 h-11 sm:h-9 rounded-lg border border-white/25 text-white text-sm font-medium whitespace-nowrap hover:bg-white/10 transition-colors"
-          ><Image size={16} strokeWidth={1.5}/> Image</button>
+          ><Image size={16} strokeWidth={1.5} className="hidden sm:block"/> Image</button>
           {!isThermal && (
             <button
               onClick={handlePdf}
               title="Colour PDF: in the print window choose Save as PDF (sharp at any zoom)"
               className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3 h-11 sm:h-9 rounded-lg border border-white/25 text-white text-sm font-medium whitespace-nowrap hover:bg-white/10 transition-colors"
-            ><FileText size={16} strokeWidth={1.5}/> PDF</button>
+            ><FileText size={16} strokeWidth={1.5} className="hidden sm:block"/> PDF</button>
           )}
           <a
-            href={`https://wa.me/?text=${encodeURIComponent(generateShareText())}`}
+            href={`https://wa.me/?text=${generateShareText()}`}
             target="_blank"
             rel="noopener noreferrer"
             aria-label="WhatsApp"
             title="Send the summary on WhatsApp"
-            className="w-11 sm:w-auto shrink-0 sm:flex-none inline-flex items-center justify-center gap-1.5 sm:px-3 h-11 sm:h-9 rounded-lg border border-white/25 text-white text-sm font-medium whitespace-nowrap hover:bg-white/10 transition-colors"
-          ><MessageCircle size={16} strokeWidth={1.5}/><span className="hidden sm:inline">WhatsApp</span></a>
-          {docType === 'invoice' && (
-            <button
-              onClick={() => setShowPrevBal(v => !v)}
-              aria-pressed={!showPrevBal}
-              title="Toggle previous balance visibility on invoice"
-              className={`flex-1 sm:flex-none inline-flex items-center justify-center px-3 h-11 sm:h-9 rounded-lg border text-sm font-medium whitespace-nowrap transition-colors ${showPrevBal ? 'border-white/25 text-white hover:bg-white/10' : 'border-kt-yellow bg-white/15 text-kt-yellow'}`}
-            >{showPrevBal ? 'Full Ledger' : 'Bill Only'}</button>
-          )}
+            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-2 sm:px-3 h-11 sm:h-9 rounded-lg border border-white/25 text-white text-sm font-medium whitespace-nowrap hover:bg-white/10 transition-colors"
+          ><MessageCircle size={16} strokeWidth={1.5} className="hidden sm:block"/>WhatsApp</a>
         </div>
       </div>
 
@@ -1080,6 +1087,19 @@ return (
       <p className="hidden sm:block text-xs text-white/70">Preview, Save / Share, PDF and Image are in colour · Print is black &amp; white</p>
     </div>
   </div>
+
+  {/* The ledger switch is a setting of the document, not an action, so it sits above the page and
+      scrolls away instead of costing the sticky bar a row on a phone. It shows the mode it is IN. */}
+  {docType === 'invoice' && (
+    <div className="no-print font-ui flex justify-center px-3 pt-3">
+      <button
+        onClick={() => setShowPrevBal(v => !v)}
+        aria-pressed={!showPrevBal}
+        title="Toggle previous balance visibility on invoice"
+        className={`inline-flex items-center justify-center px-4 h-11 sm:h-9 rounded-lg border text-sm font-medium whitespace-nowrap transition-colors ${showPrevBal ? 'border-kt-line bg-white text-kt-ink hover:bg-kt-raised' : 'border-kt-ink bg-kt-band text-kt-yellow'}`}
+      >{showPrevBal ? 'Full Ledger' : 'Bill Only'}</button>
+    </div>
+  )}
 
   {/* ── Document ── */}
   <div className={previewScale < 1 ? 'px-2 pb-6' : undefined}>
