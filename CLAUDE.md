@@ -122,6 +122,11 @@ print popup gets Inter and the black-bar pass exactly as before. The moved "INVO
 "Save / Share" is a separate standalone file: `lib/docFonts.js` fetches the faces once when a document
 opens and embeds them as data, so it looks right on any device. `?inline` does NOT embed a woff2.
 
+**One text inset on A4/A5** (A4 14px, A5 12px): the first column's left edge and the last column's right edge
+of every table (items, ledger, report, aging, totals, Total SKUs) sit on it, so figures line up down the page.
+`tools/ui-preview/docs.html?type=&format=&items=` renders any of the eight documents with real ledger data
+for looking at and measuring them.
+
 Density: A4/A5 item rows are about 28px (were 38px) at the same 12px/11px type, so about 40% more
 lines fit a page. Prove changes here by capturing what Print writes (stub `window.open`) and comparing
 thermal byte for byte, then open the shared file on its own and check A4 and A5 for text past its box.
