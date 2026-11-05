@@ -30,6 +30,12 @@ describe('preview bar', () => {
     expect(html).toContain('aria-label="Close"');
   });
 
+  it('offers a colour PDF on A4 and A5, never on the thermal roll', () => {
+    expect(render('invoice', 'a4')).toMatch(/>PDF</);
+    expect(render('invoice', 'a5')).toMatch(/>PDF</);
+    expect(render('invoice', 'thermal')).not.toMatch(/>PDF</);
+  });
+
   it('leaves out A4 for a receipt, as before', () => {
     expect(render('receipt', 'a5')).not.toMatch(/>A4</);
   });

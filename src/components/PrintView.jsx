@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { FileDown, Printer, Share2, X, MessageCircle, Image } from 'lucide-react';
+import { FileDown, Printer, Share2, X, MessageCircle, Image, FileText } from 'lucide-react';
 import { formatDateDisp, getLocalDateStr, APP_NAME } from '../helpers';
 import { splitDispatchLine } from '../lib/packaging';
 import { isCashSale } from '../lib/cashCustomer';
@@ -395,7 +395,7 @@ const generateShareText = () => {
 };
 
 // ── Build standalone HTML doc (shared by print + share) ──────────────────
-const buildHtmlDoc = (screenHide = false) => {
+const buildHtmlDoc = (screenHide = false, colour = false) => {
   const element = document.getElementById('print-document');
   if (!element) return null;
   const clone = element.cloneNode(true);
@@ -513,6 +513,31 @@ const buildHtmlDoc = (screenHide = false) => {
   const pageMargin = isThermal ? '0' : '10mm';
   const bodyPad    = isThermal ? '0' : '16px';
   const docTitle   = getFileName().replace(/\.[^.]+$/, '');
+  // Paper is black and white: this block whitens everything and restores the [data-dk] bars as black.
+  const monoPrintCss = `    @media print{
+      #doc *{
+        color:black!important;
+        background-color:white!important;
+        background-image:none!important;
+        border-color:#ccc!important;
+        box-shadow:none!important;
+        text-shadow:none!important;
+      }
+      #doc [data-dk]{background-color:black!important;border-color:black!important;}
+      #doc [data-dk] *{background-color:transparent!important;}
+      #doc [data-dk],#doc [data-dk] *{color:white!important;}
+    }
+`;
+  // A colour PDF (A4/A5, "Save as PDF" in the print window) keeps the document as it looks on screen and
+  // only needs the page-break helpers the app's stylesheets give the normal print popup. The footer is a
+  // plain row group so "Total SKUs" prints once, at the end, not at the bottom of every page.
+  const colourPrintCss = `    @media print{
+      .keep-together{break-inside:avoid;page-break-inside:avoid;}
+      thead{display:table-header-group;}
+      tfoot{display:table-row-group;}
+      tr{break-inside:avoid;page-break-inside:avoid;}
+    }
+`;
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -546,20 +571,7 @@ const buildHtmlDoc = (screenHide = false) => {
     #doc>*{margin-left:0!important;margin-right:auto!important;}` : ''}
     ${screenHide ? '@media screen{body{background:white;}#doc{visibility:hidden;}}' : ''}
     @media print{body{padding:${pageMargin};background:white;}#doc>*{width:100%!important;max-width:${isThermal ? thermalCap : 'none'}!important;min-width:0!important;padding-left:${isThermal ? thermalPadX : '0'}!important;padding-right:${isThermal ? thermalPadX : '0'}!important;}}
-    @media print{
-      #doc *{
-        color:black!important;
-        background-color:white!important;
-        background-image:none!important;
-        border-color:#ccc!important;
-        box-shadow:none!important;
-        text-shadow:none!important;
-      }
-      #doc [data-dk]{background-color:black!important;border-color:black!important;}
-      #doc [data-dk] *{background-color:transparent!important;}
-      #doc [data-dk],#doc [data-dk] *{color:white!important;}
-    }
-  </style>
+${colour ? colourPrintCss : monoPrintCss}  </style>
 </head>
 <body>
 <div id="doc">${clone.outerHTML}</div>
@@ -598,6 +610,24 @@ const handlePrint = () => {
   newWin.onafterprint = closeAfterPrint;
   const tid = setTimeout(() => { try { newWin.focus(); newWin.print(); } catch(e){} }, 900);
   newWin.onload = () => { clearTimeout(tid); newWin.focus(); newWin.print(); };
+};
+
+// ── Colour PDF — the same popup, kept in colour, saved as a PDF from the print window ─
+// A real PDF (vector text, sharp at any zoom, a few tens of KB), not a picture of the page. A4/A5
+// only: the thermal roll is paper, never a PDF. No app stylesheets are injected here: they carry the
+// app-wide Inter rule, and the file brings its own fonts and page-break helpers.
+const handlePdf = () => {
+  if (isThermal) return;
+  const result = buildHtmlDoc(false, true);
+  if (!result) { showToast('Document not found', 'error'); return; }
+  const { html, docTitle } = result;
+  const newWin = window.open('', '_blank');
+  if (!newWin) { showToast('Allow popups to save the PDF', 'error'); return; }
+  newWin.document.open(); newWin.document.write(html); newWin.document.close();
+  newWin.document.title = docTitle;
+  showToast('In the print window, choose "Save as PDF"');
+  const tid = setTimeout(() => { try { newWin.focus(); newWin.print(); } catch(e){} }, 1200);
+  newWin.onload = () => { clearTimeout(tid); setTimeout(() => { newWin.focus(); newWin.print(); }, 400); };
 };
 
 // ── HTML Share / Download ─────────────────────────────────────────────────
@@ -720,8 +750,17 @@ const handleImageShare = async () => {
   showToast('Generating image…');
 
   const targetW    = isThermal ? 302 : isA5 ? 559 : 794;
-  const imgFileName = getFileName().replace(/\.pdf$/, '.jpg');
-  const imgMime    = 'image/jpeg';
+  // The file's extension follows what is actually written: PNG (lossless, so text and the coloured
+  // blocks stay crisp) unless the image is too large to share comfortably, then high-quality JPEG.
+  const imgBaseName = getFileName().replace(/\.[^.]+$/, '');
+  const imgNameFor = (blob) => imgBaseName + (blob.type === 'image/png' ? '.png' : '.jpg');
+
+  // How sharp, within what a phone can draw. Safari refuses a canvas over ~16.7 million pixels, so the
+  // scale is the highest of 4x (about 380 dpi across A4) that keeps the whole capture inside 16M:
+  // a one-page invoice gets the full 4x, a long one steps down but never below 2x. It used to be a
+  // fixed 3x, which a three-page invoice already pushed past that limit.
+  const MAX_CANVAS_PX = 16000000;
+  const pickScale = (cssW, cssH) => Math.max(2, Math.min(4, Math.floor(Math.sqrt(MAX_CANVAS_PX / (cssW * cssH)) * 4) / 4));
 
   const withTimeout = (promise, ms) => Promise.race([
     promise,
@@ -729,9 +768,10 @@ const handleImageShare = async () => {
   ]);
 
   const shareBlob = async (blob) => {
-    const file = new File([blob], imgFileName, { type: imgMime });
+    const imgFileName = imgNameFor(blob);
+    const file = new File([blob], imgFileName, { type: blob.type });
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      navigator.share({ files: [file], title: imgFileName.replace(/\.[^.]+$/, ''), text: getShareCaption() })
+      navigator.share({ files: [file], title: imgBaseName, text: getShareCaption() })
         .catch(e => { if (e.name !== 'AbortError') downloadImageFallback(blob, imgFileName); });
     } else {
       downloadImageFallback(blob, imgFileName);
@@ -755,10 +795,16 @@ const handleImageShare = async () => {
     if (!window.htmlToImage) return;
   }
 
-  const toBlob = (canvas) => new Promise((resolve, reject) => {
+  const encode = (canvas, type, quality) => new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('toBlob timeout')), 20000);
-    canvas.toBlob(blob => { clearTimeout(timer); blob ? resolve(blob) : reject(new Error('toBlob null')); }, 'image/jpeg', 0.95);
+    canvas.toBlob(blob => { clearTimeout(timer); blob ? resolve(blob) : reject(new Error('toBlob null')); }, type, quality);
   });
+  // Lossless first; fall back to near-lossless JPEG only if the PNG is too big to share.
+  const toBlob = async (canvas) => {
+    const png = await encode(canvas, 'image/png');
+    if (png.size <= 8 * 1024 * 1024) return png;
+    return encode(canvas, 'image/jpeg', 0.97);
+  };
 
   // Read height from the already-rendered original BEFORE cloning.
   // clone.scrollHeight can be 0 when the clone hasn't finished layout yet.
@@ -776,15 +822,15 @@ const handleImageShare = async () => {
   try {
     // Thermal: single tall JPEG — continuous roll, no page slicing needed
     if (isThermal) {
-      const dataUrl = await withTimeout(window.htmlToImage.toJpeg(clone, {
-        quality: 0.95, pixelRatio: 3, backgroundColor: '#ffffff', height: captureH,
+      const roll = await withTimeout(window.htmlToImage.toCanvas(clone, {
+        pixelRatio: pickScale(targetW, captureH), backgroundColor: '#ffffff', height: captureH,
       }), 30000);
       if (document.body.contains(clone)) document.body.removeChild(clone);
-      shareBlob(await (await fetch(dataUrl)).blob());
+      shareBlob(await toBlob(roll));
       return;
     }
 
-    const PIXEL_RATIO = 3;
+    const PIXEL_RATIO = pickScale(targetW, captureH);
     const GAP_PX = 20;
 
     const srcCanvas = await withTimeout(window.htmlToImage.toCanvas(clone, {
@@ -1003,12 +1049,21 @@ return (
             title="Share as Image (PNG/JPG) — works with WhatsApp"
             className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3 h-11 sm:h-9 rounded-lg border border-white/25 text-white text-sm font-medium whitespace-nowrap hover:bg-white/10 transition-colors"
           ><Image size={16} strokeWidth={1.5}/> Image</button>
+          {!isThermal && (
+            <button
+              onClick={handlePdf}
+              title="Colour PDF: in the print window choose Save as PDF (sharp at any zoom)"
+              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3 h-11 sm:h-9 rounded-lg border border-white/25 text-white text-sm font-medium whitespace-nowrap hover:bg-white/10 transition-colors"
+            ><FileText size={16} strokeWidth={1.5}/> PDF</button>
+          )}
           <a
             href={`https://wa.me/?text=${encodeURIComponent(generateShareText())}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3 h-11 sm:h-9 rounded-lg border border-white/25 text-white text-sm font-medium whitespace-nowrap hover:bg-white/10 transition-colors"
-          ><MessageCircle size={16} strokeWidth={1.5}/> WhatsApp</a>
+            aria-label="WhatsApp"
+            title="Send the summary on WhatsApp"
+            className="w-11 sm:w-auto shrink-0 sm:flex-none inline-flex items-center justify-center gap-1.5 sm:px-3 h-11 sm:h-9 rounded-lg border border-white/25 text-white text-sm font-medium whitespace-nowrap hover:bg-white/10 transition-colors"
+          ><MessageCircle size={16} strokeWidth={1.5}/><span className="hidden sm:inline">WhatsApp</span></a>
           {docType === 'invoice' && (
             <button
               onClick={() => setShowPrevBal(v => !v)}
@@ -1022,7 +1077,7 @@ return (
 
       {/* One look on every screen, one on paper: preview, Save / Share, PDF and Image are the same
           document, yellow blocks; Print bakes monochrome in buildHtmlDoc(screenHide). */}
-      <p className="hidden sm:block text-xs text-white/70">Preview, Save / Share, PDF and Image match · Print is black &amp; white</p>
+      <p className="hidden sm:block text-xs text-white/70">Preview, Save / Share, PDF and Image are in colour · Print is black &amp; white</p>
     </div>
   </div>
 

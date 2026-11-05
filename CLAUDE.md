@@ -131,6 +131,20 @@ Density: A4/A5 item rows are about 28px (were 38px) at the same 12px/11px type, 
 lines fit a page. Prove changes here by capturing what Print writes (stub `window.open`) and comparing
 thermal byte for byte, then open the shared file on its own and check A4 and A5 for text past its box.
 
+## HD exports: Image, PDF and Print
+
+- **Image** is a lossless PNG at up to 4x (about 380 dpi across A4), stepping down only as far as the
+  16-million-pixel canvas Safari will draw allows (`pickScale`), never below 2x. It was a fixed 3x JPEG,
+  which a three-page invoice already pushed past that limit. It falls back to 0.97 JPEG only if the PNG
+  is over 8MB. Thermal's image gets the same; its print and markup are untouched.
+- **PDF** (A4/A5 only) is `buildHtmlDoc(false, true)` in the print popup: the document in colour with
+  embedded fonts, saved as a PDF from the print window. Vector text, sharp at any zoom, tens of KB. It is
+  not a picture of the page. `colourPrintCss` replaces the monochrome block; the monochrome block is a
+  constant (`monoPrintCss`) whose bytes must not change: Print stays identical, proven by capturing what
+  it writes before and after.
+- **Print** is vector on A4/A5 and the printer's own dots on thermal; there is nothing to raise.
+- The WhatsApp button is a text-only link (it shares a summary, not a file).
+
 ## Two looks, not three: screen and paper
 
 Every screen destination shows the same document — **preview, Save / Share, PDF and Image
