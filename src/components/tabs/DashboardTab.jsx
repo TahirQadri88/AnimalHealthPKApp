@@ -22,6 +22,7 @@ const filteredCreditNotes = visibleInvoices.filter(o => o.status === 'CreditNote
 const filteredExpenses = expenses.filter(e => checkDateFilter(e.date, dateFilter));
 const revenue = netBilled({ billedInvoices: filteredInvoices, creditNotes: filteredCreditNotes });
 const totalReceivables = customers.reduce((sum, c) => sum + getCustomerBalance(c.id), 0);
+const owingCount = customers.reduce((n, c) => n + (getCustomerBalance(c.id) > 0 ? 1 : 0), 0);
 const totalExpenses = filteredExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
 const todayStr = getLocalDateStr();
 // The bill COUNT stays a count of bills raised — a return is not an un-issued invoice —
@@ -124,13 +125,19 @@ return (
       <p className="font-display text-[28px] sm:text-4xl text-kt-yellow leading-tight">{money(revenue)}</p>
       {momChange !== null && <p className="text-xs sm:text-sm text-white/80">{Number(momChange) >= 0 ? '▲' : '▼'} {Math.abs(momChange)}% vs last month</p>}
     </div>
-    {isAdmin && (
-    <button onClick={() => { setSelectedLedgerId(null); setShowLedgerModal(false); setActiveTab('customers'); }} className="w-full sm:w-auto flex sm:block items-baseline justify-between gap-3 text-left sm:text-right rounded-lg hover:bg-white/10 transition-colors">
-      <p className="text-sm text-white/70 flex items-center sm:justify-end gap-1.5"><DollarSign size={16} strokeWidth={1.5}/> Receivables{topReceivables.length > 0 && <span className="text-white/70"> · {topReceivables.length} high</span>}</p>
-      <p className="font-display text-2xl sm:text-3xl leading-tight whitespace-nowrap">{money(totalReceivables)}</p>
-    </button>
-    )}
   </div>
+  {isAdmin && (
+  <button onClick={() => { setSelectedLedgerId(null); setShowLedgerModal(false); setActiveTab('customers'); }} className="mt-3 w-full flex items-center justify-between gap-3 text-left bg-white/10 hover:bg-white/15 transition-colors rounded-lg px-3 py-2">
+    <span className="min-w-0">
+      <span className="block text-sm text-white/80">Receivables</span>
+      <span className="block text-xs text-white/70">{owingCount} client{owingCount !== 1 ? 's' : ''} owe you</span>
+    </span>
+    <span className="flex items-center gap-1 shrink-0">
+      <span className="font-display text-2xl leading-tight whitespace-nowrap">{money(totalReceivables)}</span>
+      <ChevronRight size={16} strokeWidth={1.5} className="text-white/70"/>
+    </span>
+  </button>
+  )}
   <div className="mt-2 pt-2 sm:mt-4 sm:pt-3 border-t border-white/15 flex flex-wrap gap-x-4 sm:gap-x-6 gap-y-0.5 text-sm">
     <span className="flex items-center gap-1.5 text-white/80"><ReceiptText size={16} strokeWidth={1.5} className="hidden sm:block"/> Today <span className="text-white font-medium">{todayInvoices.length} bill{todayInvoices.length !== 1 ? 's' : ''}</span>{todayRevenue > 0 && <span className="text-white font-medium tabular-nums">· {money(todayRevenue)}</span>}</span>
     <span className="flex items-center gap-1.5 text-white/80"><Wallet size={16} strokeWidth={1.5} className="hidden sm:block"/> Collected <span className="text-white font-medium tabular-nums">{money(todayCollected)}</span></span>
