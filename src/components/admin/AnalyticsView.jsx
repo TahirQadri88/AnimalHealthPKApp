@@ -861,7 +861,7 @@ return (
                       </div>
                       <div className="flex items-center gap-2 ml-2 shrink-0">
                         <span className="font-semibold text-kt-red text-sm">Rs.{r.amount.toLocaleString('en-US')}</span>
-                        {r.phone && <a href={`https://wa.me/92${r.phone.replace(/^0/,'').replace(/\D/g,'')}?text=${encodeURIComponent(`Assalam o Alaikum ${r.name},\n\nYour outstanding balance is *Rs. ${r.amount.toLocaleString('en-US')}*. Kindly process payment at earliest.\n\nJazakAllah Khair`)}`} target="_blank" rel="noopener noreferrer" className="p-1.5 bg-kt-green/10 text-kt-green rounded-lg hover:bg-kt-green/10 border border-kt-green/30"><PhoneCall size={13}/></a>}
+                        {r.phone && <a href={`https://wa.me/92${r.phone.replace(/^0/,'').replace(/\D/g,'')}?text=${encodeURIComponent(`Assalam o Alaikum ${r.name},\n\nYour outstanding balance is *Rs. ${r.amount.toLocaleString('en-US')}*. Kindly process payment at earliest.\n\nJazakAllah Khair`)}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center p-1.5 bg-kt-green/10 text-kt-green rounded-lg hover:bg-kt-green/10 border border-kt-green/30"><PhoneCall size={13}/></a>}
                       </div>
                     </div>
                   ))}
@@ -891,13 +891,15 @@ return (
                     return (
                       <div key={i} className="flex justify-between items-center p-3">
                         <div className="flex-1 min-w-0">
-                          <button className="font-semibold text-sm text-kt-ink truncate hover:text-kt-blue transition-colors text-left w-full" onClick={() => { setSelectedLedgerId(r.id); setShowLedgerModal(true); }}>{r.name}</button>
-                          <p className="text-xs text-kt-muted">{r.ageDays} days old{r.oldestAgeDays > r.ageDays ? ` · oldest debt ${r.oldestAgeDays}d` : ''}</p>
+                          <button className="text-left w-full block" onClick={() => { setSelectedLedgerId(r.id); setShowLedgerModal(true); }}>
+                            <span className="block font-semibold text-sm text-kt-ink truncate hover:text-kt-blue transition-colors">{r.name}</span>
+                            <span className="block text-xs text-kt-muted">{r.ageDays} days old{r.oldestAgeDays > r.ageDays ? ` · oldest debt ${r.oldestAgeDays}d` : ''}</span>
+                          </button>
                         </div>
                         <div className="flex items-center gap-2 ml-2 shrink-0">
                           <span className="font-semibold text-kt-red text-sm">Rs.{r.amount.toLocaleString('en-US')}</span>
                           {r.phone && (
-                            <a href={`https://wa.me/92${r.phone.replace(/^0/,'').replace(/\D/g,'')}?text=${encodeURIComponent(waMsg)}`} target="_blank" rel="noopener noreferrer" className="p-1.5 bg-kt-green/10 text-kt-green rounded-lg hover:bg-kt-green/10 transition-colors border border-kt-green/30" title="Send WhatsApp reminder">
+                            <a href={`https://wa.me/92${r.phone.replace(/^0/,'').replace(/\D/g,'')}?text=${encodeURIComponent(waMsg)}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center p-1.5 bg-kt-green/10 text-kt-green rounded-lg hover:bg-kt-green/10 transition-colors border border-kt-green/30" title="Send WhatsApp reminder">
                               <PhoneCall size={13}/>
                             </a>
                           )}

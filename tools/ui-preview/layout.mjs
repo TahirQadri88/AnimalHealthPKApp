@@ -26,10 +26,10 @@ for (const w of widths) {
   await page.waitForTimeout(700);
   for (const tab of tabs) {
     // tab@selector opens something from the tab first, as in contrast.mjs.
-    const [t, then] = tab.split('@');
+    const [t, ...thens] = tab.split('@');
     await page.goto('http://localhost:5174/tools/ui-preview/app.html', { waitUntil: 'networkidle' }); await page.waitForTimeout(500);
     await page.click(`[data-sidenav="${t}"] >> visible=true`); await page.waitForTimeout(500);
-    if (then) { await page.click(`${then} >> nth=0`); await page.waitForTimeout(600); }
+    for (const then of thens) { await page.click(`${then} >> nth=0`); await page.waitForTimeout(600); }
     // --inject=<css> plants a fault, to prove the checker catches what it claims to.
     if (arg('inject', '')) { await page.addStyleTag({ content: arg('inject', '') }); await page.waitForTimeout(200); }
     const r = await page.evaluate(() => {
@@ -101,7 +101,7 @@ for (const w of widths) {
           continue;
         }
         const t = textRect(par);
-        if (t && t.height < 40) {
+        if (t && t.height < 40 && sb.bottom > t.top + 2) {  // an icon stacked ABOVE its text (an empty state) is not beside it
           const d = Math.abs(sy - (t.top + t.height / 2)); if (d > 2.5) mis.add(`icon ${d.toFixed(1)}px off its label's centre: ${name(par).slice(0, 50)}`);
           // a leading icon stays beside its label: auto margins once threw it to the far edge of the button
           const gapX = t.left - sb.right;
