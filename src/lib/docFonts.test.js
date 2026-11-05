@@ -9,8 +9,8 @@ describe('embedded document typeface', () => {
   });
 
   it('builds a self-contained @font-face rule', () => {
-    const css = faceCss(600, 'AAAA');
-    expect(css).toContain("font-family:'Poppins'");
+    const css = faceCss('DM Sans', 600, 'AAAA');
+    expect(css).toContain("font-family:'DM Sans'");
     expect(css).toContain('font-weight:600');
     expect(css).toContain('url(data:font/woff2;base64,AAAA)');
   });
@@ -19,6 +19,6 @@ describe('embedded document typeface', () => {
     // The shared file only switches to Poppins when this is non-empty, so an empty answer
     // means it keeps the system font instead of naming a face it does not carry.
     expect(getDocFontCss()).toBe('');
-    expect(DOC_FONT_STACK).toContain('Poppins');
+    expect(DOC_FONT_STACK).toContain('DM Sans');
   });
 });

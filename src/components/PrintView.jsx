@@ -3,8 +3,8 @@ import { FileDown, Printer, Share2, X, MessageCircle, Image } from 'lucide-react
 import { formatDateDisp, getLocalDateStr, APP_NAME } from '../helpers';
 import { splitDispatchLine } from '../lib/packaging';
 import { isCashSale } from '../lib/cashCustomer';
-import { YELLOW, isBlockBackground } from './printTheme';
-import { preloadDocFonts, getDocFontCss, DOC_FONT_STACK } from '../lib/docFonts';
+import { YELLOW, PASTURE, isBlockBackground } from './printTheme';
+import { preloadDocFonts, getDocFontCss, DOC_FONT_STACK, DOC_FONT_STACK_LIVE } from '../lib/docFonts';
 
 // Format: 'thermal' | 'a5' | 'a4'
 //
@@ -41,6 +41,8 @@ const bizContact = [biz.phone, biz.email, biz.address]
   .join('  ·  ');
 const isThermal = format === 'thermal';
 const isA5 = format === 'a5';
+// A4/A5 blocks are the app's green and yellow; the thermal roll keeps its measured yellow.
+const BLK = isThermal ? YELLOW : PASTURE;
 // The receivables aging report is a report, but it is a name-and-amount list rather than an
 // analytics table, so it gets its own layout and is allowed onto the thermal roll.
 const isAging = docType === 'report' && data?.view === 'Aging';
@@ -1031,32 +1033,38 @@ return (
     id="print-document"
     ref={printRef}
     className={`bg-white mx-auto ${docWidth} ${pad}${isThermal ? '' : ' font-doc'}`}
-    style={{ fontFamily: isThermal ? "'Inter', system-ui, sans-serif" : "'Poppins', 'Inter', system-ui, sans-serif", lineHeight: 1.5, fontSize: isThermal ? '10px' : isA5 ? '11px' : '12px', border: isThermal ? 'none' : '1px solid #cbd5e1', borderRadius: isThermal ? '0' : sz('','8px','10px'), overflow: 'hidden' }}
+    style={{ fontFamily: isThermal ? "'Inter', system-ui, sans-serif" : DOC_FONT_STACK_LIVE, ...(isThermal ? {} : { fontVariantNumeric: 'lining-nums tabular-nums' }), lineHeight: isThermal ? 1.5 : 1.4, fontSize: isThermal ? '10px' : isA5 ? '11px' : '12px', border: isThermal ? 'none' : '1px solid #cbd5e1', borderRadius: isThermal ? '0' : sz('','8px','10px'), overflow: 'hidden' }}
   >
 
     {/* ── Header ── */}
-    <div className="keep-together" style={{ textAlign: 'center', marginBottom: sz('14px','18px','22px'), borderRadius: isThermal ? '0' : sz('','6px 6px 0 0','8px 8px 0 0'), overflow: 'hidden', border: '2px solid #0f172a' }}>
+    <div className="keep-together" style={{ textAlign: 'center', marginBottom: sz('14px','12px','14px'), borderRadius: isThermal ? '0' : sz('','6px 6px 0 0','8px 8px 0 0'), overflow: 'hidden', border: '2px solid #0f172a' }}>
       {showBizName && (
-        <div data-dk="1" style={{ background: YELLOW.fill, padding: sz('12px 10px','18px 20px','22px 24px') }}>
-          <div style={{ fontSize: `${mastheadFontPx}px`, fontWeight: 900, letterSpacing: '1px', textTransform: 'uppercase', color: YELLOW.ink, lineHeight: 1.2 }}>
+        <div data-dk="1" style={{ background: BLK.fill, padding: sz('12px 10px','18px 20px','22px 24px') }}>
+          <div className={isThermal ? undefined : 'doc-serif'} style={{ fontSize: `${mastheadFontPx}px`, fontWeight: 900, letterSpacing: '1px', textTransform: 'uppercase', color: BLK.ink, lineHeight: 1.2 }}>
             {bizName}
           </div>
-          {bizTagline && <div style={{ fontSize: `${taglineFontPx}px`, textTransform: 'uppercase', letterSpacing: '2px', fontWeight: 600, color: YELLOW.inkMuted, marginTop: '4px' }}>
+          {bizTagline && <div style={{ fontSize: `${taglineFontPx}px`, textTransform: 'uppercase', letterSpacing: '2px', fontWeight: 600, color: BLK.inkMuted, marginTop: '4px' }}>
             {bizTagline}
           </div>}
           {/* Contact line. Brighter than the tagline because it is the actionable part —
               a phone number someone squints at, not decoration. overflowWrap keeps a long
               address inside the 68mm box instead of overrunning the head. */}
-          {bizContact && <div style={{ fontSize: `${taglineFontPx}px`, letterSpacing: '0.3px', fontWeight: 600, color: YELLOW.inkMuted, marginTop: '3px', lineHeight: 1.5, overflowWrap: 'anywhere' }}>
+          {bizContact && <div style={{ fontSize: `${taglineFontPx}px`, letterSpacing: '0.3px', fontWeight: 600, color: BLK.inkMuted, marginTop: '3px', lineHeight: 1.5, overflowWrap: 'anywhere' }}>
             {bizContact}
           </div>}
+          {!isThermal && (
+            <div style={{ marginTop: sz('', '10px', '12px') }}>
+              <span style={{ display: 'inline-block', background: BLK.ink, color: BLK.fill, padding: sz('', '3px 14px', '4px 18px'), borderRadius: '4px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '2.5px', fontSize: sz('', '8.5px', '9.5px'), lineHeight: 1.5 }}>{docLabel}</span>
+            </div>
+          )}
         </div>
       )}
+      {(isThermal || !showBizName) && (
       <div style={{ textAlign: 'center', padding: sz('5px 8px','7px 10px','8px 12px'), background: 'white' }}>
         <span data-dk="1" style={{
           display: 'inline-block',
-          background: YELLOW.fill,
-          color: YELLOW.ink,
+          background: BLK.fill,
+          color: BLK.ink,
           padding: sz('3px 12px','4px 16px','5px 20px'),
           borderRadius: '4px',
           fontWeight: 800,
@@ -1068,6 +1076,7 @@ return (
           {docLabel}
         </span>
       </div>
+      )}
     </div>
 
     {/* ── Customer / Doc Meta ── */}
@@ -1115,9 +1124,17 @@ return (
             <>
               <div style={{ fontSize: sz('7px','8.5px','9px'), textTransform: 'uppercase', fontWeight: 700, letterSpacing: '1px', color: '#1d4ed8', marginBottom: '4px' }}>Ref #</div>
               <div style={{ fontWeight: 800, fontSize: sz('11px','13px','14px'), color: '#0f172a', fontFamily: 'monospace', letterSpacing: '0.5px' }}>{data.id || '—'}</div>
-              <div style={{ color: '#475569', fontSize: sz('9px','10px','11px'), marginTop: sz('3px','4px','5px'), fontWeight: 600 }}>{formatDateDisp(data.date)}</div>
-              {docType === 'invoice' && data.salespersonName && (
-                <div style={{ fontSize: sz('7px','8px','9px'), color: '#64748b', marginTop: sz('3px','4px','5px'), fontWeight: 500 }}>by {data.salespersonName}</div>
+              {isThermal ? (
+                <>
+                  <div style={{ color: '#475569', fontSize: sz('9px','10px','11px'), marginTop: sz('3px','4px','5px'), fontWeight: 600 }}>{formatDateDisp(data.date)}</div>
+                  {docType === 'invoice' && data.salespersonName && (
+                    <div style={{ fontSize: sz('7px','8px','9px'), color: '#64748b', marginTop: sz('3px','4px','5px'), fontWeight: 500 }}>by {data.salespersonName}</div>
+                  )}
+                </>
+              ) : (
+                <div style={{ color: '#475569', fontSize: sz('', '10px', '11px'), marginTop: '3px', fontWeight: 600 }}>
+                  {formatDateDisp(data.date)}{docType === 'invoice' && data.salespersonName && <span style={{ color: '#64748b', fontWeight: 500 }}> · by {data.salespersonName}</span>}
+                </div>
               )}
             </>
           )}
@@ -1136,7 +1153,7 @@ return (
 
     {/* ── Dispatch Logistics ── */}
     {docType === 'dispatch' && data && (
-      <div className="keep-together" style={{ marginBottom: sz('14px','18px','22px'), background: '#f8fafc', padding: sz('8px','12px','14px'), borderRadius: sz('6px','7px','8px'), borderLeft: '3px solid #0f172a', fontSize: sz('9.5px','11px','11.5px'), color: '#1e293b' }}>
+      <div className="keep-together" style={{ marginBottom: sz('14px','12px','14px'), background: '#f8fafc', padding: sz('8px','12px','14px'), borderRadius: sz('6px','7px','8px'), borderLeft: '3px solid #0f172a', fontSize: sz('9.5px','11px','11.5px'), color: '#1e293b' }}>
         <div style={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '5px', fontSize: sz('7.5px','9.5px','10px'), color: '#1d4ed8' }}>
           Logistics / Delivery
         </div>
@@ -1224,7 +1241,7 @@ return (
           const grandTotal = (
             <div className="keep-together" style={{
               display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px',
-              background: YELLOW.fill, color: YELLOW.ink, borderRadius: '8px',
+              background: BLK.fill, color: BLK.ink, borderRadius: '8px',
               padding: sz('6px 8px','8px 12px','10px 14px'), marginTop: sz('8px','10px','12px'),
               fontWeight: 900, fontSize: sz('9px','12px','14px'),
             }} data-dk="1">
@@ -1272,7 +1289,7 @@ return (
               {summary}
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: sz('8px','8.5px','10px') }}>
                 <thead>
-                  <tr data-dk="1" style={{ background: YELLOW.fill, color: YELLOW.ink }}>
+                  <tr data-dk="1" style={{ background: BLK.fill, color: BLK.ink }}>
                     <th style={{ padding: sz('5px 4px','6px 5px','8px 8px'), textAlign: 'left', fontWeight: 800 }}>Customer</th>
                     <th style={{ padding: sz('5px 4px','6px 5px','8px 8px'), textAlign: 'center', fontWeight: 800, whiteSpace: 'nowrap' }}>Oldest</th>
                     {agingBuckets.map(b => (
@@ -1284,7 +1301,7 @@ return (
                 <tbody>
                   {rows.map((r, i) => (
                     <tr key={i} style={{ borderBottom: '1px solid #f1f5f9', background: i % 2 === 0 ? '#fff' : '#f8fafc', pageBreakInside: 'avoid', breakInside: 'avoid' }}>
-                      <td style={{ padding: sz('6px 4px','7px 5px','9px 8px'), fontWeight: 600, wordBreak: 'break-word', lineHeight: sz('1.5','1.55','1.6') }}>
+                      <td style={{ padding: sz('6px 4px','7px 5px','9px 8px'), fontWeight: 600, wordBreak: 'break-word', lineHeight: sz('1.5','1.35','1.35') }}>
                         {r.name}
                         {r.phone ? <span style={{ fontSize: '7.5px', color: '#64748b', display: 'block' }}>{r.phone}</span> : null}
                       </td>
@@ -1301,7 +1318,7 @@ return (
                   ))}
                 </tbody>
                 <tfoot>
-                  <tr data-dk="1" style={{ background: YELLOW.fill, color: YELLOW.ink, fontWeight: 900 }}>
+                  <tr data-dk="1" style={{ background: BLK.fill, color: BLK.ink, fontWeight: 900 }}>
                     <td style={{ padding: sz('6px 4px','7px 5px','9px 8px') }}>TOTAL ({aging.customerCount ?? rows.length})</td>
                     <td />
                     {agingBuckets.map(b => (
@@ -1315,7 +1332,7 @@ return (
           );
         })() : data.view === 'Overview' ? (
           <div className="keep-together" style={{ border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden' }}>
-            <div data-dk="1" style={{ background: YELLOW.fill, color: YELLOW.ink, padding: sz('8px 12px','10px 16px','12px 20px'), fontSize: sz('9px','10px','11px'), fontWeight: 800, letterSpacing: '1px', textTransform: 'uppercase' }}>
+            <div data-dk="1" style={{ background: BLK.fill, color: BLK.ink, padding: sz('8px 12px','10px 16px','12px 20px'), fontSize: sz('9px','10px','11px'), fontWeight: 800, letterSpacing: '1px', textTransform: 'uppercase' }}>
               Profit & Loss Summary
             </div>
             <div style={{ padding: sz('12px','16px','20px') }}>
@@ -1352,7 +1369,7 @@ return (
           </div>
         ) : data.view === 'Insights' ? (
           <div className="keep-together" style={{ border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden' }}>
-            <div data-dk="1" style={{ background: YELLOW.fill, color: YELLOW.ink, padding: sz('8px 12px','10px 16px','12px 20px'), fontSize: sz('9px','10px','11px'), fontWeight: 800, letterSpacing: '1px', textTransform: 'uppercase' }}>
+            <div data-dk="1" style={{ background: BLK.fill, color: BLK.ink, padding: sz('8px 12px','10px 16px','12px 20px'), fontSize: sz('9px','10px','11px'), fontWeight: 800, letterSpacing: '1px', textTransform: 'uppercase' }}>
               P&L Insights Report
             </div>
             <div style={{ padding: sz('12px','16px','20px') }}>
@@ -1392,7 +1409,7 @@ return (
         ) : (
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: sz('8px','9px','10px') }}>
             <thead>
-              <tr data-dk="1" style={{ background: YELLOW.fill, color: YELLOW.ink }}>
+              <tr data-dk="1" style={{ background: BLK.fill, color: BLK.ink }}>
                 <th style={{ padding: sz('5px 4px','7px 6px','8px 8px'), textAlign: 'left', fontWeight: 800 }}>Name</th>
                 {data.view !== 'Receivables' && <th style={{ padding: sz('5px 4px','7px 6px','8px 8px'), textAlign: 'center', fontWeight: 800 }}>Qty</th>}
                 {data.view !== 'Receivables' && <th style={{ padding: sz('5px 4px','7px 6px','8px 8px'), textAlign: 'right', fontWeight: 800 }}>Revenue</th>}
@@ -1410,7 +1427,7 @@ return (
                 const rGP = r['Gross Profit (Rs)'] || r['Outstanding (Rs)'] || r.GrossProfit || r.Amount || 0;
                 return (
                 <tr key={i} style={{ borderBottom: '1px solid #f1f5f9', background: i % 2 === 0 ? '#fff' : '#f8fafc', pageBreakInside: 'avoid', breakInside: 'avoid' }}>
-                  <td style={{ padding: sz('6px','8px','9px'), fontWeight: 600, wordBreak: 'break-word', lineHeight: sz('1.5','1.55','1.6') }}>
+                  <td style={{ padding: sz('6px','8px','9px'), fontWeight: 600, wordBreak: 'break-word', lineHeight: sz('1.5','1.35','1.35') }}>
                     {rName}
                     {rBrand ? <span style={{ fontSize: '7.5px', color: '#1e293b', display: 'block' }}>{rBrand}</span> : null}
                   </td>
@@ -1432,7 +1449,7 @@ return (
               const totalGP = safeRows.reduce((s,r) => s + (Number(r['Gross Profit (Rs)']||r['Outstanding (Rs)']||r.GrossProfit||r.Amount)||0), 0);
               return (
                 <tfoot>
-                  <tr data-dk="1" style={{ background: YELLOW.fill, color: YELLOW.ink, fontWeight: 900, fontSize: sz('8px','9px','10px') }}>
+                  <tr data-dk="1" style={{ background: BLK.fill, color: BLK.ink, fontWeight: 900, fontSize: sz('8px','9px','10px') }}>
                     <td style={{ padding: sz('6px 4px','8px 6px','9px 8px') }}>TOTAL ({safeRows.length})</td>
                     {data.view !== 'Receivables' && <td style={{ padding: sz('6px','8px','9px'), textAlign: 'center', whiteSpace: 'nowrap' }}>{totalQty.toLocaleString('en-US')}</td>}
                     {data.view !== 'Receivables' && <td style={{ padding: sz('6px','8px','9px'), textAlign: 'right', whiteSpace: 'nowrap' }}>Rs.{totalRev.toLocaleString('en-US')}</td>}
@@ -1451,20 +1468,20 @@ return (
       <>
         <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', marginBottom: sz('16px','20px','24px'), fontSize: sz('9.5px','11px','12px') }}>
           <thead>
-            <tr data-dk="1" style={{ background: YELLOW.fill }}>
-              <th style={{ padding: sz('6px 2px 6px 0','8px 4px 8px 8px','9px 6px 9px 10px'), textAlign: 'left', fontWeight: 800, color: YELLOW.ink, textTransform: 'uppercase', fontSize: sz('7.5px','8.5px','9px'), letterSpacing: '0.5px', width: isThermal ? (docType === 'dispatch' ? '65%' : '48%') : (docType === 'dispatch' ? '65%' : '50%') }}>
+            <tr data-dk="1" style={{ background: BLK.fill }}>
+              <th style={{ padding: sz('6px 2px 6px 0','5px 4px 5px 8px','5px 6px 5px 10px'), textAlign: 'left', fontWeight: 800, color: BLK.ink, textTransform: 'uppercase', fontSize: sz('7.5px','8.5px','9px'), letterSpacing: '0.5px', width: isThermal ? (docType === 'dispatch' ? '65%' : '48%') : (docType === 'dispatch' ? '65%' : '50%') }}>
                 Description
               </th>
-              <th style={{ padding: sz('6px 2px','8px 4px','9px 6px'), textAlign: 'center', fontWeight: 800, color: YELLOW.ink, textTransform: 'uppercase', fontSize: sz('7.5px','8.5px','9px'), letterSpacing: '0.5px', whiteSpace: 'nowrap', width: isThermal ? (docType === 'dispatch' ? '35%' : '10%') : (docType === 'dispatch' ? '35%' : '9%') }}>
+              <th style={{ padding: sz('6px 2px','5px 4px','5px 6px'), textAlign: 'center', fontWeight: 800, color: BLK.ink, textTransform: 'uppercase', fontSize: sz('7.5px','8.5px','9px'), letterSpacing: '0.5px', whiteSpace: 'nowrap', width: isThermal ? (docType === 'dispatch' ? '35%' : '10%') : (docType === 'dispatch' ? '35%' : '9%') }}>
                 {docType === 'dispatch' ? 'Qty / Pack' : 'Qty'}
               </th>
               {showRateCol && (
-                <th style={{ padding: sz('6px 2px','8px 4px','9px 6px'), textAlign: 'right', fontWeight: 800, color: YELLOW.ink, textTransform: 'uppercase', fontSize: sz('7.5px','8.5px','9px'), letterSpacing: '0.5px', whiteSpace: 'nowrap', width: isThermal ? '42%' : '17%' }}>
+                <th style={{ padding: sz('6px 2px','5px 4px','5px 6px'), textAlign: 'right', fontWeight: 800, color: BLK.ink, textTransform: 'uppercase', fontSize: sz('7.5px','8.5px','9px'), letterSpacing: '0.5px', whiteSpace: 'nowrap', width: isThermal ? '42%' : '17%' }}>
                   Rate
                 </th>
               )}
               {showAmountCol && (
-                <th style={{ padding: sz('','8px 8px 8px 4px','9px 10px 9px 4px'), textAlign: 'right', fontWeight: 800, color: YELLOW.ink, textTransform: 'uppercase', fontSize: sz('','8.5px','9px'), letterSpacing: '0.5px', whiteSpace: 'nowrap', width: '24%' }}>
+                <th style={{ padding: sz('','5px 8px 5px 4px','5px 10px 5px 4px'), textAlign: 'right', fontWeight: 800, color: BLK.ink, textTransform: 'uppercase', fontSize: sz('','8.5px','9px'), letterSpacing: '0.5px', whiteSpace: 'nowrap', width: '24%' }}>
                   Amount
                 </th>
               )}
@@ -1473,7 +1490,7 @@ return (
           <tbody>
             {safeItems.map((item, idx) => (
               <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9', pageBreakInside: 'avoid', breakInside: 'avoid', background: idx % 2 === 1 ? '#f8fafc' : '#ffffff' }}>
-                <td style={{ padding: sz('6px 2px 6px 0','8px 4px 8px 8px','9px 6px 9px 10px'), fontWeight: 600, wordBreak: 'break-word', lineHeight: sz('1.5','1.55','1.6'), color: '#1e293b' }}>
+                <td style={{ padding: sz('6px 2px 6px 0','5px 4px 5px 8px','5px 6px 5px 10px'), fontWeight: 600, wordBreak: 'break-word', lineHeight: sz('1.5','1.35','1.35'), color: '#1e293b' }}>
                   {item?.name || '—'}
                   {item?.isBonus && (
                     <span style={{ marginLeft: '5px', padding: '1px 5px', background: '#d1fae5', color: '#059669', fontSize: '6.5px', fontWeight: 800, borderRadius: '4px', textTransform: 'uppercase', border: '1px solid #a7f3d0', letterSpacing: '0.5px' }}>
@@ -1481,7 +1498,7 @@ return (
                     </span>
                   )}
                 </td>
-                <td style={{ padding: sz('6px 2px','8px 4px','9px 6px'), textAlign: docType === 'dispatch' ? 'left' : 'center', fontWeight: 600, lineHeight: sz('1.5','1.55','1.6'), color: '#334155', whiteSpace: docType === 'dispatch' ? 'normal' : 'nowrap' }}>
+                <td style={{ padding: sz('6px 2px','5px 4px','5px 6px'), textAlign: docType === 'dispatch' ? 'left' : 'center', fontWeight: 600, lineHeight: sz('1.5','1.35','1.35'), color: '#334155', whiteSpace: docType === 'dispatch' ? 'normal' : 'nowrap' }}>
                   {docType === 'dispatch' ? (() => {
                     const { qty, uib, boxes, loose } = getDispatchParts(item);
                     // Product first, for the same reason getDispatchParts reads it first:
@@ -1511,7 +1528,7 @@ return (
                   })() : (item?.quantity || 0)}
                 </td>
                 {showRateCol && (
-                  <td style={{ padding: sz('6px 2px','8px 4px','9px 6px'), textAlign: 'right', color: '#1e293b', whiteSpace: 'nowrap' }}>
+                  <td style={{ padding: sz('6px 2px','5px 4px','5px 6px'), textAlign: 'right', color: '#1e293b', whiteSpace: 'nowrap' }}>
                     {item?.isBonus ? (
                       <span style={{ color: '#059669', fontWeight: 800, fontSize: sz('7px','8px','9px'), textTransform: 'uppercase' }}>Free</span>
                     ) : (
@@ -1532,7 +1549,7 @@ return (
                   </td>
                 )}
                 {showAmountCol && (
-                  <td style={{ padding: sz('','8px 8px 8px 4px','9px 10px 9px 4px'), textAlign: 'right', fontWeight: 800, color: '#1e293b', whiteSpace: 'nowrap' }}>
+                  <td style={{ padding: sz('','5px 8px 5px 4px','5px 10px 5px 4px'), textAlign: 'right', fontWeight: 800, color: '#1e293b', whiteSpace: 'nowrap' }}>
                     {item?.isBonus
                       ? <span style={{ color: '#059669' }}>Rs. 0</span>
                       : `Rs. ${((item?.price || 0) * (item?.quantity || 0)).toLocaleString('en-US')}`}
@@ -1565,7 +1582,7 @@ return (
             return (
               <tfoot>
                 <tr style={{ borderTop: '2px solid #1e293b' }}>
-                  <td style={{ padding: sz('6px 2px','8px 4px','9px 6px'), fontWeight: 700, fontSize: sz('8px','9px','10px'), color: '#1e293b' }}>
+                  <td style={{ padding: sz('6px 2px','5px 4px','5px 6px'), fontWeight: 700, fontSize: sz('8px','9px','10px'), color: '#1e293b' }}>
                     Total SKUs: <strong style={{ color: '#1e293b' }}>{safeItems.length}</strong>
                   </td>
                   <td colSpan={1} style={{ padding: sz('6px','8px','9px'), textAlign: 'left', fontWeight: 800, color: '#1e293b' }}>
@@ -1599,10 +1616,10 @@ return (
           {docType === 'invoice' && safeItems.length > 0 && (
             <tfoot>
               <tr style={{ borderTop: '2px solid #1e293b' }}>
-                <td style={{ padding: sz('6px 2px','8px 4px','9px 6px'), fontWeight: 700, fontSize: sz('8px','9px','10px'), color: '#1e293b' }}>
+                <td style={{ padding: sz('6px 2px','5px 4px','5px 6px'), fontWeight: 700, fontSize: sz('8px','9px','10px'), color: '#1e293b' }}>
                   Total SKUs: <strong style={{ color: '#1e293b' }}>{safeItems.length}</strong>
                 </td>
-                <td style={{ padding: sz('6px 2px','8px 4px','9px 6px'), textAlign: 'center', fontWeight: 800, color: '#1e293b', fontSize: sz('8px','9px','10px') }}>
+                <td style={{ padding: sz('6px 2px','5px 4px','5px 6px'), textAlign: 'center', fontWeight: 800, color: '#1e293b', fontSize: sz('8px','9px','10px') }}>
                   {safeItems.reduce((s, i) => s + (i.quantity || 0), 0)} units
                 </td>
                 <td colSpan={isThermal ? 1 : 2} />
@@ -1680,7 +1697,7 @@ return (
                   <span style={{ color: row.color || '#0f172a', fontVariantNumeric: 'tabular-nums' }}>{row.val}</span>
                 </div>
               ))}
-              <div data-dk="1" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: YELLOW.fill, borderRadius: sz('4px','5px','6px'), marginTop: sz('6px','8px','10px'), padding: sz('6px 8px','8px 12px','10px 14px'), fontWeight: 900, fontSize: sz('12px','13px','15px'), color: YELLOW.ink, fontVariantNumeric: 'tabular-nums' }}>
+              <div data-dk="1" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: BLK.fill, borderRadius: sz('4px','5px','6px'), marginTop: sz('6px','8px','10px'), padding: sz('6px 8px','8px 12px','10px 14px'), fontWeight: 900, fontSize: sz('12px','13px','15px'), color: BLK.ink, fontVariantNumeric: 'tabular-nums' }}>
                 <span>Net Balance:</span>
                 <span>Rs. {(showPrevBal ? netBalance : ((data.total || 0) - received)).toLocaleString('en-US')}</span>
               </div>
@@ -1759,17 +1776,17 @@ return (
         )}
 
         {/* ── Return / Exchange Policy ── */}
-        {docType !== 'estimate' && docType !== 'creditnote' && <div className="keep-together" style={{ marginTop: sz('12px','16px','20px'), border: '1.5px solid #1e293b', borderRadius: '8px', fontSize: sz('6.5px','7.5px','8.5px') }}>
-          <div data-dk="1" style={{ background: YELLOW.fill, color: YELLOW.ink, padding: sz('4px 8px','5px 12px','6px 14px'), fontWeight: 900, textAlign: 'center', letterSpacing: '0.5px', textTransform: 'uppercase', fontSize: sz('6.5px','7px','8px'), borderRadius: '6px 6px 0 0' }}>
+        {docType !== 'estimate' && docType !== 'creditnote' && <div className="keep-together" style={{ marginTop: sz('12px','12px','14px'), border: '1.5px solid #1e293b', borderRadius: '8px', fontSize: sz('6.5px','8.5px','9.5px') }}>
+          <div data-dk="1" style={{ background: BLK.fill, color: BLK.ink, padding: sz('4px 8px','5px 12px','6px 14px'), fontWeight: 900, textAlign: 'center', letterSpacing: '0.5px', textTransform: 'uppercase', fontSize: sz('6.5px','7px','8px'), borderRadius: '6px 6px 0 0' }}>
             "No" Return / Exchange Policy on Some Items
           </div>
-          <div style={{ padding: sz('6px 8px','8px 12px','10px 14px'), background: '#f8fafc', borderRadius: '0 0 6px 6px' }}>
-            <div style={{ color: '#334155', lineHeight: 1.7, marginBottom: sz('4px','5px','6px') }}>
+          <div style={{ padding: sz('6px 8px','6px 12px','8px 14px'), background: '#f8fafc', borderRadius: '0 0 6px 6px' }}>
+            <div style={{ color: '#334155', lineHeight: sz('1.7','1.45','1.45'), marginBottom: sz('4px','4px','5px') }}>
               To ensure <strong>"Reliable, Authentic &amp; Storage Maintained"</strong> Vet. Medical Supplies, there is a <strong>No Return / No Exchange</strong> policy for the following items:
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: sz('1px','2px','3px'), color: '#1e293b', fontWeight: 700 }}>
               {['1. Vaccines','2. Sprays','3. Imported Products','4. Surgical Items','5. Items with <6 Months Expiry','6. Damaged / Soiled Package'].map((item, i) => (
-                <div key={i} style={{ padding: sz('1.5px 0','2px 0','3px 0') }}>{item}</div>
+                <div key={i} style={{ padding: sz('1.5px 0','1px 0','1.5px 0') }}>{item}</div>
               ))}
             </div>
             <div style={{ marginTop: sz('4px','6px','8px'), textAlign: 'center', fontWeight: 800, color: '#1e293b', textTransform: 'uppercase', letterSpacing: '1px', fontSize: sz('6px','7px','7.5px'), borderTop: '1px dashed #cbd5e1', paddingTop: sz('4px','5px','6px') }}>
@@ -1783,7 +1800,7 @@ return (
     {/* ── Receipt Content ── */}
     {docType === 'receipt' && data && (
       <div className="keep-together">
-        <div style={{ background: '#f0fdf4', padding: sz('16px 12px','24px 20px','32px 24px'), border: '2px solid #bbf7d0', borderRadius: sz('10px','14px','16px'), textAlign: 'center', marginBottom: sz('14px','18px','22px') }}>
+        <div style={{ background: '#f0fdf4', padding: sz('16px 12px','24px 20px','32px 24px'), border: '2px solid #bbf7d0', borderRadius: sz('10px','14px','16px'), textAlign: 'center', marginBottom: sz('14px','12px','14px') }}>
           <div style={{ fontSize: sz('7.5px','8.5px','9px'), fontWeight: 700, color: '#15803d', textTransform: 'uppercase', letterSpacing: '2px' }}>
             Amount Received
           </div>
@@ -1844,12 +1861,12 @@ return (
         {/* Ledger table */}
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: sz('8.5px','9px','10px'), tableLayout: 'fixed' }}>
           <thead>
-            <tr data-dk="1" style={{ background: YELLOW.fill, color: YELLOW.ink }}>
-              <th style={{ padding: sz('6px 2px','8px 4px','9px 6px'), textAlign: 'left', fontWeight: 800, textTransform: 'uppercase', fontSize: sz('6.5px','7px','7.5px'), letterSpacing: '0.5px', width: isThermal ? '14%' : '13%' }}>Date</th>
-              <th style={{ padding: sz('6px 2px','8px 4px','9px 6px'), textAlign: 'left', fontWeight: 800, textTransform: 'uppercase', fontSize: sz('6.5px','7px','7.5px'), letterSpacing: '0.5px' }}>Particulars</th>
-              <th style={{ padding: sz('6px 2px','8px 4px','9px 6px'), textAlign: 'right', fontWeight: 800, textTransform: 'uppercase', fontSize: sz('6.5px','7px','7.5px'), letterSpacing: '0.5px', whiteSpace: 'nowrap', width: isThermal ? '15%' : '15%' }}>Dr</th>
-              <th style={{ padding: sz('6px 2px','8px 4px','9px 6px'), textAlign: 'right', fontWeight: 800, textTransform: 'uppercase', fontSize: sz('6.5px','7px','7.5px'), letterSpacing: '0.5px', whiteSpace: 'nowrap', width: isThermal ? '15%' : '15%' }}>Cr</th>
-              <th style={{ padding: sz('6px 2px','8px 4px','9px 6px'), textAlign: 'right', fontWeight: 800, textTransform: 'uppercase', fontSize: sz('6.5px','7px','7.5px'), letterSpacing: '0.5px', whiteSpace: 'nowrap', width: isThermal ? '16%' : '17%' }}>Bal</th>
+            <tr data-dk="1" style={{ background: BLK.fill, color: BLK.ink }}>
+              <th style={{ padding: sz('6px 2px','5px 4px','5px 6px'), textAlign: 'left', fontWeight: 800, textTransform: 'uppercase', fontSize: sz('6.5px','7px','7.5px'), letterSpacing: '0.5px', width: isThermal ? '14%' : '13%' }}>Date</th>
+              <th style={{ padding: sz('6px 2px','5px 4px','5px 6px'), textAlign: 'left', fontWeight: 800, textTransform: 'uppercase', fontSize: sz('6.5px','7px','7.5px'), letterSpacing: '0.5px' }}>Particulars</th>
+              <th style={{ padding: sz('6px 2px','5px 4px','5px 6px'), textAlign: 'right', fontWeight: 800, textTransform: 'uppercase', fontSize: sz('6.5px','7px','7.5px'), letterSpacing: '0.5px', whiteSpace: 'nowrap', width: isThermal ? '15%' : '15%' }}>Dr</th>
+              <th style={{ padding: sz('6px 2px','5px 4px','5px 6px'), textAlign: 'right', fontWeight: 800, textTransform: 'uppercase', fontSize: sz('6.5px','7px','7.5px'), letterSpacing: '0.5px', whiteSpace: 'nowrap', width: isThermal ? '15%' : '15%' }}>Cr</th>
+              <th style={{ padding: sz('6px 2px','5px 4px','5px 6px'), textAlign: 'right', fontWeight: 800, textTransform: 'uppercase', fontSize: sz('6.5px','7px','7.5px'), letterSpacing: '0.5px', whiteSpace: 'nowrap', width: isThermal ? '16%' : '17%' }}>Bal</th>
             </tr>
           </thead>
           <tbody>
@@ -1859,7 +1876,7 @@ return (
                   {formatDateDisp(row.date)}
                 </td>
                 <td style={{ padding: sz('5px 2px','7px 4px','8px 6px'), wordBreak: 'break-word' }}>
-                  <span style={{ fontWeight: 700, display: 'block', lineHeight: sz('1.5','1.55','1.6'), color: row.isCreditNote ? '#be123c' : '#1e293b', fontSize: sz('7px','8.5px','9.5px') }}>{row.desc || '—'}</span>
+                  <span style={{ fontWeight: 700, display: 'block', lineHeight: sz('1.5','1.35','1.35'), color: row.isCreditNote ? '#be123c' : '#1e293b', fontSize: sz('7px','8.5px','9.5px') }}>{row.desc || '—'}</span>
                   {!isSimple && <span style={{ fontSize: sz('6px','7px','7.5px'), color: '#1e293b', fontWeight: 500, display: 'block', marginTop: '1px', wordBreak: 'break-all' }}>{row.ref || ''}</span>}
                   {!isSimple && (row.lineItems || []).length > 0 && (row.lineItems || []).map((li, idx) => (
                     <div key={idx} style={{ fontSize: sz('6px','7px','7.5px'), color: '#1e293b', display: 'flex', justifyContent: 'space-between', marginTop: '2px', paddingLeft: '6px' }}>
@@ -1889,13 +1906,13 @@ return (
             )}
           </tbody>
           <tfoot>
-            <tr data-dk="1" style={{ background: YELLOW.fill, color: YELLOW.ink }}>
-              <td colSpan={2} style={{ padding: sz('6px 2px','8px 4px','9px 6px'), textAlign: 'right', fontWeight: 700, textTransform: 'uppercase', fontSize: sz('6.5px','7px','7.5px'), letterSpacing: '0.5px' }}>
+            <tr data-dk="1" style={{ background: BLK.fill, color: BLK.ink }}>
+              <td colSpan={2} style={{ padding: sz('6px 2px','5px 4px','5px 6px'), textAlign: 'right', fontWeight: 700, textTransform: 'uppercase', fontSize: sz('6.5px','7px','7.5px'), letterSpacing: '0.5px' }}>
                 Totals:
               </td>
-              <td style={{ padding: sz('6px 2px','8px 4px','9px 6px'), textAlign: 'right', fontWeight: 900, fontVariantNumeric: 'tabular-nums', fontSize: sz('7px','8.5px','9.5px'), whiteSpace: 'nowrap' }}>{(data.totalDebit || 0).toLocaleString('en-US')}</td>
-              <td style={{ padding: sz('6px 2px','8px 4px','9px 6px'), textAlign: 'right', fontWeight: 900, fontVariantNumeric: 'tabular-nums', fontSize: sz('7px','8.5px','9.5px'), whiteSpace: 'nowrap' }}>{(data.totalCredit || 0).toLocaleString('en-US')}</td>
-              <td style={{ padding: sz('6px 2px','8px 4px','9px 6px'), textAlign: 'right', fontWeight: 900, fontVariantNumeric: 'tabular-nums', fontSize: sz('7px','8.5px','9.5px'), whiteSpace: 'nowrap' }}>{closingBal.toLocaleString('en-US')}</td>
+              <td style={{ padding: sz('6px 2px','5px 4px','5px 6px'), textAlign: 'right', fontWeight: 900, fontVariantNumeric: 'tabular-nums', fontSize: sz('7px','8.5px','9.5px'), whiteSpace: 'nowrap' }}>{(data.totalDebit || 0).toLocaleString('en-US')}</td>
+              <td style={{ padding: sz('6px 2px','5px 4px','5px 6px'), textAlign: 'right', fontWeight: 900, fontVariantNumeric: 'tabular-nums', fontSize: sz('7px','8.5px','9.5px'), whiteSpace: 'nowrap' }}>{(data.totalCredit || 0).toLocaleString('en-US')}</td>
+              <td style={{ padding: sz('6px 2px','5px 4px','5px 6px'), textAlign: 'right', fontWeight: 900, fontVariantNumeric: 'tabular-nums', fontSize: sz('7px','8.5px','9.5px'), whiteSpace: 'nowrap' }}>{closingBal.toLocaleString('en-US')}</td>
             </tr>
           </tfoot>
         </table>
