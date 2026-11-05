@@ -980,7 +980,7 @@ return (
 
   <style>{`
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
-    *:not(.font-ui, .font-ui *) { font-family: 'Inter', system-ui, sans-serif; }
+    *:not(.font-ui, .font-ui *, .font-doc, .font-doc *) { font-family: 'Inter', system-ui, sans-serif; }
     @keyframes slide-up { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
     .animate-slide-up { animation: slide-up 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
     .scrollbar-hide::-webkit-scrollbar { display: none; }

@@ -90,6 +90,16 @@ actually works.
 
 ---
 
+## The document's typeface: Poppins on screen, Inter on paper
+
+The brand's face is Poppins, so the A4/A5 document is set in it for the preview, the PDF and the
+image. It is marked `font-doc`, which the app-wide Inter rule in `App.jsx` excludes. Paper is
+unchanged on purpose: `buildHtmlDoc` copies the document, drops its class and resets its font, so
+the print popup gets Inter exactly as before; thermal never gets `font-doc` at all. Prove it by
+capturing what Print writes (stub `window.open`) before and after a change: the only difference
+allowed is unused `@font-face` text. Poppins is wider than Inter, so after touching a document
+check A4 and A5 for text past its box (`PrintView.bar.test.jsx` pins where the class is and is not).
+
 ## Two looks, not three: screen and paper
 
 Every screen destination shows the same document — **preview, Save / Share, PDF and Image
