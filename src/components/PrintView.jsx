@@ -1022,8 +1022,8 @@ return (
   <div
     id="print-document"
     ref={printRef}
-    className={`bg-white mx-auto ${docWidth} ${pad}`}
-    style={{ fontFamily: "'Inter', system-ui, sans-serif", lineHeight: 1.5, fontSize: isThermal ? '10px' : isA5 ? '11px' : '12px', border: isThermal ? 'none' : '1px solid #cbd5e1', borderRadius: isThermal ? '0' : sz('','8px','10px'), overflow: 'hidden' }}
+    className={`bg-white mx-auto ${docWidth} ${pad}${isThermal ? '' : ' font-doc'}`}
+    style={{ fontFamily: isThermal ? "'Inter', system-ui, sans-serif" : "'Poppins', 'Inter', system-ui, sans-serif", lineHeight: 1.5, fontSize: isThermal ? '10px' : isA5 ? '11px' : '12px', border: isThermal ? 'none' : '1px solid #cbd5e1', borderRadius: isThermal ? '0' : sz('','8px','10px'), overflow: 'hidden' }}
   >
 
     {/* ── Header ── */}

@@ -41,3 +41,24 @@ describe('preview bar', () => {
     expect(doc).not.toContain('zoom');
   });
 });
+
+// The brand's typeface (Poppins) is for the A4/A5 document on screen, PDF and image. The thermal
+// roll stays as it was measured, and paper is reset by buildHtmlDoc, which drops the class the
+// font rule keys on. Pinning where the class is, and is not, is what keeps those apart.
+describe('document typeface', () => {
+  it('sets A4 and A5 in Poppins, marked so the app-wide Inter rule leaves it alone', () => {
+    ['a4', 'a5'].forEach(f => {
+      const html = render('invoice', f);
+      const doc = html.slice(html.indexOf('id="print-document"'));
+      expect(doc.slice(0, 400)).toContain('font-doc');
+      expect(doc.slice(0, 400)).toContain('Poppins');
+    });
+  });
+
+  it('leaves the thermal roll in Inter, untouched', () => {
+    const html = render('invoice', 'thermal');
+    const doc = html.slice(html.indexOf('id="print-document"'));
+    expect(doc.slice(0, 400)).not.toContain('font-doc');
+    expect(doc.slice(0, 400)).not.toContain('Poppins');
+  });
+});
