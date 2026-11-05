@@ -6,6 +6,7 @@ import { isCashSale } from '../lib/cashCustomer';
 import { YELLOW, PASTURE, isBlockBackground } from './printTheme';
 import { preloadDocFonts, getDocFontCss, DOC_FONT_STACK, DOC_FONT_STACK_LIVE } from '../lib/docFonts';
 import { buildPdf, pageBreaks } from '../lib/pdfFile';
+import { isIOS } from '../lib/platform';
 
 // Format: 'thermal' | 'a5' | 'a4'
 //
@@ -589,8 +590,7 @@ ${popupBar}<div id="doc">${clone.outerHTML}</div>
 // (no pop-up windows). Safari's own print also adds the page address in the footer and its own margins.
 // So on iOS the document is turned into a PDF here and handed to the share sheet, which offers Print,
 // Save to Files and WhatsApp. Print is black and white (paper), PDF keeps the colours.
-const isIOSDevice = () => typeof navigator !== 'undefined'
-  && (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
+const isIOSDevice = () => typeof navigator !== 'undefined' && isIOS(navigator);
 
 const handleIosPdf = async (mono) => {
   const element = document.getElementById('print-document');

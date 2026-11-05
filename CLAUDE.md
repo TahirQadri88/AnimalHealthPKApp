@@ -174,6 +174,10 @@ thermal byte for byte, then open the shared file on its own and check A4 and A5 
   is ready, a bar asks for one more tap. Computers and Android keep the popup paths, byte-identical. Thermal is never
   routed here. Not yet seen on a real iPhone. The filter string is built from parts: Tailwind scans source text for
   class names and would otherwise mint an unused `.grayscale` rule that the A4/A5 Print popup copies.
+- **Detecting iOS** (`lib/platform.js`, `isIOS`) uses every signal: the identity string, `navigator.platform`, an iPad posing
+  as a Mac (touch screen), and the home-screen app flag. The first version checked only the identity string and an
+  iPad signal, so an iPhone showing "Request Desktop Website" or running as the home-screen app looked like a Mac, took
+  the print-window route, and Safari printed it with its footer and page address (a real ledger PDF proved it).
 - **The browser's own print of the invoice screen** (Safari's Share > Print, Ctrl+P) adds the browser's header and footer,
   page address and date included, and a page cannot switch that off on an iPhone: `@page { margin: 0 }` was already
   there twice and Safari ignores it (a real file proved it). So that print is a short notice (`.print-guard`, rules in
