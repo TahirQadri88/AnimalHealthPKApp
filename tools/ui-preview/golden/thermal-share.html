@@ -29,7 +29,7 @@
     /* Defeat any centring: the receipt must be hard left-aligned in the page box. */
     #doc{margin:0;padding:0;width:100%;}
     #doc>*{margin-left:0!important;margin-right:auto!important;}
-    
+    @media screen{#doc [data-dk]{background-color:#142339!important;color:#FFF200!important}#doc [data-dk] *{color:#FFF200!important}}
     @media print{body{padding:0;background:white;}#doc>*{width:100%!important;max-width:68mm!important;min-width:0!important;padding-left:3mm!important;padding-right:3mm!important;}}
     @media print{
       #doc *{

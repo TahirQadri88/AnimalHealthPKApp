@@ -109,6 +109,18 @@ every light background, so it opened as outlines on white while the preview was 
 is pixel-identical to before (its `@media print` rules force white), and the Print popup is byte-identical;
 only `golden/thermal-share.html` was updated, on purpose.
 
+The thermal receipt wears the app's ink and yellow **on screen only**, as a skin from outside: `data-skin="ink"` on the
+wrapper around the document (preview) or on the capture's clone (Image), with the rule in `index.css`; the shared
+file gets the same as a `@media screen` block. Never in the receipt's own markup, which the SSR lock pins. Print
+popup byte-identical; printing the shared file pixel-identical. Only `golden/thermal-share.html` moved, on purpose.
+
+**iPhone printing.** iOS only opens the print sheet when `print()` is called directly inside a tap, never from a
+timer, and the popup used to hide its page on screen and call `print()` from `setTimeout`, so Print and PDF did nothing
+on an iPhone. The A4/A5 popups (Print and PDF) now carry a Print button and a Close button of their own (`popupBar`,
+hidden when printing) and show the page; the thermal roll's popup is untouched (it prints from a computer).
+Verified here by tapping the button in the real popup page and by pixel-comparing the printed pages; **not** verified
+on a real iPhone, which this environment cannot run.
+
 **Test on the shop's real data, not tidy sample data.** A product named "MILK POWDER 20KG (26-28% Milk Fat
 with 34% Protein) Imported Calf Milk Replacer" stretched a grid column 313px past a 360px phone and nobody
 saw it, because the sample names were short. `tools/ui-preview/sample-data.js` now carries that name, and

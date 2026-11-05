@@ -43,6 +43,13 @@ describe('preview bar', () => {
     expect(href).not.toContain('%2520');
   });
 
+  it('skins the thermal preview from outside the receipt, never inside it', () => {
+    const t = render('invoice', 'thermal');
+    expect(t).toContain('data-skin="ink"');                       // the wrapper around the receipt
+    expect(t.slice(t.indexOf('id="print-document"'))).not.toContain('data-skin');  // not in the receipt itself
+    expect(render('invoice', 'a4')).not.toContain('data-skin');
+  });
+
   it('leaves out A4 for a receipt, as before', () => {
     expect(render('receipt', 'a5')).not.toMatch(/>A4</);
   });
