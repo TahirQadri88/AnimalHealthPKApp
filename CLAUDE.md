@@ -104,6 +104,16 @@ before the A4/A5 redesign. Both were proven to discriminate: a 1px thermal chang
 A4-only change does not. **If one fails, a change reached the receipt. Never `-u` / `--update` to
 make it pass**: gate the change behind `!isThermal`, or print it on the real printer first.
 
+One deliberate exception: the thermal **Save / Share** file keeps its on-screen colours (it used to clear
+every light background, so it opened as outlines on white while the preview was yellow). Printing that file
+is pixel-identical to before (its `@media print` rules force white), and the Print popup is byte-identical;
+only `golden/thermal-share.html` was updated, on purpose.
+
+**Test on the shop's real data, not tidy sample data.** A product named "MILK POWDER 20KG (26-28% Milk Fat
+with 34% Protein) Imported Calf Milk Replacer" stretched a grid column 313px past a 360px phone and nobody
+saw it, because the sample names were short. `tools/ui-preview/sample-data.js` now carries that name, and
+`layout.mjs` should be run at 360px as well as 390px (small Android phones are 360 wide).
+
 ---
 
 ## The A4/A5 document's look: the app's brand on screen, Inter and black on paper

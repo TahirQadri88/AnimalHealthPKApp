@@ -821,8 +821,8 @@ return (
 
       {view === 'Receivables' && (
         <div className="space-y-3 mt-3">
-          {/* Collection rate summary */}
-          <div className="grid grid-cols-2 gap-3">
+          {/* Collection rate summary. Two across from 400px: a figure like Rs.2,506,380 in 24px serif needs more than half of a 360px screen. */}
+          <div className="grid grid-cols-1 min-[400px]:grid-cols-2 gap-3">
             <div className="bg-white p-4 rounded-xl border border-kt-line">
               <p className="text-xs font-medium text-kt-muted">Collection Rate <span className="text-kt-muted">(All-time)</span></p>
               <p className={`font-display text-2xl mt-1 ${Number(reportEngine.collectionRate) >= 80 ? 'text-kt-green' : Number(reportEngine.collectionRate) >= 50 ? 'text-kt-amber' : 'text-kt-red'}`}>{reportEngine.collectionRate}%</p>

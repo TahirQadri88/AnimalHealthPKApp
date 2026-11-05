@@ -152,7 +152,7 @@ return (
       Outstanding balances
       <span className="font-ui text-xs font-medium bg-kt-red/10 text-kt-red px-2 h-6 inline-flex items-center rounded-md">{topReceivables.length}</span>
     </h3>
-    <button onClick={() => { setActiveTab('admin'); setAdminView('analytics'); setAnalyticsView('Receivables'); }} className="text-sm font-medium text-kt-ink hover:underline flex items-center gap-0.5">View all <ChevronRight size={16} strokeWidth={1.5}/></button>
+    <button onClick={() => { setActiveTab('admin'); setAdminView('analytics'); setAnalyticsView('Receivables'); }} className="text-sm font-medium text-kt-ink hover:underline flex items-center gap-0.5 whitespace-nowrap shrink-0">View all <ChevronRight size={16} strokeWidth={1.5}/></button>
   </div>
   <div className="divide-y divide-kt-line">
     {topReceivables.map(c => (
@@ -174,7 +174,7 @@ return (
 )}
 
 {isAdmin && (
-<div className="grid sm:grid-cols-2 gap-4 items-start">
+<div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
 <button type="button" className={`${card} p-4 sm:p-5 flex justify-between items-center hover:border-kt-muted/40 transition-colors text-left`} onClick={() => {setActiveTab('admin'); setAdminView('expenses');}}>
 <div><p className="text-sm text-kt-sub flex items-center gap-1.5"><TrendingDown size={16} strokeWidth={1.5}/> Operational expenses · {dateFilter}</p><p className="font-display text-2xl sm:text-3xl text-kt-ink mt-0.5 sm:mt-1">{money(totalExpenses)}</p></div>
 <ChevronRight size={20} strokeWidth={1.5} className="text-kt-muted"/>
@@ -185,7 +185,7 @@ return (
 <div className="space-y-3">
 {topStats.topValue.map((item, i) => (
   <div key={i}>
-    <div className="flex justify-between items-baseline gap-3 text-sm"><span className="text-kt-ink truncate">{i+1}. {item.name}</span><span className="font-medium text-kt-ink shrink-0 tabular-nums">{money(item.revenue)}</span></div>
+    <div className="flex justify-between items-baseline gap-3 text-sm"><span className="text-kt-ink truncate min-w-0">{i+1}. {item.name}</span><span className="font-medium text-kt-ink shrink-0 tabular-nums">{money(item.revenue)}</span></div>
     <div className="mt-1 h-1.5 rounded-full bg-kt-raised overflow-hidden"><div className="h-full rounded-full bg-kt-band" style={{ width: `${Math.max(4, Math.round(item.revenue / maxTop * 100))}%` }}></div></div>
   </div>
 ))}
@@ -202,7 +202,7 @@ return (
   Recent activity
   {recentActivity.length > 0 && <span className="font-ui text-xs font-medium bg-kt-raised text-kt-sub px-2 h-6 inline-flex items-center rounded-md tabular-nums">{recentActivity.length}</span>}
 </h3>
-<button onClick={() => setActiveTab('billing')} className="text-sm font-medium text-kt-ink hover:underline flex items-center gap-0.5">View all <ChevronRight size={16} strokeWidth={1.5}/></button>
+<button onClick={() => setActiveTab('billing')} className="text-sm font-medium text-kt-ink hover:underline flex items-center gap-0.5 whitespace-nowrap shrink-0">View all <ChevronRight size={16} strokeWidth={1.5}/></button>
 </div>
 <div className="relative mb-3"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-kt-muted" size={16} strokeWidth={1.5}/><input placeholder="Search activity" className="w-full h-10 pl-9 pr-3 bg-white border border-kt-line rounded-lg text-sm text-kt-ink placeholder-kt-muted outline-none focus:border-kt-ink transition-colors" value={activitySearch} onChange={e => setActivitySearch(e.target.value)} /></div>
 <div className={`${card} divide-y divide-kt-line overflow-hidden`}>

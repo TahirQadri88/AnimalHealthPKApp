@@ -879,7 +879,7 @@ return (
     {/* Mobile/tablet header */}
     <header className="font-ui lg:hidden bg-kt-band text-white px-4 py-3 flex justify-between items-center z-10 sticky top-0">
       <div className="min-w-0">
-        <h1 className="font-display text-2xl leading-none">{APP_NAME}</h1>
+        <h1 className="font-display text-xl min-[380px]:text-2xl leading-none">{APP_NAME}</h1>
         <p className="text-sm text-white/70 mt-1 flex items-center gap-2 truncate"><span className="w-1.5 h-1.5 rounded-full bg-kt-yellow shrink-0"></span>{currentUser?.name}</p>
       </div>
       <div className="flex items-center gap-2 shrink-0">
