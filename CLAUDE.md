@@ -167,8 +167,9 @@ thermal byte for byte, then open the shared file on its own and check A4 and A5 
 - **Print** is vector on A4/A5 and the printer's own dots on thermal; there is nothing to raise.
 - **iPhone / iPad (any mode, including the home-screen app):** Print and PDF do not open a window at all. A web page
   cannot reliably open the print sheet on iOS, and Safari's own print adds the page address in the footer and its own
-  margins. `handleIosPdf` builds a PDF in the app (`lib/pdfFile.js`, a small dependency-free writer: one JPEG per
-  page, breaks on row boundaries) and hands it to the share sheet, whose Print / Save to Files / WhatsApp do the rest.
+  margins. `handleIosPdf` builds a PDF in the app (`lib/pdfFile.js`, a small dependency-free writer: JPEG strips per
+  page, cuts on row boundaries only, the table's header row repeated on every page that starts inside the table,
+  a "ref - Page n of N" footer when there is more than one page) and hands it to the share sheet, whose Print / Save to Files / WhatsApp do the rest.
   Print is black and white (a filter on the capture), PDF keeps the navy. If iOS has lost the tap by the time the file
   is ready, a bar asks for one more tap. Computers and Android keep the popup paths, byte-identical. Thermal is never
   routed here. Not yet seen on a real iPhone. The filter string is built from parts: Tailwind scans source text for

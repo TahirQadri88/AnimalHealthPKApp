@@ -621,7 +621,14 @@ const handleIosPdf = async (mono) => {
     await new Promise(r => setTimeout(r, 400));
     const totalH = clone.scrollHeight;
     const top = clone.getBoundingClientRect().top;
-    const marks = [...clone.querySelectorAll('tr, .keep-together')].map(e => Math.round(e.getBoundingClientRect().bottom - top));
+    const at = (e) => e.getBoundingClientRect();
+    // Cuts may fall after a body row, a footer row or a whole block, never after the header row itself.
+    const marks = [...clone.querySelectorAll('tbody tr, tfoot tr, .keep-together')].map(e => Math.round(at(e).bottom - top));
+    const thead = clone.querySelector('thead');
+    const tbl = thead && thead.closest('table');
+    const headerTop = thead ? Math.round(at(thead).top - top) : 0;
+    const headerBottom = thead ? Math.round(at(thead).bottom - top) : 0;
+    const tableOpts = thead ? { headerH: headerBottom - headerTop, tableStart: headerBottom, tableEnd: Math.round(at(tbl).bottom - top) } : {};
     // Canvas budget: Safari refuses a canvas over ~16.7M pixels.
     const scale = Math.max(2, Math.min(3, Math.floor(Math.sqrt(16000000 / (targetW * totalH)) * 4) / 4));
     const canvas = await window.htmlToImage.toCanvas(clone, { pixelRatio: scale, backgroundColor: '#ffffff', height: totalH });
@@ -630,8 +637,7 @@ const handleIosPdf = async (mono) => {
     const pageW = isA5 ? 419.53 : 595.28, pageH = isA5 ? 595.28 : 841.89, margin = 24;   // points; 24pt is about 8.5mm
     const ptPerPx = pageW / targetW;
     const usable = Math.floor((pageH - 2 * margin) / ptPerPx);                            // css px one page holds
-    const pages = [];
-    for (const [a, b] of pageBreaks(totalH, usable, marks)) {
+    const slice = async (a, b) => {
       const sh = Math.max(1, Math.round((b - a) * scale));
       const out = document.createElement('canvas');
       out.width = canvas.width; out.height = sh;
@@ -639,8 +645,21 @@ const handleIosPdf = async (mono) => {
       ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, out.width, sh);
       ctx.drawImage(canvas, 0, Math.round(a * scale), canvas.width, sh, 0, 0, out.width, sh);
       const jpeg = new Uint8Array(await (await new Promise((res, rej) => out.toBlob(bl => bl ? res(bl) : rej(new Error('jpeg')), 'image/jpeg', 0.92))).arrayBuffer());
-      const hPt = (b - a) * ptPerPx;
-      pages.push({ jpeg, pxW: out.width, pxH: sh, x: 0, y: pageH - margin - hPt, w: pageW, h: hPt });
+      return { jpeg, pxW: out.width, pxH: sh };
+    };
+    const cuts = pageBreaks(totalH, usable, marks, tableOpts);
+    const pages = [];
+    for (let i = 0; i < cuts.length; i++) {
+      const [a, b, repeat] = cuts[i];
+      const images = [];
+      let y = pageH - margin;
+      if (repeat) {                                   // a page that starts inside the table gets its header row again
+        const hh = (headerBottom - headerTop) * ptPerPx;
+        y -= hh; images.push({ ...(await slice(headerTop, headerBottom)), x: 0, y, w: pageW, h: hh });
+      }
+      const bh = (b - a) * ptPerPx;
+      y -= bh; images.push({ ...(await slice(a, b)), x: 0, y, w: pageW, h: bh });
+      pages.push({ images, footer: cuts.length > 1 ? `${data?.id || ''}${data?.id ? '  -  ' : ''}Page ${i + 1} of ${cuts.length}` : '' });
     }
     const name = getFileName().replace(/\.[^.]+$/, '') + '.pdf';
     const file = new File([buildPdf(pages, { pageW, pageH })], name, { type: 'application/pdf' });
