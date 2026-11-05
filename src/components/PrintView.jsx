@@ -541,18 +541,24 @@ const buildHtmlDoc = (screenHide = false, colour = false) => {
       tr{break-inside:avoid;page-break-inside:avoid;}
     }
 `;
-  // The colour PDF opens in its own window. On a phone that window can be full screen with nothing around
-  // it, so it carries its own two buttons (hidden when printing): Print / Save as PDF, and Close.
-  const pdfBar = colour ? `<style>
+  // The Print and PDF windows (A4/A5) carry their own controls, hidden when printing. Two reasons:
+  // on a phone the window can be full screen with nothing around it, and iOS only opens the print
+  // sheet when print() is called directly inside a tap, never from a timer, so the tap has to happen
+  // in this window. The thermal roll's window is not touched: it prints from a computer.
+  const popupBar = !isThermal && (colour || screenHide) ? `<style>
 .pdf-bar{position:sticky;top:0;z-index:10;display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 12px;background:#142339;color:#fff;font:500 14px 'DM Sans',system-ui,sans-serif;margin:-16px -16px 14px}
 .pdf-bar button{min-height:44px;padding:0 16px;border-radius:8px;border:1px solid rgba(255,255,255,.35);background:transparent;color:#fff;font:600 14px 'DM Sans',system-ui,sans-serif}
 .pdf-bar button.main{background:#FFF200;color:#142339;border-color:#FFF200}
-.pdf-bar span{flex:1 1 100%;font-size:12px;opacity:.8}
+.pdf-bar span{flex:1 1 100%;font-size:12px;opacity:.85}
 @media print{.pdf-bar{display:none!important}}
 </style>
 <script>function closePdf(){try{window.close()}catch(e){}setTimeout(function(){if(!window.closed)location.href=${JSON.stringify(window.location.href)}},200)}</script>
-<div class="pdf-bar"><button class="main" onclick="window.print()">Print / Save as PDF</button><button onclick="closePdf()">Close</button><span>In the print window, choose Save as PDF as the printer.</span></div>
+<div class="pdf-bar"><button class="main" onclick="window.print()">${colour ? 'Print / Save as PDF' : 'Print'}</button><button onclick="closePdf()">Close</button><span>${colour ? 'In the print window, choose Save as PDF as the printer.' : 'Tap Print to open the print window.'}</span><span id="ios-tip" style="display:none">iPhone: tap Print, then the Share icon in the preview, then Save to Files for a PDF.</span></div>
+<script>if(/iPhone|iPad|iPod/.test(navigator.userAgent)){document.getElementById('ios-tip').style.display='block'}</script>
 ` : '';
+  // The shared thermal file is a screen document: the app's ink and yellow, like A4/A5. Screen only, so
+  // printing that file is unchanged (its @media print rules below force black and white).
+  const thermalShareSkin = '@media screen{#doc [data-dk]{background-color:#142339!important;color:#FFF200!important}#doc [data-dk] *{color:#FFF200!important}}';
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -584,12 +590,12 @@ const buildHtmlDoc = (screenHide = false, colour = false) => {
     /* Defeat any centring: the receipt must be hard left-aligned in the page box. */
     #doc{margin:0;padding:0;width:100%;}
     #doc>*{margin-left:0!important;margin-right:auto!important;}` : ''}
-    ${screenHide ? '@media screen{body{background:white;}#doc{visibility:hidden;}}' : ''}
+    ${screenHide ? (isThermal ? '@media screen{body{background:white;}#doc{visibility:hidden;}}' : '@media screen{body{background:white;}}') : (isThermal ? thermalShareSkin : '')}
     @media print{body{padding:${pageMargin};background:white;}#doc>*{width:100%!important;max-width:${isThermal ? thermalCap : 'none'}!important;min-width:0!important;padding-left:${isThermal ? thermalPadX : '0'}!important;padding-right:${isThermal ? thermalPadX : '0'}!important;}}
 ${colour ? colourPrintCss : monoPrintCss}  </style>
 </head>
 <body>
-${colour ? pdfBar : ''}<div id="doc">${clone.outerHTML}</div>
+${popupBar}<div id="doc">${clone.outerHTML}</div>
 </body>
 </html>`;
   return { html, docTitle };
@@ -825,6 +831,7 @@ const handleImageShare = async () => {
   // clone.scrollHeight can be 0 when the clone hasn't finished layout yet.
   const originalH = element.scrollHeight;
   const clone = element.cloneNode(true);
+  if (isThermal) clone.setAttribute('data-skin', 'ink');   // the receipt's image takes the app's ink and yellow too
   Object.assign(clone.style, {
     position: 'fixed', top: '0', left: '0',
     width: targetW + 'px', maxWidth: targetW + 'px', minWidth: targetW + 'px',
@@ -1102,7 +1109,7 @@ return (
   )}
 
   {/* ── Document ── */}
-  <div className={previewScale < 1 ? 'px-2 pb-6' : undefined}>
+  <div className={previewScale < 1 ? 'px-2 pb-6' : undefined} data-skin={isThermal ? 'ink' : undefined}>
   <div style={previewScale < 1 ? { width: pageW, zoom: previewScale } : undefined}>
   <div
     id="print-document"

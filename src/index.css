@@ -184,3 +184,9 @@ input::placeholder, textarea::placeholder { color: rgb(var(--kt-muted)); opacity
 /* The business name on an A4/A5 document: EB Garamond, large enough to read. Keyed to .font-doc, which
    buildHtmlDoc drops from the print copy, so paper never picks it up. The shared file carries its own rule. */
 .font-doc .doc-serif { font-family: 'EB Garamond', Georgia, serif !important; font-weight: 500 !important; letter-spacing: 0.5px !important; }
+
+/* The thermal receipt on screen (preview, Image) wears the app's ink and yellow like A4/A5. It is a skin
+   applied from outside the document, keyed to data-skin on a wrapper or on the capture's clone, so the
+   receipt's own markup, and everything that reaches the printer, stays byte for byte as measured. */
+[data-skin="ink"] [data-dk] { background-color: rgb(var(--kt-band)) !important; color: rgb(var(--kt-yellow)) !important; }
+[data-skin="ink"] [data-dk] * { color: rgb(var(--kt-yellow)) !important; }
