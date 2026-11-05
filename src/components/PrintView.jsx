@@ -58,6 +58,19 @@ useEffect(() => {
   window.addEventListener('keydown', onKey);
   return () => window.removeEventListener('keydown', onKey);
 }, []);
+// The screen preview of an A4/A5 page is laid out at the page's real width and scaled down to fit a
+// narrow screen. It used to reflow to the screen's width instead, so on a phone the preview was a
+// different layout from the PDF and the image, which are always captured at 794px (A4) / 559px (A5).
+// A wrapper does the scaling, never the document element: the print path and both captures read
+// #print-document, and a zoom on it would travel into them.
+const [viewW, setViewW] = useState(() => (typeof window === 'undefined' ? 1024 : window.innerWidth));
+useEffect(() => {
+  const onResize = () => setViewW(window.innerWidth);
+  window.addEventListener('resize', onResize);
+  return () => window.removeEventListener('resize', onResize);
+}, []);
+const pageW = isA5 ? 559 : 794;
+const previewScale = !isThermal && viewW - 16 < pageW ? (viewW - 16) / pageW : 1;
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 // Pre-built maps for fast, reliable product lookup (rebuilt each render when products change)
@@ -926,93 +939,86 @@ const getInvoiceLedger = () => {
 return (
 <div className="fixed inset-0 bg-white z-[100] overflow-y-auto overflow-x-hidden" id="print-root">
 
-  {/* ── Control Bar (hidden on print) ── */}
-  <div className="no-print sticky top-0 z-50 bg-slate-900 border-b border-slate-700 shadow-xl">
-    <div className="flex flex-wrap items-center justify-between gap-2 max-w-[900px] mx-auto px-3 py-2.5">
+  {/* ── Control bar (hidden on print) ──
+      The screen around the document, in the app's own look. It sits outside #print-document, so
+      nothing here reaches a printed page, a PDF or an image. `font-ui` because the global rule
+      keeps everything else in this overlay in Inter, which is right for the document and not
+      for the app's own controls. Every control is 44px on a phone. */}
+  <div className="no-print font-ui sticky top-0 z-50 bg-kt-band text-white shadow-md">
+    <div className="max-w-[900px] mx-auto px-3 py-2 space-y-2">
 
-      {/* Format switcher */}
-      <div className="flex items-center gap-1 bg-slate-800 rounded-xl p-1">
-        {showThermal && (
-          <button
-            onClick={() => setPrintConfig({ ...printConfig, format: 'thermal' })}
-            className={`px-3 py-1.5 rounded-lg font-bold text-xs transition-all focus:outline-none focus:ring-2 focus:ring-white/50 ${isThermal ? 'bg-white text-slate-900 shadow' : 'text-slate-400 hover:text-white'}`}
-          >Thermal</button>
-        )}
-        {showA5 && (
-          <button
-            onClick={() => setPrintConfig({ ...printConfig, format: 'a5' })}
-            className={`px-3 py-1.5 rounded-lg font-bold text-xs transition-all focus:outline-none focus:ring-2 focus:ring-white/50 ${isA5 ? 'bg-white text-slate-900 shadow' : 'text-slate-400 hover:text-white'}`}
-          >A5</button>
-        )}
-        {showA4 && (
-          <button
-            onClick={() => setPrintConfig({ ...printConfig, format: 'a4' })}
-            className={`px-3 py-1.5 rounded-lg font-bold text-xs transition-all focus:outline-none focus:ring-2 focus:ring-white/50 ${!isThermal && !isA5 ? 'bg-white text-slate-900 shadow' : 'text-slate-400 hover:text-white'}`}
-          >A4</button>
-        )}
-      </div>
-
-      {/* Doc type label */}
-      <span className="text-slate-400 font-bold text-xs uppercase tracking-widest hidden sm:block">{docLabel}</span>
-
-      {/* Actions */}
-      <div className="flex flex-wrap items-center gap-1.5">
-        <button
-          onClick={handleShareHTML}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-400 text-white rounded-lg font-bold text-xs transition-colors shadow"
-        ><FileDown size={14}/> Save / Share</button>
-
-        <button
-          onClick={handlePrint}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-400 text-white rounded-lg font-bold text-xs transition-colors shadow"
-        ><Printer size={14}/> Print</button>
-
-        <button
-          onClick={handleImageShare}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 bg-teal-600 hover:bg-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-400 text-white rounded-lg font-bold text-xs transition-colors shadow"
-          title="Share as Image (PNG/JPG) — works with WhatsApp"
-        ><Image size={14}/> Image</button>
-
-
-        <a
-          href={`https://wa.me/?text=${encodeURIComponent(generateShareText())}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-1.5 px-2.5 py-1.5 bg-green-600 hover:bg-green-500 focus:outline-none focus:ring-2 focus:ring-green-400 text-white rounded-lg font-bold text-xs transition-colors shadow"
-        ><MessageCircle size={14}/> WhatsApp</a>
-
-        {docType === 'invoice' && (
-          <button
-            onClick={() => setShowPrevBal(v => !v)}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg font-bold text-xs transition-colors shadow border ${showPrevBal ? 'bg-slate-700 border-slate-600 text-slate-200 hover:bg-slate-600' : 'bg-amber-500 border-amber-400 text-white hover:bg-amber-400'}`}
-            title="Toggle previous balance visibility on invoice"
-          >{showPrevBal ? 'Full Ledger' : 'Bill Only'}</button>
-        )}
-
+      {/* Title (larger screens), paper size, close — one row, so a phone loses as little height as possible */}
+      <div className="flex items-center gap-2">
+        <div className="hidden sm:block min-w-0 flex-1">
+          <p className="font-display text-xl leading-tight truncate">{docLabel}</p>
+          <p className="text-xs text-white/70 truncate">{getFileName()}</p>
+        </div>
+        <div role="group" aria-label="Paper size" className="flex flex-1 sm:flex-none gap-1 rounded-lg bg-white/10 p-1">
+          {[
+            showThermal && ['thermal', 'Thermal', isThermal],
+            showA5 && ['a5', 'A5', isA5],
+            showA4 && ['a4', 'A4', !isThermal && !isA5],
+          ].filter(Boolean).map(([f, label, on]) => (
+            <button
+              key={f}
+              onClick={() => setPrintConfig({ ...printConfig, format: f })}
+              aria-pressed={on}
+              className={`flex-1 sm:flex-none sm:px-5 h-11 sm:h-8 rounded-md text-sm font-medium transition-colors ${on ? 'bg-kt-yellow text-kt-ink' : 'text-white/80 hover:bg-white/10'}`}
+            >{label}</button>
+          ))}
+        </div>
         <button
           onClick={() => setPrintConfig(null)}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 bg-rose-600 hover:bg-rose-500 focus:outline-none focus:ring-2 focus:ring-rose-400 text-white rounded-lg font-bold text-xs transition-colors shadow"
-        ><X size={14}/> Close</button>
+          aria-label="Close"
+          title="Close (Esc)"
+          className="inline-flex items-center justify-center w-11 h-11 sm:w-9 sm:h-9 shrink-0 rounded-lg border border-white/25 text-white hover:bg-white/10 transition-colors"
+        ><X size={18} strokeWidth={1.5}/></button>
       </div>
-    </div>
 
-    {/* File name hint.
-        One look everywhere on a screen, one on paper:
-          Preview, Save / Share, PDF, Image — all the same document, yellow blocks
-          Print — buildHtmlDoc(screenHide) bakes monochrome; black and white
-        The blocks are yellow in the document itself now, rather than being repainted on
-        the image's clone, which is why those four finally agree. */}
-    <div className="text-center pb-1.5 no-print">
-      <span className="text-[10px] text-slate-500 font-mono">{getFileName()}</span>
-      <span className="block text-[10px] text-slate-400 mt-0.5 px-3 leading-relaxed">
-        Preview matches <span className="text-indigo-300 font-bold">Save / Share</span>,
-        {' '}PDF and <span className="text-yellow-300 font-bold">Image</span> ·
-        {' '}<span className="text-emerald-300 font-bold">Print</span> is black &amp; white
-      </span>
+      {/* Actions: the two that matter first, then the rest */}
+      <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2">
+        <div className="flex gap-2">
+          <button
+            onClick={handleShareHTML}
+            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-4 h-11 sm:h-9 rounded-lg bg-kt-yellow text-kt-ink text-sm font-medium whitespace-nowrap"
+          ><FileDown size={16} strokeWidth={1.5}/> Save / Share</button>
+          <button
+            onClick={handlePrint}
+            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-4 h-11 sm:h-9 rounded-lg bg-white text-kt-band text-sm font-medium whitespace-nowrap"
+          ><Printer size={16} strokeWidth={1.5}/> Print</button>
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={handleImageShare}
+            title="Share as Image (PNG/JPG) — works with WhatsApp"
+            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3 h-11 sm:h-9 rounded-lg border border-white/25 text-white text-sm font-medium whitespace-nowrap hover:bg-white/10 transition-colors"
+          ><Image size={16} strokeWidth={1.5}/> Image</button>
+          <a
+            href={`https://wa.me/?text=${encodeURIComponent(generateShareText())}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3 h-11 sm:h-9 rounded-lg border border-white/25 text-white text-sm font-medium whitespace-nowrap hover:bg-white/10 transition-colors"
+          ><MessageCircle size={16} strokeWidth={1.5}/> WhatsApp</a>
+          {docType === 'invoice' && (
+            <button
+              onClick={() => setShowPrevBal(v => !v)}
+              aria-pressed={!showPrevBal}
+              title="Toggle previous balance visibility on invoice"
+              className={`flex-1 sm:flex-none inline-flex items-center justify-center px-3 h-11 sm:h-9 rounded-lg border text-sm font-medium whitespace-nowrap transition-colors ${showPrevBal ? 'border-white/25 text-white hover:bg-white/10' : 'border-kt-yellow bg-white/15 text-kt-yellow'}`}
+            >{showPrevBal ? 'Full Ledger' : 'Bill Only'}</button>
+          )}
+        </div>
+      </div>
+
+      {/* One look on every screen, one on paper: preview, Save / Share, PDF and Image are the same
+          document, yellow blocks; Print bakes monochrome in buildHtmlDoc(screenHide). */}
+      <p className="hidden sm:block text-xs text-white/70">Preview, Save / Share, PDF and Image match · Print is black &amp; white</p>
     </div>
   </div>
 
   {/* ── Document ── */}
+  <div className={previewScale < 1 ? 'px-2 pb-6' : undefined}>
+  <div style={previewScale < 1 ? { width: pageW, zoom: previewScale } : undefined}>
   <div
     id="print-document"
     ref={printRef}
@@ -1903,6 +1909,8 @@ return (
     }}>
       Software Generated{showBizName ? ` · ${bizName}` : ''} · {formatDateDisp(getLocalDateStr())}
     </div>
+  </div>
+  </div>
   </div>
 
   {/* ── Print/PDF styles ── */}
