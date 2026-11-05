@@ -174,6 +174,11 @@ thermal byte for byte, then open the shared file on its own and check A4 and A5 
   is ready, a bar asks for one more tap. Computers and Android keep the popup paths, byte-identical. Thermal is never
   routed here. Not yet seen on a real iPhone. The filter string is built from parts: Tailwind scans source text for
   class names and would otherwise mint an unused `.grayscale` rule that the A4/A5 Print popup copies.
+- **The browser's own print of the invoice screen** (Safari's Share > Print, Ctrl+P) adds the browser's header and footer,
+  page address and date included, and a page cannot switch that off on an iPhone: `@page { margin: 0 }` was already
+  there twice and Safari ignores it (a real file proved it). So that print is a short notice (`.print-guard`, rules in
+  `index.css`, deliberately not in PrintView's own style block, which the thermal lock pins). The app's Print and PDF
+  buttons are the only way to get a document.
 - The WhatsApp button shares a **text summary**, not a file: plain WhatsApp formatting (bold, blank lines), no rule
   lines or emoji, the business name rather than the app's, the letterhead phone only while the business name is shown.
   `PrintView.share.test.jsx` decodes it for every document type and fails on rules, `%` codes, `undefined`/`NaN`.

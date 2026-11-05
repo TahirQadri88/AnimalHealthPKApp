@@ -190,3 +190,12 @@ input::placeholder, textarea::placeholder { color: rgb(var(--kt-muted)); opacity
    receipt's own markup, and everything that reaches the printer, stays byte for byte as measured. */
 [data-skin="ink"] [data-dk] { background-color: rgb(var(--kt-band)) !important; color: rgb(var(--kt-yellow)) !important; }
 [data-skin="ink"] [data-dk] * { color: rgb(var(--kt-yellow)) !important; }
+
+/* The invoice screen printed by the browser itself (Safari's Share > Print, Ctrl+P) would carry the browser's own
+   header and footer, page address included, which no page can switch off on an iPhone. So it prints as a short
+   notice. Kept here, not in PrintView's own style block: that block is pinned next to the thermal receipt. */
+.print-guard { display: none; }
+@media print {
+  #print-root #print-document { display: none !important; }
+  #print-root .print-guard { display: block !important; padding: 24mm 16mm; }
+}
