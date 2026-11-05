@@ -1198,6 +1198,14 @@ return (
     </div>
   )}
 
+  {/* If the browser itself prints this screen (Safari's Share > Print, Ctrl+P), it adds its own header and footer,
+      including the page address, which no page can switch off on an iPhone. So the screen prints as a short
+      notice instead of a document; the app's own Print and PDF buttons are the way to get one. */}
+  <div className="print-guard" aria-hidden="true">
+    <p style={{ font: '600 16px system-ui, sans-serif', margin: '0 0 6px' }}>This screen is not for browser printing.</p>
+    <p style={{ font: '400 14px system-ui, sans-serif', margin: 0 }}>Go back to the app and use the Print or PDF button on the document.</p>
+  </div>
+
   {/* ── Document ── */}
   <div className={previewScale < 1 ? 'px-2 pb-6' : undefined} data-skin={isThermal ? 'ink' : undefined}>
   <div style={previewScale < 1 ? { width: pageW, zoom: previewScale } : undefined}>
