@@ -4,6 +4,7 @@ import { formatDateDisp, getLocalDateStr, APP_NAME } from '../helpers';
 import { splitDispatchLine } from '../lib/packaging';
 import { isCashSale } from '../lib/cashCustomer';
 import { YELLOW, isBlockBackground } from './printTheme';
+import { preloadDocFonts, getDocFontCss, DOC_FONT_STACK } from '../lib/docFonts';
 
 // Format: 'thermal' | 'a5' | 'a4'
 //
@@ -63,6 +64,8 @@ useEffect(() => {
 // different layout from the PDF and the image, which are always captured at 794px (A4) / 559px (A5).
 // A wrapper does the scaling, never the document element: the print path and both captures read
 // #print-document, and a zoom on it would travel into them.
+// Have the typeface ready for the shared file before anyone taps Save / Share.
+useEffect(() => { preloadDocFonts(); }, []);
 const [viewW, setViewW] = useState(() => (typeof window === 'undefined' ? 1024 : window.innerWidth));
 useEffect(() => {
   const onResize = () => setViewW(window.innerWidth);
@@ -449,6 +452,11 @@ const buildHtmlDoc = (screenHide = false) => {
   const printFont = isThermal
     ? 'Arial,Helvetica,sans-serif'
     : 'system-ui,-apple-system,sans-serif';
+  // The shared file (screenHide false) is a screen document: A4/A5 in the brand typeface, embedded
+  // below. Print (screenHide true) and the thermal roll keep exactly what they had.
+  const docFontCss = !screenHide && !isThermal ? getDocFontCss() : '';
+  const useDocFont = !!docFontCss;   // only claim the typeface when the file really carries it
+  const docFont = useDocFont ? DOC_FONT_STACK : printFont;
   // Thermal width MUST be adaptive, never a fixed mm value. A fixed 72mm clone overflows
   // the printable window the moment anything introduces a left offset (browser default
   // page margin, driver origin) — that is exactly the "wide left margin + right cut"
@@ -462,7 +470,7 @@ const buildHtmlDoc = (screenHide = false) => {
     : `width:100%;max-width:${paperW}`;
   clone.style.cssText = [
     widthCss, 'margin:0', `padding:${padding}`, 'background:white',
-    `font-family:${printFont}`,
+    `font-family:${docFont}`,
     `font-size:${isThermal ? '9px' : isA5 ? '11px' : '12px'}`,
     'line-height:1.5', 'box-sizing:border-box',
   ].join(';');
@@ -514,9 +522,9 @@ const buildHtmlDoc = (screenHide = false) => {
        come from the @page box keeps mm values meaning millimetres. -->
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>${docTitle}</title>
-  <style>
+  <style>${docFontCss}
     *{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact;-webkit-text-size-adjust:none;text-size-adjust:none;}
-    body{margin:0;padding:${bodyPad};background:white;font-family:${printFont};${isThermal ? 'overflow-x:hidden;' : ''}}
+    body{margin:0;padding:${bodyPad};background:white;font-family:${docFont};${isThermal ? 'overflow-x:hidden;' : ''}}
     @page{size:${pageSize};margin:0;}
     ${isThermal ? `
     /* Belt-and-braces against right-edge clipping on the 72mm head.
