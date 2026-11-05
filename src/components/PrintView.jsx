@@ -1290,18 +1290,18 @@ return (
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: sz('8px','8.5px','10px') }}>
                 <thead>
                   <tr data-dk="1" style={{ background: BLK.fill, color: BLK.ink }}>
-                    <th style={{ padding: sz('5px 4px','6px 5px','8px 8px'), textAlign: 'left', fontWeight: 800 }}>Customer</th>
+                    <th style={{ padding: sz('5px 4px','6px 5px 6px 12px','8px 8px 8px 14px'), textAlign: 'left', fontWeight: 800 }}>Customer</th>
                     <th style={{ padding: sz('5px 4px','6px 5px','8px 8px'), textAlign: 'center', fontWeight: 800, whiteSpace: 'nowrap' }}>Oldest</th>
                     {agingBuckets.map(b => (
                       <th key={b.key} style={{ padding: sz('5px 4px','6px 5px','8px 8px'), textAlign: 'right', fontWeight: 800 }}>{b.label}</th>
                     ))}
-                    <th style={{ padding: sz('5px 4px','6px 5px','8px 8px'), textAlign: 'right', fontWeight: 800 }}>Total Due</th>
+                    <th style={{ padding: sz('5px 4px','6px 12px 6px 5px','8px 14px 8px 8px'), textAlign: 'right', fontWeight: 800 }}>Total Due</th>
                   </tr>
                 </thead>
                 <tbody>
                   {rows.map((r, i) => (
                     <tr key={i} style={{ borderBottom: '1px solid #f1f5f9', background: i % 2 === 0 ? '#fff' : '#f8fafc', pageBreakInside: 'avoid', breakInside: 'avoid' }}>
-                      <td style={{ padding: sz('6px 4px','7px 5px','9px 8px'), fontWeight: 600, wordBreak: 'break-word', lineHeight: sz('1.5','1.35','1.35') }}>
+                      <td style={{ padding: sz('6px 4px','7px 5px 7px 12px','9px 8px 9px 14px'), fontWeight: 600, wordBreak: 'break-word', lineHeight: sz('1.5','1.35','1.35') }}>
                         {r.name}
                         {r.phone ? <span style={{ fontSize: '7.5px', color: '#64748b', display: 'block' }}>{r.phone}</span> : null}
                       </td>
@@ -1313,18 +1313,18 @@ return (
                           {(r.buckets?.[b.key] || 0) > 0 ? money(r.buckets[b.key]) : '—'}
                         </td>
                       ))}
-                      <td style={{ padding: sz('6px 4px','7px 5px','9px 8px'), textAlign: 'right', fontWeight: 800 }}>{money(r.totalOutstanding)}</td>
+                      <td style={{ padding: sz('6px 4px','7px 12px 7px 5px','9px 14px 9px 8px'), textAlign: 'right', fontWeight: 800 }}>{money(r.totalOutstanding)}</td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot>
                   <tr data-dk="1" style={{ background: BLK.fill, color: BLK.ink, fontWeight: 900 }}>
-                    <td style={{ padding: sz('6px 4px','7px 5px','9px 8px') }}>TOTAL ({aging.customerCount ?? rows.length})</td>
+                    <td style={{ padding: sz('6px 4px','7px 5px 7px 12px','9px 8px 9px 14px') }}>TOTAL ({aging.customerCount ?? rows.length})</td>
                     <td />
                     {agingBuckets.map(b => (
                       <td key={b.key} style={{ padding: sz('6px 4px','7px 5px','9px 8px'), textAlign: 'right' }}>{money(aging.totals?.[b.key])}</td>
                     ))}
-                    <td style={{ padding: sz('6px 4px','7px 5px','9px 8px'), textAlign: 'right' }}>{money(aging.grandTotal)}</td>
+                    <td style={{ padding: sz('6px 4px','7px 12px 7px 5px','9px 14px 9px 8px'), textAlign: 'right' }}>{money(aging.grandTotal)}</td>
                   </tr>
                 </tfoot>
               </table>
@@ -1410,10 +1410,10 @@ return (
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: sz('8px','9px','10px') }}>
             <thead>
               <tr data-dk="1" style={{ background: BLK.fill, color: BLK.ink }}>
-                <th style={{ padding: sz('5px 4px','7px 6px','8px 8px'), textAlign: 'left', fontWeight: 800 }}>Name</th>
+                <th style={{ padding: sz('5px 4px','7px 6px 7px 12px','8px 8px 8px 14px'), textAlign: 'left', fontWeight: 800 }}>Name</th>
                 {data.view !== 'Receivables' && <th style={{ padding: sz('5px 4px','7px 6px','8px 8px'), textAlign: 'center', fontWeight: 800 }}>Qty</th>}
                 {data.view !== 'Receivables' && <th style={{ padding: sz('5px 4px','7px 6px','8px 8px'), textAlign: 'right', fontWeight: 800 }}>Revenue</th>}
-                <th style={{ padding: sz('5px 4px','7px 6px','8px 8px'), textAlign: 'right', fontWeight: 800 }}>
+                <th style={{ padding: sz('5px 4px','7px 12px 7px 6px','8px 14px 8px 8px'), textAlign: 'right', fontWeight: 800 }}>
                   {data.view === 'Receivables' ? 'Balance' : 'Gross Profit'}
                 </th>
               </tr>
@@ -1427,13 +1427,13 @@ return (
                 const rGP = r['Gross Profit (Rs)'] || r['Outstanding (Rs)'] || r.GrossProfit || r.Amount || 0;
                 return (
                 <tr key={i} style={{ borderBottom: '1px solid #f1f5f9', background: i % 2 === 0 ? '#fff' : '#f8fafc', pageBreakInside: 'avoid', breakInside: 'avoid' }}>
-                  <td style={{ padding: sz('6px','8px','9px'), fontWeight: 600, wordBreak: 'break-word', lineHeight: sz('1.5','1.35','1.35') }}>
+                  <td style={{ padding: sz('6px','8px 8px 8px 12px','9px 9px 9px 14px'), fontWeight: 600, wordBreak: 'break-word', lineHeight: sz('1.5','1.35','1.35') }}>
                     {rName}
                     {rBrand ? <span style={{ fontSize: '7.5px', color: '#1e293b', display: 'block' }}>{rBrand}</span> : null}
                   </td>
                   {data.view !== 'Receivables' && <td style={{ padding: sz('6px','8px','9px'), textAlign: 'center', whiteSpace: 'nowrap' }}>{Number(rQty).toLocaleString('en-US')}</td>}
                   {data.view !== 'Receivables' && <td style={{ padding: sz('6px','8px','9px'), textAlign: 'right', whiteSpace: 'nowrap' }}>Rs.{Number(rRev).toLocaleString('en-US')}</td>}
-                  <td style={{ padding: sz('6px','8px','9px'), textAlign: 'right', fontWeight: 800, color: '#059669', whiteSpace: 'nowrap' }}>
+                  <td style={{ padding: sz('6px','8px 12px 8px 8px','9px 14px 9px 9px'), textAlign: 'right', fontWeight: 800, color: '#059669', whiteSpace: 'nowrap' }}>
                     Rs.{Number(rGP).toLocaleString('en-US')}
                   </td>
                 </tr>
@@ -1450,10 +1450,10 @@ return (
               return (
                 <tfoot>
                   <tr data-dk="1" style={{ background: BLK.fill, color: BLK.ink, fontWeight: 900, fontSize: sz('8px','9px','10px') }}>
-                    <td style={{ padding: sz('6px 4px','8px 6px','9px 8px') }}>TOTAL ({safeRows.length})</td>
+                    <td style={{ padding: sz('6px 4px','8px 6px 8px 12px','9px 8px 9px 14px') }}>TOTAL ({safeRows.length})</td>
                     {data.view !== 'Receivables' && <td style={{ padding: sz('6px','8px','9px'), textAlign: 'center', whiteSpace: 'nowrap' }}>{totalQty.toLocaleString('en-US')}</td>}
                     {data.view !== 'Receivables' && <td style={{ padding: sz('6px','8px','9px'), textAlign: 'right', whiteSpace: 'nowrap' }}>Rs.{totalRev.toLocaleString('en-US')}</td>}
-                    <td style={{ padding: sz('6px','8px','9px'), textAlign: 'right', whiteSpace: 'nowrap' }}>Rs.{totalGP.toLocaleString('en-US')}</td>
+                    <td style={{ padding: sz('6px','8px 12px 8px 8px','9px 14px 9px 9px'), textAlign: 'right', whiteSpace: 'nowrap' }}>Rs.{totalGP.toLocaleString('en-US')}</td>
                   </tr>
                 </tfoot>
               );
@@ -1582,7 +1582,7 @@ return (
             return (
               <tfoot>
                 <tr style={{ borderTop: '2px solid #1e293b' }}>
-                  <td style={{ padding: sz('6px 2px','5px 4px','5px 6px'), fontWeight: 700, fontSize: sz('8px','9px','10px'), color: '#1e293b' }}>
+                  <td style={{ padding: sz('6px 2px','5px 4px 5px 12px','5px 6px 5px 14px'), fontWeight: 700, fontSize: sz('8px','9px','10px'), color: '#1e293b' }}>
                     Total SKUs: <strong style={{ color: '#1e293b' }}>{safeItems.length}</strong>
                   </td>
                   <td colSpan={1} style={{ padding: sz('6px','8px','9px'), textAlign: 'left', fontWeight: 800, color: '#1e293b' }}>
@@ -1862,17 +1862,17 @@ return (
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: sz('8.5px','9px','10px'), tableLayout: 'fixed' }}>
           <thead>
             <tr data-dk="1" style={{ background: BLK.fill, color: BLK.ink }}>
-              <th style={{ padding: sz('6px 2px','5px 4px','5px 6px'), textAlign: 'left', fontWeight: 800, textTransform: 'uppercase', fontSize: sz('6.5px','7px','7.5px'), letterSpacing: '0.5px', width: isThermal ? '14%' : '13%' }}>Date</th>
+              <th style={{ padding: sz('6px 2px','5px 4px 5px 12px','5px 6px 5px 14px'), textAlign: 'left', fontWeight: 800, textTransform: 'uppercase', fontSize: sz('6.5px','7px','7.5px'), letterSpacing: '0.5px', width: isThermal ? '14%' : '13%' }}>Date</th>
               <th style={{ padding: sz('6px 2px','5px 4px','5px 6px'), textAlign: 'left', fontWeight: 800, textTransform: 'uppercase', fontSize: sz('6.5px','7px','7.5px'), letterSpacing: '0.5px' }}>Particulars</th>
               <th style={{ padding: sz('6px 2px','5px 4px','5px 6px'), textAlign: 'right', fontWeight: 800, textTransform: 'uppercase', fontSize: sz('6.5px','7px','7.5px'), letterSpacing: '0.5px', whiteSpace: 'nowrap', width: isThermal ? '15%' : '15%' }}>Dr</th>
               <th style={{ padding: sz('6px 2px','5px 4px','5px 6px'), textAlign: 'right', fontWeight: 800, textTransform: 'uppercase', fontSize: sz('6.5px','7px','7.5px'), letterSpacing: '0.5px', whiteSpace: 'nowrap', width: isThermal ? '15%' : '15%' }}>Cr</th>
-              <th style={{ padding: sz('6px 2px','5px 4px','5px 6px'), textAlign: 'right', fontWeight: 800, textTransform: 'uppercase', fontSize: sz('6.5px','7px','7.5px'), letterSpacing: '0.5px', whiteSpace: 'nowrap', width: isThermal ? '16%' : '17%' }}>Bal</th>
+              <th style={{ padding: sz('6px 2px','5px 12px 5px 4px','5px 14px 5px 6px'), textAlign: 'right', fontWeight: 800, textTransform: 'uppercase', fontSize: sz('6.5px','7px','7.5px'), letterSpacing: '0.5px', whiteSpace: 'nowrap', width: isThermal ? '16%' : '17%' }}>Bal</th>
             </tr>
           </thead>
           <tbody>
             {safeRows.map((row, i) => (
               <tr key={row.id || i} style={{ borderBottom: '1px solid #f1f5f9', background: i % 2 === 0 ? '#fff' : '#f8fafc', pageBreakInside: 'avoid', breakInside: 'avoid' }}>
-                <td style={{ padding: sz('5px 2px','7px 4px','8px 6px'), color: '#334155', whiteSpace: 'nowrap', fontSize: sz('6.5px','8px','9px') }}>
+                <td style={{ padding: sz('5px 2px','7px 4px 7px 12px','8px 6px 8px 14px'), color: '#334155', whiteSpace: 'nowrap', fontSize: sz('6.5px','8px','9px') }}>
                   {formatDateDisp(row.date)}
                 </td>
                 <td style={{ padding: sz('5px 2px','7px 4px','8px 6px'), wordBreak: 'break-word' }}>
@@ -1896,7 +1896,7 @@ return (
                 <td style={{ padding: sz('5px 2px','7px 4px','8px 6px'), textAlign: 'right', fontWeight: 800, color: '#059669', fontVariantNumeric: 'tabular-nums', fontSize: sz('7px','8.5px','9.5px'), whiteSpace: 'nowrap' }}>
                   {(row.credit || 0) > 0 ? (row.credit || 0).toLocaleString('en-US') : '—'}
                 </td>
-                <td style={{ padding: sz('5px 2px','7px 4px','8px 6px'), textAlign: 'right', fontWeight: 900, color: (row.balance || 0) > 0 ? '#be123c' : '#065f46', fontVariantNumeric: 'tabular-nums', fontSize: sz('7px','8.5px','9.5px'), whiteSpace: 'nowrap' }}>
+                <td style={{ padding: sz('5px 2px','7px 12px 7px 4px','8px 14px 8px 6px'), textAlign: 'right', fontWeight: 900, color: (row.balance || 0) > 0 ? '#be123c' : '#065f46', fontVariantNumeric: 'tabular-nums', fontSize: sz('7px','8.5px','9.5px'), whiteSpace: 'nowrap' }}>
                   {(row.balance || 0).toLocaleString('en-US')}
                 </td>
               </tr>
@@ -1912,7 +1912,7 @@ return (
               </td>
               <td style={{ padding: sz('6px 2px','5px 4px','5px 6px'), textAlign: 'right', fontWeight: 900, fontVariantNumeric: 'tabular-nums', fontSize: sz('7px','8.5px','9.5px'), whiteSpace: 'nowrap' }}>{(data.totalDebit || 0).toLocaleString('en-US')}</td>
               <td style={{ padding: sz('6px 2px','5px 4px','5px 6px'), textAlign: 'right', fontWeight: 900, fontVariantNumeric: 'tabular-nums', fontSize: sz('7px','8.5px','9.5px'), whiteSpace: 'nowrap' }}>{(data.totalCredit || 0).toLocaleString('en-US')}</td>
-              <td style={{ padding: sz('6px 2px','5px 4px','5px 6px'), textAlign: 'right', fontWeight: 900, fontVariantNumeric: 'tabular-nums', fontSize: sz('7px','8.5px','9.5px'), whiteSpace: 'nowrap' }}>{closingBal.toLocaleString('en-US')}</td>
+              <td style={{ padding: sz('6px 2px','5px 12px 5px 4px','5px 14px 5px 6px'), textAlign: 'right', fontWeight: 900, fontVariantNumeric: 'tabular-nums', fontSize: sz('7px','8.5px','9.5px'), whiteSpace: 'nowrap' }}>{closingBal.toLocaleString('en-US')}</td>
             </tr>
           </tfoot>
         </table>
