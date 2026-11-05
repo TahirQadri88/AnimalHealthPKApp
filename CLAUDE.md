@@ -88,6 +88,22 @@ dark-background elements so they can be restored to black-with-white-text after 
 monochrome pass. Keep both mechanisms — the CSS is the fallback, the inline baking is what
 actually works.
 
+### 9. The receipt is locked: two golden-master checks
+
+Anything that shares `PrintView.jsx` can silently reach the 80mm roll, and a column-count test will
+not notice a 1px padding. So the thermal output is pinned byte for byte, twice:
+
+- `src/components/PrintView.thermal.lock.test.jsx` (runs in `npm test`, and in CI before every
+  deploy): the markup of nine thermal documents against `src/components/__thermal_lock__/`.
+- `npm run lock:thermal` (needs the preview server up): what the Print popup and Save / Share
+  actually write for thermal, against `tools/ui-preview/golden/`. This covers `buildHtmlDoc`, the
+  path that reaches the printer, which no unit test can render.
+
+Both were generated from the version that printed correctly and proven identical to the output from
+before the A4/A5 redesign. Both were proven to discriminate: a 1px thermal change fails them, an
+A4-only change does not. **If one fails, a change reached the receipt. Never `-u` / `--update` to
+make it pass**: gate the change behind `!isThermal`, or print it on the real printer first.
+
 ---
 
 ## The A4/A5 document's look: the app's brand on screen, Inter and black on paper

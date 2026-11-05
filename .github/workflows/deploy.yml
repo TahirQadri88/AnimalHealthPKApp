@@ -28,6 +28,9 @@ jobs:
       # Lint before build: a scope error compiles cleanly and only throws at render,
       # so `npm run build` alone once deployed an app that failed to load for everyone.
       - run: npm run lint
+      # The tests include the thermal golden-master lock (PrintView.thermal.lock.test.jsx): a change
+      # that reaches the 80mm receipt must stop the deploy, not be found on the printer.
+      - run: npm test
       - run: npm run build
         env:
           VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
