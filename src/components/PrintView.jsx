@@ -647,6 +647,11 @@ const handleIosPdf = async (mono) => {
       const jpeg = new Uint8Array(await (await new Promise((res, rej) => out.toBlob(bl => bl ? res(bl) : rej(new Error('jpeg')), 'image/jpeg', 0.92))).arrayBuffer());
       return { jpeg, pxW: out.width, pxH: sh };
     };
+    // What the footer names: the document's own number where it has one (invoice, estimate, credit note, dispatch
+    // note, receipt); for a ledger or a report, whom or what it is about. Its `id` is an internal key, a long
+    // timestamp, which read as "1773230565823 - Page 1 of 3".
+    const hasRef = ['invoice', 'estimate', 'creditnote', 'dispatch', 'receipt'].includes(docType);
+    const footerRef = (hasRef ? data?.id : (data?.customerName || data?.title)) || docLabel;
     const cuts = pageBreaks(totalH, usable, marks, tableOpts);
     const pages = [];
     for (let i = 0; i < cuts.length; i++) {
@@ -659,7 +664,7 @@ const handleIosPdf = async (mono) => {
       }
       const bh = (b - a) * ptPerPx;
       y -= bh; images.push({ ...(await slice(a, b)), x: 0, y, w: pageW, h: bh });
-      pages.push({ images, footer: cuts.length > 1 ? `${data?.id || ''}${data?.id ? '  -  ' : ''}Page ${i + 1} of ${cuts.length}` : '' });
+      pages.push({ images, footer: cuts.length > 1 ? `${footerRef}  -  Page ${i + 1} of ${cuts.length}` : '' });
     }
     const name = getFileName().replace(/\.[^.]+$/, '') + '.pdf';
     const file = new File([buildPdf(pages, { pageW, pageH })], name, { type: 'application/pdf' });
