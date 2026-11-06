@@ -33,7 +33,12 @@ export const onSnapshot = (ref, opts, cb) => {
 const docSnap = (ref) => { const v = col(ref.collection).get(ref.id); return { id: ref.id, exists: () => !!v, data: () => v }; };
 export const getDoc = async (ref) => docSnap(ref);
 export const getDocs = async (ref) => snapshotOf(ref.collection);
+// Every write is recorded on window.__writes for scripts (billing-flow.mjs counts them), and
+// ?slow=<ms> delays each one, so a double tap has the time it would have on a real connection.
+const slowMs = Number(new URLSearchParams(location.search).get('slow')) || 0;
 export const setDoc = async (ref, value, opts = {}) => {
+  (window.__writes ||= []).push({ collection: ref.collection, id: ref.id, value });
+  if (slowMs) await new Promise(r => setTimeout(r, slowMs));
   const prev = col(ref.collection).get(ref.id);
   col(ref.collection).set(ref.id, opts.merge ? { ...prev, ...value } : value);
   notify(ref.collection);

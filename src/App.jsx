@@ -446,6 +446,8 @@ const saveToFirebase = async (collectionName, id, dataObj, { merge = false, sile
 };
 
 const vehicleTypesSeeded = React.useRef(false);
+// Set by the billing form while it is open: how Escape asks it to close.
+const billingCloseRef = useRef(null);
 React.useEffect(() => {
   // Seed default vehicle types — only when Firestore has responded (appSettings loaded)
   // and the collection is genuinely empty. Predictable string IDs prevent duplicates.
@@ -690,6 +692,8 @@ useEffect(() => {
       if (map[e.key]) { e.preventDefault(); setActiveTab(map[e.key]); }
     }
     if (e.key === 'Escape') {
+      // A confirm or prompt answers Escape itself (as Cancel); nothing behind it may also close.
+      if (confirmDialog) return;
       // Search sits above everything else it can open, so it closes first.
       if (showSearchModal) setShowSearchModal(false);
       else if (printConfig) setPrintConfig(null);
@@ -702,12 +706,13 @@ useEffect(() => {
       else if (showExpenseCatModal) setShowExpenseCatModal(false);
       else if (showSegmentsModal) setShowSegmentsModal(false);
       else if (showRidersModal) setShowRidersModal(false);
-      else if (billingView === 'form') setBillingView('list');
+      // The form decides: it asks before discarding changes.
+      else if (billingView === 'form') { if (billingCloseRef.current) billingCloseRef.current(); else setBillingView('list'); }
     }
   };
   window.addEventListener('keydown', handler);
   return () => window.removeEventListener('keydown', handler);
-}, [currentUser, showSearchModal, printConfig, showProductModal, showCustomerModal, showPaymentModal, showCreditNoteModal, showLedgerModal, showUserModal, showExpenseCatModal, showSegmentsModal, showRidersModal, billingView]);
+}, [currentUser, showSearchModal, printConfig, showProductModal, showCustomerModal, showPaymentModal, showCreditNoteModal, showLedgerModal, showUserModal, showExpenseCatModal, showSegmentsModal, showRidersModal, billingView, confirmDialog]);
 
 // Tab list & permission helpers — defined here so the redirect effect below can use them
 // while still being BEFORE any conditional return (Rules of Hooks)
@@ -740,6 +745,11 @@ const toastEl = toast && (
     {toast.msg}
   </div>
 );
+
+// The menu badges. Worked out once per data change, not on every keystroke of the billing
+// form, whose draft lives in this component and re-renders it.
+const navDraftCount = useMemo(() => invoices.filter(o => o.status === 'Booked' || o.status === 'Estimate').length, [invoices]);
+const navCostCount = useMemo(() => productsNeedingCost(products).length, [products]);
 
 // — Auth Screen —
 if (!currentUser) {
@@ -813,7 +823,7 @@ cities, areas, customerTypes, vehicleTypes,
 getPaymentStatus,
 showToast, showConfirm, showPrompt, confirmDialog, setConfirmDialog, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData,
 voidRecord, restoreRecord, logSave, logDelete, fetchAuditLog, nextDocNumber, invoicesRaw, paymentsRaw, expensesRaw,
-billingView, setBillingView, currentInvoice, setCurrentInvoice,
+billingView, setBillingView, currentInvoice, setCurrentInvoice, billingCloseRef,
 activeTab, setActiveTab, adminView, setAdminView, analyticsView, setAnalyticsView,
 editingProduct, setEditingProduct, showProductModal, setShowProductModal, productPreFill, setProductPreFill,
 editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal,
@@ -847,9 +857,9 @@ return (
       {TABS.map(tab => {
         if (!canSeeTab(tab)) return null;
         const active = activeTab === tab.id;
-        const draftCount = tab.id === 'billing' ? invoices.filter(o => o.status === 'Booked' || o.status === 'Estimate').length : 0;
+        const draftCount = tab.id === 'billing' ? navDraftCount : 0;
         // Items is admin-only, so this is only ever seen by someone who can set the cost.
-        const costCount = tab.id === 'products' ? productsNeedingCost(products).length : 0;
+        const costCount = tab.id === 'products' ? navCostCount : 0;
         return (
           <button key={tab.id} data-sidenav={tab.id} tabIndex={active ? 0 : -1} onClick={() => setActiveTab(tab.id)} title={`Alt+${tab.label[0].toLowerCase()}`}
             aria-current={active ? 'page' : undefined}
@@ -916,7 +926,7 @@ return (
     </header>
 
     <main className="font-ui flex-1 overflow-hidden h-full bg-kt-page">
-      <div className="relative h-full lg:max-w-4xl lg:mx-auto lg:my-0 bg-kt-page overflow-hidden flex flex-col">
+      <div className="relative h-full lg:max-w-screen-xl 2xl:max-w-[1600px] lg:mx-auto lg:my-0 bg-kt-page overflow-hidden flex flex-col">
         {activeTab === 'dashboard' && <DashboardTab />}
         {activeTab === 'products' && <ProductsTab />}
         {activeTab === 'billing' && <BillingTab />}
@@ -931,9 +941,9 @@ return (
       {TABS.map(tab => {
         if (!canSeeTab(tab)) return null;
         const active = activeTab === tab.id;
-        const draftCount = tab.id === 'billing' ? invoices.filter(o => o.status === 'Booked' || o.status === 'Estimate').length : 0;
+        const draftCount = tab.id === 'billing' ? navDraftCount : 0;
         // Items is admin-only, so this is only ever seen by someone who can set the cost.
-        const costCount = tab.id === 'products' ? productsNeedingCost(products).length : 0;
+        const costCount = tab.id === 'products' ? navCostCount : 0;
         return (
           <button key={tab.id} data-sidenav={tab.id} tabIndex={active ? 0 : -1} onClick={() => setActiveTab(tab.id)}
             aria-current={active ? 'page' : undefined}

@@ -46,7 +46,7 @@ return (
   <button onClick={() => setShowIncompleteOnly(v => !v)} className={`shrink-0 h-11 sm:h-9 px-3 text-base sm:text-xs font-medium rounded-lg flex items-center gap-1.5 border transition-colors ${showIncompleteOnly ? 'bg-kt-amber text-white border-kt-amber/30' : 'bg-white text-kt-amber border-kt-amber/30 hover:bg-kt-amber/10'}`}><AlertCircle size={10}/> Incomplete{incompleteIds.size > 0 ? ` (${incompleteIds.size})` : ''}</button>
   {activeFilters && <button onClick={clearFilters} className="shrink-0 h-11 sm:h-9 px-3 text-base sm:text-xs font-medium text-kt-red bg-kt-red/10 border border-kt-red/30 rounded-lg flex items-center gap-1.5 hover:bg-kt-red/10 transition-colors"><X size={10}/> Clear</button>}
 </ScrollableTabBar>
-<div className="flex-1 overflow-y-auto space-y-3 pb-24 pr-1">
+<div className="flex-1 overflow-y-auto space-y-3 xl:space-y-0 xl:grid xl:grid-cols-2 xl:gap-3 xl:content-start pb-24 pr-1">
 {customers.filter(c => {
 const bal = getCustomerBalance(c.id);
 const nameMatch = c.name.toLowerCase().includes(search.toLowerCase()) || (c.contactPerson||'').toLowerCase().includes(search.toLowerCase()) || (c.phone||'').includes(search);

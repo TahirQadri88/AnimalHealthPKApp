@@ -136,3 +136,47 @@ describe('BillingTab — converting needs Issue / Convert Docs', () => {
     expect(html).toContain('Issue Invoice');
   });
 });
+
+// The pinned bar: the bill's figures stay on screen while products are added.
+describe('BillingTab — pinned summary bar', () => {
+  const lines = [
+    { uniqueId: 10, productId: 10, name: 'Antox 9 100ml', price: 7500, quantity: 3 },
+    { uniqueId: '10_bonus', productId: 10, name: 'Antox 9 100ml', price: 0, originalPrice: 7500, quantity: 1, isBonus: true },
+  ];
+  const base = { id: null, customerId: 1, customerName: 'Abdul Qadir Shan Cattle', customerDetails: {}, items: lines,
+    deliveryBilled: 500, transportExpense: 0, discount: 1000, receivedAmount: 0, vehicle: 'Self-Pickup', date: '2026-09-02' };
+  const fig = (html, k) => (html.match(new RegExp(`data-summary="${k}"[^>]*>([^<]*)<`)) || [])[1];
+  const form = (inv = {}, over = {}) => render({ billingView: 'form', currentInvoice: { ...base, ...inv }, getCustomerBalance: () => 20000, ...over });
+
+  it('shows SKUs, paid units, free units and the total that will be saved', () => {
+    const html = form();
+    expect([fig(html, 'skus'), fig(html, 'units'), fig(html, 'bonusUnits')]).toEqual(['2', '3', '1']);
+    expect(fig(html, 'total')).toBe('Rs. 22,000');
+    expect(fig(html, 'discount')).toBe('− Rs. 1,000');
+    expect(fig(html, 'bonusGiven')).toBe('Rs. 7,500');
+    expect(html).toContain('Issue Invoice');
+    expect(html).not.toMatch(/undefined|NaN/);
+  });
+
+  it('received and balance due appear only once something is received', () => {
+    expect(fig(form(), 'received')).toBeUndefined();
+    const html = form({ receivedAmount: 5000 });
+    expect(fig(html, 'received')).toBe('Rs. 5,000');
+    expect(fig(html, 'balanceDue')).toBe('Rs. 17,000');
+    expect(fig(form({ receivedAmount: 5000 }, { hasPermission: (k) => k !== 'collectOnBill' }), 'received')).toBeUndefined();
+  });
+
+  it('account after this bill: new documents only, and never counted twice', () => {
+    expect(fig(form(), 'accountAfter')).toBe('Rs. 42,000');
+    expect(fig(form({ id: 'INV-8457', status: 'Billed' }), 'accountAfter')).toBeUndefined();
+  });
+
+  it('an empty bill renders zeros, not blanks', () => {
+    const html = form({ items: [], deliveryBilled: 0, discount: 0 });
+    expect([fig(html, 'skus'), fig(html, 'units'), fig(html, 'total')]).toEqual(['0', '0', 'Rs. 0']);
+  });
+
+  it('the old totals card is gone: one total on screen', () => {
+    expect((form().match(/Grand total/g) || []).length).toBe(1);
+  });
+});
