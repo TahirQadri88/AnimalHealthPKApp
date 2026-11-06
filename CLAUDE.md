@@ -541,6 +541,30 @@ The rule that follows: **anything a view computes that an export also needs goes
 service.** `services/analytics/itemSales.js` now, with tests. And both export paths refuse an
 empty tab with a toast rather than assuming there is something there.
 
+## The billing form: one save, one total, nothing lost to Escape
+
+The form's figures live in a pinned bar (`components/billing/InvoiceSummaryBar.jsx`) built by
+`lib/billingSummary.js` on the same `invoiceTotals` functions `saveInvoice` stores, so the bar and
+the saved total cannot differ. Four faults were real and each has a guard; keep them:
+
+- **A second Ctrl+Enter during the number claim wrote a second invoice.** `savingRef` is set before
+  the first await and cleared in `finally`. `tools/ui-preview/billing-flow.mjs` presses it twice and
+  counts the writes (`?slow=` in the preview stub gives the race its real-world time); without the
+  guard it records INV-0001 and INV-0002.
+- **Escape in a search box also closed the form**, because App's window Escape ran after it. The
+  search handlers `stopPropagation`; the form's own close (`billingCloseRef`, set by BillingTab)
+  asks before discarding a changed draft; and App's Escape chain does nothing while a confirm is
+  open, which used to close the form behind the question.
+- **Validation runs before `nextDocNumber`** (`lib/invoiceValidation.js`), so a refused bill never
+  uses a number. Zero or empty quantity and a paid line with no rate are refused; part quantities are
+  allowed, as they always were. Old invoices with such lines must be fixed before they can be re-saved.
+- **`paymentStatus` is worked out at save time** (`paymentStatusFor`), not when "received" was typed.
+
+Run `node tools/ui-preview/billing-flow.mjs` after touching the form: keyboard-only billing on
+desktop, tapping on 360 and 390px phones, and the bar's position. Its checks were proven by planting
+each fault. Hotkeys while the form is open: F2 or `/` product search, F4 customer, Enter add,
+Shift+Enter add as Bonus, Ctrl+S save as it is (Draft Order when new), Ctrl+Enter issue.
+
 ## Firestore reads cost money — check before adding a listener
 
 The project blew through the 50,000 reads/day free tier on 2026-08-28. `useLiveCollection`

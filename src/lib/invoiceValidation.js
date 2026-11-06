@@ -13,7 +13,8 @@ export const validateInvoiceDraft = (inv = {}, { canCollect = false } = {}) => {
   items.forEach((i, idx) => {
     const key = i?.uniqueId || i?.productId || idx;
     const q = n(i?.quantity);
-    if (!Number.isInteger(q) || q < 1) errors.push({ field: 'qty', key, message: `${i?.name || 'Item'}: quantity must be a whole number, 1 or more` });
+    // Part quantities (half a bag) are allowed, as they always were; zero and below are not.
+    if (!Number.isFinite(q) || q <= 0) errors.push({ field: 'qty', key, message: `${i?.name || 'Item'}: enter a quantity` });
     if (!i?.isBonus) {
       const r = n(i?.price);
       if (!Number.isFinite(r) || r <= 0) errors.push({ field: 'rate', key, message: `${i?.name || 'Item'}: enter a rate, or add it as Bonus` });

@@ -137,8 +137,9 @@ describe('validateInvoiceDraft', () => {
     const r = validateInvoiceDraft({ items: [] });
     expect(r.errors.map(e => e.field)).toEqual(['customer', 'items']);
   });
-  it('quantity must be a whole number 1 or more', () => {
-    for (const q of [0, -1, 1.5, '', NaN]) {
+  it('quantity must be more than zero; a part quantity is allowed', () => {
+    expect(validateInvoiceDraft({ ...good, items: [{ ...items[0], quantity: 1.5 }] }).ok).toBe(true);
+    for (const q of [0, -1, '', NaN, 'x']) {
       const r = validateInvoiceDraft({ ...good, items: [{ ...items[0], quantity: q }] });
       expect(r.errors[0]).toMatchObject({ field: 'qty', key: 'a' });
     }
