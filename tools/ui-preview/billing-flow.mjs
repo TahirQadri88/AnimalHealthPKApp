@@ -49,8 +49,8 @@ const money = (t) => Number(String(t).replace(/^\D*Rs\.\s*/, '').replace(/[^0-9.
 // ── Desktop, keyboard only ───────────────────────────────────────────────────────────────
 // A step that cannot run is a failure too, and the run carries on to the next section.
 const section = async (name, fn) => { try { await fn(); } catch (e) { check(false, `${name}: stopped: ${e.message.split('\n')[0]}`); } };
-await section('desktop', async () => {
-  const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+for (const dw of [1280, 1920]) await section(`desktop ${dw}`, async () => {
+  const page = await browser.newPage({ viewport: { width: dw, height: 900 } });
   page.setDefaultTimeout(5000); page.on('pageerror', e => fails.push(`page error: ${e.message}`));
   await openForm(page);
   await page.keyboard.type('cash sale');

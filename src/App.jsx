@@ -926,7 +926,7 @@ return (
     </header>
 
     <main className="font-ui flex-1 overflow-hidden h-full bg-kt-page">
-      <div className="relative h-full lg:max-w-4xl lg:mx-auto lg:my-0 bg-kt-page overflow-hidden flex flex-col">
+      <div className="relative h-full lg:max-w-screen-xl 2xl:max-w-[1600px] lg:mx-auto lg:my-0 bg-kt-page overflow-hidden flex flex-col">
         {activeTab === 'dashboard' && <DashboardTab />}
         {activeTab === 'products' && <ProductsTab />}
         {activeTab === 'billing' && <BillingTab />}

@@ -12,7 +12,7 @@ return (
 <div className="relative flex-1"><Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-kt-muted" size={18} /><input placeholder="Search products" className="w-full pl-10 pr-4 py-3 bg-white border border-kt-line rounded-xl font-semibold outline-none text-sm" value={search} onChange={e => setSearch(e.target.value)} onKeyDown={e => { if (e.key === 'Escape' && search) { e.stopPropagation(); setSearch(''); } }} /></div>
 <button onClick={() => { setEditingProduct(null); setShowProductModal(true); }} className="bg-kt-primary text-white p-3 rounded-xl"><Plus size={20}/></button>
 </div>
-<div className="flex-1 overflow-y-auto space-y-3 pb-24 pr-1">
+<div className="flex-1 overflow-y-auto space-y-3 xl:space-y-0 xl:grid xl:grid-cols-2 xl:gap-3 xl:content-start pb-24 pr-1">
 {/* Products waiting for a cost come first: the Home notice and the tab badge send you here for them. */}
 {products.filter(p => p.name.toLowerCase().includes(search.toLowerCase())).sort((a, b) => needsCost(b) - needsCost(a)).map(p => (
 <div key={p.id} className={`p-4 rounded-xl border  ${p.archived ? 'bg-kt-amber/10 border-kt-amber/30 opacity-75' : 'bg-white border-kt-line'}`}>

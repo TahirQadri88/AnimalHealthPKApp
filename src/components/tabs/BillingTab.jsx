@@ -195,8 +195,8 @@ if (billingCloseRef) billingCloseRef.current = formOpen ? requestClose : null;
 // Khyber Traders look (unslop trial): bone neutrals, hairlines, one yellow block per screen.
 const inputClass = "w-full h-11 px-3 bg-white border border-kt-line rounded-lg text-sm text-kt-ink placeholder-kt-muted focus:outline-none focus:border-kt-ink transition-colors";
 const labelClass = "text-xs font-medium text-kt-sub mb-1.5 block";
-const sectionClass = "bg-white p-5 sm:p-6 rounded-xl border border-kt-line shadow-[0_1px_2px_rgba(20,20,20,0.05)]";
-const sectionTitleClass = "font-display text-2xl text-kt-ink mb-4 flex items-center gap-3";
+const sectionClass = "bg-white p-4 lg:p-5 rounded-xl border border-kt-line shadow-[0_1px_2px_rgba(20,20,20,0.05)]";
+const sectionTitleClass = "font-display text-xl sm:text-2xl text-kt-ink mb-3 flex items-center gap-3";
 // The signature detail: sections numbered like the parts of a bill book, in the order a bill is written.
 const Step = ({ n }) => <span aria-hidden="true" className="font-ui w-6 h-6 shrink-0 rounded-full bg-kt-primary text-white text-xs font-medium flex items-center justify-center">{n}</span>;
 const iconBtn = "w-11 h-11 shrink-0 flex items-center justify-center rounded-lg border border-kt-line bg-white text-kt-sub hover:bg-kt-raised hover:text-kt-ink transition-colors";
@@ -253,11 +253,13 @@ hotkeyRef.current = (e) => {
 };
 return (
 <div data-billing-form="1" className="font-ui h-full flex flex-col bg-kt-page absolute inset-0 z-20 animate-slide-up">
-<div className="bg-kt-band text-white px-5 sm:px-6 py-4 flex justify-between items-center sticky top-0 z-30">
-<div><h2 className="font-display text-2xl leading-tight">{isEdit ? `${formTypeLabel} — ${currentInvoice.id}` : formTypeLabel}</h2><input type="date" value={currentInvoice.date || getLocalDateStr()} onChange={e => setCurrentInvoice({...currentInvoice, date: e.target.value})} className="text-sm text-white/70 bg-transparent border-0 outline-none cursor-pointer hover:text-white transition-colors mt-1 p-0 tabular-nums [color-scheme:dark]" /></div>
+<div className="bg-kt-band text-white px-4 sm:px-6 py-2.5 sm:py-3 flex justify-between items-center sticky top-0 z-30">
+<div><h2 className="font-display text-xl sm:text-2xl leading-tight">{isEdit ? `${formTypeLabel} — ${currentInvoice.id}` : formTypeLabel}</h2><input type="date" value={currentInvoice.date || getLocalDateStr()} onChange={e => setCurrentInvoice({...currentInvoice, date: e.target.value})} className="text-sm text-white/70 bg-transparent border-0 outline-none cursor-pointer hover:text-white transition-colors mt-1 p-0 tabular-nums [color-scheme:dark]" /></div>
 <button onClick={requestClose} title="Close (Esc)" aria-label="Close" className="w-11 h-11 -mr-2 flex items-center justify-center rounded-lg text-white/70 hover:bg-white/10 hover:text-white transition-colors"><X size={18} strokeWidth={1.5}/></button>
 </div>
-<div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 pb-6">
+{/* From 1536px wide, two columns: the customer and products where the work happens, delivery, payment and notes beside them. */}
+<div className="flex-1 overflow-y-auto p-3 sm:p-4 lg:p-5 space-y-3 2xl:space-y-0 2xl:grid 2xl:grid-cols-[minmax(0,1fr)_380px] 2xl:gap-4 2xl:items-start">
+<div className="space-y-3 min-w-0">
 <div className={sectionClass}>
 <h3 className={sectionTitleClass}><Step n={1}/> Customer</h3>
 <div className="flex gap-2 items-center">
@@ -326,23 +328,6 @@ return (
   return null;
 })()}
 </div>
-{currentInvoice.customerId && (() => {
-  const cust = selectedCustomer;
-  if (!cust?.address2) return null;
-  return (
-    <div className={sectionClass}>
-      <h3 className={sectionTitleClass}><MapPin size={18} strokeWidth={1.5} className="text-kt-muted"/> Delivery address</h3>
-      <div className="space-y-2">
-        {[{key:'address1',label:'Primary',address:cust.address1},{key:'address2',label:'Secondary',address:cust.address2}].map(opt=>(
-          <label key={opt.key} className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${currentInvoice.deliveryAddressKey===opt.key?'bg-kt-raised border-kt-ink':'bg-white border-kt-line hover:bg-kt-raised'}`}>
-            <input type="radio" name="deliveryAddress" className="mt-0.5 accent-kt-primary" checked={currentInvoice.deliveryAddressKey===opt.key} onChange={()=>setCurrentInvoice({...currentInvoice,deliveryAddressKey:opt.key})} />
-            <div><span className="text-xs font-medium text-kt-sub">{opt.label}</span><p className="text-sm text-kt-ink mt-0.5 leading-snug">{opt.address}</p></div>
-          </label>
-        ))}
-      </div>
-    </div>
-  );
-})()}
 <div className={sectionClass}>
 <h3 className={sectionTitleClass}><Step n={2}/> Products</h3>
 <div className="flex gap-2 items-center mb-4">
@@ -381,20 +366,21 @@ const setLine = (patch) => setCurrentInvoice(prev => ({ ...prev, items: prev.ite
 const qtyErr = errFor('qty', itemKey);
 const rateErr = errFor('rate', itemKey);
 return (
-<div key={itemKey} data-item-row="1" data-key={String(itemKey)} className={`bg-kt-page/50 p-4 rounded-lg border transition-shadow duration-500 ${flashKey === itemKey ? 'border-kt-ink shadow-[0_0_0_3px_rgb(var(--kt-yellow))]' : 'border-kt-line'}`}>
-<div className="flex justify-between items-start gap-2 mb-3">
-<p className="min-w-0 break-words font-medium text-[15px] text-kt-ink leading-tight pt-1">{item.name}{item.isBonus && <span className="ml-2 text-xs font-medium text-kt-green bg-kt-green/10 px-1.5 py-0.5 rounded">Bonus</span>}</p>
-<span className="ml-auto pt-0.5 font-display text-2xl text-kt-ink leading-none whitespace-nowrap">{item.isBonus ? 'Free' : `Rs. ${((Number(item.price) || 0) * (Number(item.quantity) || 0)).toLocaleString('en-US')}`}</span>
-<button type="button" tabIndex={-1} onClick={() => setCurrentInvoice(prev => ({ ...prev, items: prev.items.filter(i => (i.uniqueId || i.productId) !== itemKey) }))} title="Remove" aria-label={`Remove ${item.name}`} className="w-11 h-11 -mt-2 -mr-2 shrink-0 flex items-center justify-center rounded-lg text-kt-muted hover:text-kt-red hover:bg-kt-raised transition-colors"><X size={16} strokeWidth={1.5}/></button>
+<div key={itemKey} data-item-row="1" data-key={String(itemKey)} className={`bg-kt-page/50 p-4 lg:px-3 lg:py-2 lg:flex lg:flex-wrap lg:items-center lg:gap-x-3 rounded-lg border transition-shadow duration-500 ${flashKey === itemKey ? 'border-kt-ink shadow-[0_0_0_3px_rgb(var(--kt-yellow))]' : 'border-kt-line'}`}>
+{/* Phones: a two-row card. Desktop: the wrappers dissolve (lg:contents) into one line, reordered name, rate, quantity, amount, remove. */}
+<div className="flex justify-between items-start gap-2 mb-3 lg:contents">
+<p className="min-w-0 break-words font-medium text-[15px] text-kt-ink leading-tight pt-1 lg:pt-0 lg:order-1 lg:flex-1">{item.name}{item.isBonus && <span className="ml-2 text-xs font-medium text-kt-green bg-kt-green/10 px-1.5 py-0.5 rounded">Bonus</span>}</p>
+<span className="ml-auto pt-0.5 lg:pt-0 lg:order-4 lg:ml-0 lg:min-w-28 lg:text-right font-display text-2xl lg:text-xl text-kt-ink leading-none whitespace-nowrap">{item.isBonus ? 'Free' : `Rs. ${((Number(item.price) || 0) * (Number(item.quantity) || 0)).toLocaleString('en-US')}`}</span>
+<button type="button" tabIndex={-1} onClick={() => setCurrentInvoice(prev => ({ ...prev, items: prev.items.filter(i => (i.uniqueId || i.productId) !== itemKey) }))} title="Remove" aria-label={`Remove ${item.name}`} className="w-11 h-11 -mt-2 -mr-2 lg:m-0 lg:order-5 shrink-0 flex items-center justify-center rounded-lg text-kt-muted hover:text-kt-red hover:bg-kt-raised transition-colors"><X size={16} strokeWidth={1.5}/></button>
 </div>
-<div className="flex items-end justify-between gap-3">
-<div className="flex flex-col">
-<label className="text-xs text-kt-sub mb-1">Rate (Rs)</label>
-<input type="number" inputMode="decimal" enterKeyHint="next" aria-invalid={rateErr.length ? 'true' : undefined} className={`w-28 h-11 px-2 text-sm font-medium text-kt-ink bg-white border rounded-md tabular-nums focus:outline-none focus:border-kt-ink ${rateErr.length ? 'border-kt-red' : 'border-kt-line'}`} value={item.price} disabled={item.isBonus} onFocus={numFocus} onWheel={numWheel} onChange={(e) => { const v = e.target.value; setLine(() => ({ price: Number(v) })); }} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); const q = e.target.closest('[data-item-row]')?.querySelector('[data-item-qty]'); q?.focus(); q?.select(); } }} />
-{item.isBonus && <span className="text-xs text-kt-muted line-through mt-1 tabular-nums">Rs. {item.originalPrice}</span>}
+<div className="flex items-end justify-between gap-3 lg:contents">
+<div className="flex flex-col lg:order-2 lg:flex-row lg:items-center lg:gap-2">
+<label className="text-xs text-kt-sub mb-1 lg:sr-only">Rate (Rs)</label>
+<input type="number" inputMode="decimal" enterKeyHint="next" aria-label={`Rate of ${item.name}`} aria-invalid={rateErr.length ? 'true' : undefined} className={`w-28 h-11 px-2 text-sm font-medium text-kt-ink bg-white border rounded-md tabular-nums focus:outline-none focus:border-kt-ink ${rateErr.length ? 'border-kt-red' : 'border-kt-line'}`} value={item.price} disabled={item.isBonus} onFocus={numFocus} onWheel={numWheel} onChange={(e) => { const v = e.target.value; setLine(() => ({ price: Number(v) })); }} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); const q = e.target.closest('[data-item-row]')?.querySelector('[data-item-qty]'); q?.focus(); q?.select(); } }} />
+{item.isBonus && <span className="text-xs text-kt-muted line-through mt-1 lg:mt-0 tabular-nums">Rs. {item.originalPrice}</span>}
 </div>
-<div className="flex flex-col items-center">
-<label className="text-xs text-kt-sub mb-1">Quantity</label>
+<div className="flex flex-col items-center lg:order-3">
+<label className="text-xs text-kt-sub mb-1 lg:sr-only">Quantity</label>
 <div className={`flex items-center bg-white border rounded-md ${qtyErr.length ? 'border-kt-red' : 'border-kt-line'}`}>
 <button type="button" tabIndex={-1} onClick={() => setCurrentInvoice(prev => ({ ...prev, items: prev.items.map(i => (i.uniqueId || i.productId) === itemKey ? { ...i, quantity: (Number(i.quantity) || 0) - 1 } : i).filter(i => i.quantity > 0) }))} aria-label="One less" className="w-11 h-11 text-lg text-kt-sub hover:bg-kt-raised hover:text-kt-ink transition-colors">−</button>
 <input data-item-qty="1" type="number" inputMode="decimal" enterKeyHint="done" aria-label={`Quantity of ${item.name}`} aria-invalid={qtyErr.length ? 'true' : undefined} className="w-14 h-11 text-center text-sm font-medium text-kt-ink bg-transparent outline-none appearance-none tabular-nums" value={item.quantity} onFocus={numFocus} onWheel={numWheel} onChange={(e) => { const v = e.target.value; setLine(() => ({ quantity: Number(v) })); }} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); prodSearchRef.current?.focus(); } }} />
@@ -402,11 +388,30 @@ return (
 </div>
 </div>
 </div>
-{[...rateErr, ...qtyErr].map((e, n) => <p key={n} className="mt-2 text-xs text-kt-red">{e.message}</p>)}
+{[...rateErr, ...qtyErr].map((e, n) => <p key={n} className="mt-2 lg:mt-1 lg:order-6 lg:basis-full text-xs text-kt-red">{e.message}</p>)}
 </div>
 )})}
 </div>
 </div>
+</div>
+<div className="space-y-3 min-w-0">
+{currentInvoice.customerId && (() => {
+  const cust = selectedCustomer;
+  if (!cust?.address2) return null;
+  return (
+    <div className={sectionClass}>
+      <h3 className={sectionTitleClass}><MapPin size={18} strokeWidth={1.5} className="text-kt-muted"/> Delivery address</h3>
+      <div className="space-y-2">
+        {[{key:'address1',label:'Primary',address:cust.address1},{key:'address2',label:'Secondary',address:cust.address2}].map(opt=>(
+          <label key={opt.key} className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${currentInvoice.deliveryAddressKey===opt.key?'bg-kt-raised border-kt-ink':'bg-white border-kt-line hover:bg-kt-raised'}`}>
+            <input type="radio" name="deliveryAddress" className="mt-0.5 accent-kt-primary" checked={currentInvoice.deliveryAddressKey===opt.key} onChange={()=>setCurrentInvoice({...currentInvoice,deliveryAddressKey:opt.key})} />
+            <div><span className="text-xs font-medium text-kt-sub">{opt.label}</span><p className="text-sm text-kt-ink mt-0.5 leading-snug">{opt.address}</p></div>
+          </label>
+        ))}
+      </div>
+    </div>
+  );
+})()}
 <div className={sectionClass}>
 <h3 className={sectionTitleClass}><Step n={3}/> Delivery and payment</h3>
 <div className="mb-4"><label className={labelClass}>Vehicle / transport method</label><select className={inputClass} value={currentInvoice.vehicle} onChange={e => { const v = e.target.value; setCurrentInvoice({...currentInvoice, vehicle: v, ...(isTransportMethod(vehicleTypes, v) ? {} : { transportCompany: '', biltyNumber: '' }), ...(usesCarrierPerson(v) ? {} : { driverName: '', driverPhone: '', riderId: '' })}); }}>{(vehicleTypes.length ? vehicleTypes : [{name:'Rider'},{name:'Rickshaw'},{name:'Suzuki'},{name:'Intercity Transport'},{name:'Self-Pickup'}]).map(v => <option key={v.name} value={v.name}>{v.name}</option>)}</select></div>
@@ -491,8 +496,8 @@ return (
     </div>
   </div>
 )}
-<div className="col-span-2 sm:col-span-1"><label className={labelClass}>Booked By (Rider / Driver)</label><input placeholder="Name, or 'By Hand'" className={`${inputClass}`} value={currentInvoice.driverName || ''} onChange={e => setCurrentInvoice({...currentInvoice, driverName: e.target.value, riderId: ''})} /></div>
-<div className="col-span-2 sm:col-span-1"><label className={labelClass}>Their Phone</label><input placeholder="03XX XXXXXXX" className={`${inputClass}`} value={currentInvoice.driverPhone || ''} onChange={e => setCurrentInvoice({...currentInvoice, driverPhone: e.target.value})} /></div>
+<div className="col-span-2 sm:col-span-1 2xl:col-span-2"><label className={labelClass}>Booked By (Rider / Driver)</label><input placeholder="Name, or 'By Hand'" className={`${inputClass}`} value={currentInvoice.driverName || ''} onChange={e => setCurrentInvoice({...currentInvoice, driverName: e.target.value, riderId: ''})} /></div>
+<div className="col-span-2 sm:col-span-1 2xl:col-span-2"><label className={labelClass}>Their Phone</label><input placeholder="03XX XXXXXXX" className={`${inputClass}`} value={currentInvoice.driverPhone || ''} onChange={e => setCurrentInvoice({...currentInvoice, driverPhone: e.target.value})} /></div>
 </div>
 )}
 {(vehicleTypes.find(v => v.name === currentInvoice.vehicle)?.requiresRider ?? ['Rider','Rickshaw','Suzuki'].includes(currentInvoice.vehicle)) && (
@@ -534,11 +539,11 @@ return (
     </div>
   </div>
 )}
-<div className="col-span-2 sm:col-span-1"><label className={labelClass}>Rider / Driver Name</label><input placeholder="Name, or 'By Hand'" className={`${inputClass}`} value={currentInvoice.driverName || ''} onChange={e => setCurrentInvoice({...currentInvoice, driverName: e.target.value, riderId: ''})} /></div>
-<div className="col-span-2 sm:col-span-1"><label className={labelClass}>Rider / Driver Phone</label><input placeholder="03XX XXXXXXX" className={`${inputClass}`} value={currentInvoice.driverPhone || ''} onChange={e => setCurrentInvoice({...currentInvoice, driverPhone: e.target.value})} /></div>
+<div className="col-span-2 sm:col-span-1 2xl:col-span-2"><label className={labelClass}>Rider / Driver Name</label><input placeholder="Name, or 'By Hand'" className={`${inputClass}`} value={currentInvoice.driverName || ''} onChange={e => setCurrentInvoice({...currentInvoice, driverName: e.target.value, riderId: ''})} /></div>
+<div className="col-span-2 sm:col-span-1 2xl:col-span-2"><label className={labelClass}>Rider / Driver Phone</label><input placeholder="03XX XXXXXXX" className={`${inputClass}`} value={currentInvoice.driverPhone || ''} onChange={e => setCurrentInvoice({...currentInvoice, driverPhone: e.target.value})} /></div>
 </div>
 )}
-<div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+<div className="grid grid-cols-1 sm:grid-cols-3 2xl:grid-cols-1 gap-3">
 <div><label className={labelClass}>Delivery (+)</label><input type="number" inputMode="decimal" enterKeyHint="next" aria-invalid={errFor('deliveryBilled').length ? 'true' : undefined} className={`${inputClass} tabular-nums`} value={currentInvoice.deliveryBilled} onFocus={numFocus} onWheel={numWheel} onChange={e => setCurrentInvoice({...currentInvoice, deliveryBilled: e.target.value})} /></div>
 <div><label className={labelClass}>Driver expense (−)</label><input type="number" inputMode="decimal" enterKeyHint="next" aria-invalid={errFor('transportExpense').length ? 'true' : undefined} className={`${inputClass} tabular-nums`} value={currentInvoice.transportExpense} onFocus={numFocus} onWheel={numWheel} onChange={e => setCurrentInvoice({...currentInvoice, transportExpense: e.target.value})} /></div>
 <div><label className={labelClass}>Discount (−)</label><input type="number" inputMode="decimal" enterKeyHint="next" aria-invalid={errFor('discount').length ? 'true' : undefined} className={`${inputClass} tabular-nums`} value={currentInvoice.discount || ''} placeholder="0" onFocus={numFocus} onWheel={numWheel} onChange={e => setCurrentInvoice({...currentInvoice, discount: Number(e.target.value) || 0})} /></div>
@@ -560,6 +565,7 @@ return (
 <textarea rows={3} placeholder="Delivery instructions, payment terms" className={`${inputClass} h-auto py-2.5 resize-none`} value={currentInvoice.notes || ''} onChange={e => setCurrentInvoice({...currentInvoice, notes: e.target.value})} />
 </div>
 {isEdit && isAdmin && (<button onClick={async () => { const reason = await showPrompt(`Void ${currentInvoice.id}?\n\nIt stays on file and drops out of every balance and report.`, { placeholder: 'e.g. duplicate entry' }); if (reason === null) return; /* void what is stored, not the half-edited form state */ const stored = invoices.find(o => o.id === currentInvoice.id) || currentInvoice; await voidRecord('invoices', stored, { label: stored.id, reason }); showToast(`${currentInvoice.id} voided`); setBillingView('list'); }} className="w-full h-11 bg-white text-kt-red font-medium rounded-lg flex justify-center items-center gap-2 border border-kt-line hover:bg-kt-raised transition-colors"><Trash2 size={16} strokeWidth={1.5}/> Void {editingStatus === 'Estimate' ? 'Estimate' : editingStatus === 'Booked' ? 'Draft Order' : 'Invoice'}</button>)}
+</div>
 </div>
 <InvoiceSummaryBar summary={summary} open={summaryOpen} onToggle={toggleSummary} compact={keyboardUp} onDone={() => document.activeElement?.blur?.()}>
 {(() => {

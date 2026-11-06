@@ -46,8 +46,12 @@ for (const w of widths) {
       if (document.documentElement.scrollWidth > innerWidth + 1) spill.add(`page scrolls sideways (${document.documentElement.scrollWidth}px)`);
       for (const e of document.querySelectorAll('main *, header *, nav *, [role="dialog"] *, .font-ui.absolute *')) {
         if (!vis(e) || e.closest('svg')) continue;
-        const b = e.getBoundingClientRect(), p = e.parentElement?.getBoundingClientRect();
-        if (p && e.parentElement && !clips(e.parentElement) && (b.right > p.right + 2 || b.left < p.left - 2) && getComputedStyle(e).position !== 'absolute' && getComputedStyle(e).position !== 'fixed')
+        // A display:contents wrapper has no box of its own (its children lay out in the one
+        // above it), so measure against the nearest ancestor that does.
+        let box = e.parentElement;
+        while (box && getComputedStyle(box).display === 'contents') box = box.parentElement;
+        const b = e.getBoundingClientRect(), p = box?.getBoundingClientRect();
+        if (p && box && !clips(box) && (b.right > p.right + 2 || b.left < p.left - 2) && getComputedStyle(e).position !== 'absolute' && getComputedStyle(e).position !== 'fixed')
           spill.add(`${name(e)} past its box by ${Math.round(Math.max(b.right - p.right, p.left - b.left))}px`);
         if (e.scrollWidth > e.clientWidth + 2 && !clips(e) && getComputedStyle(e).overflowX === 'visible' && e.children.length === 0)
           spill.add(`${name(e)} text wider than its box`);
@@ -68,6 +72,9 @@ for (const w of widths) {
         if (t.width > box.width + 2) spill.add(`${name(e)} label ${Math.round(t.width)}px in a ${Math.round(box.width)}px button`);
       }
       for (const list of document.querySelectorAll('main [class*="space-y-"], main .divide-y, [role="dialog"] [class*="space-y-"]')) {
+        // A grid laid out in columns on purpose (xl:grid-cols-2) is not a stack.
+        const lcs = getComputedStyle(list);
+        if (lcs.display === 'grid' && lcs.gridTemplateColumns.trim().split(/\s+/).length > 1) continue;
         const kids = [...list.children].filter(vis);
         if (kids.length < 2) continue;
         const lefts = kids.map(k => Math.round(k.getBoundingClientRect().left));

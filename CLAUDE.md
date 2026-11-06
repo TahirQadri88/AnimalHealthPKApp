@@ -565,6 +565,13 @@ desktop, tapping on 360 and 390px phones, and the bar's position. Its checks wer
 each fault. Hotkeys while the form is open: F2 or `/` product search, F4 customer, Enter add,
 Shift+Enter add as Bonus, Ctrl+S save as it is (Draft Order when new), Ctrl+Enter issue.
 
+Desktop width: the content area is capped at 1280px (`lg:max-w-screen-xl`), 1600px from 1536 (it was
+896px, which left wide empty margins). Items and Clients cards go two to a row from 1280; the bill's
+lines become one row each from 1024 (`lg:contents` dissolves the phone card's wrappers); the form goes
+two columns only from 1536, because at 1280 the side column squeezed product names onto six lines.
+`layout.mjs` measures a `display: contents` child against the nearest real box and skips grids laid
+out in columns on purpose; both were false alarms, and planted faults inside each are still caught.
+
 ## Firestore reads cost money — check before adding a listener
 
 The project blew through the 50,000 reads/day free tier on 2026-08-28. `useLiveCollection`
