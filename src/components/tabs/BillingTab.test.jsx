@@ -180,3 +180,26 @@ describe('BillingTab — pinned summary bar', () => {
     expect((form().match(/Grand total/g) || []).length).toBe(1);
   });
 });
+
+// Newest line on top, next to the search box, on screen only. The stored order, which is what
+// prints, is the order the products were added.
+describe('BillingTab — newest line first on screen', () => {
+  const items = [
+    { uniqueId: 'a', productId: 'a', name: 'First Added', price: 100, quantity: 1 },
+    { uniqueId: 'b', productId: 'b', name: 'Second Added', price: 200, quantity: 2 },
+    { uniqueId: 'c', productId: 'c', name: 'Third Added', price: 300, quantity: 3 },
+  ];
+  const inv = { id: null, customerId: 1, customerName: 'X', customerDetails: {}, items, deliveryBilled: 0, transportExpense: 0, discount: 0, receivedAmount: 0, vehicle: 'Self-Pickup', date: '2026-11-09' };
+  it('renders the last added first and says so', () => {
+    const html = render({ billingView: 'form', currentInvoice: inv });
+    const keys = [...html.matchAll(/data-item-row="1" data-key="([^"]+)"/g)].map(m => m[1]);
+    expect(keys).toEqual(['c', 'b', 'a']);
+    expect(html).toContain('Newest first');
+    expect(items.map(i => i.uniqueId)).toEqual(['a', 'b', 'c']);
+  });
+  it('quantity and rate open the decimal keypad as text fields, so the figure can be selected', () => {
+    const html = render({ billingView: 'form', currentInvoice: inv });
+    expect(html).toMatch(/data-item-qty="1" type="text" inputMode="decimal"/);
+    expect(html).not.toMatch(/data-item-qty="1" type="number"/);
+  });
+});

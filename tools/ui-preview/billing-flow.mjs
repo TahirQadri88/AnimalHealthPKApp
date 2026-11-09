@@ -40,7 +40,7 @@ const focusInfo = (page) => page.evaluate(() => {
   return { qty: a?.hasAttribute('data-item-qty'), key: a?.closest('[data-item-row]')?.getAttribute('data-key'), ph: a?.getAttribute('placeholder') };
 });
 const lines = (page) => page.$$eval('[data-item-row]', rows => rows.map(r => {
-  const [rate] = r.querySelectorAll('input[type=number]');
+  const rate = r.querySelector('input[aria-label^="Rate"]');
   return { key: r.getAttribute('data-key'), rate: Number(rate.value), qty: Number(r.querySelector('[data-item-qty]').value), bonus: r.textContent.includes('Free') };
 }));
 const bar = (page) => page.$$eval('[data-summary]', els => Object.fromEntries(els.map(e => [e.getAttribute('data-summary'), e.textContent])));
@@ -118,6 +118,10 @@ for (const dw of [1280, 1920]) await section(`desktop ${dw}`, async () => {
   const inv = await page.evaluate(() => (window.__writes || []).filter(w => w.collection === 'invoices'));
   check(inv.length === 1, `Ctrl+Enter twice writes exactly one invoice (${inv.length}: ${inv.map(w => w.id).join(', ')})`);
   check(inv[0] && money(b.total) === inv[0].value.total, `the saved total equals the bar (${inv[0]?.value.total})`);
+  // The screen shows the newest line on top; the bill keeps the order the products were added.
+  const order = (inv[0]?.value.items || []).map(i => String(i.uniqueId));
+  check(order.join() === '101,102,108,109,105,102_bonus', `saved lines keep the order added (${order.join()})`);
+  check((inv[0]?.value.items || []).every(i => typeof i.quantity === 'number' && typeof i.price === 'number'), 'saved quantities and rates are numbers');
   check(!(await page.$('[data-billing-form]')), 'the form closes after saving');
 
   // Escape on a changed draft asks; Escape on the question cancels only the question.
@@ -154,14 +158,26 @@ for (const width of [360, 390]) await section(`phone ${width}`, async () => {
   page.setDefaultTimeout(5000); page.on('pageerror', e => fails.push(`page error: ${e.message}`));
   await openForm(page);
   await page.keyboard.type('cash sale'); await page.keyboard.press('Enter'); await page.waitForTimeout(200);
-  for (const q of ['Trifas', 'MILK POWDER', 'Tylosin']) {
-    await page.fill('input[placeholder="Search products"]', q);
+  // As a person does it: tap the search box, type, tap the result, type the quantity.
+  for (const [q, id, n] of [['Trifas', '101', '3'], ['MILK POWDER', '109', '2'], ['Tylosin', '108', '12']]) {
+    await page.tap('input[placeholder="Search products"]');
+    await page.keyboard.type(q);
     await page.waitForTimeout(100);
     await page.tap('[data-prod-idx="0"] button >> nth=0');
-    await page.waitForTimeout(150);
+    await page.waitForTimeout(120);
+    const f = await page.evaluate(() => {
+      const a = document.activeElement;
+      return { qty: a?.hasAttribute('data-item-qty'), key: a?.closest('[data-item-row]')?.getAttribute('data-key'), all: a && a.selectionStart === 0 && a.selectionEnd === a.value.length && a.value.length > 0 };
+    });
+    check(f.qty && f.key === id && f.all, `${width}: tapping "${q}" moves the cursor to its quantity with the figure selected (${f.key})`);
+    await page.keyboard.type(n);
+    await page.waitForTimeout(60);
+    const v = await page.inputValue(`[data-item-row][data-key="${id}"] [data-item-qty]`);
+    check(v === n, `${width}: typing ${n} replaces the 1 (${v})`);
+    const first = await page.$eval('[data-item-row]', r => r.getAttribute('data-key'));
+    check(first === id, `${width}: the newest line is on top, under the search box (${first})`);
   }
   check((await lines(page)).length === 3, `${width}: three products added by tapping`);
-  check((await focusInfo(page)).ph === 'Search products', `${width}: after a tap the search keeps focus for the next product`);
   await page.evaluate(() => document.activeElement?.blur());
   await page.waitForTimeout(200);
   const r = await page.$eval('[data-summary-bar]', el => { const b = el.getBoundingClientRect(); const s = el.firstElementChild.getBoundingClientRect(); return { top: b.top, bottom: b.bottom, strip: s.height, h: b.height }; });
