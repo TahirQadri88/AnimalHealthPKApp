@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useContext, useMemo, Fragment } from 'react';
+import { flushSync } from 'react-dom';
 import { Plus, Search, X, Edit, Trash2, Save, Truck, MapPin, Calendar,
          AlertCircle, BookOpen, FileText, ReceiptText, RotateCcw, Gift } from 'lucide-react';
 // nextDocNumber comes through context, not by import: ../../lib/claimDocNumber pulls in
@@ -37,8 +38,6 @@ const [showBookerDrop, setShowBookerDrop] = useState(false);
 const [hiProduct, setHiProduct] = useState(-1);
 const prodSearchRef = useRef(null);
 const custSearchRef = useRef(null);
-// After a keyboard add, the quantity of the line it landed on takes focus.
-const focusLineRef = useRef(null);
 const [flashKey, setFlashKey] = useState(null);
 // One save at a time: a second Ctrl+Enter during the number claim used to write a second invoice.
 const savingRef = useRef(false);
@@ -63,14 +62,6 @@ const customerList = useMemo(() => (formOpen ? customerMatches(customers, custom
 useEffect(() => {
   if (formOpen) { openSnapshotRef.current = JSON.stringify(currentInvoice); setShowErrors(false); }
 }, [formOpen]);
-useEffect(() => {
-  const key = focusLineRef.current;
-  if (!key) return;
-  focusLineRef.current = null;
-  const row = [...document.querySelectorAll('[data-item-row]')].find(r => r.getAttribute('data-key') === String(key));
-  const q = row?.querySelector('[data-item-qty]');
-  if (q) { q.focus(); q.select(); row.scrollIntoView?.({ block: 'nearest' }); }
-}, [currentInvoice?.items]);
 useEffect(() => {
   if (!flashKey) return undefined;
   const t = setTimeout(() => setFlashKey(null), 900);
@@ -114,7 +105,11 @@ savingRef.current = true; setSaving(true);
 try {
 const grandTotal = invoiceTotal(currentInvoice);
 const activeCustomer = customers.find(c => c.id === currentInvoice.customerId);
-const enrichedItems = currentInvoice.items.map(item => {
+const enrichedItems = currentInvoice.items.map(raw => {
+  // A figure left mid-typing ("1.") is text on screen; the record always gets a number.
+  const item = { ...raw,
+    ...(typeof raw.quantity === 'string' ? { quantity: Number(raw.quantity) || 0 } : {}),
+    ...(typeof raw.price === 'string' ? { price: Number(raw.price) || 0 } : {}) };
   if (item.unit && item.unitsInBox) return item;
   const nameLower = (item.name || '').toLowerCase().trim();
   const prod = products.find(p =>
@@ -200,24 +195,34 @@ const sectionTitleClass = "font-display text-xl sm:text-2xl text-kt-ink mb-3 fle
 // The signature detail: sections numbered like the parts of a bill book, in the order a bill is written.
 const Step = ({ n }) => <span aria-hidden="true" className="font-ui w-6 h-6 shrink-0 rounded-full bg-kt-primary text-white text-xs font-medium flex items-center justify-center">{n}</span>;
 const iconBtn = "w-11 h-11 shrink-0 flex items-center justify-center rounded-lg border border-kt-line bg-white text-kt-sub hover:bg-kt-raised hover:text-kt-ink transition-colors";
-// `viaKey`: added from the keyboard, so the line's quantity takes focus. A tap keeps the
-// search focused (and the phone keyboard up) for the next product.
-const handleAddItem = (p, isBonus, viaKey = false) => {
+// After every add, by tap or by Enter, the cursor goes to that line's quantity with the figure
+// selected, so typing replaces it. The line is committed with flushSync and focused in this same
+// handler: iOS raises the keyboard only for a focus made inside the tap itself, never from a later
+// effect (that is why phones used to stay in the search box).
+const handleAddItem = (p, isBonus) => {
 const uniqueId = isBonus ? `${p.id}_bonus` : p.id;
 // The rate this customer was last charged, as before; the list price otherwise.
 const historicalPrice = !isBonus && lastPriceMap.has(p.id) ? lastPriceMap.get(p.id) : p.sellingPrice;
 // Functional update: two quick adds must not overwrite each other.
-setCurrentInvoice(prev => {
+flushSync(() => setCurrentInvoice(prev => {
   const existing = prev.items.find(i => (i.uniqueId || i.productId) === uniqueId);
   if (existing) return { ...prev, items: prev.items.map(i => (i.uniqueId || i.productId) === uniqueId ? { ...i, quantity: (Number(i.quantity) || 0) + 1 } : i) };
   return { ...prev, items: [...prev.items, { uniqueId: uniqueId, productId: p.id, name: p.name, price: isBonus ? 0 : historicalPrice, originalPrice: p.sellingPrice, costPrice: p.costPrice, company: getCompanyName(p.companyId), quantity: 1, unitsInBox: p.unitsInBox, unit: p.unit, isBonus: isBonus }] };
-});
+}));
+const row = typeof document !== 'undefined' && [...document.querySelectorAll('[data-item-row]')].find(r => r.getAttribute('data-key') === String(uniqueId));
+const q = row && row.querySelector('[data-item-qty]');
+if (q) { q.focus(); q.select(); row.scrollIntoView?.({ block: 'nearest' }); }
 setFlashKey(uniqueId);
-if (viaKey) focusLineRef.current = uniqueId;
-else setTimeout(() => prodSearchRef.current?.focus(), 0);
 setProdSearch(''); setHiProduct(-1);
 };
 const numFocus = (e) => e.target.select();
+// Figures are typed into text fields with the decimal keypad (inputMode), not type="number":
+// Safari cannot select the text of a number field, so the "1" could not be typed over. A figure
+// still being typed ("1." or "") is kept as text and turned into a number when the bill is saved.
+const figure = (v) => {
+  const clean = String(v).replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1');
+  return clean !== '' && String(Number(clean)) === clean ? Number(clean) : clean;
+};
 // A mouse wheel over a focused number field changed the figure; it scrolls the page instead.
 const numWheel = (e) => e.currentTarget.blur();
 if (billingView === 'form') {
@@ -329,7 +334,7 @@ return (
 })()}
 </div>
 <div className={sectionClass}>
-<h3 className={sectionTitleClass}><Step n={2}/> Products</h3>
+<h3 className={sectionTitleClass}><Step n={2}/> Products{currentInvoice.items.length > 1 && <span className="font-ui ml-auto text-xs font-normal text-kt-sub">Newest first</span>}</h3>
 <div className="flex gap-2 items-center mb-4">
   <div className="relative flex-1"><Search size={16} strokeWidth={1.5} className="absolute left-3 top-1/2 -translate-y-1/2 text-kt-muted"/><input ref={prodSearchRef} placeholder="Search products" title="F2 or /" enterKeyHint="search" aria-invalid={errFor('items').length ? 'true' : undefined} className={`pl-10 ${inputClass}`} value={prodSearch} onChange={e=>{ setProdSearch(e.target.value); setHiProduct(-1); }} onKeyDown={e => {
     const filtP = productList.items;
@@ -337,7 +342,7 @@ return (
     const hi = hiProduct >= 0 ? hiProduct : 0;
     if (e.key === 'ArrowDown') { e.preventDefault(); setHiProduct(Math.min(hi + 1, filtP.length - 1)); }
     else if (e.key === 'ArrowUp') { e.preventDefault(); setHiProduct(Math.max(hi - 1, 0)); }
-    else if (e.key === 'Enter') { e.preventDefault(); const p = filtP[hi]; if (prodSearch.trim() && p) handleAddItem(p, e.shiftKey, true); }
+    else if (e.key === 'Enter') { e.preventDefault(); const p = filtP[hi]; if (prodSearch.trim() && p) handleAddItem(p, e.shiftKey); }
     else if (e.key === 'Escape' && prodSearch) { e.stopPropagation(); setProdSearch(''); setHiProduct(-1); }
   }} /></div>
   {hasPermission('addEditProducts') && <button type="button" onClick={() => { setProductPreFill(prodSearch.trim()); setEditingProduct(null); setShowProductModal(true); }} className="shrink-0 h-11 flex items-center gap-1.5 px-4 bg-white text-kt-ink border border-kt-line rounded-lg text-sm font-medium hover:bg-kt-raised transition-colors" title="Register a new product"><Plus size={16} strokeWidth={1.5}/> New</button>}
@@ -360,7 +365,8 @@ return (
 )}
 {errFor('items').map(e => <p key="i" className="-mt-2 mb-3 text-xs text-kt-red">{e.message}</p>)}
 <div className="space-y-2">
-{currentInvoice.items.map((item) => {
+{/* Newest line on top, next to the search box. On screen only: the bill keeps the order added. */}
+{[...currentInvoice.items].reverse().map((item) => {
 const itemKey = item.uniqueId || item.productId;
 const setLine = (patch) => setCurrentInvoice(prev => ({ ...prev, items: prev.items.map(i => (i.uniqueId || i.productId) === itemKey ? { ...i, ...patch(i) } : i) }));
 const qtyErr = errFor('qty', itemKey);
@@ -376,14 +382,14 @@ return (
 <div className="flex items-end justify-between gap-3 lg:contents">
 <div className="flex flex-col lg:order-2 lg:flex-row lg:items-center lg:gap-2">
 <label className="text-xs text-kt-sub mb-1 lg:sr-only">Rate (Rs)</label>
-<input type="number" inputMode="decimal" enterKeyHint="next" aria-label={`Rate of ${item.name}`} aria-invalid={rateErr.length ? 'true' : undefined} className={`w-28 h-11 px-2 text-sm font-medium text-kt-ink bg-white border rounded-md tabular-nums focus:outline-none focus:border-kt-ink ${rateErr.length ? 'border-kt-red' : 'border-kt-line'}`} value={item.price} disabled={item.isBonus} onFocus={numFocus} onWheel={numWheel} onChange={(e) => { const v = e.target.value; setLine(() => ({ price: Number(v) })); }} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); const q = e.target.closest('[data-item-row]')?.querySelector('[data-item-qty]'); q?.focus(); q?.select(); } }} />
+<input type="text" inputMode="decimal" autoComplete="off" enterKeyHint="next" aria-label={`Rate of ${item.name}`} aria-invalid={rateErr.length ? 'true' : undefined} className={`w-28 h-11 px-2 text-sm font-medium text-kt-ink bg-white border rounded-md tabular-nums focus:outline-none focus:border-kt-ink ${rateErr.length ? 'border-kt-red' : 'border-kt-line'}`} value={item.price} disabled={item.isBonus} onFocus={numFocus} onWheel={numWheel} onChange={(e) => { const v = figure(e.target.value); setLine(() => ({ price: v })); }} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); const q = e.target.closest('[data-item-row]')?.querySelector('[data-item-qty]'); q?.focus(); q?.select(); } }} />
 {item.isBonus && <span className="text-xs text-kt-muted line-through mt-1 lg:mt-0 tabular-nums">Rs. {item.originalPrice}</span>}
 </div>
 <div className="flex flex-col items-center lg:order-3">
 <label className="text-xs text-kt-sub mb-1 lg:sr-only">Quantity</label>
 <div className={`flex items-center bg-white border rounded-md ${qtyErr.length ? 'border-kt-red' : 'border-kt-line'}`}>
 <button type="button" tabIndex={-1} onClick={() => setCurrentInvoice(prev => ({ ...prev, items: prev.items.map(i => (i.uniqueId || i.productId) === itemKey ? { ...i, quantity: (Number(i.quantity) || 0) - 1 } : i).filter(i => i.quantity > 0) }))} aria-label="One less" className="w-11 h-11 text-lg text-kt-sub hover:bg-kt-raised hover:text-kt-ink transition-colors">−</button>
-<input data-item-qty="1" type="number" inputMode="decimal" enterKeyHint="done" aria-label={`Quantity of ${item.name}`} aria-invalid={qtyErr.length ? 'true' : undefined} className="w-14 h-11 text-center text-sm font-medium text-kt-ink bg-transparent outline-none appearance-none tabular-nums" value={item.quantity} onFocus={numFocus} onWheel={numWheel} onChange={(e) => { const v = e.target.value; setLine(() => ({ quantity: Number(v) })); }} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); prodSearchRef.current?.focus(); } }} />
+<input data-item-qty="1" type="text" inputMode="decimal" autoComplete="off" enterKeyHint="done" aria-label={`Quantity of ${item.name}`} aria-invalid={qtyErr.length ? 'true' : undefined} className="w-14 h-11 text-center text-sm font-medium text-kt-ink bg-transparent outline-none appearance-none tabular-nums" value={item.quantity} onFocus={numFocus} onWheel={numWheel} onChange={(e) => { const v = figure(e.target.value); setLine(() => ({ quantity: v })); }} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); prodSearchRef.current?.focus(); } }} />
 <button type="button" tabIndex={-1} onClick={() => setLine(i => ({ quantity: (Number(i.quantity) || 0) + 1 }))} aria-label="One more" className="w-11 h-11 text-lg text-kt-sub hover:bg-kt-raised hover:text-kt-ink transition-colors">+</button>
 </div>
 </div>
