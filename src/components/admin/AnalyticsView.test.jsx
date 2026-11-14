@@ -338,3 +338,31 @@ describe('AnalyticsView — Needs attention', () => {
     expect(html).not.toMatch(/undefined|NaN/);
   });
 });
+
+describe('AnalyticsView — four sections', () => {
+  it('Overview carries Insights, with the P&L shown once', () => {
+    const html = render({ analyticsView: 'Overview' });
+    expect(html).toContain('Needs attention');
+    expect(html).toContain('data-info="billedPeriod"');
+    expect(html).toContain('P&amp;L Dashboard');
+    expect(html).not.toContain('P&amp;L Summary');
+  });
+  it('the old Insights name still opens, as Overview', () => {
+    const html = render({ analyticsView: 'Insights' });
+    expect(html).toMatch(/data-analytics-section="Overview"[^>]*aria-selected="true"|aria-selected="true"[^>]*data-analytics-section="Overview"/);
+  });
+  it('every old view name still renders, in its section, with no undefined', () => {
+    for (const v of ['Monthly Trend', 'By Product', 'By Company', 'By Customer', 'By City', 'By Area', 'By Type', 'By Salesperson', 'Receivables', 'Collections', 'Returns', 'Expenses', 'Item Sales']) {
+      const html = render({ analyticsView: v });
+      expect(html, v).not.toMatch(/undefined|NaN/);
+      if (v !== 'Monthly Trend') expect(html, v).toMatch(new RegExp(`data-analytictab="${v}"`));
+    }
+  });
+  it('on a phone each table row is a card with the same figures', () => {
+    const html = render({ analyticsView: 'By Product' });
+    const cards = html.split('data-phone-rows="1"')[1].split('</ul>')[0];
+    const rows = (html.split('<tbody')[1] || '').split('</tbody>')[0];
+    const count = (str, re) => (str.match(re) || []).length;
+    expect(count(cards, /<li><button/g)).toBe(count(rows, /<tr /g));
+  });
+});

@@ -1,8 +1,7 @@
 import { useContext } from 'react';
 import { BarChart3, Wallet, Archive, Upload, Globe, Users, Settings, Truck, Activity, Lock } from 'lucide-react';
 import { AppContext } from '../../context/AppContext';
-import { ScrollableTabBar } from '../ui/ScrollableTabBar';
-import { makeArrowNav } from '../../lib/a11y';
+import { AdminRail, AdminSwitcher } from '../admin/AdminNav';
 import { AnalyticsView } from '../admin/AnalyticsView';
 import { ExpensesView } from '../admin/ExpensesView';
 import { MastersView } from '../admin/MastersView';
@@ -21,19 +20,12 @@ if(!isAdmin) return <div className="p-10 text-center font-medium text-kt-muted f
 return (
 <div className="h-full flex flex-col">
 <div className="font-ui px-4 pt-4 pb-2">
-<h2 className="font-display text-3xl text-kt-ink mb-4">Admin</h2>
-<div className="bg-white border border-kt-line p-1 rounded-xl">
-<ScrollableTabBar bgClass="bg-white">
-{[['analytics','bg-white text-kt-blue',<BarChart3 size={14}/>,'Analytics'],['expenses','bg-white text-kt-red',<Wallet size={14}/>,'Expenses'],['masters','bg-white text-kt-green',<Archive size={14}/>,'Masters'],['bulk','bg-white text-kt-green',<Upload size={14}/>,'Bulk Ops'],['segments','bg-white text-kt-blue',<Globe size={14}/>,'Segments'],['users','bg-white text-kt-amber',<Users size={14}/>,'Users'],['settings','bg-white text-kt-ink',<Settings size={14}/>,'Settings'],['riders','bg-white text-kt-blue',<Truck size={14}/>,'Riders'],['transportCos','bg-white text-kt-amber',<Truck size={14}/>,'Transport Cos'],['receivables','bg-white text-kt-red',<Wallet size={14}/>,'Receivables'],['audit','bg-white text-kt-ink',<Activity size={14}/>,'Activity']].map(([v,activeClass,icon,label])=>(
-  <button key={v} data-admintab={v} tabIndex={adminView===v?0:-1}
-    onClick={()=>setAdminView(v)}
-    onKeyDown={makeArrowNav(['analytics','expenses','masters','bulk','segments','users','settings','riders','transportCos','receivables','audit'],adminView,setAdminView,'data-admintab')}
-    className={`h-9 px-3 rounded-lg text-sm flex items-center justify-center gap-1.5 whitespace-nowrap transition-colors ${adminView===v?'bg-kt-yellow text-black font-medium':'text-kt-sub hover:bg-kt-raised hover:text-kt-ink'}`}>{icon} {label}</button>
-))}
-</ScrollableTabBar>
+<h2 className="font-display text-3xl text-kt-ink mb-3 lg:mb-1">Admin</h2>
+<AdminSwitcher adminView={adminView} setAdminView={setAdminView} />
 </div>
-</div>
-<div className="flex-1 overflow-hidden">
+<div className="flex-1 min-h-0 flex">
+<AdminRail adminView={adminView} setAdminView={setAdminView} />
+<div className="flex-1 min-w-0 overflow-hidden">
 <div style={{display: adminView === 'analytics' ? 'flex' : 'none', flexDirection: 'column', height: '100%'}}><AnalyticsView /></div>
 <div style={{display: adminView === 'expenses' ? 'flex' : 'none', flexDirection: 'column', height: '100%'}}><ExpensesView /></div>
 <div style={{display: adminView === 'masters' ? 'flex' : 'none', flexDirection: 'column', height: '100%'}}><MastersView /></div>
@@ -45,6 +37,7 @@ return (
 <div style={{display: adminView === 'transportCos' ? 'flex' : 'none', flexDirection: 'column', height: '100%'}}><TransportCompaniesManager /></div>
 <div style={{display: adminView === 'receivables' ? 'flex' : 'none', flexDirection: 'column', height: '100%'}}><ReceivablesView /></div>
 <div style={{display: adminView === 'audit' ? 'flex' : 'none', flexDirection: 'column', height: '100%'}}><AuditView /></div>
+</div>
 </div>
 </div>
 )
