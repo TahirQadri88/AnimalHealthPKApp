@@ -2,6 +2,10 @@ import { useState, useMemo, useContext } from 'react';
 import { Search, FileSpreadsheet, FileDown } from 'lucide-react';
 import { AppContext } from '../../context/AppContext';
 import { APP_NAME, getLocalDateStr, formatDateDisp, exportToCSV } from '../../helpers';
+
+// Each age bucket is topped by a strip in its colour, green through amber to red, so the
+// age of the money reads before its figure does (the bright --kt-icon-* tones, graphics only).
+const BUCKET_STRIP = { current: 'border-t-kt-icon-green', d31_60: 'border-t-kt-icon-amber', d61_90: 'border-t-kt-amber', d90plus: 'border-t-kt-icon-red' };
 import { buildAgingReport, summariseAging, AGING_BUCKETS } from '../../services/analytics/receivables';
 
 export const ReceivablesView = () => {
@@ -112,7 +116,7 @@ return (
     {[{ key: 'all', label: 'All', amount: report.grandTotal }, ...AGING_BUCKETS.map(b => ({ key: b.key, label: b.label, amount: report.totals[b.key] }))]
       .map(b => (
       <button key={b.key} onClick={() => setBucket(b.key)}
-        className={`text-left p-3 rounded-xl border transition-colors ${bucket === b.key ? 'bg-kt-band text-white border-kt-line' : 'bg-white border-kt-line hover:border-kt-line'}`}>
+        className={`text-left p-3 rounded-xl border border-t-4 transition-colors ${BUCKET_STRIP[b.key] || 'border-t-kt-primary'} ${bucket === b.key ? 'bg-kt-band text-white border-kt-line' : 'bg-white border-kt-line hover:border-kt-line'}`}>
         <p className={`text-xs font-medium   ${bucket === b.key ? 'text-white/70' : 'text-kt-muted'}`}>{b.label}</p>
         <p className={`text-sm font-semibold mt-0.5 ${bucket === b.key ? 'text-white' : b.key === 'd90plus' && b.amount > 0 ? 'text-kt-red' : 'text-kt-ink'}`}>{money(b.amount)}</p>
       </button>

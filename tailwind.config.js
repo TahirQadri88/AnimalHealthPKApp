@@ -15,7 +15,9 @@ export default {
       // is a set of variables in index.css, and opacity modifiers like bg-kt-red/10 still work.
       colors: {
         kt: Object.fromEntries(['yellow', 'ink', 'sub', 'muted', 'page', 'raised', 'line', 'band', 'primary',
-          'red', 'amber', 'green', 'blue'].map(n => [n, `rgb(var(--kt-${n}) / <alpha-value>)`])),
+          'red', 'amber', 'green', 'blue',
+          // Brighter fills and markers (3:1 graphics, never text): index.css --kt-icon-*.
+          'icon-red', 'icon-amber', 'icon-green', 'icon-blue'].map(n => [n, `rgb(var(--kt-${n}) / <alpha-value>)`])),
       },
     },
   },

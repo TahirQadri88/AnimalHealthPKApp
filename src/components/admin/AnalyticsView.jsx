@@ -4,6 +4,7 @@ import { METRIC_INFO } from '../../services/analytics/metricInfo';
 import { windowLabel, currentWindow, comparisonWindow } from '../../services/analytics/periods';
 import { debtWatch, salesByKey, movers, marginAlerts, lapsedCustomers } from '../../services/analytics/attention';
 import { NeedsAttention } from './analytics/NeedsAttention';
+import { tone, trendTone, recoveryTone, marginTone, daysTone } from './analytics/tone';
 import { Search, Calendar, ChevronDown, Download, Printer, Share2, Users, Package, Zap, PhoneCall,
          AlertCircle, CheckCircle2, X,
          Award, Clock, DollarSign, Filter, Receipt, TrendingUp, Wallet } from 'lucide-react';
@@ -15,12 +16,14 @@ import { FilterSelect } from '../ui/FilterSelect';
 // Meaning colours as whole class strings, so Tailwind can find them. Analytics used to build
 // names like `bg-${color}-50` at run time, which only rendered when the same class happened to
 // be used somewhere else in the app.
+// Each bucket is headed by a solid strip in its colour, green through amber to red, with the
+// figures in the dark tone on a light tint (contrast.mjs measures them).
 const KT_TONE = {
-  emerald: { border: 'border-kt-green/30', head: 'bg-kt-green/10 border-kt-green/30 text-kt-green' },
-  amber:   { border: 'border-kt-amber/30', head: 'bg-kt-amber/10 border-kt-amber/30 text-kt-amber' },
-  orange:  { border: 'border-kt-amber/30', head: 'bg-kt-amber/10 border-kt-amber/30 text-kt-amber' },
-  rose:    { border: 'border-kt-red/30',   head: 'bg-kt-red/10 border-kt-red/30 text-kt-red' },
-  indigo:  { border: 'border-kt-blue/30',  head: 'bg-kt-blue/10 border-kt-blue/30 text-kt-blue' },
+  emerald: { border: 'border-kt-icon-green/40 border-t-4 border-t-kt-icon-green', head: 'bg-kt-icon-green/15 border-kt-icon-green/30 text-kt-green' },
+  amber:   { border: 'border-kt-icon-amber/50 border-t-4 border-t-kt-icon-amber', head: 'bg-kt-icon-amber/15 border-kt-icon-amber/30 text-kt-amber' },
+  orange:  { border: 'border-kt-icon-amber/60 border-t-4 border-t-kt-amber', head: 'bg-kt-icon-amber/25 border-kt-icon-amber/40 text-kt-amber' },
+  rose:    { border: 'border-kt-icon-red/40 border-t-4 border-t-kt-icon-red', head: 'bg-kt-icon-red/15 border-kt-icon-red/30 text-kt-red' },
+  indigo:  { border: 'border-kt-icon-blue/40 border-t-4 border-t-kt-icon-blue', head: 'bg-kt-icon-blue/15 border-kt-icon-blue/30 text-kt-blue' },
 };
 import { APP_NAME, getPKTDate, getLocalDateStr, formatDateDisp, checkDateFilter, exportToCSV } from '../../helpers';
 import { makeArrowNav } from '../../lib/a11y';
@@ -379,7 +382,8 @@ const renderTable = (dataObj, type, dimension) => {
   const totalRev = arrWithABC.reduce((s, r) => s + (r.revenue || r.productRevenue || 0), 0);
   const totalGP = arrWithABC.reduce((s, r) => s + (r.profit || 0), 0);
   const totalQtyOrOrders = arrWithABC.reduce((s, r) => s + (r.qty || r.orders || 0), 0);
-  const tierColors = { A: 'bg-kt-green/10 text-kt-green border-kt-green/30', B: 'bg-kt-amber/10 text-kt-amber border-kt-amber/30', C: 'bg-kt-raised text-kt-sub border-kt-line' };
+  // Filled so the tier reads at a glance: A in the brand yellow, B outlined navy, C grey.
+  const tierColors = { A: 'bg-kt-yellow text-kt-ink border-kt-primary', B: 'bg-white text-kt-primary border-kt-primary', C: 'bg-kt-raised text-kt-sub border-kt-line' };
   return (
     <div className="bg-white rounded-xl border border-kt-line overflow-hidden mt-3">
        <div className="bg-kt-raised border-b border-kt-line p-2 flex flex-wrap justify-between items-center gap-2">
@@ -425,7 +429,7 @@ const renderTable = (dataObj, type, dimension) => {
                           <span className="font-medium text-kt-ink underline decoration-dotted decoration-kt-muted underline-offset-2">{row.label || row.key}</span>
                         </span>
                         {row.company && <span className="block text-xs text-kt-muted">{row.company}</span>}
-                        <span className="block w-full bg-kt-raised rounded-full h-1 mt-1 max-w-[100px]"><span className="block bg-kt-primary h-1 rounded-full" style={{width:`${barW}%`}}></span></span>
+                        <span className="block w-full bg-kt-raised rounded-full h-1.5 mt-1 max-w-[100px]"><span className="block bg-kt-yellow border border-kt-primary h-1.5 rounded-full" style={{width:`${barW}%`}}></span></span>
                       </button>
                     </td>
                     {type !== 'Customer' && <td className="p-3 text-center bg-kt-raised/50 font-medium">{(row.qty||0).toLocaleString('en-US')}</td>}
@@ -433,7 +437,7 @@ const renderTable = (dataObj, type, dimension) => {
                     <td className="p-3 text-right text-kt-ink font-medium">Rs.{rev.toLocaleString('en-US')}</td>
                     <td className="p-3 text-right text-kt-sub">{revShare}%</td>
                     <td className="p-3 text-right font-medium" style={{color: gp >= 0 ? 'rgb(var(--kt-green))' : 'rgb(var(--kt-red))'}}>Rs.{gp.toLocaleString('en-US')}</td>
-                    <td className="p-3 text-right text-kt-blue font-medium">{margin}%</td>
+                    <td className="p-3 text-right"><span data-tone={marginTone(rev > 0 ? Number(margin) : null)} className={`inline-block px-2 py-0.5 rounded-md font-medium tabular-nums ${tone(marginTone(rev > 0 ? Number(margin) : null)).chip}`}>{margin}%</span></td>
                   </tr>
                 );
               })}
@@ -494,13 +498,13 @@ const renderSegmentTable = (dataObj, label, dimension) => {
                       onClick={() => openDrill(dimension, row.key)}
                     >
                       <span className="font-medium text-kt-ink underline decoration-dotted decoration-kt-muted underline-offset-2">{row.key || '—'}</span>
-                      <span className="block w-full bg-kt-raised rounded-full h-1 mt-1 max-w-[100px]"><span className="block bg-kt-primary h-1 rounded-full" style={{width:`${barW}%`}}></span></span>
+                      <span className="block w-full bg-kt-raised rounded-full h-1.5 mt-1 max-w-[100px]"><span className="block bg-kt-yellow border border-kt-primary h-1.5 rounded-full" style={{width:`${barW}%`}}></span></span>
                     </button>
                   </td>
                   <td className="p-3 text-center bg-kt-raised/50 font-medium">{row.orders||0}</td>
                   <td className="p-3 text-right font-medium text-kt-ink">Rs.{rev.toLocaleString('en-US')}</td>
                   <td className="p-3 text-right font-medium" style={{color: gp >= 0 ? 'rgb(var(--kt-green))' : 'rgb(var(--kt-red))'}}>Rs.{gp.toLocaleString('en-US')}</td>
-                  <td className="p-3 text-right text-kt-blue font-medium">{margin}%</td>
+                  <td className="p-3 text-right"><span data-tone={marginTone(Number(margin))} className={`inline-block px-2 py-0.5 rounded-md font-medium tabular-nums ${tone(marginTone(Number(margin))).chip}`}>{margin}%</span></td>
                 </tr>
               );
             })}
@@ -611,12 +615,12 @@ return (
                { label: 'Sales Trend', val: reportEngine.trends.revenue, icon: TrendingUp, info: 'revenueTrend' },
                { label: 'Gross Profit Trend', val: reportEngine.trends.profit, icon: TrendingUp, info: 'profitTrend' }
              ].map(({label, val, icon: Icon, info}) => (
-               <div key={label} className="bg-white p-4 rounded-xl border border-kt-line">
-                 <p className="text-xs font-medium text-kt-muted flex items-center gap-1.5">{label} <InfoTip k={info} /></p>
+               <div key={label} data-tone={trendTone(val)} className={`p-4 rounded-xl border ${tone(trendTone(val)).card}`}>
+                 <p className="text-xs font-medium text-kt-sub flex items-center gap-1.5">{label} <InfoTip k={info} /></p>
                  {val !== null ? (
-                   <div className="flex items-center gap-1 mt-1">
-                     <span className={`text-lg font-semibold ${Number(val) >= 0 ? 'text-kt-green' : 'text-kt-red'}`}>{Number(val) >= 0 ? '+' : ''}{val}%</span>
-                     <span className="text-xs text-kt-muted">{vsLabel}</span>
+                   <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                     <span className={`text-lg font-semibold px-2 rounded-md ${tone(trendTone(val)).chip}`}><span aria-hidden="true">{Number(val) >= 0 ? '▲' : '▼'} </span>{Number(val) >= 0 ? '+' : ''}{val}%</span>
+                     <span className="text-xs text-kt-sub">{vsLabel}</span>
                    </div>
                  ) : <p className="text-xs text-kt-muted mt-1">{reportEngine.trends.window ? `Nothing to compare in ${windowLabel(reportEngine.trends.window)}` : 'Choose a period to compare'}</p>}
                </div>
@@ -633,9 +637,9 @@ return (
                <p className="text-xs font-medium text-kt-muted flex items-center justify-center gap-1">Repeat <InfoTip k="repeatClients" /></p>
                <p className="text-xl font-semibold text-kt-green mt-0.5">{reportEngine.repeatCustCount}</p>
              </div>
-             <div className="bg-white p-3 rounded-xl border border-kt-line text-center">
-               <p className="text-xs font-medium text-kt-muted flex items-center justify-center gap-1">Recovery <InfoTip k="recoveryPeriod" align="right" /></p>
-               <p className={`text-xl font-semibold mt-0.5 ${recoveryPeriod === null ? 'text-kt-muted' : Number(recoveryPeriod) >= 80 ? 'text-kt-green' : Number(recoveryPeriod) >= 50 ? 'text-kt-amber' : 'text-kt-red'}`}>{recoveryPeriod === null ? '—' : `${recoveryPeriod}%`}</p>
+             <div data-tone={recoveryTone(recoveryPeriod)} className={`p-3 rounded-xl border text-center ${tone(recoveryTone(recoveryPeriod)).card}`}>
+               <p className="text-xs font-medium text-kt-sub flex items-center justify-center gap-1">Recovery <InfoTip k="recoveryPeriod" align="right" /></p>
+               <p className={`text-xl font-semibold mt-0.5 ${tone(recoveryTone(recoveryPeriod)).text}`}>{recoveryPeriod === null ? '—' : `${recoveryPeriod}%`}</p>
              </div>
            </div>
 
@@ -644,7 +648,7 @@ return (
              <div className="bg-white p-4 rounded-xl border border-kt-line">
                <div className="flex justify-between items-center mb-3">
                  <p className="text-xs font-medium text-kt-sub flex items-center gap-1">Daily Sales <InfoTip k="dailySales" /></p>
-                 <div className="flex gap-2 text-xs font-medium"><span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-kt-muted/40 inline-block"></span>Revenue</span><span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-kt-primary inline-block"></span>Profit</span></div>
+                 <div className="flex gap-2 text-xs font-medium"><span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-kt-primary inline-block"></span>Sales</span><span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-kt-yellow border border-kt-primary inline-block"></span>Gross profit</span></div>
                </div>
                <div className="flex items-end gap-1 h-28 overflow-x-auto">
                  {Object.entries(reportEngine.dailyBreakdown).sort((a,b) => a[0].localeCompare(b[0])).slice(-21).map(([date, data]) => {
@@ -657,8 +661,10 @@ return (
                          {date.slice(5)}<br/>Rev: {data.revenue.toLocaleString('en-US')}<br/>GP: {data.profit.toLocaleString('en-US')}
                        </div>
                        <div className="flex gap-0.5 items-end" style={{height:'96px'}}>
-                         <div className="w-2 bg-kt-muted/40 rounded-t" style={{height:`${rH}%`}}></div>
-                         <div className="w-2 bg-kt-primary rounded-t" style={{height:`${pH}%`}}></div>
+                         <div className="w-2.5 bg-kt-primary rounded-t" style={{height:`${rH}%`}}></div>
+                         {data.profit < 0
+                           ? <div title="Loss on this day" className="w-2.5 bg-kt-icon-red rounded-t" style={{height:`${Math.max(Math.min((-data.profit / maxRevenue) * 100, 100), 6)}%`}}></div>
+                           : <div className="w-2.5 bg-kt-yellow border border-kt-primary rounded-t" style={{height:`${pH}%`}}></div>}
                        </div>
                        <span className="text-[8px] text-kt-muted mt-1">{date.slice(-2)}</span>
                      </div>
@@ -679,7 +685,7 @@ return (
                      <span className="w-5 h-5 bg-kt-raised rounded-full flex items-center justify-center text-xs font-medium text-kt-sub shrink-0">{i+1}</span>
                      <div className="flex-1 min-w-0">
                        <div className="flex justify-between text-xs"><span className="font-semibold text-kt-ink truncate">{name}</span><span className="font-medium text-kt-green ml-2 shrink-0">Rs.{data.profit.toLocaleString('en-US')}</span></div>
-                       <div className="w-full bg-kt-raised rounded-full h-1.5 mt-1"><div className="bg-kt-primary h-1.5 rounded-full" style={{width:`${Math.min((data.profit/maxP)*100,100)}%`}}></div></div>
+                       <div className="w-full bg-kt-raised rounded-full h-2 mt-1"><div className="bg-kt-yellow border border-kt-primary h-2 rounded-full" style={{width:`${Math.min((data.profit/maxP)*100,100)}%`}}></div></div>
                      </div>
                    </div>
                  );
@@ -698,7 +704,7 @@ return (
                      <div key={cat} className="flex items-center gap-3">
                        <div className="flex-1 min-w-0">
                          <div className="flex justify-between text-xs"><span className="font-semibold text-kt-sub truncate">{cat}</span><span className="font-medium text-kt-red ml-2 shrink-0">Rs.{amt.toLocaleString('en-US')}</span></div>
-                         <div className="w-full bg-kt-raised rounded-full h-1.5 mt-1"><div className="bg-kt-red h-1.5 rounded-full" style={{width:`${Math.min((amt/maxAmt)*100,100)}%`}}></div></div>
+                         <div className="w-full bg-kt-raised rounded-full h-2 mt-1"><div className="bg-kt-icon-red h-2 rounded-full" style={{width:`${Math.min((amt/maxAmt)*100,100)}%`}}></div></div>
                        </div>
                      </div>
                    );
@@ -855,7 +861,7 @@ return (
                       <td className="p-3 text-center font-medium">{data.orders}</td>
                       <td className="p-3 text-right font-medium text-kt-ink">Rs.{data.revenue.toLocaleString('en-US')}</td>
                       <td className="p-3 text-right font-medium text-kt-green">Rs.{data.profit.toLocaleString('en-US')}</td>
-                      <td className="p-3 text-right font-medium text-kt-blue">{margin}%</td>
+                      <td className="p-3 text-right"><span data-tone={marginTone(Number(margin))} className={`inline-block px-2 py-0.5 rounded-md font-medium tabular-nums ${tone(marginTone(Number(margin))).chip}`}>{margin}%</span></td>
                     </tr>
                   );
                 })}
@@ -1357,7 +1363,7 @@ return (
           { info: 'grossMargin', label: 'Gross Margin', value: `${gpMargin}%`, sub: `Rs.${kpis.grossMargin.toLocaleString('en-US')} on Rs.${kpis.productRevenue.toLocaleString('en-US')} sales`, color: Number(gpMargin) >= 25 ? 'emerald' : Number(gpMargin) >= 15 ? 'amber' : 'rose', icon: TrendingUp },
           { info: 'netMargin', label: 'Net Margin', value: `${netMargin}%`, sub: `Rs.${kpis.netProfit.toLocaleString('en-US')} after all expenses`, color: Number(netMargin) >= 15 ? 'emerald' : Number(netMargin) >= 5 ? 'amber' : 'rose', icon: DollarSign },
           { info: 'recoveryPeriod', label: 'Recovery', value: recoveryPeriod === null ? '—' : `${recoveryPeriod}%`, sub: `Rs.${collections.totals.received.toLocaleString('en-US')} in · ${reportEngine.collectionRate}% of all billing recovered`, color: recoveryPeriod === null ? 'slate' : Number(recoveryPeriod) >= 80 ? 'emerald' : Number(recoveryPeriod) >= 50 ? 'amber' : 'rose', icon: Wallet },
-          { info: 'activeClients', label: 'Active Clients', value: `${reportEngine.newCustCount + reportEngine.repeatCustCount}`, sub: `${reportEngine.newCustCount} new · ${reportEngine.repeatCustCount} repeat`, color: 'indigo', icon: Users },
+          { info: 'activeClients', label: 'Clients', value: `${reportEngine.newCustCount + reportEngine.repeatCustCount}`, sub: `${reportEngine.newCustCount} new · ${reportEngine.repeatCustCount} repeat`, color: 'indigo', icon: Users },
           { info: 'billedPeriod', label: 'Billed', value: `Rs.${reportEngine.totalBilledAmt.toLocaleString('en-US')}`, sub: 'invoice totals, delivery included', color: 'slate', icon: Receipt },
           ...(reportEngine.avgDaysToPay !== null ? [{ info: 'daysToPay', label: 'Days to Pay', value: `${reportEngine.avgDaysToPay}d`, sub: `${reportEngine.paymentSpeed.settledCount} bills cleared${reportEngine.paymentSpeed.openCount ? ` · ${reportEngine.paymentSpeed.openCount} open, oldest ${reportEngine.paymentSpeed.oldestOpenDays}d` : ''}`, color: reportEngine.avgDaysToPay <= 7 ? 'emerald' : reportEngine.avgDaysToPay <= 21 ? 'amber' : 'rose', icon: Clock }] : []),
         ];
@@ -1367,12 +1373,13 @@ return (
               {/* Written out in full: Tailwind cannot see a class assembled as `bg-${color}-50`, so the
                   tiles' colours depended on whether the same class happened to appear elsewhere. */}
               {insightCards.map(card => {
-                const tone = { emerald: 'bg-kt-green/10 border-kt-green/30 text-kt-green', amber: 'bg-kt-amber/10 border-kt-amber/30 text-kt-amber',
-                  rose: 'bg-kt-red/10 border-kt-red/30 text-kt-red', indigo: 'bg-kt-blue/10 border-kt-blue/30 text-kt-blue' }[card.color] || 'bg-white border-kt-line text-kt-sub';
+                const kind = { emerald: 'good', amber: 'watch', rose: 'bad', indigo: 'info' }[card.color] || 'neutral';
+                const t = tone(kind);
                 return (
-                <div key={card.label} className={`p-4 rounded-xl border ${tone}`}>
+                <div key={card.label} data-tone={kind} className={`relative overflow-hidden p-4 pl-5 rounded-xl border ${t.card} ${t.text}`}>
+                  <span aria-hidden="true" className={`absolute left-0 inset-y-0 w-1.5 ${t.bar}`} />
                   <p className="text-xs font-medium mb-1 flex items-center gap-1"><card.icon size={12}/> {card.label} <InfoTip k={card.info} /></p>
-                  <p className="font-display text-2xl text-kt-ink">{card.value}</p>
+                  <p className={`text-2xl font-semibold tabular-nums ${kind === 'neutral' || kind === 'info' ? 'text-kt-ink' : t.text}`}>{card.value}</p>
                   <p className="text-xs text-kt-ink/80 mt-1">{card.sub}</p>
                 </div>
                 );
@@ -1431,7 +1438,7 @@ return (
             <div className="bg-white p-4 rounded-xl border border-kt-line">
               <div className="flex justify-between items-center mb-3">
                 <p className="text-xs font-medium text-kt-sub">Monthly Revenue & Profit</p>
-                <div className="flex gap-2 text-xs font-medium"><span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-kt-muted/40 inline-block"></span>Revenue</span><span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-kt-primary inline-block"></span>Profit</span></div>
+                <div className="flex gap-2 text-xs font-medium"><span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-kt-primary inline-block"></span>Sales</span><span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-kt-yellow border border-kt-primary inline-block"></span>Gross profit</span></div>
               </div>
               <div className="flex items-end gap-1.5 overflow-x-auto pb-2" style={{height:'130px'}}>
                 {months.map(m => {
@@ -1445,8 +1452,8 @@ return (
                         {monthNames[parseInt(mo)-1]} {yr.slice(2)}<br/>Rev: Rs.{d.revenue.toLocaleString('en-US')}<br/>GP: Rs.{d.profit.toLocaleString('en-US')}<br/>Orders: {d.orders}
                       </div>
                       <div className="flex gap-0.5 items-end" style={{height:'100px'}}>
-                        <div className="w-3 bg-kt-muted/40 rounded-t-sm" style={{height:`${rH}%`}}></div>
-                        <div className="w-3 bg-kt-primary rounded-t-sm" style={{height:`${pH}%`}}></div>
+                        <div className="w-3 bg-kt-primary rounded-t-sm" style={{height:`${rH}%`}}></div>
+                        <div className="w-3 bg-kt-yellow border border-kt-primary rounded-t-sm" style={{height:`${pH}%`}}></div>
                       </div>
                       <span className="text-[8px] text-kt-muted mt-1 font-semibold">{monthNames[parseInt(mo)-1].slice(0,3)}</span>
                       <span className="text-[7px] text-kt-muted">{yr.slice(2)}</span>
@@ -1477,7 +1484,7 @@ return (
                           <td className="p-3 text-right">Rs.{d.revenue.toLocaleString('en-US')}</td>
                           <td className="p-3 text-right text-kt-red">Rs.{d.cost.toLocaleString('en-US')}</td>
                           <td className="p-3 text-right font-medium text-kt-green">Rs.{d.profit.toLocaleString('en-US')}</td>
-                          <td className="p-3 text-right text-kt-blue">{margin}%</td>
+                          <td className="p-3 text-right"><span data-tone={marginTone(Number(margin))} className={`inline-block px-2 py-0.5 rounded-md font-medium tabular-nums ${tone(marginTone(Number(margin))).chip}`}>{margin}%</span></td>
                         </tr>
                       );
                     })}
