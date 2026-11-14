@@ -329,3 +329,12 @@ describe('AnalyticsView — two figures that were computed and never shown', () 
       .toContain('this view ignores the');
   });
 });
+
+describe('AnalyticsView — Needs attention', () => {
+  it('Overview opens with the questions the owner asked, each explained, with no undefined', () => {
+    const html = render({ analyticsView: 'Overview' });
+    expect(html).toContain('Needs attention');
+    ['debtLate', 'debtGrowing', 'debtQuiet', 'lapsed', 'belowCost', 'thinMargin'].forEach(k => expect(html).toContain(`data-info="${k}"`));
+    expect(html).not.toMatch(/undefined|NaN/);
+  });
+});

@@ -1,7 +1,9 @@
 import { useState, useEffect, useMemo, useContext } from 'react';
 import { InfoTip } from '../ui/InfoTip';
 import { METRIC_INFO } from '../../services/analytics/metricInfo';
-import { windowLabel } from '../../services/analytics/periods';
+import { windowLabel, currentWindow, comparisonWindow } from '../../services/analytics/periods';
+import { debtWatch, salesByKey, movers, marginAlerts, lapsedCustomers } from '../../services/analytics/attention';
+import { NeedsAttention } from './analytics/NeedsAttention';
 import { Search, Calendar, ChevronDown, Download, Printer, Share2, Users, Package, Zap, PhoneCall,
          AlertCircle, CheckCircle2, X,
          Award, Clock, DollarSign, Filter, Receipt, TrendingUp, Wallet } from 'lucide-react';
@@ -32,7 +34,7 @@ import { previousPeriod } from '../../services/analytics/periods';
 import { DrillDownModal } from '../modals/DrillDownModal';
 
 export const AnalyticsView = () => {
-const { getPaymentStatus, isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, cities, areas, customerTypes, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, analyticsView, setAnalyticsView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig, showConfirm } = useContext(AppContext);
+const { getPaymentStatus, isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, cities, areas, customerTypes, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, analyticsView, setAnalyticsView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig, showConfirm, appSettings } = useContext(AppContext);
 const [view, setView] = useState(analyticsView || 'Overview');
 useEffect(() => { if (analyticsView) { setView(analyticsView); setAnalyticsView(''); } }, [analyticsView]);
 const [dateFilter, setDateFilter] = useState('This Month');
@@ -78,6 +80,26 @@ const collections = useMemo(() => buildCollections({
 // question and is labelled so.
 const recoveryPeriod = reportEngine.totalBilledAmt > 0 ? (collections.totals.received / reportEngine.totalBilledAmt * 100).toFixed(1) : null;
 const vsLabel = reportEngine.trends.window ? `vs ${windowLabel(reportEngine.trends.window)}` : '';
+
+// Needs attention: who owes and is late, who stopped buying, what sold below cost, what is
+// rising or falling. services/analytics/attention.js, reconciled in attention.test.js.
+const attention = useMemo(() => {
+  const today = getLocalDateStr();
+  const cur = currentWindow(dateFilter, customStart, customEnd);
+  const prev = comparisonWindow(dateFilter, customStart, customEnd);
+  const filt = { filterCompanies, filterCustomers, filterSalespersons };
+  const both = (dimension) => movers({
+    current: salesByKey({ invoices, products, window: cur, dimension, ...filt }),
+    previous: salesByKey({ invoices, products, window: prev, dimension, ...filt }),
+  });
+  return {
+    debts: debtWatch({ customers, invoices, payments, asOf: today, periodStart: cur?.start || null, onlyCustomers: filterCustomers }),
+    lapsed: lapsedCustomers({ customers, invoices, asOf: today, onlyCustomers: filterCustomers }),
+    margins: marginAlerts({ invoices, products, customers, window: cur, ...filt }),
+    products: cur && prev ? both('product') : null,
+    brands: cur && prev ? both('company') : null,
+  };
+}, [invoices, payments, products, customers, dateFilter, customStart, customEnd, ...[...filterCompanies], ...[...filterCustomers], ...[...filterSalespersons]]);
 
 // Item Sales, lifted out of the view's own IIFE so an export can reach it. It could not
 // before, so `getSortedExportData` returned null for this tab while the CSV and WhatsApp
@@ -582,6 +604,7 @@ return (
     <div className="flex-1 overflow-y-auto pr-1 pb-24 space-y-3">
       {view === 'Overview' && (
         <div className="space-y-3">
+           <NeedsAttention data={attention} vsLabel={vsLabel} businessName={appSettings?.showBusinessNameOnDocs === false ? '' : (appSettings?.businessName || '')} />
            {/* Trend cards */}
            <div className="grid grid-cols-2 gap-3">
              {[

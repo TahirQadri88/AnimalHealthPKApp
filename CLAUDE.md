@@ -546,6 +546,14 @@ from whichever invoice was seen first.
   screen uses that has no entry. Card labels are kept short enough not to wrap at 360px; the ⓘ carries
   the full meaning. Its 44px tap area overhangs the label on purpose (`data-hitarea`, skipped by layout.mjs).
 
+**Needs attention** (top of Overview, `components/admin/analytics/NeedsAttention.jsx`) answers the owner's
+questions from `services/analytics/attention.js`: late over 30 days and debt growing (from the aging
+report and the ledger), owing and not paying, stopped buying (3+ bills, silent for more than twice
+their usual gap and 30+ days), sold below cost / thin margin under 5%, and rising / falling products
+and brands against the like-for-like window. `attention.test.js` reconciles `salesByKey` with the
+engine's breakdown tables under brand and client filters, and the late list with the aging report;
+dropping the returns from `salesByKey` fails three of its tests.
+
 ## An export that a view cannot reach is a crash waiting for a press
 
 Item Sales computed its rows inside the view's own IIFE. `getSortedExportData` returned
