@@ -554,6 +554,13 @@ and brands against the like-for-like window. `attention.test.js` reconciles `sal
 engine's breakdown tables under brand and client filters, and the late list with the aging report;
 dropping the returns from `salesByKey` fails three of its tests.
 
+**Status colour is a fill, not thin text** (`components/admin/analytics/tone.js`): good / watch / bad / info /
+neutral, each a light tint with the DARK text token on it (`chip`, `card`), and a solid marker (`bar`) in the
+bright `--kt-icon-*` tones, now mapped in Tailwind as `kt-icon-red` etc. Bright tones never carry words: a planted
+`text-kt-icon-red` chip measured 3.82:1 and contrast.mjs failed it. Bands live in one place (`marginTone`,
+`recoveryTone`, `trendTone`, `daysTone`). Restart the preview server after touching `tailwind.config.js`: the
+running one does not mint the new colour classes, and the screen silently loses every tint.
+
 ## An export that a view cannot reach is a crash waiting for a press
 
 Item Sales computed its rows inside the view's own IIFE. `getSortedExportData` returned
