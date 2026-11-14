@@ -61,3 +61,12 @@ describe('AdminTab', () => {
     expect(render()).not.toMatch(/undefined|NaN/);
   });
 });
+
+describe('AdminTab — grouped navigation', () => {
+  it('lists the screens under Insights, Money and Setup, with the current one marked', () => {
+    const html = render({ adminView: 'receivables' });
+    ['Insights', 'Money', 'Setup'].forEach(g => expect(html).toContain(`>${g}</p>`));
+    expect(html).toMatch(/data-admintab="receivables"[^>]*aria-current="page"/);
+    expect(html).toContain('data-admin-switcher="1"');
+  });
+});

@@ -36,9 +36,22 @@ import { buildExpenses } from '../../services/analytics/expenses';
 import { previousPeriod } from '../../services/analytics/periods';
 import { DrillDownModal } from '../modals/DrillDownModal';
 
+// Sections and the views inside them, with the short names shown on the sub-switch.
+export const ANALYTICS_SECTIONS = [
+  ['Overview', [['Overview', 'Overview']]],
+  ['Sales', [['By Product', 'Product'], ['By Company', 'Brand'], ['By Customer', 'Customer'], ['By City', 'City'], ['By Area', 'Area'], ['By Type', 'Type'], ['By Salesperson', 'Staff'], ['Item Sales', 'Item Sales']]],
+  ['Money', [['Receivables', 'Receivables'], ['Collections', 'Collections'], ['Returns', 'Returns'], ['Expenses', 'Expenses']]],
+  ['Trends', [['Monthly Trend', 'Monthly']]],
+];
+export const sectionOf = (v) => (ANALYTICS_SECTIONS.find(([, items]) => items.some(([k]) => k === v)) || ANALYTICS_SECTIONS[0])[0];
+
 export const AnalyticsView = () => {
 const { getPaymentStatus, isAdmin, currentUser, companies, products, customers, invoices, expenses, expenseCategories, payments, appUsers, cities, areas, customerTypes, showToast, saveToFirebase, deleteFromFirebase, checkDuplicate, getCompanyName, getCustomerBalance, getCustomerLedger, generateReceiptData, billingView, setBillingView, currentInvoice, setCurrentInvoice, activeTab, setActiveTab, adminView, setAdminView, analyticsView, setAnalyticsView, editingProduct, setEditingProduct, showProductModal, setShowProductModal, editingCustomer, setEditingCustomer, showCustomerModal, setShowCustomerModal, showPaymentModal, setShowPaymentModal, selectedCustomerForPayment, setSelectedCustomerForPayment, showLedgerModal, setShowLedgerModal, selectedLedgerId, setSelectedLedgerId, showExpenseCatModal, setShowExpenseCatModal, showUserModal, setShowUserModal, editingUser, setEditingUser, setPrintConfig, printConfig, showConfirm, appSettings } = useContext(AppContext);
-const [view, setView] = useState(analyticsView || 'Overview');
+// 'Insights' lives inside Overview now; the old name still opens it (deep links, saved state).
+const [view, setViewRaw] = useState((analyticsView === 'Insights' ? 'Overview' : analyticsView) || 'Overview');
+const setView = (v) => setViewRaw(v === 'Insights' ? 'Overview' : v);
+// Phones show the period and a Filters button; Brand, Client and Staff open below it.
+const [showFilters, setShowFilters] = useState(false);
 useEffect(() => { if (analyticsView) { setView(analyticsView); setAnalyticsView(''); } }, [analyticsView]);
 const [dateFilter, setDateFilter] = useState('This Month');
 const [customStart, setCustomStart] = useState('');
@@ -396,7 +409,31 @@ const renderTable = (dataObj, type, dimension) => {
            {type !== 'Customer' && <option value="qty">Sort: Highest Qty</option>}
          </FilterSelect>
        </div>
-       <div className="overflow-x-auto">
+       {/* Phones: one card per row, no sideways scrolling. Same figures as the table, same drill-down. */}
+       <ul data-phone-rows="1" className="sm:hidden divide-y divide-kt-line">
+         {arrWithABC.map((row, i) => {
+           const rev = row.revenue || row.productRevenue || 0;
+           const gp = row.profit || 0;
+           const margin = rev > 0 ? ((gp / rev) * 100).toFixed(1) : 0;
+           return (
+             <li key={i}>
+               <button type="button" onClick={() => openDrill(dimension, row.key, row.label || row.key)}
+                 className="w-full min-h-11 px-3 py-2.5 text-left flex items-start gap-3 hover:bg-kt-raised">
+                 <span className={`mt-0.5 text-xs font-semibold px-1 py-0.5 rounded border shrink-0 ${tierColors[row.abcTier]}`}>{row.abcTier}</span>
+                 <span className="flex-1 min-w-0">
+                   <span className="block text-sm font-medium text-kt-ink break-words">{row.label || row.key}</span>
+                   <span className="block text-xs text-kt-sub mt-0.5 tabular-nums">{type === 'Customer' ? `${row.orders || 0} orders` : `${(row.qty || 0).toLocaleString('en-US')} sold`} · Rs.{rev.toLocaleString('en-US')} · GP <span className={gp < 0 ? 'text-kt-red' : 'text-kt-green'}>Rs.{gp.toLocaleString('en-US')}</span></span>
+                 </span>
+                 <span className={`shrink-0 text-xs font-medium px-2 py-0.5 rounded-md tabular-nums ${tone(marginTone(rev > 0 ? Number(margin) : null)).chip}`}>{margin}%</span>
+               </button>
+             </li>
+           );
+         })}
+         <li className="px-3 py-2.5 bg-kt-raised flex justify-between text-xs font-semibold text-kt-ink tabular-nums">
+           <span>Totals · {arrWithABC.length}</span><span>Rs.{totalRev.toLocaleString('en-US')} · GP Rs.{totalGP.toLocaleString('en-US')}</span>
+         </li>
+       </ul>
+       <div className="overflow-x-auto hidden sm:block">
          <table className="w-full min-w-[34rem] sm:min-w-0 text-left text-xs whitespace-nowrap">
             <thead className="bg-kt-raised text-kt-sub font-medium border-b border-kt-line">
               <tr>
@@ -478,7 +515,25 @@ const renderSegmentTable = (dataObj, label, dimension) => {
           <option value="marginWorst">Sort: Worst Margin</option>
         </FilterSelect>
       </div>
-      <div className="overflow-x-auto">
+      <ul data-phone-rows="1" className="sm:hidden divide-y divide-kt-line">
+        {arr.map((row, i) => {
+          const rev = row.revenue || 0, gp = row.profit || 0;
+          const margin = rev > 0 ? ((gp / rev) * 100).toFixed(1) : 0;
+          return (
+            <li key={i}>
+              <button type="button" onClick={() => openDrill(dimension, row.key)} className="w-full min-h-11 px-3 py-2.5 text-left flex items-start gap-3 hover:bg-kt-raised">
+                <span className="flex-1 min-w-0">
+                  <span className="block text-sm font-medium text-kt-ink break-words">{row.key || '—'}</span>
+                  <span className="block text-xs text-kt-sub mt-0.5 tabular-nums">{row.orders || 0} orders · Rs.{rev.toLocaleString('en-US')} · GP <span className={gp < 0 ? 'text-kt-red' : 'text-kt-green'}>Rs.{gp.toLocaleString('en-US')}</span></span>
+                </span>
+                <span className={`shrink-0 text-xs font-medium px-2 py-0.5 rounded-md tabular-nums ${tone(marginTone(Number(margin))).chip}`}>{margin}%</span>
+              </button>
+            </li>
+          );
+        })}
+        {arr.length === 0 && <li className="p-6 text-center text-sm text-kt-muted">No data. Add city/area/type to customers first.</li>}
+      </ul>
+      <div className="overflow-x-auto hidden sm:block">
         <table className="w-full min-w-[34rem] sm:min-w-0 text-left text-xs whitespace-nowrap">
           <thead className="bg-kt-raised text-kt-sub font-medium border-b border-kt-line">
             <tr><th className="p-3">{label}</th><th className="p-3 text-center">Orders</th><th className="p-3 text-right">Revenue</th><th className="p-3 text-right text-kt-green">GP</th><th className="p-3 text-right text-kt-blue whitespace-nowrap">Margin% <InfoTip k="margin" align="right" /></th></tr>
@@ -540,6 +595,78 @@ const filterLabel = (() => {
   return dateFilter;
 })();
 
+// Insights (tiles and callouts), shown inside Overview since the two used to repeat each other.
+// `withPnl` kept for the standalone use; Overview already has the P&L card.
+const renderInsights = (withPnl) => {
+        const kpis = reportEngine.kpis;
+        const gpMargin = kpis.productRevenue > 0 ? ((kpis.grossMargin / kpis.productRevenue) * 100).toFixed(1) : '0.0';
+        const netMargin = kpis.productRevenue > 0 ? ((kpis.netProfit / kpis.productRevenue) * 100).toFixed(1) : '0.0';
+        const topProduct = Object.entries(reportEngine.byProduct).sort((a,b)=>b[1].profit-a[1].profit)[0];
+        const topCustomer = Object.values(reportEngine.byCustomer).sort((a,b)=>b.productRevenue-a.productRevenue)[0];
+        const insightCards = [
+          { info: 'grossMargin', label: 'Gross Margin', value: `${gpMargin}%`, sub: `Rs.${kpis.grossMargin.toLocaleString('en-US')} on Rs.${kpis.productRevenue.toLocaleString('en-US')} sales`, color: Number(gpMargin) >= 25 ? 'emerald' : Number(gpMargin) >= 15 ? 'amber' : 'rose', icon: TrendingUp },
+          { info: 'netMargin', label: 'Net Margin', value: `${netMargin}%`, sub: `Rs.${kpis.netProfit.toLocaleString('en-US')} after all expenses`, color: Number(netMargin) >= 15 ? 'emerald' : Number(netMargin) >= 5 ? 'amber' : 'rose', icon: DollarSign },
+          { info: 'recoveryPeriod', label: 'Recovery', value: recoveryPeriod === null ? '—' : `${recoveryPeriod}%`, sub: `Rs.${collections.totals.received.toLocaleString('en-US')} in · ${reportEngine.collectionRate}% of all billing recovered`, color: recoveryPeriod === null ? 'slate' : Number(recoveryPeriod) >= 80 ? 'emerald' : Number(recoveryPeriod) >= 50 ? 'amber' : 'rose', icon: Wallet },
+          { info: 'activeClients', label: 'Clients', value: `${reportEngine.newCustCount + reportEngine.repeatCustCount}`, sub: `${reportEngine.newCustCount} new · ${reportEngine.repeatCustCount} repeat`, color: 'indigo', icon: Users },
+          { info: 'billedPeriod', label: 'Billed', value: `Rs.${reportEngine.totalBilledAmt.toLocaleString('en-US')}`, sub: 'invoice totals, delivery included', color: 'slate', icon: Receipt },
+          ...(reportEngine.avgDaysToPay !== null ? [{ info: 'daysToPay', label: 'Days to Pay', value: `${reportEngine.avgDaysToPay}d`, sub: `${reportEngine.paymentSpeed.settledCount} bills cleared${reportEngine.paymentSpeed.openCount ? ` · ${reportEngine.paymentSpeed.openCount} open, oldest ${reportEngine.paymentSpeed.oldestOpenDays}d` : ''}`, color: reportEngine.avgDaysToPay <= 7 ? 'emerald' : reportEngine.avgDaysToPay <= 21 ? 'amber' : 'rose', icon: Clock }] : []),
+        ];
+        return (
+          <div className="space-y-4 mt-2">
+            <div className="grid grid-cols-2 gap-3">
+              {/* Written out in full: Tailwind cannot see a class assembled as `bg-${color}-50`, so the
+                  tiles' colours depended on whether the same class happened to appear elsewhere. */}
+              {insightCards.map(card => {
+                const kind = { emerald: 'good', amber: 'watch', rose: 'bad', indigo: 'info' }[card.color] || 'neutral';
+                const t = tone(kind);
+                return (
+                <div key={card.label} data-tone={kind} className={`relative overflow-hidden p-4 pl-5 rounded-xl border ${t.card} ${t.text}`}>
+                  <span aria-hidden="true" className={`absolute left-0 inset-y-0 w-1.5 ${t.bar}`} />
+                  <p className="text-xs font-medium mb-1 flex items-center gap-1"><card.icon size={12}/> {card.label} <InfoTip k={card.info} /></p>
+                  <p className={`text-2xl font-semibold tabular-nums ${kind === 'neutral' || kind === 'info' ? 'text-kt-ink' : t.text}`}>{card.value}</p>
+                  <p className="text-xs text-kt-ink/80 mt-1">{card.sub}</p>
+                </div>
+                );
+              })}
+            </div>
+            {/* Key callouts */}
+            <div className="bg-white p-4 rounded-xl border border-kt-line space-y-3">
+              <p className="text-xs font-medium text-kt-sub flex items-center gap-1.5"><Zap size={12} className="text-kt-amber"/> Smart Callouts</p>
+              {topProduct && <div className="flex items-start gap-2 text-sm"><span className="text-kt-green font-semibold shrink-0">★</span><p className="text-kt-ink"><span className="font-medium">{topProduct[0]}</span> is your most profitable product — Rs.{topProduct[1].profit.toLocaleString('en-US')} GP ({topProduct[1].qty} units sold)</p></div>}
+              {topCustomer && <div className="flex items-start gap-2 text-sm"><span className="text-kt-blue font-semibold shrink-0">★</span><p className="text-kt-ink"><button className="font-medium hover:text-kt-blue transition-colors" onClick={() => { if (topCustomer.id !== undefined) { setSelectedLedgerId(topCustomer.id); setShowLedgerModal(true); } }}>{topCustomer.label}</button> is your top customer — Rs.{(topCustomer.productRevenue||0).toLocaleString('en-US')} revenue in {topCustomer.orders} orders</p></div>}
+              {reportEngine.agingBuckets.days90plus.length > 0 && <div className="flex items-start gap-2 text-sm"><span className="text-kt-red font-semibold shrink-0">!</span><p className="text-kt-ink"><span className="font-medium text-kt-red">{reportEngine.agingBuckets.days90plus.length} customer{reportEngine.agingBuckets.days90plus.length>1?'s':''}</span> overdue 90+ days — Rs.{reportEngine.agingBuckets.days90plus.reduce((s,r)=>s+r.amount,0).toLocaleString('en-US')} at risk</p></div>}
+              {reportEngine.trends.revenue !== null && <div className="flex items-start gap-2 text-sm"><span className={`font-semibold shrink-0 ${Number(reportEngine.trends.revenue)>=0?'text-kt-green':'text-kt-red'}`}>{Number(reportEngine.trends.revenue)>=0?'↑':'↓'}</span><p className="text-kt-ink">Revenue is <span className="font-medium">{Number(reportEngine.trends.revenue)>=0?'up':'down'} {Math.abs(reportEngine.trends.revenue)}%</span> vs previous period</p></div>}
+              {kpis.deliveryBilled > kpis.transportExpense && <div className="flex items-start gap-2 text-sm"><span className="text-kt-green font-semibold shrink-0">+</span><p className="text-kt-ink">Delivery net contribution: <span className="font-medium text-kt-green">Rs.{(kpis.deliveryBilled - kpis.transportExpense).toLocaleString('en-US')}</span></p></div>}
+            </div>
+            {withPnl && (<>
+            {/* P&L summary */}
+            <div className="bg-kt-band text-white p-5 rounded-2xl shadow-[0_8px_24px_rgba(0,0,0,0.08)]">
+              <p className="text-xs font-medium text-white/70 mb-4">P&L Summary · {filterLabel}</p>
+              <div className="space-y-0">
+                {[
+                  ['Gross Sales', `Rs.${(kpis.productRevenue + kpis.creditNotesTotal).toLocaleString('en-US')}`, 'text-white', false],
+                  ...(kpis.creditNotesTotal > 0 ? [['Sales Returns', `- Rs.${kpis.creditNotesTotal.toLocaleString('en-US')}`, 'text-white/80 text-xs', false]] : []),
+                  ['COGS', `- Rs.${kpis.totalCOGS.toLocaleString('en-US')}`, 'text-white/80', false],
+                  ['Gross Profit', `Rs.${kpis.grossMargin.toLocaleString('en-US')}`, 'text-white', gpMargin + '%'],
+                  ['Delivery Net', `+ Rs.${(kpis.deliveryBilled - kpis.transportExpense).toLocaleString('en-US')}`, 'text-white/70', false],
+                  ['Operational Expenses', `- Rs.${kpis.totalExpenses.toLocaleString('en-US')}`, 'text-white/80', false],
+                  ['Net Profit', `Rs.${kpis.netProfit.toLocaleString('en-US')}`, kpis.netProfit >= 0 ? 'text-kt-yellow text-base font-semibold' : 'text-white/80 text-base font-semibold', netMargin + '%'],
+                ].map(([label, val, cls, pct]) => (
+                  <div key={label} className="flex justify-between items-center text-sm py-1.5 border-b border-white/15 last:border-0">
+                    <span className="text-white/70 inline-flex items-center gap-1">{label} <InfoTip tone="light" k={{ 'Gross Sales': 'grossSales', 'Sales Returns': 'salesReturns', 'COGS': 'cogs', 'Gross Profit': 'grossProfit', 'Delivery Net': 'deliveryNet', 'Operational Expenses': 'opExpenses', 'Net Profit': 'netProfit' }[label]} /></span>
+                    <div className="text-right"><span className={`font-medium ${cls}`}>{val}</span>{pct && <span className="text-xs text-white/80 ml-1.5">{pct}</span>}</div>
+                  </div>
+                ))}
+                <div className="h-px bg-white/10 my-2"></div>
+                <div className="flex justify-between items-center text-xs py-1"><span className="text-white/80">Outstanding Receivables</span><span className="font-medium text-white/80">Rs.{kpis.totalReceivables.toLocaleString('en-US')}</span></div>
+                <div className="flex justify-between items-center text-xs py-0.5"><span className="text-white/80 inline-flex items-center gap-1">Recovered of all billing <InfoTip k="recoveryAllTime" tone="light" /></span><span className={`font-medium ${Number(reportEngine.collectionRate) >= 80 ? 'text-kt-yellow' : Number(reportEngine.collectionRate) >= 50 ? 'text-white/80' : 'text-white/80'}`}>{reportEngine.collectionRate}%</span></div>
+              </div>
+            </div>
+            </>)}
+          </div>
+        );
+      };
+
 return (
   <div className="h-full flex flex-col p-4">
     {/* Filter Bar */}
@@ -549,12 +676,20 @@ return (
        <FilterSelect compact className="sm:shrink-0" value={dateFilter} onChange={e => setDateFilter(e.target.value)} label="Period" icon={Calendar}>
          <option>Today</option><option>This Week</option><option>This Month</option><option>This Year</option><option>All Time</option><option>Custom</option>
        </FilterSelect>
+       {(() => { const n = [filterCompanies, filterCustomers, filterSalespersons].filter(f => f.size > 0).length; return (
+         <button type="button" aria-expanded={showFilters} onClick={() => setShowFilters(o => !o)} data-filters-toggle="1"
+           className={`sm:hidden h-11 px-3 rounded-lg border font-medium text-base flex items-center justify-between gap-2 ${n ? 'bg-kt-primary text-white border-kt-primary' : 'bg-white text-kt-ink border-kt-line'}`}>
+           <span className="flex items-center gap-2"><Filter size={14} strokeWidth={1.5} aria-hidden="true" />Filters{n ? ` (${n})` : ''}</span><ChevronDown size={16} strokeWidth={1.5} aria-hidden="true" className={showFilters ? 'rotate-180' : ''} />
+         </button>
+       ); })()}
+       <div className={`${showFilters ? 'col-span-2 grid grid-cols-1 gap-2' : 'hidden'} sm:contents`}>
        <MultiPicker label="Brand" Icon={Filter} items={companies} selected={filterCompanies}
          onToggle={id=>toggleFilter(setFilterCompanies,id)} onClear={()=>clearFilter(setFilterCompanies)} />
        <MultiPicker label="Client" Icon={Users} items={customers} selected={filterCustomers}
          onToggle={id=>toggleFilter(setFilterCustomers,id)} onClear={()=>clearFilter(setFilterCustomers)} />
        <MultiPicker label="Staff" Icon={Award} items={appUsers} selected={filterSalespersons}
          onToggle={id=>toggleFilter(setFilterSalespersons,id)} onClear={()=>clearFilter(setFilterSalespersons)} />
+       </div>
     </div>
 
     {/* Custom date inputs */}
@@ -566,14 +701,33 @@ return (
     )}
 
     {/* View Tabs */}
-    <ScrollableTabBar className="pb-2 shrink-0">
-       {['Overview','Insights','Monthly Trend','By Product','By Company','By Customer','By City','By Area','By Type','By Salesperson','Receivables','Collections','Returns','Expenses','Item Sales'].map(v => (
-         <button key={v} data-analytictab={v} tabIndex={view===v?0:-1}
-           onClick={() => setView(v)}
-           onKeyDown={makeArrowNav(['Overview','Insights','Monthly Trend','By Product','By Company','By Customer','By City','By Area','By Type','By Salesperson','Receivables','Collections','Returns','Expenses','Item Sales'],view,setView,'data-analytictab')}
-           className={`h-11 sm:h-8 px-3 rounded-xl font-medium text-sm sm:text-xs whitespace-nowrap transition-colors ${view === v ? 'bg-kt-band text-white' : 'bg-white text-kt-sub border border-kt-line'}`}>{v}</button>
-       ))}
-    </ScrollableTabBar>
+    {/* Four sections instead of fifteen pills. The view names underneath are unchanged, so
+        exports, drill-downs and links into a view work as before. */}
+    <div role="tablist" aria-label="Analytics sections" className="grid grid-cols-4 gap-1 p-1 bg-white border border-kt-line rounded-xl mb-2 shrink-0">
+      {ANALYTICS_SECTIONS.map(([section, items]) => {
+        const active = sectionOf(view) === section;
+        return (
+          <button key={section} type="button" role="tab" aria-selected={active} data-analytics-section={section}
+            onClick={() => { if (!active) setView(items[0][0]); }}
+            className={`h-11 rounded-lg text-sm font-medium transition-colors ${active ? 'bg-kt-band text-white' : 'text-kt-sub hover:bg-kt-raised hover:text-kt-ink'}`}>{section}</button>
+        );
+      })}
+    </div>
+    {(() => {
+      const items = ANALYTICS_SECTIONS.find(([s]) => s === sectionOf(view))[1];
+      if (items.length < 2) return null;
+      const keys = items.map(([v]) => v);
+      return (
+        <ScrollableTabBar className="pb-2 shrink-0">
+          {items.map(([v, label]) => (
+            <button key={v} data-analytictab={v} tabIndex={view===v?0:-1}
+              onClick={() => setView(v)}
+              onKeyDown={makeArrowNav(keys, view, setView, 'data-analytictab')}
+              className={`h-11 sm:h-9 px-3 rounded-xl font-medium text-sm whitespace-nowrap transition-colors ${view === v ? 'bg-kt-yellow text-black' : 'bg-white text-kt-sub border border-kt-line'}`}>{label}</button>
+          ))}
+        </ScrollableTabBar>
+      );
+    })()}
 
     {/* Active filter chips */}
     {(filterCompanies.size > 0 || filterCustomers.size > 0 || filterSalespersons.size > 0) && (
@@ -642,6 +796,8 @@ return (
                <p className={`text-xl font-semibold mt-0.5 ${tone(recoveryTone(recoveryPeriod)).text}`}>{recoveryPeriod === null ? '—' : `${recoveryPeriod}%`}</p>
              </div>
            </div>
+
+           {renderInsights(false)}
 
            {/* Daily chart - revenue + profit bars */}
            {Object.keys(reportEngine.dailyBreakdown).length > 0 && (
@@ -1353,74 +1509,6 @@ return (
       })()}
 
       {/* ── Insights View ── */}
-      {view === 'Insights' && (() => {
-        const kpis = reportEngine.kpis;
-        const gpMargin = kpis.productRevenue > 0 ? ((kpis.grossMargin / kpis.productRevenue) * 100).toFixed(1) : '0.0';
-        const netMargin = kpis.productRevenue > 0 ? ((kpis.netProfit / kpis.productRevenue) * 100).toFixed(1) : '0.0';
-        const topProduct = Object.entries(reportEngine.byProduct).sort((a,b)=>b[1].profit-a[1].profit)[0];
-        const topCustomer = Object.values(reportEngine.byCustomer).sort((a,b)=>b.productRevenue-a.productRevenue)[0];
-        const insightCards = [
-          { info: 'grossMargin', label: 'Gross Margin', value: `${gpMargin}%`, sub: `Rs.${kpis.grossMargin.toLocaleString('en-US')} on Rs.${kpis.productRevenue.toLocaleString('en-US')} sales`, color: Number(gpMargin) >= 25 ? 'emerald' : Number(gpMargin) >= 15 ? 'amber' : 'rose', icon: TrendingUp },
-          { info: 'netMargin', label: 'Net Margin', value: `${netMargin}%`, sub: `Rs.${kpis.netProfit.toLocaleString('en-US')} after all expenses`, color: Number(netMargin) >= 15 ? 'emerald' : Number(netMargin) >= 5 ? 'amber' : 'rose', icon: DollarSign },
-          { info: 'recoveryPeriod', label: 'Recovery', value: recoveryPeriod === null ? '—' : `${recoveryPeriod}%`, sub: `Rs.${collections.totals.received.toLocaleString('en-US')} in · ${reportEngine.collectionRate}% of all billing recovered`, color: recoveryPeriod === null ? 'slate' : Number(recoveryPeriod) >= 80 ? 'emerald' : Number(recoveryPeriod) >= 50 ? 'amber' : 'rose', icon: Wallet },
-          { info: 'activeClients', label: 'Clients', value: `${reportEngine.newCustCount + reportEngine.repeatCustCount}`, sub: `${reportEngine.newCustCount} new · ${reportEngine.repeatCustCount} repeat`, color: 'indigo', icon: Users },
-          { info: 'billedPeriod', label: 'Billed', value: `Rs.${reportEngine.totalBilledAmt.toLocaleString('en-US')}`, sub: 'invoice totals, delivery included', color: 'slate', icon: Receipt },
-          ...(reportEngine.avgDaysToPay !== null ? [{ info: 'daysToPay', label: 'Days to Pay', value: `${reportEngine.avgDaysToPay}d`, sub: `${reportEngine.paymentSpeed.settledCount} bills cleared${reportEngine.paymentSpeed.openCount ? ` · ${reportEngine.paymentSpeed.openCount} open, oldest ${reportEngine.paymentSpeed.oldestOpenDays}d` : ''}`, color: reportEngine.avgDaysToPay <= 7 ? 'emerald' : reportEngine.avgDaysToPay <= 21 ? 'amber' : 'rose', icon: Clock }] : []),
-        ];
-        return (
-          <div className="space-y-4 mt-2">
-            <div className="grid grid-cols-2 gap-3">
-              {/* Written out in full: Tailwind cannot see a class assembled as `bg-${color}-50`, so the
-                  tiles' colours depended on whether the same class happened to appear elsewhere. */}
-              {insightCards.map(card => {
-                const kind = { emerald: 'good', amber: 'watch', rose: 'bad', indigo: 'info' }[card.color] || 'neutral';
-                const t = tone(kind);
-                return (
-                <div key={card.label} data-tone={kind} className={`relative overflow-hidden p-4 pl-5 rounded-xl border ${t.card} ${t.text}`}>
-                  <span aria-hidden="true" className={`absolute left-0 inset-y-0 w-1.5 ${t.bar}`} />
-                  <p className="text-xs font-medium mb-1 flex items-center gap-1"><card.icon size={12}/> {card.label} <InfoTip k={card.info} /></p>
-                  <p className={`text-2xl font-semibold tabular-nums ${kind === 'neutral' || kind === 'info' ? 'text-kt-ink' : t.text}`}>{card.value}</p>
-                  <p className="text-xs text-kt-ink/80 mt-1">{card.sub}</p>
-                </div>
-                );
-              })}
-            </div>
-            {/* Key callouts */}
-            <div className="bg-white p-4 rounded-xl border border-kt-line space-y-3">
-              <p className="text-xs font-medium text-kt-sub flex items-center gap-1.5"><Zap size={12} className="text-kt-amber"/> Smart Callouts</p>
-              {topProduct && <div className="flex items-start gap-2 text-sm"><span className="text-kt-green font-semibold shrink-0">★</span><p className="text-kt-ink"><span className="font-medium">{topProduct[0]}</span> is your most profitable product — Rs.{topProduct[1].profit.toLocaleString('en-US')} GP ({topProduct[1].qty} units sold)</p></div>}
-              {topCustomer && <div className="flex items-start gap-2 text-sm"><span className="text-kt-blue font-semibold shrink-0">★</span><p className="text-kt-ink"><button className="font-medium hover:text-kt-blue transition-colors" onClick={() => { if (topCustomer.id !== undefined) { setSelectedLedgerId(topCustomer.id); setShowLedgerModal(true); } }}>{topCustomer.label}</button> is your top customer — Rs.{(topCustomer.productRevenue||0).toLocaleString('en-US')} revenue in {topCustomer.orders} orders</p></div>}
-              {reportEngine.agingBuckets.days90plus.length > 0 && <div className="flex items-start gap-2 text-sm"><span className="text-kt-red font-semibold shrink-0">!</span><p className="text-kt-ink"><span className="font-medium text-kt-red">{reportEngine.agingBuckets.days90plus.length} customer{reportEngine.agingBuckets.days90plus.length>1?'s':''}</span> overdue 90+ days — Rs.{reportEngine.agingBuckets.days90plus.reduce((s,r)=>s+r.amount,0).toLocaleString('en-US')} at risk</p></div>}
-              {reportEngine.trends.revenue !== null && <div className="flex items-start gap-2 text-sm"><span className={`font-semibold shrink-0 ${Number(reportEngine.trends.revenue)>=0?'text-kt-green':'text-kt-red'}`}>{Number(reportEngine.trends.revenue)>=0?'↑':'↓'}</span><p className="text-kt-ink">Revenue is <span className="font-medium">{Number(reportEngine.trends.revenue)>=0?'up':'down'} {Math.abs(reportEngine.trends.revenue)}%</span> vs previous period</p></div>}
-              {kpis.deliveryBilled > kpis.transportExpense && <div className="flex items-start gap-2 text-sm"><span className="text-kt-green font-semibold shrink-0">+</span><p className="text-kt-ink">Delivery net contribution: <span className="font-medium text-kt-green">Rs.{(kpis.deliveryBilled - kpis.transportExpense).toLocaleString('en-US')}</span></p></div>}
-            </div>
-            {/* P&L summary */}
-            <div className="bg-kt-band text-white p-5 rounded-2xl shadow-[0_8px_24px_rgba(0,0,0,0.08)]">
-              <p className="text-xs font-medium text-white/70 mb-4">P&L Summary · {filterLabel}</p>
-              <div className="space-y-0">
-                {[
-                  ['Gross Sales', `Rs.${(kpis.productRevenue + kpis.creditNotesTotal).toLocaleString('en-US')}`, 'text-white', false],
-                  ...(kpis.creditNotesTotal > 0 ? [['Sales Returns', `- Rs.${kpis.creditNotesTotal.toLocaleString('en-US')}`, 'text-white/80 text-xs', false]] : []),
-                  ['COGS', `- Rs.${kpis.totalCOGS.toLocaleString('en-US')}`, 'text-white/80', false],
-                  ['Gross Profit', `Rs.${kpis.grossMargin.toLocaleString('en-US')}`, 'text-white', gpMargin + '%'],
-                  ['Delivery Net', `+ Rs.${(kpis.deliveryBilled - kpis.transportExpense).toLocaleString('en-US')}`, 'text-white/70', false],
-                  ['Operational Expenses', `- Rs.${kpis.totalExpenses.toLocaleString('en-US')}`, 'text-white/80', false],
-                  ['Net Profit', `Rs.${kpis.netProfit.toLocaleString('en-US')}`, kpis.netProfit >= 0 ? 'text-kt-yellow text-base font-semibold' : 'text-white/80 text-base font-semibold', netMargin + '%'],
-                ].map(([label, val, cls, pct]) => (
-                  <div key={label} className="flex justify-between items-center text-sm py-1.5 border-b border-white/15 last:border-0">
-                    <span className="text-white/70 inline-flex items-center gap-1">{label} <InfoTip tone="light" k={{ 'Gross Sales': 'grossSales', 'Sales Returns': 'salesReturns', 'COGS': 'cogs', 'Gross Profit': 'grossProfit', 'Delivery Net': 'deliveryNet', 'Operational Expenses': 'opExpenses', 'Net Profit': 'netProfit' }[label]} /></span>
-                    <div className="text-right"><span className={`font-medium ${cls}`}>{val}</span>{pct && <span className="text-xs text-white/80 ml-1.5">{pct}</span>}</div>
-                  </div>
-                ))}
-                <div className="h-px bg-white/10 my-2"></div>
-                <div className="flex justify-between items-center text-xs py-1"><span className="text-white/80">Outstanding Receivables</span><span className="font-medium text-white/80">Rs.{kpis.totalReceivables.toLocaleString('en-US')}</span></div>
-                <div className="flex justify-between items-center text-xs py-0.5"><span className="text-white/80 inline-flex items-center gap-1">Recovered of all billing <InfoTip k="recoveryAllTime" tone="light" /></span><span className={`font-medium ${Number(reportEngine.collectionRate) >= 80 ? 'text-kt-yellow' : Number(reportEngine.collectionRate) >= 50 ? 'text-white/80' : 'text-white/80'}`}>{reportEngine.collectionRate}%</span></div>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
-
       {/* ── Monthly Trend View ── */}
       {view === 'Monthly Trend' && (() => {
         const months = Object.keys(reportEngine.monthlyData).sort().slice(-18);

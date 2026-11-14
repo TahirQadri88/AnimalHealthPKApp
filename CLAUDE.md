@@ -561,6 +561,14 @@ bright `--kt-icon-*` tones, now mapped in Tailwind as `kt-icon-red` etc. Bright 
 `recoveryTone`, `trendTone`, `daysTone`). Restart the preview server after touching `tailwind.config.js`: the
 running one does not mint the new colour classes, and the screen silently loses every tint.
 
+**Admin is grouped** (`components/admin/AdminNav.jsx`): Insights (Analytics, Receivables, Activity), Money
+(Expenses), Setup (the rest). Desktop has a rail; phones and tablets one button naming the current screen,
+opening a sheet with all eleven. The `adminView` keys are unchanged (the Dashboard links into Admin by them).
+**Analytics has four sections** (`ANALYTICS_SECTIONS`): Overview (Insights merged in, one P&L), Sales, Money,
+Trends, each with a sub-switch over the OLD view names, so exports, drill-downs and `analyticsView` deep links
+did not move; `setView('Insights')` lands on Overview. Phones fold Brand/Client/Staff behind "Filters (n)" and
+show the breakdown tables as row cards (`data-phone-rows`) with the same figures and drill-down.
+
 ## An export that a view cannot reach is a crash waiting for a press
 
 Item Sales computed its rows inside the view's own IIFE. `getSortedExportData` returned
