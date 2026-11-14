@@ -15,7 +15,8 @@
 // The parameter list was not guessed: it is exactly what `no-undef` reported once the body
 // was on its own, which is an exhaustive answer rather than a careful one.
 import { getLocalDateStr } from '../../helpers';
-import { previousPeriod } from './periods';
+import { comparisonWindow, currentWindow } from './periods';
+import { paymentSpeed } from './paymentSpeed';
 import { computePnL } from './profitAndLoss';
 import { buildAgingReport } from './receivables';
 import { custKey, buildCustomerIndex } from './keys';
@@ -96,18 +97,8 @@ export const buildReport = ({
   // Expense breakdown by category
   const byExpenseCategory = {};
   filteredExpenses.forEach(e => { if(!byExpenseCategory[e.category]) byExpenseCategory[e.category] = 0; byExpenseCategory[e.category] += Number(e.amount); });
-  // Previous period for comparison
-  // services/analytics/periods.js — shared with the expense comparison, so the two cannot
-  // mean different things by "vs previous period" on the same screen.
-  const prevPeriod = previousPeriod(dateFilter, customStart, customEnd);
-  let prevRevenue = 0, prevProfit = 0;
-  invoices.filter(o => o.status === 'Billed' && o.date >= prevPeriod.start && o.date <= prevPeriod.end).forEach(o => {
-    (o.items || []).forEach(item => { prevRevenue += item.price * item.quantity; prevProfit += (item.price - (item.costPrice||0)) * item.quantity; });
-  });
-  const trends = {
-    revenue: prevRevenue > 0 ? ((kpis.productRevenue - prevRevenue) / prevRevenue * 100).toFixed(1) : null,
-    profit: prevProfit > 0 ? ((kpis.grossMargin - prevProfit) / prevProfit * 100).toFixed(1) : null
-  };
+  // The revenue / profit trend is worked out below, once the period's figures are net of
+  // returns, so both sides of the comparison are counted the same way.
   // Daily breakdown with both revenue and profit
   const dailyBreakdown = {};
   billedForPnL.forEach(o => {
@@ -245,25 +236,52 @@ export const buildReport = ({
   kpis.totalCOGS       = pnl.cogs;
   kpis.grossMargin     = pnl.grossProfit;
   kpis.netProfit       = pnl.netProfit;
+  // Trend: this period against the like-for-like stretch before it (services/analytics/periods.js).
+  // The previous side used to be a 30-day window whatever the period, with no brand, client or
+  // staff filter and no returns taken off, while this side had all three: "-89.6%" on 14
+  // November was fourteen filtered, net days against thirty gross ones. Both sides now go
+  // through the same filters and computePnL.
+  const includeItem = (item) => {
+    if (filterCompanies.size === 0) return true;
+    const cid = products.find(p => p.id === item.productId)?.companyId;
+    return filterCompanies.has(String(cid));
+  };
+  const onScreen = (o) => (filterCustomers.size === 0 || filterCustomers.has(String(o.customerId)))
+    && (filterSalespersons.size === 0 || filterSalespersons.has(String(o.salespersonId)));
+  const compareWith = comparisonWindow(dateFilter, customStart, customEnd);
+  let prevNet = null;
+  if (compareWith) {
+    const inPrev = (o) => o.date >= compareWith.start && o.date <= compareWith.end && onScreen(o);
+    prevNet = computePnL({
+      billedInvoices: invoices.filter(o => o.status === 'Billed' && inPrev(o)),
+      creditNotes: invoices.filter(o => o.status === 'CreditNote' && inPrev(o)),
+      expenses: [], includeItem,
+    });
+  }
+  const pct = (now, before) => (before > 0 ? ((now - before) / before * 100).toFixed(1) : null);
+  const trends = {
+    revenue: prevNet ? pct(kpis.productRevenue, prevNet.netSales) : null,
+    profit: prevNet ? pct(kpis.grossMargin, prevNet.grossProfit) : null,
+    window: compareWith,
+    prevRevenue: prevNet ? prevNet.netSales : null,
+    prevProfit: prevNet ? prevNet.grossProfit : null,
+  };
   // All-time collection rate: (total ever billed − currently outstanding) / total ever billed
   // Period-filtered billing vs period-filtered payments is misleading (cross-period collections inflate to 100%)
   const allTimeBilled = invoices.filter(o => o.status === 'Billed').reduce((s, o) => s + o.total, 0);
   const allTimeOutstanding = receivablesList.reduce((s, r) => s + r.amount, 0);
   const collectionRate = allTimeBilled > 0 ? Math.max(0, Math.min(((allTimeBilled - allTimeOutstanding) / allTimeBilled) * 100, 100)).toFixed(1) : '0.0';
   const totalBilledAmt = billedForPnL.reduce((s, o) => s + o.total, 0);
-  // Payment velocity: avg days from invoice date to first payment received for that customer
-  let velDays = 0, velCount = 0;
-  invoices.filter(o => o.status === 'Billed' && getPaymentStatus(o) === 'Paid').forEach(inv => {
-    const pmt = payments.filter(p => String(p.customerId) === String(inv.customerId) && p.date >= inv.date)
-      .sort((a, b) => a.date.localeCompare(b.date))[0];
-    if (pmt) { const d = Math.floor((new Date(pmt.date) - new Date(inv.date)) / 86400000); if (d >= 0) { velDays += d; velCount++; } }
-  });
-  const avgDaysToPay = velCount > 0 ? Math.round(velDays / velCount) : null;
+  // Days to pay: from each bill to the date it was fully settled, for bills settled in this
+  // period, settled the way the ledger settles them (services/analytics/paymentSpeed.js). It
+  // used to count days to the customer's next payment of any size.
+  const speed = paymentSpeed({ invoices, payments, window: currentWindow(dateFilter, customStart, customEnd), include: onScreen, today });
+  const avgDaysToPay = speed.avgDays;
   // New vs repeat customers in period
   const custFirstOrderDate = {};
   invoices.filter(o => o.status === 'Billed').sort((a,b)=>a.date.localeCompare(b.date)).forEach(o => { if (!custFirstOrderDate[o.customerId]) custFirstOrderDate[o.customerId] = o.date; });
   const periodCustIds = [...new Set(billedForPnL.map(o => o.customerId))];
   let newCustCount = 0, repeatCustCount = 0;
   periodCustIds.forEach(id => { if (billedForPnL.some(o => o.customerId === id && o.date === custFirstOrderDate[id])) newCustCount++; else repeatCustCount++; });
-  return { kpis, byProduct, byCompany, byCustomer, bySalesperson, byCity, byArea, byType, receivablesList: receivablesList.sort((a,b)=>b.amount-a.amount), trends, dailyBreakdown, byExpenseCategory, aging, agingBuckets, monthlyData, collectionRate, newCustCount, repeatCustCount, totalBilledAmt, avgDaysToPay };
+  return { kpis, byProduct, byCompany, byCustomer, bySalesperson, byCity, byArea, byType, receivablesList: receivablesList.sort((a,b)=>b.amount-a.amount), trends, dailyBreakdown, byExpenseCategory, aging, agingBuckets, monthlyData, collectionRate, newCustCount, repeatCustCount, totalBilledAmt, avgDaysToPay, paymentSpeed: speed };
 };

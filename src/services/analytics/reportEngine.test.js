@@ -400,3 +400,33 @@ describe('buildReport — a return reaches every breakdown it belongs to', () =>
     expect(r.byType.Retail.revenue).toBe(-15000);
   });
 });
+
+// "Revenue -89.6%" on 14 November: fourteen filtered, net days were compared with a gross,
+// unfiltered 30-day window. Both sides now cover the same stretch and go through the same
+// filters and returns.
+import { vi, afterEach } from 'vitest';
+describe('buildReport — trend compares like with like', () => {
+  afterEach(() => vi.useRealTimers());
+  const inMonth = (d) => d >= '2026-11-01' && d <= '2026-11-14';
+  const data = [
+    billed('INV-1', '2026-11-05', [line('Antox', 1, 1000, 600)]),
+    billed('INV-0', '2026-10-05', [line('Antox', 1, 1000, 600)]),
+    creditNote('CN-1', '2026-10-06', [line('Antox', 1, 500, 300)]),
+    billed('INV-X', '2026-10-07', [line('Antox', 5, 1000, 600)], { customerId: 2, customerName: 'Other' }),
+    billed('INV-S', '2026-09-20', [line('Antox', 9, 1000, 600)]),
+  ];
+  it('This Month on the 14th: 1-14 Nov against 1-14 Oct, same client filter, returns taken off', () => {
+    vi.useFakeTimers(); vi.setSystemTime(new Date('2026-11-14T06:00:00Z'));
+    const r = run({ invoices: data, dateFilter: 'This Month', checkCustomFilter: inMonth, filterCustomers: new Set(['1']) });
+    expect(r.trends.window).toEqual({ start: '2026-10-01', end: '2026-10-14' });
+    expect(r.trends.prevRevenue).toBe(500);
+    expect(r.trends.revenue).toBe('100.0');
+    expect(r.trends.prevProfit).toBe(200);
+    expect(r.trends.profit).toBe('100.0');
+  });
+  it('All Time has nothing to compare with', () => {
+    const r = run({ invoices: data });
+    expect(r.trends.revenue).toBeNull();
+    expect(r.trends.window).toBeNull();
+  });
+});

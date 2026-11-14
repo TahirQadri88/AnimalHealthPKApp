@@ -46,6 +46,9 @@ for (const w of widths) {
       if (document.documentElement.scrollWidth > innerWidth + 1) spill.add(`page scrolls sideways (${document.documentElement.scrollWidth}px)`);
       for (const e of document.querySelectorAll('main *, header *, nav *, [role="dialog"] *, .font-ui.absolute *')) {
         if (!vis(e) || e.closest('svg')) continue;
+        // A transparent tap area that overhangs its label on purpose (InfoTip's 44px target round
+        // a 13px icon). Only a box with no background and no border may claim this.
+        if (e.dataset.hitarea === '1' && getComputedStyle(e).backgroundColor === 'rgba(0, 0, 0, 0)' && parseFloat(getComputedStyle(e).borderTopWidth) === 0) continue;
         // A display:contents wrapper has no box of its own (its children lay out in the one
         // above it), so measure against the nearest ancestor that does.
         let box = e.parentElement;

@@ -1,4 +1,7 @@
 import { useState, useEffect, useMemo, useContext } from 'react';
+import { InfoTip } from '../ui/InfoTip';
+import { METRIC_INFO } from '../../services/analytics/metricInfo';
+import { windowLabel } from '../../services/analytics/periods';
 import { Search, Calendar, ChevronDown, Download, Printer, Share2, Users, Package, Zap, PhoneCall,
          AlertCircle, CheckCircle2, X,
          Award, Clock, DollarSign, Filter, Receipt, TrendingUp, Wallet } from 'lucide-react';
@@ -70,6 +73,12 @@ const collections = useMemo(() => buildCollections({
   invoices, payments, customers, checkCustomFilter, filterCustomers,
 }), [invoices, payments, customers, dateFilter, customStart, customEnd, ...[...filterCustomers]]);
 
+// Recovery this period: money received in the period against the bills raised in it. Over
+// 100% means older debt came in too. The all-time figure (collectionRate) answers a different
+// question and is labelled so.
+const recoveryPeriod = reportEngine.totalBilledAmt > 0 ? (collections.totals.received / reportEngine.totalBilledAmt * 100).toFixed(1) : null;
+const vsLabel = reportEngine.trends.window ? `vs ${windowLabel(reportEngine.trends.window)}` : '';
+
 // Item Sales, lifted out of the view's own IIFE so an export can reach it. It could not
 // before, so `getSortedExportData` returned null for this tab while the CSV and WhatsApp
 // buttons stayed on screen — both threw on `null.some` / `null.forEach` when pressed.
@@ -112,8 +121,9 @@ const getSortedExportData = () => {
      rows.push({ 'P&L Item': 'Operational Expenses', 'Amount (Rs)': -kpis.totalExpenses, 'Notes': '' });
      rows.push({ 'P&L Item': 'Net Profit', 'Amount (Rs)': kpis.netProfit, 'Notes': `${netMargin}% net margin` });
      rows.push({ 'P&L Item': 'Billed This Period', 'Amount (Rs)': reportEngine.totalBilledAmt, 'Notes': 'invoice totals, delivery included' });
-     rows.push({ 'P&L Item': 'Outstanding Receivables', 'Amount (Rs)': kpis.totalReceivables, 'Notes': `${reportEngine.collectionRate}% collected` });
-     if (reportEngine.avgDaysToPay !== null) rows.push({ 'P&L Item': 'Avg Days to Pay', 'Amount (Rs)': '', 'Notes': `${reportEngine.avgDaysToPay} days` });
+     rows.push({ 'P&L Item': 'Outstanding Receivables', 'Amount (Rs)': kpis.totalReceivables, 'Notes': `${reportEngine.collectionRate}% of all billing recovered` });
+     if (recoveryPeriod !== null) rows.push({ 'P&L Item': 'Recovery this period', 'Amount (Rs)': collections.totals.received, 'Notes': `${recoveryPeriod}% of Rs.${reportEngine.totalBilledAmt.toLocaleString('en-US')} billed` });
+     if (reportEngine.avgDaysToPay !== null) rows.push({ 'P&L Item': 'Avg Days to Pay', 'Amount (Rs)': '', 'Notes': `${reportEngine.avgDaysToPay} days, bills cleared in the period` });
      rows.push({ 'P&L Item': `Active Customers: ${reportEngine.newCustCount + reportEngine.repeatCustCount}`, 'Amount (Rs)': '', 'Notes': `${reportEngine.newCustCount} new · ${reportEngine.repeatCustCount} repeat` });
      return rows;
    }
@@ -208,7 +218,7 @@ const handleExport = (format) => {
           text += `\n${'─'.repeat(30)}\n`;
           text += `✅ *Net Profit: Rs. ${kpis.netProfit.toLocaleString('en-US')}*\n`;
           text += `📌 Receivables: Rs. ${kpis.totalReceivables.toLocaleString('en-US')}\n`;
-          if (reportEngine.trends.revenue !== null) text += `📈 Revenue trend: ${Number(reportEngine.trends.revenue) >= 0 ? '+' : ''}${reportEngine.trends.revenue}% vs prev period\n`;
+          if (reportEngine.trends.revenue !== null) text += `📈 Sales trend: ${Number(reportEngine.trends.revenue) >= 0 ? '+' : ''}${reportEngine.trends.revenue}% ${vsLabel}\n`;
         } else if (view === 'Insights') {
           const gpMargin = kpis.productRevenue > 0 ? ((kpis.grossMargin / kpis.productRevenue) * 100).toFixed(1) : '0.0';
           const netMargin = kpis.productRevenue > 0 ? ((kpis.netProfit / kpis.productRevenue) * 100).toFixed(1) : '0.0';
@@ -224,7 +234,8 @@ const handleExport = (format) => {
           text += `✅ *Net Profit: Rs.${kpis.netProfit.toLocaleString('en-US')} (${netMargin}%)*\n`;
           text += `\n📌 *Key Metrics*\n`;
           text += `Receivables:     Rs.${kpis.totalReceivables.toLocaleString('en-US')}\n`;
-          text += `Collection Rate: ${reportEngine.collectionRate}%\n`;
+          if (recoveryPeriod !== null) text += `Recovery this period: ${recoveryPeriod}%\n`;
+          text += `Recovered of all billing: ${reportEngine.collectionRate}%\n`;
           if (reportEngine.avgDaysToPay !== null) text += `Avg Days to Pay: ${reportEngine.avgDaysToPay} days\n`;
           text += `Customers:       ${reportEngine.newCustCount + reportEngine.repeatCustCount} (${reportEngine.newCustCount} new, ${reportEngine.repeatCustCount} repeat)\n`;
           const topProduct = Object.entries(reportEngine.byProduct).sort((a,b) => b[1].profit - a[1].profit)[0];
@@ -233,7 +244,7 @@ const handleExport = (format) => {
             text += `\n⭐ *Smart Callouts*\n`;
             if (topProduct) text += `Top Product: ${topProduct[0]} — Rs.${topProduct[1].profit.toLocaleString('en-US')} GP\n`;
             if (topCustomer) text += `Top Customer: ${topCustomer.label} — Rs.${(topCustomer.productRevenue||0).toLocaleString('en-US')} revenue\n`;
-            if (reportEngine.trends.revenue !== null) text += `Revenue Trend: ${Number(reportEngine.trends.revenue) >= 0 ? '+' : ''}${reportEngine.trends.revenue}% vs prev period\n`;
+            if (reportEngine.trends.revenue !== null) text += `Sales Trend: ${Number(reportEngine.trends.revenue) >= 0 ? '+' : ''}${reportEngine.trends.revenue}% ${vsLabel}\n`;
             if (reportEngine.agingBuckets.days90plus.length > 0) text += `⚠️ ${reportEngine.agingBuckets.days90plus.length} customer(s) overdue 90+ days\n`;
           }
         } else if (view === 'Receivables') {
@@ -350,7 +361,7 @@ const renderTable = (dataObj, type, dimension) => {
   return (
     <div className="bg-white rounded-xl border border-kt-line overflow-hidden mt-3">
        <div className="bg-kt-raised border-b border-kt-line p-2 flex flex-wrap justify-between items-center gap-2">
-         <span className="text-xs font-medium text-kt-sub ml-1 whitespace-nowrap">{arrWithABC.length} {type}s <span className="text-kt-muted hidden sm:inline">· ABC = revenue tier</span></span>
+         <span className="text-xs font-medium text-kt-sub ml-1 whitespace-nowrap">{arrWithABC.length} {type}s <span className="text-kt-muted hidden sm:inline">· ABC = revenue tier</span> <InfoTip k="abcTier" /></span>
          <FilterSelect compact className="w-44 sm:w-52 shrink-0" value={sortBy} onChange={e=>setSortBy(e.target.value)} label="Sort">
            <option value="profit">Sort: Highest GP</option>
            <option value="revenue">Sort: Highest Revenue</option>
@@ -367,9 +378,9 @@ const renderTable = (dataObj, type, dimension) => {
                 {type !== 'Customer' && <th className="p-3 text-center">Qty</th>}
                 {type === 'Customer' && <th className="p-3 text-center">Orders</th>}
                 <th className="p-3 text-right">Revenue</th>
-                <th className="p-3 text-right">Rev%</th>
+                <th className="p-3 text-right whitespace-nowrap">Share <InfoTip k="share" align="right" /></th>
                 <th className="p-3 text-right text-kt-green">GP</th>
-                <th className="p-3 text-right text-kt-blue">Margin%</th>
+                <th className="p-3 text-right text-kt-blue whitespace-nowrap">Margin% <InfoTip k="margin" align="right" /></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-kt-line font-semibold text-kt-ink">
@@ -444,7 +455,7 @@ const renderSegmentTable = (dataObj, label, dimension) => {
       <div className="overflow-x-auto">
         <table className="w-full min-w-[34rem] sm:min-w-0 text-left text-xs whitespace-nowrap">
           <thead className="bg-kt-raised text-kt-sub font-medium border-b border-kt-line">
-            <tr><th className="p-3">{label}</th><th className="p-3 text-center">Orders</th><th className="p-3 text-right">Revenue</th><th className="p-3 text-right text-kt-green">GP</th><th className="p-3 text-right text-kt-blue">Margin%</th></tr>
+            <tr><th className="p-3">{label}</th><th className="p-3 text-center">Orders</th><th className="p-3 text-right">Revenue</th><th className="p-3 text-right text-kt-green">GP</th><th className="p-3 text-right text-kt-blue whitespace-nowrap">Margin% <InfoTip k="margin" align="right" /></th></tr>
           </thead>
           <tbody className="divide-y divide-kt-line font-semibold text-kt-ink">
             {arr.map((row, i) => {
@@ -574,17 +585,17 @@ return (
            {/* Trend cards */}
            <div className="grid grid-cols-2 gap-3">
              {[
-               { label: 'Revenue Trend', val: reportEngine.trends.revenue, icon: TrendingUp },
-               { label: 'Profit Trend', val: reportEngine.trends.profit, icon: TrendingUp }
-             ].map(({label, val, icon: Icon}) => (
+               { label: 'Sales Trend', val: reportEngine.trends.revenue, icon: TrendingUp, info: 'revenueTrend' },
+               { label: 'Gross Profit Trend', val: reportEngine.trends.profit, icon: TrendingUp, info: 'profitTrend' }
+             ].map(({label, val, icon: Icon, info}) => (
                <div key={label} className="bg-white p-4 rounded-xl border border-kt-line">
-                 <p className="text-xs font-medium text-kt-muted">{label}</p>
+                 <p className="text-xs font-medium text-kt-muted flex items-center gap-1.5">{label} <InfoTip k={info} /></p>
                  {val !== null ? (
                    <div className="flex items-center gap-1 mt-1">
                      <span className={`text-lg font-semibold ${Number(val) >= 0 ? 'text-kt-green' : 'text-kt-red'}`}>{Number(val) >= 0 ? '+' : ''}{val}%</span>
-                     <span className="text-xs text-kt-muted">vs prev</span>
+                     <span className="text-xs text-kt-muted">{vsLabel}</span>
                    </div>
-                 ) : <p className="text-xs text-kt-muted mt-1">No prior data</p>}
+                 ) : <p className="text-xs text-kt-muted mt-1">{reportEngine.trends.window ? `Nothing to compare in ${windowLabel(reportEngine.trends.window)}` : 'Choose a period to compare'}</p>}
                </div>
              ))}
            </div>
@@ -592,16 +603,16 @@ return (
            {/* New vs Repeat + Collection Rate quick stats */}
            <div className="grid grid-cols-3 gap-2">
              <div className="bg-white p-3 rounded-xl border border-kt-line text-center">
-               <p className="text-xs font-medium text-kt-muted">New Clients</p>
+               <p className="text-xs font-medium text-kt-muted flex items-center justify-center gap-1">New Clients <InfoTip k="newClients" /></p>
                <p className="text-xl font-semibold text-kt-blue mt-0.5">{reportEngine.newCustCount}</p>
              </div>
              <div className="bg-white p-3 rounded-xl border border-kt-line text-center">
-               <p className="text-xs font-medium text-kt-muted">Repeat</p>
+               <p className="text-xs font-medium text-kt-muted flex items-center justify-center gap-1">Repeat <InfoTip k="repeatClients" /></p>
                <p className="text-xl font-semibold text-kt-green mt-0.5">{reportEngine.repeatCustCount}</p>
              </div>
              <div className="bg-white p-3 rounded-xl border border-kt-line text-center">
-               <p className="text-xs font-medium text-kt-muted">Collected</p>
-               <p className={`text-xl font-semibold mt-0.5 ${Number(reportEngine.collectionRate) >= 80 ? 'text-kt-green' : Number(reportEngine.collectionRate) >= 50 ? 'text-kt-amber' : 'text-kt-red'}`}>{reportEngine.collectionRate}%</p>
+               <p className="text-xs font-medium text-kt-muted flex items-center justify-center gap-1">Recovery <InfoTip k="recoveryPeriod" align="right" /></p>
+               <p className={`text-xl font-semibold mt-0.5 ${recoveryPeriod === null ? 'text-kt-muted' : Number(recoveryPeriod) >= 80 ? 'text-kt-green' : Number(recoveryPeriod) >= 50 ? 'text-kt-amber' : 'text-kt-red'}`}>{recoveryPeriod === null ? '—' : `${recoveryPeriod}%`}</p>
              </div>
            </div>
 
@@ -609,7 +620,7 @@ return (
            {Object.keys(reportEngine.dailyBreakdown).length > 0 && (
              <div className="bg-white p-4 rounded-xl border border-kt-line">
                <div className="flex justify-between items-center mb-3">
-                 <p className="text-xs font-medium text-kt-sub">Daily Sales</p>
+                 <p className="text-xs font-medium text-kt-sub flex items-center gap-1">Daily Sales <InfoTip k="dailySales" /></p>
                  <div className="flex gap-2 text-xs font-medium"><span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-kt-muted/40 inline-block"></span>Revenue</span><span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-kt-primary inline-block"></span>Profit</span></div>
                </div>
                <div className="flex items-end gap-1 h-28 overflow-x-auto">
@@ -636,7 +647,7 @@ return (
 
            {/* Top 5 products */}
            <div className="bg-white p-4 rounded-xl border border-kt-line">
-             <p className="text-xs font-medium text-kt-sub mb-3">Top 5 Products by GP</p>
+             <p className="text-xs font-medium text-kt-sub mb-3 flex items-center gap-1">Top 5 Products by Gross Profit <InfoTip k="topProductsGP" /></p>
              <div className="space-y-2">
                {Object.entries(reportEngine.byProduct).sort((a,b) => b[1].profit - a[1].profit).slice(0, 5).map(([name, data], i) => {
                  const maxP = Object.entries(reportEngine.byProduct).sort((a,b) => b[1].profit - a[1].profit)[0]?.[1].profit || 1;
@@ -656,7 +667,7 @@ return (
            {/* Expense breakdown by category */}
            {Object.keys(reportEngine.byExpenseCategory).length > 0 && (
              <div className="bg-white p-4 rounded-xl border border-kt-line">
-               <p className="text-xs font-medium text-kt-sub mb-3">Expenses by Category</p>
+               <p className="text-xs font-medium text-kt-sub mb-3 flex items-center gap-1">Expenses by Category <InfoTip k="expensesByCategory" /></p>
                <div className="space-y-2">
                  {Object.entries(reportEngine.byExpenseCategory).sort((a,b)=>b[1]-a[1]).map(([cat, amt]) => {
                    const maxAmt = Math.max(...Object.values(reportEngine.byExpenseCategory), 1);
@@ -682,24 +693,39 @@ return (
                <div className="bg-kt-band text-white p-6 rounded-2xl shadow-[0_8px_24px_rgba(0,0,0,0.08)] border border-white/15">
                  <p className="text-xs font-medium text-white/70 mb-5 flex justify-between"><span>P&L Dashboard</span><span className="text-white">{filterLabel}</span></p>
                  <div className="space-y-3">
-                   <div className="flex justify-between items-center text-sm font-medium"><span className="text-white/70">Gross Product Sales</span><span className="font-medium text-white">Rs.{(k.productRevenue + k.creditNotesTotal).toLocaleString('en-US')}</span></div>
-                   {k.creditNotesTotal > 0 && <div className="flex justify-between items-center text-xs"><span className="text-white/80">Sales Returns ({k.creditNotesCount})</span><span className="font-medium text-white/80">− Rs.{k.creditNotesTotal.toLocaleString('en-US')}</span></div>}
-                   <div className="flex justify-between items-center text-sm font-medium"><span className="text-white/80">Total COGS</span><span className="font-medium text-white/80">- Rs.{k.totalCOGS.toLocaleString('en-US')}</span></div>
-                   <div className="flex justify-between items-baseline"><span className="text-white text-sm font-semibold">Gross Profit</span><div className="text-right"><span className="font-medium text-white">Rs.{k.grossMargin.toLocaleString('en-US')}</span><span className="text-xs text-white ml-2">{gpPct}%</span></div></div>
+                   <div className="flex justify-between items-center text-sm font-medium"><span className="text-white/70 inline-flex items-center gap-1">Gross Product Sales <InfoTip k="grossSales" tone="light" /></span><span className="font-medium text-white">Rs.{(k.productRevenue + k.creditNotesTotal).toLocaleString('en-US')}</span></div>
+                   {k.creditNotesTotal > 0 && <div className="flex justify-between items-center text-xs"><span className="text-white/80 inline-flex items-center gap-1">Sales Returns ({k.creditNotesCount}) <InfoTip k="salesReturns" tone="light" /></span><span className="font-medium text-white/80">− Rs.{k.creditNotesTotal.toLocaleString('en-US')}</span></div>}
+                   <div className="flex justify-between items-center text-sm font-medium"><span className="text-white/80 inline-flex items-center gap-1">Cost of Goods <InfoTip k="cogs" tone="light" /></span><span className="font-medium text-white/80">- Rs.{k.totalCOGS.toLocaleString('en-US')}</span></div>
+                   <div className="flex justify-between items-baseline"><span className="text-white text-sm font-semibold inline-flex items-center gap-1">Gross Profit <InfoTip k="grossProfit" tone="light" /></span><div className="text-right"><span className="font-medium text-white">Rs.{k.grossMargin.toLocaleString('en-US')}</span><span className="text-xs text-white ml-2">{gpPct}%</span></div></div>
                    <div className="h-px bg-white/10 my-1"></div>
-                   <div className="flex justify-between items-center text-xs"><span className="text-white/70">Delivery Billed</span><span className="font-medium text-white/70">+ Rs.{k.deliveryBilled.toLocaleString('en-US')}</span></div>
+                   <div className="flex justify-between items-center text-xs"><span className="text-white/70 inline-flex items-center gap-1">Delivery Billed <InfoTip k="deliveryNet" tone="light" /></span><span className="font-medium text-white/70">+ Rs.{k.deliveryBilled.toLocaleString('en-US')}</span></div>
                    <div className="flex justify-between items-center text-xs"><span className="text-white/80">Transport Expenses</span><span className="font-medium text-white/80">- Rs.{k.transportExpense.toLocaleString('en-US')}</span></div>
-                   <div className="flex justify-between items-center text-xs"><span className="text-white/80">Operational Expenses</span><span className="font-medium text-white/80">- Rs.{k.totalExpenses.toLocaleString('en-US')}</span></div>
+                   <div className="flex justify-between items-center text-xs"><span className="text-white/80 inline-flex items-center gap-1">Running Expenses <InfoTip k="opExpenses" tone="light" /></span><span className="font-medium text-white/80">- Rs.{k.totalExpenses.toLocaleString('en-US')}</span></div>
                    <div className="h-px bg-white/10 my-1"></div>
-                   <div className="flex justify-between items-baseline"><span className="font-medium text-kt-yellow text-xs">Net Profit</span><div className="text-right"><span className={`font-display text-2xl  ${k.netProfit >= 0 ? 'text-kt-yellow' : 'text-white/80'}`}>Rs.{k.netProfit.toLocaleString('en-US')}</span><span className={`text-xs ml-2 ${k.netProfit >= 0 ? 'text-kt-yellow' : 'text-white/80'}`}>{netPct}%</span></div></div>
+                   <div className="flex justify-between items-baseline"><span className="font-medium text-kt-yellow text-xs inline-flex items-center gap-1">Net Profit <InfoTip k="netProfit" tone="light" /></span><div className="text-right"><span className={`font-display text-2xl  ${k.netProfit >= 0 ? 'text-kt-yellow' : 'text-white/80'}`}>Rs.{k.netProfit.toLocaleString('en-US')}</span><span className={`text-xs ml-2 ${k.netProfit >= 0 ? 'text-kt-yellow' : 'text-white/80'}`}>{netPct}%</span></div></div>
                    <div className="h-px bg-white/10 my-1"></div>
-                   <div className="flex justify-between items-center text-xs"><span className="text-white/80 font-semibold">Outstanding Receivables</span><span className="font-medium text-white/80">Rs.{k.totalReceivables.toLocaleString('en-US')}</span></div>
-                   <div className="flex justify-between items-center text-xs"><span className="text-white/80">Collection Rate (all-time)</span><span className={`font-medium ${Number(reportEngine.collectionRate) >= 80 ? 'text-kt-yellow' : Number(reportEngine.collectionRate) >= 50 ? 'text-white/80' : 'text-white/80'}`}>{reportEngine.collectionRate}%</span></div>
+                   <div className="flex justify-between items-center text-xs"><span className="text-white/80 font-semibold inline-flex items-center gap-1">Outstanding Receivables <InfoTip k="outstanding" tone="light" /></span><span className="font-medium text-white/80">Rs.{k.totalReceivables.toLocaleString('en-US')}</span></div>
+                   <div className="flex justify-between items-center text-xs"><span className="text-white/80 inline-flex items-center gap-1">Recovered of all billing <InfoTip k="recoveryAllTime" tone="light" /></span><span className={`font-medium ${Number(reportEngine.collectionRate) >= 80 ? 'text-kt-yellow' : Number(reportEngine.collectionRate) >= 50 ? 'text-white/80' : 'text-white/80'}`}>{reportEngine.collectionRate}%</span></div>
                  </div>
                </div>
              );
            })()}
         </div>
+      )}
+
+      {(view === 'Overview' || view === 'Insights') && (
+        <details className="bg-white rounded-xl border border-kt-line group">
+          <summary className="min-h-11 px-4 flex items-center justify-between text-sm font-medium text-kt-ink cursor-pointer select-none">How these figures are worked out<span className="text-kt-muted text-xs group-open:hidden">Show</span><span className="text-kt-muted text-xs hidden group-open:inline">Hide</span></summary>
+          <dl data-metric-glossary="1" className="px-4 pb-4 grid sm:grid-cols-2 gap-x-6 gap-y-3">
+            {Object.entries(METRIC_INFO).map(([key, m]) => (
+              <div key={key}>
+                <dt className="text-sm font-medium text-kt-ink">{m.label}</dt>
+                <dd className="text-sm text-kt-sub leading-snug">{m.means}</dd>
+                <dd className="text-xs text-kt-sub leading-snug mt-0.5"><span className="font-medium text-kt-ink">How: </span>{m.how}</dd>
+              </div>
+            ))}
+          </dl>
+        </details>
       )}
 
       {view === 'By Product' && renderTable(reportEngine.byProduct, 'Product', 'product')}
@@ -795,7 +821,7 @@ return (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[34rem] sm:min-w-0 text-left text-xs whitespace-nowrap">
               <thead className="bg-kt-raised text-kt-sub font-medium border-b border-kt-line">
-                <tr><th className="p-3">Staff</th><th className="p-3 text-center">Orders</th><th className="p-3 text-right">Revenue</th><th className="p-3 text-right text-kt-green">GP</th><th className="p-3 text-right text-kt-blue">Margin%</th></tr>
+                <tr><th className="p-3">Staff</th><th className="p-3 text-center">Orders</th><th className="p-3 text-right">Revenue</th><th className="p-3 text-right text-kt-green">GP</th><th className="p-3 text-right text-kt-blue whitespace-nowrap">Margin% <InfoTip k="margin" align="right" /></th></tr>
               </thead>
               <tbody className="divide-y divide-kt-line">
                 {Object.entries(reportEngine.bySalesperson).sort((a,b)=>b[1].revenue-a[1].revenue).map(([name, data], i) => {
@@ -824,12 +850,12 @@ return (
           {/* Collection rate summary. Two across from 400px: a figure like Rs.2,506,380 in 24px serif needs more than half of a 360px screen. */}
           <div className="grid grid-cols-1 min-[400px]:grid-cols-2 gap-3">
             <div className="bg-white p-4 rounded-xl border border-kt-line">
-              <p className="text-xs font-medium text-kt-muted">Collection Rate <span className="text-kt-muted">(All-time)</span></p>
+              <p className="text-xs font-medium text-kt-muted flex items-center gap-1">Recovered of all billing <InfoTip k="recoveryAllTime" /></p>
               <p className={`font-display text-2xl mt-1 ${Number(reportEngine.collectionRate) >= 80 ? 'text-kt-green' : Number(reportEngine.collectionRate) >= 50 ? 'text-kt-amber' : 'text-kt-red'}`}>{reportEngine.collectionRate}%</p>
               <p className="text-xs text-kt-muted mt-1">of all-time billed amount recovered</p>
             </div>
             <div className="bg-white p-4 rounded-xl border border-kt-line">
-              <p className="text-xs font-medium text-kt-muted">Outstanding</p>
+              <p className="text-xs font-medium text-kt-muted flex items-center gap-1">Outstanding <InfoTip k="outstanding" align="right" /></p>
               <p className="font-display text-2xl mt-1 text-kt-red">Rs.{reportEngine.kpis.totalReceivables.toLocaleString('en-US')}</p>
               <p className="text-xs text-kt-muted mt-1">{reportEngine.receivablesList.length} customers with balance</p>
             </div>
@@ -849,7 +875,7 @@ return (
             return (
               <div className="bg-white rounded-xl border border-kt-red/30 overflow-hidden">
                 <div className="bg-kt-red p-3 flex justify-between items-center">
-                  <span className="text-xs font-medium text-white flex items-center gap-1.5"><AlertCircle size={13}/> Top Overdue Balances</span>
+                  <span className="text-xs font-medium text-white flex items-center gap-1.5"><AlertCircle size={13}/> Top Overdue Balances <InfoTip k="topOverdue" tone="light" /></span>
                   <span className="text-xs font-semibold text-white">{overdue.length} accounts · 31+ days</span>
                 </div>
                 <div className="divide-y divide-kt-line">
@@ -933,12 +959,12 @@ return (
           <div className="space-y-3 mt-3">
             <div className="grid grid-cols-2 gap-3">
               <div className="bg-white p-4 rounded-xl border border-kt-line">
-                <p className="text-xs font-medium text-kt-muted">Spent · {filterLabel}</p>
+                <p className="text-xs font-medium text-kt-muted flex items-center gap-1">Spent · {filterLabel} <InfoTip k="opExpenses" /></p>
                 <p className="font-display text-2xl mt-1 text-kt-red">Rs.{t.amount.toLocaleString('en-US')}</p>
                 <p className="text-xs text-kt-muted mt-1">{t.count} entr{t.count === 1 ? 'y' : 'ies'}</p>
               </div>
               <div className="bg-white p-4 rounded-xl border border-kt-line">
-                <p className="text-xs font-medium text-kt-muted">vs Previous Period</p>
+                <p className="text-xs font-medium text-kt-muted flex items-center gap-1">{vsLabel || 'vs previous period'} <InfoTip k="expenseChange" align="right" /></p>
                 {t.changePct === null ? (
                   <p className="text-sm font-medium text-kt-muted mt-2">Nothing spent in the period before this one</p>
                 ) : (
@@ -1077,12 +1103,12 @@ return (
           <div className="space-y-3 mt-3">
             <div className="grid grid-cols-2 gap-3">
               <div className="bg-white p-4 rounded-xl border border-kt-line">
-                <p className="text-xs font-medium text-kt-muted">Returned · {filterLabel}</p>
+                <p className="text-xs font-medium text-kt-muted flex items-center gap-1">Returned · {filterLabel} <InfoTip k="returnValue" /></p>
                 <p className="font-display text-2xl mt-1 text-kt-red">Rs.{t.value.toLocaleString('en-US')}</p>
                 <p className="text-xs text-kt-muted mt-1">{t.count} credit note{t.count === 1 ? '' : 's'} · {t.units.toLocaleString('en-US')} units</p>
               </div>
               <div className={`p-4 rounded-xl border ${KT_TONE[rateColor]?.head || 'bg-white border-kt-line text-kt-sub'}`}>
-                <p className="text-xs font-medium">Return Rate</p>
+                <p className="text-xs font-medium flex items-center gap-1">Return Rate <InfoTip k="returnRate" align="right" /></p>
                 <p className="font-display text-2xl mt-1 text-kt-ink">{t.ratePct}%</p>
                 <p className="text-xs text-kt-ink/80 mt-1">of Rs.{t.grossSales.toLocaleString('en-US')} gross sales</p>
               </div>
@@ -1116,7 +1142,7 @@ return (
                   <div className="overflow-x-auto">
                     <table className="w-full min-w-[34rem] sm:min-w-0 text-left text-xs whitespace-nowrap">
                       <thead className="bg-kt-raised text-kt-sub font-medium border-b border-kt-line">
-                        <tr><th className="p-3">Date</th><th className="p-3">Credit Note</th><th className="p-3">Customer</th><th className="p-3">Reason</th><th className="p-3 text-center">Days Out</th><th className="p-3 text-right">Value</th></tr>
+                        <tr><th className="p-3">Date</th><th className="p-3">Credit Note</th><th className="p-3">Customer</th><th className="p-3">Reason</th><th className="p-3 text-center whitespace-nowrap">Days Out</th><th className="p-3 text-right">Value</th></tr>
                       </thead>
                       <tbody className="divide-y divide-kt-line font-semibold text-kt-ink">
                         {returns.rows.map(r => (
@@ -1162,12 +1188,12 @@ return (
           <div className="space-y-3 mt-3">
             <div className="grid grid-cols-2 gap-3">
               <div className="bg-white p-4 rounded-xl border border-kt-line">
-                <p className="text-xs font-medium text-kt-muted">Received · {filterLabel}</p>
+                <p className="text-xs font-medium text-kt-muted flex items-center gap-1">Received · {filterLabel} <InfoTip k="received" /></p>
                 <p className="font-display text-2xl mt-1 text-kt-green">Rs.{t.received.toLocaleString('en-US')}</p>
                 <p className="text-xs text-kt-muted mt-1">{t.count} collection{t.count === 1 ? '' : 's'}</p>
               </div>
               <div className="bg-white p-4 rounded-xl border border-kt-line">
-                <p className="text-xs font-medium text-kt-muted">At Counter vs Receipts</p>
+                <p className="text-xs font-medium text-kt-muted flex items-center gap-1">At Counter vs Receipts <InfoTip k="atCounter" align="right" /></p>
                 <p className="text-base font-semibold mt-1 text-kt-ink">Rs.{t.atBilling.toLocaleString('en-US')}</p>
                 <p className="text-xs text-kt-muted">taken when the bill was raised</p>
                 <p className="text-base font-semibold mt-1 text-kt-ink">Rs.{t.receipts.toLocaleString('en-US')}</p>
@@ -1304,17 +1330,13 @@ return (
         const netMargin = kpis.productRevenue > 0 ? ((kpis.netProfit / kpis.productRevenue) * 100).toFixed(1) : '0.0';
         const topProduct = Object.entries(reportEngine.byProduct).sort((a,b)=>b[1].profit-a[1].profit)[0];
         const topCustomer = Object.values(reportEngine.byCustomer).sort((a,b)=>b.productRevenue-a.productRevenue)[0];
-        const aProducts = Object.entries(reportEngine.byProduct).filter(([,v]) => {
-          let cum = 0; const total = Object.values(reportEngine.byProduct).reduce((s,r)=>s+r.revenue,0);
-          return (Object.entries(reportEngine.byProduct).sort((a,b)=>b[1].revenue-a[1].revenue).every(([k,d]) => { cum += d.revenue; return cum / total <= 0.8 || k === Object.keys(reportEngine.byProduct)[0]; }));
-        }).length || Math.max(1, Math.ceil(Object.keys(reportEngine.byProduct).length * 0.2));
         const insightCards = [
-          { label: 'Gross Margin', value: `${gpMargin}%`, sub: `Rs.${kpis.grossMargin.toLocaleString('en-US')} on Rs.${kpis.productRevenue.toLocaleString('en-US')} sales`, color: Number(gpMargin) >= 25 ? 'emerald' : Number(gpMargin) >= 15 ? 'amber' : 'rose', icon: TrendingUp },
-          { label: 'Net Profit Margin', value: `${netMargin}%`, sub: `Rs.${kpis.netProfit.toLocaleString('en-US')} after all expenses`, color: Number(netMargin) >= 15 ? 'emerald' : Number(netMargin) >= 5 ? 'amber' : 'rose', icon: DollarSign },
-          { label: 'Collection Rate', value: `${reportEngine.collectionRate}%`, sub: `all-time billed vs outstanding`, color: Number(reportEngine.collectionRate) >= 80 ? 'emerald' : Number(reportEngine.collectionRate) >= 50 ? 'amber' : 'rose', icon: Wallet },
-          { label: 'Active Customers', value: `${reportEngine.newCustCount + reportEngine.repeatCustCount}`, sub: `${reportEngine.newCustCount} new · ${reportEngine.repeatCustCount} repeat`, color: 'indigo', icon: Users },
-          { label: 'Billed This Period', value: `Rs.${reportEngine.totalBilledAmt.toLocaleString('en-US')}`, sub: 'invoice totals, delivery included', color: 'slate', icon: Receipt },
-          ...(reportEngine.avgDaysToPay !== null ? [{ label: 'Avg Days to Pay', value: `${reportEngine.avgDaysToPay}d`, sub: reportEngine.avgDaysToPay <= 7 ? 'Excellent payment speed' : reportEngine.avgDaysToPay <= 21 ? 'Acceptable turnaround' : 'Slow — follow up needed', color: reportEngine.avgDaysToPay <= 7 ? 'emerald' : reportEngine.avgDaysToPay <= 21 ? 'amber' : 'rose', icon: Clock }] : []),
+          { info: 'grossMargin', label: 'Gross Margin', value: `${gpMargin}%`, sub: `Rs.${kpis.grossMargin.toLocaleString('en-US')} on Rs.${kpis.productRevenue.toLocaleString('en-US')} sales`, color: Number(gpMargin) >= 25 ? 'emerald' : Number(gpMargin) >= 15 ? 'amber' : 'rose', icon: TrendingUp },
+          { info: 'netMargin', label: 'Net Margin', value: `${netMargin}%`, sub: `Rs.${kpis.netProfit.toLocaleString('en-US')} after all expenses`, color: Number(netMargin) >= 15 ? 'emerald' : Number(netMargin) >= 5 ? 'amber' : 'rose', icon: DollarSign },
+          { info: 'recoveryPeriod', label: 'Recovery', value: recoveryPeriod === null ? '—' : `${recoveryPeriod}%`, sub: `Rs.${collections.totals.received.toLocaleString('en-US')} in · ${reportEngine.collectionRate}% of all billing recovered`, color: recoveryPeriod === null ? 'slate' : Number(recoveryPeriod) >= 80 ? 'emerald' : Number(recoveryPeriod) >= 50 ? 'amber' : 'rose', icon: Wallet },
+          { info: 'activeClients', label: 'Active Clients', value: `${reportEngine.newCustCount + reportEngine.repeatCustCount}`, sub: `${reportEngine.newCustCount} new · ${reportEngine.repeatCustCount} repeat`, color: 'indigo', icon: Users },
+          { info: 'billedPeriod', label: 'Billed', value: `Rs.${reportEngine.totalBilledAmt.toLocaleString('en-US')}`, sub: 'invoice totals, delivery included', color: 'slate', icon: Receipt },
+          ...(reportEngine.avgDaysToPay !== null ? [{ info: 'daysToPay', label: 'Days to Pay', value: `${reportEngine.avgDaysToPay}d`, sub: `${reportEngine.paymentSpeed.settledCount} bills cleared${reportEngine.paymentSpeed.openCount ? ` · ${reportEngine.paymentSpeed.openCount} open, oldest ${reportEngine.paymentSpeed.oldestOpenDays}d` : ''}`, color: reportEngine.avgDaysToPay <= 7 ? 'emerald' : reportEngine.avgDaysToPay <= 21 ? 'amber' : 'rose', icon: Clock }] : []),
         ];
         return (
           <div className="space-y-4 mt-2">
@@ -1326,7 +1348,7 @@ return (
                   rose: 'bg-kt-red/10 border-kt-red/30 text-kt-red', indigo: 'bg-kt-blue/10 border-kt-blue/30 text-kt-blue' }[card.color] || 'bg-white border-kt-line text-kt-sub';
                 return (
                 <div key={card.label} className={`p-4 rounded-xl border ${tone}`}>
-                  <p className="text-xs font-medium mb-1 flex items-center gap-1"><card.icon size={12}/> {card.label}</p>
+                  <p className="text-xs font-medium mb-1 flex items-center gap-1"><card.icon size={12}/> {card.label} <InfoTip k={card.info} /></p>
                   <p className="font-display text-2xl text-kt-ink">{card.value}</p>
                   <p className="text-xs text-kt-ink/80 mt-1">{card.sub}</p>
                 </div>
@@ -1356,13 +1378,13 @@ return (
                   ['Net Profit', `Rs.${kpis.netProfit.toLocaleString('en-US')}`, kpis.netProfit >= 0 ? 'text-kt-yellow text-base font-semibold' : 'text-white/80 text-base font-semibold', netMargin + '%'],
                 ].map(([label, val, cls, pct]) => (
                   <div key={label} className="flex justify-between items-center text-sm py-1.5 border-b border-white/15 last:border-0">
-                    <span className="text-white/70">{label}</span>
+                    <span className="text-white/70 inline-flex items-center gap-1">{label} <InfoTip tone="light" k={{ 'Gross Sales': 'grossSales', 'Sales Returns': 'salesReturns', 'COGS': 'cogs', 'Gross Profit': 'grossProfit', 'Delivery Net': 'deliveryNet', 'Operational Expenses': 'opExpenses', 'Net Profit': 'netProfit' }[label]} /></span>
                     <div className="text-right"><span className={`font-medium ${cls}`}>{val}</span>{pct && <span className="text-xs text-white/80 ml-1.5">{pct}</span>}</div>
                   </div>
                 ))}
                 <div className="h-px bg-white/10 my-2"></div>
                 <div className="flex justify-between items-center text-xs py-1"><span className="text-white/80">Outstanding Receivables</span><span className="font-medium text-white/80">Rs.{kpis.totalReceivables.toLocaleString('en-US')}</span></div>
-                <div className="flex justify-between items-center text-xs py-0.5"><span className="text-white/80">Collection Rate (all-time)</span><span className={`font-medium ${Number(reportEngine.collectionRate) >= 80 ? 'text-kt-yellow' : Number(reportEngine.collectionRate) >= 50 ? 'text-white/80' : 'text-white/80'}`}>{reportEngine.collectionRate}%</span></div>
+                <div className="flex justify-between items-center text-xs py-0.5"><span className="text-white/80 inline-flex items-center gap-1">Recovered of all billing <InfoTip k="recoveryAllTime" tone="light" /></span><span className={`font-medium ${Number(reportEngine.collectionRate) >= 80 ? 'text-kt-yellow' : Number(reportEngine.collectionRate) >= 50 ? 'text-white/80' : 'text-white/80'}`}>{reportEngine.collectionRate}%</span></div>
               </div>
             </div>
           </div>
@@ -1418,7 +1440,7 @@ return (
               <div className="overflow-x-auto">
                 <table className="w-full text-xs text-left whitespace-nowrap">
                   <thead className="bg-kt-raised text-kt-sub font-medium border-b border-kt-line">
-                    <tr><th className="p-3">Month</th><th className="p-3 text-center">Orders</th><th className="p-3 text-right">Revenue</th><th className="p-3 text-right">Cost</th><th className="p-3 text-right text-kt-green">GP</th><th className="p-3 text-right text-kt-blue">Margin%</th></tr>
+                    <tr><th className="p-3">Month</th><th className="p-3 text-center">Orders</th><th className="p-3 text-right">Revenue</th><th className="p-3 text-right">Cost</th><th className="p-3 text-right text-kt-green">GP</th><th className="p-3 text-right text-kt-blue whitespace-nowrap">Margin% <InfoTip k="margin" align="right" /></th></tr>
                   </thead>
                   <tbody className="divide-y divide-kt-line font-semibold text-kt-ink">
                     {months.slice().reverse().map(m => {
