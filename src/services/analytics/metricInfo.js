@@ -44,6 +44,15 @@ export const METRIC_INFO = {
   returnValue: { label: 'Returned', means: 'Value of goods taken back.', how: 'Total of credit notes in the period.' },
   daysOut: { label: 'Days out', means: 'How long the goods were with the customer before coming back.', how: 'Days from the original bill to the credit note.' },
   expenseChange: { label: 'Expense change', means: 'Running costs against the same stretch of the period before.', how: '(Expenses now − then) ÷ then, same windows as the sales trend.' },
+  debtGrowing: { label: 'Debt growing', means: 'Clients who owe more now than when the period began.', how: 'Ledger balance today − ledger balance on the day before the period started. Needs a period (not All Time).' },
+  debtLate: { label: 'Late over 30 days', means: 'Clients with money unpaid for more than 30 days.', how: 'Payments clear the oldest bills first; what is left of bills older than 30 days is the overdue amount.' },
+  debtQuiet: { label: 'Owing and not paying', means: 'Clients who owe money and have paid nothing for 30 days or more.', how: 'Balance above zero and the last receipt or cash at billing 30+ days ago (or never).' },
+  lapsed: { label: 'Stopped buying', means: 'Regular clients who have gone quiet for longer than usual. Worth a call.', how: 'Clients with 3+ bills whose days since the last bill are more than twice their usual gap between bills (the middle value), and at least 30 days. Ignores the period.' },
+  belowCost: { label: 'Sold below cost', means: 'Lines where the rate charged was under the cost price: a loss on every unit.', how: 'Billed lines in the period with rate < cost price. Bonus lines and lines with no cost are left out. Loss = (rate − cost) × quantity.' },
+  thinMargin: { label: 'Thin margin', means: 'Lines sold at a profit, but under 5 rupees in every 100.', how: 'Billed lines in the period with (rate − cost) ÷ rate under 5%.' },
+  fallingProducts: { label: 'Falling products', means: 'Products earning less gross profit than in the same stretch before.', how: 'Gross profit now − gross profit in the comparison window, per product, returns taken off. Largest drops first.' },
+  risingProducts: { label: 'Rising products', means: 'Products earning more gross profit than in the same stretch before.', how: 'Gross profit now − gross profit in the comparison window, per product. Largest gains first.' },
+  fallingBrands: { label: 'Falling brands', means: 'Brands earning less gross profit than in the same stretch before.', how: 'As falling products, per brand (company).' },
   monthlyTrend: { label: 'Monthly trend', means: 'Month by month sales and profit, all time.', how: 'Net sales and gross profit of each calendar month. Ignores the period and filters.' },
 };
 
