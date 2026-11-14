@@ -302,7 +302,8 @@ describe('AnalyticsView — Expenses', () => {
   });
 
   it('offers a comparison to the period before', () => {
-    expect(render(WORLD)).toContain('vs Previous Period');
+    // It names the dates it compared with ("vs 1–14 Oct"), or says so when there are none.
+    expect(render(WORLD)).toMatch(/vs (previous period|\d{1,2}[ –])/);
   });
 
   it('says so plainly when nothing was spent', () => {
@@ -317,7 +318,8 @@ describe('AnalyticsView — Expenses', () => {
 
 describe('AnalyticsView — two figures that were computed and never shown', () => {
   it('shows what was billed in the period, which totalBilledAmt already knew', () => {
-    expect(render({ analyticsView: 'Insights' })).toContain('Billed This Period');
+    // Labelled "Billed" on the card (short enough not to wrap at 360px); its ⓘ says it is the period's bills.
+    expect(render({ analyticsView: 'Insights' })).toMatch(/Billed <span data-info="billedPeriod"/);
   });
 
   // The monthly chart deliberately ignores the filter and said nothing, so it disagreed

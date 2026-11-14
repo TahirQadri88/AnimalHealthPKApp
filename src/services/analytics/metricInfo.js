@@ -1,0 +1,50 @@
+// What every figure on the Analytics screens means, and how it is worked out.
+//
+// One place, in plain words, so the screen can explain itself (the ⓘ next to each figure)
+// and a test can check that nothing on screen goes unexplained. "means" answers "what is
+// this telling me"; "how" is the arithmetic, short enough to read on a phone.
+export const METRIC_INFO = {
+  revenueTrend: { label: 'Sales trend', means: 'Whether net sales are up or down against the same stretch of the period before.', how: '(Net sales now − net sales then) ÷ net sales then. Both sides use the same filters and have returns taken off. This Month on the 14th is compared with the 1st–14th of last month.' },
+  profitTrend: { label: 'Gross profit trend', means: 'Whether gross profit is up or down against the same stretch before.', how: '(Gross profit now − then) ÷ then, counted the same way on both sides.' },
+  newClients: { label: 'New clients', means: 'Customers whose first ever bill falls in this period.', how: 'Customers billed in the period whose earliest bill is in it.' },
+  repeatClients: { label: 'Repeat clients', means: 'Customers billed in this period who had bought before.', how: 'Customers billed in the period whose first bill is earlier.' },
+  activeClients: { label: 'Active clients', means: 'How many customers bought in this period.', how: 'New clients + repeat clients.' },
+  recoveryPeriod: { label: 'Recovery this period', means: 'How much of what you billed in this period has been collected in it. Over 100% means older debt was collected too.', how: 'Money received in the period (cash at billing + receipts) ÷ bills raised in the period, delivery included.' },
+  recoveryAllTime: { label: 'Recovered of all billing', means: 'Of everything ever billed, the share already paid. It ignores the period and filters.', how: '(All bills ever − what customers owe today) ÷ all bills ever.' },
+  daysToPay: { label: 'Days to pay', means: 'How long customers take to clear a bill.', how: 'For each bill fully paid in this period: days from the bill to the day it was cleared, oldest bills cleared first (as the ledger does). Averaged.' },
+  billedPeriod: { label: 'Billed this period', means: 'The total of the bills raised in the period.', how: 'Sum of bill totals, delivery included, returns not taken off.' },
+  dailySales: { label: 'Daily sales', means: 'Sales and gross profit day by day, last 21 days of the period.', how: 'Net sales and gross profit of each day\'s bills, returns taken off on the day they came back.' },
+  topProductsGP: { label: 'Top products by gross profit', means: 'The products that earned you the most in the period.', how: 'Sales minus cost of each product, returns taken off. Top five.' },
+  expensesByCategory: { label: 'Expenses by category', means: 'Where the period\'s running costs went.', how: 'Sum of expenses in the period, by category.' },
+  grossSales: { label: 'Gross sales', means: 'Everything sold in the period before returns.', how: 'Rate × quantity of every billed line (bonus lines count as 0). Delivery not included.' },
+  salesReturns: { label: 'Sales returns', means: 'Value of the goods that came back in the period.', how: 'Total of the credit notes dated in the period.' },
+  netSales: { label: 'Net sales', means: 'What you actually sold once returns are taken off.', how: 'Gross sales − returns.' },
+  cogs: { label: 'Cost of goods', means: 'What the goods sold cost you, free bonus stock included.', how: 'Cost price × quantity of every line sold, less the cost of returned goods.' },
+  grossProfit: { label: 'Gross profit', means: 'What the goods earned before running costs.', how: 'Net sales − cost of goods.' },
+  grossMargin: { label: 'Gross margin', means: 'How many rupees of every 100 sold are profit on the goods.', how: 'Gross profit ÷ net sales.' },
+  deliveryNet: { label: 'Delivery net', means: 'What delivery charges earned after paying drivers.', how: 'Delivery billed to customers − driver expense on those bills.' },
+  opExpenses: { label: 'Running expenses', means: 'Rent, salaries, bills and other costs entered under Expenses.', how: 'Sum of expenses dated in the period.' },
+  netProfit: { label: 'Net profit', means: 'What the business made after everything.', how: 'Gross profit + delivery net − running expenses.' },
+  netMargin: { label: 'Net margin', means: 'How many rupees of every 100 sold you keep after everything.', how: 'Net profit ÷ net sales.' },
+  outstanding: { label: 'Outstanding', means: 'What customers owe you today.', how: 'Sum of every customer balance above zero. Ignores the period.' },
+  abcTier: { label: 'ABC tier', means: 'A = the few items that bring most of your sales, C = the long tail.', how: 'Sorted by sales: the rows that make the first 80% of sales are A, the next 15% B, the rest C.' },
+  share: { label: 'Share', means: 'This row\'s part of the period\'s sales.', how: 'Row sales ÷ total sales.' },
+  margin: { label: 'Margin', means: 'Profit on every 100 rupees sold for this row.', how: 'Row gross profit ÷ row sales.' },
+  qty: { label: 'Quantity', means: 'Units sold in the period, returns taken off.', how: 'Sum of quantities on bills − quantities returned.' },
+  orders: { label: 'Orders', means: 'Number of bills in the period.', how: 'Count of billed invoices.' },
+  aging: { label: 'Age of debt', means: 'How old the unpaid money is.', how: 'Payments clear the oldest bills first; what is left of each bill is placed by its age: 0–30, 31–60, 61–90, over 90 days.' },
+  topOverdue: { label: 'Top overdue', means: 'The largest debts older than 30 days.', how: 'Unpaid parts of bills over 30 days old, largest five.' },
+  received: { label: 'Received', means: 'Money that came in during the period.', how: 'Cash taken on bills + receipts, round-off discount not included.' },
+  atCounter: { label: 'At the counter', means: 'Cash taken while billing.', how: 'Payment received entered on bills in the period.' },
+  receipts: { label: 'Receipts', means: 'Payments recorded separately from a bill.', how: 'Receipts dated in the period.' },
+  roundOff: { label: 'Round-off given', means: 'Discount given when collecting, to round a payment.', how: 'Sum of discounts on receipts in the period.' },
+  method: { label: 'Method', means: 'How the money came: cash, bank, JazzCash and so on.', how: 'Read from the note typed on the receipt, as there is no method field.' },
+  collectedBy: { label: 'Collected by', means: 'Who took the money.', how: 'The salesperson on the bill for cash at billing; unknown for receipts, which do not record it.' },
+  returnRate: { label: 'Return rate', means: 'How much of what you sold came back.', how: 'Returns ÷ gross sales in the period.' },
+  returnValue: { label: 'Returned', means: 'Value of goods taken back.', how: 'Total of credit notes in the period.' },
+  daysOut: { label: 'Days out', means: 'How long the goods were with the customer before coming back.', how: 'Days from the original bill to the credit note.' },
+  expenseChange: { label: 'Expense change', means: 'Running costs against the same stretch of the period before.', how: '(Expenses now − then) ÷ then, same windows as the sales trend.' },
+  monthlyTrend: { label: 'Monthly trend', means: 'Month by month sales and profit, all time.', how: 'Net sales and gross profit of each calendar month. Ignores the period and filters.' },
+};
+
+export const infoFor = (key) => METRIC_INFO[key] || null;

@@ -530,6 +530,22 @@ shops that share a name and split one customer's history whenever the rename cas
 half-succeeded. The label comes from the customer record — what they are called today — not
 from whichever invoice was seen first.
 
+## Analytics figures compare like with like, and explain themselves
+
+- **Comparisons are like-for-like** (`services/analytics/periods.js`): This Month on the 14th against the
+  1st–14th of last month (clamped at month end), the week and year the same way, Today against the same
+  weekday last week, Custom against the range just before it, All Time against nothing. Both sides go
+  through the same filters and `computePnL` (returns off). It was a 30-day window, unfiltered and gross,
+  whatever the period: "Revenue -89.6%" on an ordinary 14 November. Every card names its window ("vs 1–14 Oct").
+- **Recovery is two figures:** this period (received ÷ billed in the period, can pass 100% when old debt
+  comes in) and of all billing (the old all-time "Collection Rate").
+- **Days to pay** settles bills the ledger's way, in date order (`paymentSpeed.js`); it counted days
+  to the next payment of any size, so a Rs 500 receipt "paid" a Rs 200,000 bill in a day.
+- **Every figure has an ⓘ** (`components/ui/InfoTip.jsx`) reading `services/analytics/metricInfo.js`,
+  and the glossary at the foot of Overview lists them all. `metricInfo.test.js` fails on a key the
+  screen uses that has no entry. Card labels are kept short enough not to wrap at 360px; the ⓘ carries
+  the full meaning. Its 44px tap area overhangs the label on purpose (`data-hitarea`, skipped by layout.mjs).
+
 ## An export that a view cannot reach is a crash waiting for a press
 
 Item Sales computed its rows inside the view's own IIFE. `getSortedExportData` returned
